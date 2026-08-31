@@ -48,7 +48,7 @@ casasRouter.patch('/:id', async (c) => {
     if (!existing) return c.json({ error: 'Casa de oração não encontrada' }, 404)
 
     const updated = await db.update(casas)
-      .set({ ...parsed, updatedAt: new Date().toISOString().replace('T', ' ').replace('Z', '') })
+      .set({ ...parsed, updatedAt: new Date().toISOString() })
       .where(eq(casas.id, id))
       .returning().get()
       

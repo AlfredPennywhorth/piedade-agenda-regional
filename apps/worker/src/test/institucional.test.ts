@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import Database from 'better-sqlite3'
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
-import app from '../index'
+import { createApp } from '../index'
 import * as schema from '../db/schema'
 
 // Cria banco de dados SQLite em memória
@@ -11,6 +10,9 @@ const sqlite = new Database(':memory:')
 sqlite.pragma('foreign_keys = ON')
 
 const db = drizzle(sqlite, { schema })
+
+// Aplicação Hono com o DB injetado
+const app = createApp(db)
 
 beforeAll(() => {
   // Aplicamos um script manual minimalista pois o migrator padrão pode requerer pasta de migrations
@@ -27,8 +29,8 @@ beforeAll(() => {
 
 // Helper para injetar o db no Hono
 const req = async (path: string, options?: RequestInit) => {
-  const request = new Request(\`http://localhost\${path}\`, options)
-  return app.request(request, {}, { db }) // Injeção de mock do contexto Hono
+  const request = new Request(`http://localhost${path}`, options)
+  return app.request(request)
 }
 
 describe('Testes do Modelo Institucional S01', () => {
@@ -57,7 +59,7 @@ describe('Testes do Modelo Institucional S01', () => {
     })
     const json = await res.json()
     expect(res.status).toBe(201)
-    expect(json.regional_id).toBe(regionalId)
+    expect(json.regionalId).toBe(regionalId)
     admId = json.id
   })
 
@@ -86,17 +88,17 @@ describe('Testes do Modelo Institucional S01', () => {
     })
     const json = await res.json()
     expect(res.status).toBe(201)
-    expect(json.setor_id).toBe(setorId)
+    expect(json.setorId).toBe(setorId)
     casaId = json.id
   })
 
   it('5. Alterar Casa de um Setor para outro preservando seu ID e created_at', async () => {
     // Busca antes
-    const resGet = await req(\`/api/v1/casas/\${casaId}\`)
+    const resGet = await req(`/api/v1/casas/${casaId}`)
     const original = await resGet.json()
 
     // Transfere
-    const resPatch = await req(\`/api/v1/casas/\${casaId}\`, {
+    const resPatch = await req(`/api/v1/casas/${casaId}`, {
       method: 'PATCH',
       body: JSON.stringify({ setorId: setorId2 })
     })
@@ -104,9 +106,9 @@ describe('Testes do Modelo Institucional S01', () => {
     
     expect(resPatch.status).toBe(200)
     expect(json.id).toBe(casaId) // Mesmo ID
-    expect(json.setor_id).toBe(setorId2) // Novo Setor
-    expect(json.created_at).toBe(original.created_at) // Preservado
-    expect(json.updated_at).not.toBe(original.updated_at) // Atualizado
+    expect(json.setorId).toBe(setorId2) // Novo Setor
+    expect(json.createdAt).toBe(original.createdAt) // Preservado
+    expect(json.updatedAt).not.toBe(original.updatedAt) // Atualizado
   })
 
   it('6. Criar GT Regional', async () => {
@@ -143,7 +145,7 @@ describe('Testes do Modelo Institucional S01', () => {
   })
 
   it('10. Inativar entidade sem apagá-la (ativo = false)', async () => {
-    const res = await req(\`/api/v1/casas/\${casaId}\`, {
+    const res = await req(`/api/v1/casas/${casaId}`, {
       method: 'PATCH',
       body: JSON.stringify({ ativo: false })
     })
@@ -173,7 +175,7 @@ describe('Testes do Modelo Institucional S01', () => {
   it('12. Respostas HTTP adequadas para dados inválidos (400, 404)', async () => {
     // 404 - Not found
     const fakeUuid = '00000000-0000-0000-0000-000000000000'
-    const res404 = await req(\`/api/v1/casas/\${fakeUuid}\`)
+    const res404 = await req(`/api/v1/casas/${fakeUuid}`)
     expect(res404.status).toBe(404)
 
     // 400 - Zod validation

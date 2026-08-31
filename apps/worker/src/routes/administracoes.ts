@@ -48,7 +48,7 @@ administracoesRouter.patch('/:id', async (c) => {
     if (!existing) return c.json({ error: 'Administração não encontrada' }, 404)
 
     const updated = await db.update(administracoes)
-      .set({ ...parsed, updatedAt: new Date().toISOString().replace('T', ' ').replace('Z', '') })
+      .set({ ...parsed, updatedAt: new Date().toISOString() })
       .where(eq(administracoes.id, id))
       .returning().get()
       

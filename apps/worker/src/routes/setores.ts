@@ -48,7 +48,7 @@ setoresRouter.patch('/:id', async (c) => {
     if (!existing) return c.json({ error: 'Setor não encontrado' }, 404)
 
     const updated = await db.update(setores)
-      .set({ ...parsed, updatedAt: new Date().toISOString().replace('T', ' ').replace('Z', '') })
+      .set({ ...parsed, updatedAt: new Date().toISOString() })
       .where(eq(setores.id, id))
       .returning().get()
       

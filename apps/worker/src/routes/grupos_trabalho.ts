@@ -50,8 +50,23 @@ gruposTrabalhoRouter.patch('/:id', async (c) => {
     const existing = await db.select().from(gruposTrabalho).where(eq(gruposTrabalho.id, id)).get()
     if (!existing) return c.json({ error: 'Grupo de Trabalho não encontrado' }, 404)
 
+    // Compor estado final do PATCH
+    const finalRegionalId = parsed.regionalId !== undefined ? parsed.regionalId : existing.regionalId
+    const finalAdmId = parsed.administracaoId !== undefined ? parsed.administracaoId : existing.administracaoId
+    const finalSetorId = parsed.setorId !== undefined ? parsed.setorId : existing.setorId
+
+    // Validar deterministicamente se o estado final tem exatamente um escopo
+    let escoposPreenchidos = 0
+    if (finalRegionalId) escoposPreenchidos++
+    if (finalAdmId) escoposPreenchidos++
+    if (finalSetorId) escoposPreenchidos++
+
+    if (escoposPreenchidos !== 1) {
+      return c.json({ error: 'O Grupo de Trabalho deve pertencer a exatamente um escopo no estado final da atualização.' }, 400)
+    }
+
     const updated = await db.update(gruposTrabalho)
-      .set({ ...parsed, updatedAt: new Date().toISOString().replace('T', ' ').replace('Z', '') })
+      .set({ ...parsed, updatedAt: new Date().toISOString() })
       .where(eq(gruposTrabalho.id, id))
       .returning().get()
       
