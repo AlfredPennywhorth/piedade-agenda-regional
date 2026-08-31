@@ -6,7 +6,10 @@
     "strict": true,
     "declaration": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "types": ["node"],
+    "lib": ["ES2022", "ESNext.Disposable"],
+    "skipLibCheck": true
   },
   "include": ["src"]
 }
