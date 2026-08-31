@@ -13,10 +13,10 @@ import { logger } from 'hono/logger'
 export interface Env {
   APP_ENV: string
   APP_VERSION: string
-  // DB: D1Database  // Ativar após: wrangler d1 create piedade-agenda-db
+  DB: D1Database
 }
 
-const app = new Hono<{ Bindings: Env }>()
+const app = new Hono<{ Bindings: Env; Variables: { db: any } }>()
 
 // Middlewares globais
 app.use('*', logger())
@@ -49,15 +49,33 @@ app.get('/health', c => {
   })
 })
 
+import { drizzle } from 'drizzle-orm/d1'
+import { regionaisRouter } from './routes/regionais'
+import { administracoesRouter } from './routes/administracoes'
+import { setoresRouter } from './routes/setores'
+import { casasRouter } from './routes/casas'
+import { gruposTrabalhoRouter } from './routes/grupos_trabalho'
+
 // ============================================================
-// Placeholder de rota de API — aguarda Sprint S01
+// Middlewares da API
 // ============================================================
-app.get('/api/v1', c => {
-  return c.json({
-    message: 'API v1 — Sprint S01 pendente de autorização PMO',
-    docs: '/docs',
-  })
+app.use('/api/v1/*', async (c, next) => {
+  // Injeção de dependência do DB
+  // Permite que os testes passem um banco em memória ou usa o D1 em produção
+  if (!c.get('db') && c.env?.DB) {
+    c.set('db', drizzle(c.env.DB))
+  }
+  await next()
 })
+
+// ============================================================
+// Rotas da API (S01)
+// ============================================================
+app.route('/api/v1/regionais', regionaisRouter)
+app.route('/api/v1/administracoes', administracoesRouter)
+app.route('/api/v1/setores', setoresRouter)
+app.route('/api/v1/casas', casasRouter)
+app.route('/api/v1/grupos-trabalho', gruposTrabalhoRouter)
 
 // 404 padrão
 app.notFound(c => {
