@@ -1,0 +1,76 @@
+name: CI — Agenda Regional São Paulo
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Install · Lint · Typecheck · Test · Build
+    runs-on: ubuntu-latest
+
+    steps:
+      # --------------------------------------------------------
+      # 1. Checkout
+      # --------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # --------------------------------------------------------
+      # 2. Setup pnpm
+      # --------------------------------------------------------
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      # --------------------------------------------------------
+      # 3. Setup Node.js
+      # --------------------------------------------------------
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      # --------------------------------------------------------
+      # 4. Instalar dependências
+      # --------------------------------------------------------
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # --------------------------------------------------------
+      # 5. Lint
+      # --------------------------------------------------------
+      - name: Lint
+        run: pnpm lint
+
+      # --------------------------------------------------------
+      # 6. Typecheck (todos os workspaces)
+      # --------------------------------------------------------
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # --------------------------------------------------------
+      # 7. Testes unitários (todos os workspaces)
+      # --------------------------------------------------------
+      - name: Test
+        run: pnpm test
+
+      # --------------------------------------------------------
+      # 8. Build (todos os workspaces, ordem topológica)
+      # --------------------------------------------------------
+      - name: Build
+        run: pnpm build
+
+      # --------------------------------------------------------
+      # NOTA: Deploy NÃO é realizado neste pipeline (S00)
+      # Deploy requer CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN
+      # configurados como GitHub Secrets (nunca hardcoded aqui).
+      # --------------------------------------------------------
