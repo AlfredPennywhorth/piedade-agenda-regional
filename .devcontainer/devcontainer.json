@@ -1,0 +1,70 @@
+{
+  "name": "Agenda Regional São Paulo — Dev Container",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bullseye",
+
+  // Instalar pnpm e dependências do projeto ao criar o Codespace
+  "postCreateCommand": "npm install -g pnpm@9 && pnpm install",
+
+  // Iniciar servidores de desenvolvimento automaticamente (opcional)
+  // "postStartCommand": "pnpm dev:web & pnpm dev:worker",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // TypeScript e ESLint
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-typescript-next",
+
+        // Tailwind
+        "bradlc.vscode-tailwindcss",
+
+        // Testes
+        "vitest.explorer",
+        "ms-playwright.playwright",
+
+        // Cloudflare
+        "cloudflare.cloudflare-workers-bindings",
+
+        // Git e utilitários
+        "eamodio.gitlens",
+        "EditorConfig.EditorConfig"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        },
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "eslint.useFlatConfig": true,
+        "files.eol": "\n"
+      }
+    }
+  },
+
+  // Portas utilizadas pelos servidores de desenvolvimento
+  "forwardPorts": [5173, 8787],
+  "portsAttributes": {
+    "5173": {
+      "label": "Web — Vite Dev Server",
+      "onAutoForward": "notify"
+    },
+    "8787": {
+      "label": "Worker — Wrangler Dev",
+      "onAutoForward": "notify"
+    }
+  },
+
+  // Variáveis de ambiente do Codespace (sem valores sensíveis)
+  // Secrets reais: configurar em Settings > Codespaces > Secrets
+  "containerEnv": {
+    "APP_ENV": "development"
+  },
+
+  // Funcionalidades adicionais do devcontainer
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  }
+}
