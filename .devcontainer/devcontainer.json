@@ -1,6 +1,6 @@
 {
   "name": "Agenda Regional São Paulo — Dev Container",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bullseye",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-20-bookworm",
 
   // Instalar pnpm e dependências do projeto ao criar o Codespace
   "postCreateCommand": "npm install -g pnpm@9 && pnpm install",

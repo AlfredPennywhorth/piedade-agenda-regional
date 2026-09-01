@@ -2,44 +2,33 @@
 # Wrangler — Cloudflare Worker
 # Agenda Regional São Paulo
 # ============================================================
-# SEGURANÇA: Este arquivo NÃO deve conter:
-#   - account_id real (usar variável de ambiente CLOUDFLARE_ACCOUNT_ID)
-#   - api_token (usar variável de ambiente CLOUDFLARE_API_TOKEN)
-#   - secrets (usar: wrangler secret put <NOME>)
-#   - dados reais de membros
-# ============================================================
 
 name = "piedade-agenda-worker"
 main = "src/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
-# account_id deve ser configurado via:
-#   export CLOUDFLARE_ACCOUNT_ID=<seu-id>
-# ou via wrangler login
-
 # ============================================================
-# D1 Database — configurar após provisionamento
-# ============================================================
-# Passos:
-#   1. wrangler d1 create piedade-agenda-db
-#   2. Copiar database_id gerado e configurar abaixo
-#   3. NUNCA commitar o database_id de produção diretamente aqui;
-#      use variáveis de ambiente no CI/CD.
+# D1 Database
 # ============================================================
 
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "piedade-agenda-db"
-# database_id = "CONFIGURE_APOS_CRIAR_COM_WRANGLER_D1_CREATE"
+[[d1_databases]]
+binding = "DB"
+database_name = "piedade-agenda-db"
+database_id = "local"
+migrations_dir = "drizzle"
 
 # ============================================================
-# Ambiente de Desenvolvimento Local
+# Variáveis não-secretas
 # ============================================================
-[env.development]
-name = "piedade-agenda-worker-dev"
 
-# Variáveis não-secretas de desenvolvimento (seguras para commitar)
 [vars]
 APP_ENV = "development"
-APP_VERSION = "0.0.1-s00"
+APP_VERSION = "0.0.1-s01"
+
+# ============================================================
+# Ambiente de Desenvolvimento
+# ============================================================
+
+[env.development]
+name = "piedade-agenda-worker-dev"
