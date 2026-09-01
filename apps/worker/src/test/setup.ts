@@ -39,8 +39,21 @@ export function setupDb(sqlite: any) {
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       FOREIGN KEY (membro_id) REFERENCES membros(id),
-      FOREIGN KEY (funcao_id) REFERENCES funcoes(id)
+      FOREIGN KEY (funcao_id) REFERENCES funcoes(id),
+      CONSTRAINT check_vinculo_escopo_unico CHECK (
+        (CASE WHEN regional_id IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN administracao_id IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN setor_id IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN casa_id IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN grupo_trabalho_id IS NOT NULL THEN 1 ELSE 0 END) = 1
+      )
     );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_vinculo_unico_regional ON vinculos_funcionais (membro_id, funcao_id, regional_id) WHERE regional_id IS NOT NULL AND ativo = 1;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_vinculo_unico_administracao ON vinculos_funcionais (membro_id, funcao_id, administracao_id) WHERE administracao_id IS NOT NULL AND ativo = 1;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_vinculo_unico_setor ON vinculos_funcionais (membro_id, funcao_id, setor_id) WHERE setor_id IS NOT NULL AND ativo = 1;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_vinculo_unico_casa ON vinculos_funcionais (membro_id, funcao_id, casa_id) WHERE casa_id IS NOT NULL AND ativo = 1;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_vinculo_unico_gt ON vinculos_funcionais (membro_id, funcao_id, grupo_trabalho_id) WHERE grupo_trabalho_id IS NOT NULL AND ativo = 1;
 
     CREATE TABLE IF NOT EXISTS links_ativacao (
       id text PRIMARY KEY NOT NULL,

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import Database from 'better-sqlite3'
 import { createApp } from '../index'
@@ -23,7 +23,6 @@ describe('Autenticação e Sessões S03', () => {
   const membroInativoId = 'mem-inativo'
   let tokenAtivacaoPuro = ''
   let sessionTokenPuro = ''
-  let tokenInativoPuro = ''
 
   beforeAll(() => {
     sqlite = new Database(':memory:')

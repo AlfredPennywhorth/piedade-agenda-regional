@@ -60,15 +60,11 @@ export async function authMiddleware(c: Context<{ Variables: Variables }>, next:
     return c.json({ error: 'Acesso bloqueado', code: 'FORBIDDEN' }, 403)
   }
 
-  // Atualizar último acesso em background
-  if (c.executionCtx) {
-    c.executionCtx.waitUntil(
-      db.update(schema.sessoes)
-        .set({ ultimoAcessoEm: agora })
-        .where(eq(schema.sessoes.id, sessao.id))
-        .execute()
-    )
-  }
+  // Atualizar último acesso (síncrono para garantir compatibilidade nos testes)
+  await db.update(schema.sessoes)
+    .set({ ultimoAcessoEm: agora })
+    .where(eq(schema.sessoes.id, sessao.id))
+    .execute()
 
   // Carrega permissões
   const contextoPermissoes = await carregarContextoPermissoes(db, sessao.membroId)

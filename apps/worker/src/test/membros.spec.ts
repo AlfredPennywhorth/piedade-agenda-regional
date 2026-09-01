@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import Database from 'better-sqlite3'
 import { createApp } from '../index'
@@ -21,14 +21,6 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
   let db: ReturnType<typeof drizzle>
   let app: any
 
-  beforeEach(() => {
-    sqlite = new Database(':memory:')
-    sqlite.pragma('foreign_keys = ON')
-    db = drizzle(sqlite, { schema })
-    setupDb(sqlite)
-    app = createApp(db)
-  })
-
   const req = async (path: string, options?: RequestInit) => {
     const request = new Request(`http://localhost${path}`, options)
     return app.request(request)
@@ -40,10 +32,15 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
   const casaId = '11111111-1111-4111-8111-111111111111'
   const casaId2 = '22222222-2222-4222-8222-222222222222'
   const casaInexistenteId = '99999999-9999-4999-8999-999999999999'
-
-  let membroId = ''
+  const membroId = '33333333-3333-4333-8333-333333333333'
 
   beforeEach(() => {
+    sqlite = new Database(':memory:')
+    sqlite.pragma('foreign_keys = ON')
+    db = drizzle(sqlite, { schema })
+    setupDb(sqlite)
+    app = createApp(db)
+
     sqlite.exec(`
       INSERT INTO regionais (id, nome)
       VALUES ('${regionalId}', 'Regional 1');
@@ -59,6 +56,9 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
 
       INSERT INTO casas (id, setor_id, nome)
       VALUES ('${casaId2}', '${setorId}', 'Casa 2');
+
+      INSERT INTO membros (id, nome, celular, data_nascimento, casa_id, ativo)
+      VALUES ('${membroId}', 'Pessoa Teste Base', '11999999999', '1990-01-01', '${casaId}', 1);
     `)
   })
 
@@ -75,8 +75,7 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
 
     expect(res.status).toBe(201)
     expect(json.nome).toBe('Pessoa Teste A')
-
-    membroId = json.id
+    expect(json.id).toBeDefined()
   })
 
   it('2. Deve rejeitar membro com Casa inexistente', async () => {
