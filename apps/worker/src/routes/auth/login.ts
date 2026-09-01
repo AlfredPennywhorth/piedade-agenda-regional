@@ -1,13 +1,11 @@
 import { Hono } from 'hono'
-import { env } from 'hono/adapter'
 import { eq } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/d1'
 import { loginSchema } from '@piedade/shared'
 import * as schema from '../../db/schema'
 import { verifyPin } from '../../security/pin'
 import { hashToken, gerarTokenAleatorio } from '../../security/tokens'
 
-export const loginApp = new Hono<{ Bindings: { DB: D1Database } }>()
+export const loginApp = new Hono<{ Variables: { db: any } }>()
 
 const LIMITE_TENTATIVAS = 5
 const TEMPO_BLOQUEIO_MS = 15 * 60 * 1000 // 15 minutos
@@ -21,12 +19,19 @@ loginApp.post('/', async (c) => {
   }
 
   const { identificador, pin } = result.data
-  const db = drizzle(c.env.DB, { schema })
+  
+  const db = c.get('db')
+  if (!db) {
+    return c.json({ error: 'Banco de dados indisponível', code: 'INTERNAL_ERROR' }, 500)
+  }
+
   const agora = new Date()
 
-  const membro = await db.query.membros.findFirst({
-    where: eq(schema.membros.celular, identificador)
-  })
+  const [membro] = await db
+    .select()
+    .from(schema.membros)
+    .where(eq(schema.membros.celular, identificador))
+    .limit(1)
 
   // Mensagem genérica para não enumerar usuários
   const errorMsg = 'Credenciais inválidas'
@@ -80,7 +85,7 @@ loginApp.post('/', async (c) => {
         sucesso: false,
         motivo: 'PIN inválido'
       })
-    ])
+    ] as any)
 
     return c.json({ error: errorMsg }, 401)
   }
@@ -114,7 +119,7 @@ loginApp.post('/', async (c) => {
       tipo: 'LOGIN_PIN',
       sucesso: true
     })
-  ])
+  ] as any)
 
   return c.json({ sessionToken }, 200)
 })

@@ -14,7 +14,7 @@ export interface ContextoPermissoes {
   }[]
 }
 
-export async function carregarContextoPermissoes(db: DrizzleD1Database<typeof schema>, membroId: string): Promise<ContextoPermissoes> {
+export async function carregarContextoPermissoes(db: any, membroId: string): Promise<ContextoPermissoes> {
   const vinculos = await db
     .select({
       funcaoId: schema.vinculosFuncionais.funcaoId,

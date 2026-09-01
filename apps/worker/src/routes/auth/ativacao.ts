@@ -1,13 +1,11 @@
 import { Hono } from 'hono'
-import { env } from 'hono/adapter'
 import { eq, and, isNull, gt } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/d1'
 import { ativacaoSchema } from '@piedade/shared'
 import * as schema from '../../db/schema'
 import { hashToken, gerarTokenAleatorio } from '../../security/tokens'
 import { gerarSalt, hashPin } from '../../security/pin'
 
-export const ativacaoApp = new Hono<{ Bindings: { DB: D1Database } }>()
+export const ativacaoApp = new Hono<{ Variables: { db: any } }>()
 
 ativacaoApp.post('/', async (c) => {
   const body = await c.req.json()
@@ -20,27 +18,36 @@ ativacaoApp.post('/', async (c) => {
   const { token, celular, dataNascimento, pin } = result.data
   const hashedToken = await hashToken(token)
 
-  const db = drizzle(c.env.DB, { schema })
+  const db = c.get('db')
+  if (!db) {
+    return c.json({ error: 'Banco de dados indisponível', code: 'INTERNAL_ERROR' }, 500)
+  }
+
   const agora = new Date().toISOString()
 
-  // Buscar link de ativação válido
-  const link = await db.query.linksAtivacao.findFirst({
-    where: and(
-      eq(schema.linksAtivacao.tokenHash, hashedToken),
-      isNull(schema.linksAtivacao.utilizadoEm),
-      isNull(schema.linksAtivacao.revogadoEm),
-      gt(schema.linksAtivacao.expiraEm, agora)
-    ),
-    with: {
-      membro: true
-    }
-  })
+  // Buscar link de ativação válido e membro
+  const [queryResult] = await db
+    .select({
+      link: schema.linksAtivacao,
+      membro: schema.membros
+    })
+    .from(schema.linksAtivacao)
+    .innerJoin(schema.membros, eq(schema.linksAtivacao.membroId, schema.membros.id))
+    .where(
+      and(
+        eq(schema.linksAtivacao.tokenHash, hashedToken),
+        isNull(schema.linksAtivacao.utilizadoEm),
+        isNull(schema.linksAtivacao.revogadoEm),
+        gt(schema.linksAtivacao.expiraEm, agora)
+      )
+    )
+    .limit(1)
 
-  if (!link || !link.membro) {
+  if (!queryResult || !queryResult.membro) {
     // Registrar tentativa falha sem expor erro específico de membro
     await db.insert(schema.tentativasAcesso).values({
       id: crypto.randomUUID(),
-      membroId: link?.membroId || null,
+      membroId: queryResult?.link?.membroId || null,
       tipo: 'ATIVACAO',
       sucesso: false,
       motivo: 'Token inválido, expirado ou revogado'
@@ -48,7 +55,7 @@ ativacaoApp.post('/', async (c) => {
     return c.json({ error: 'Link de ativação inválido ou expirado' }, 400)
   }
 
-  const membro = link.membro
+  const { link, membro } = queryResult
 
   if (!membro.ativo) {
     await db.insert(schema.tentativasAcesso).values({

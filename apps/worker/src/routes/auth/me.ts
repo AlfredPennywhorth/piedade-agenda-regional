@@ -1,21 +1,24 @@
 import { Hono } from 'hono'
-import { env } from 'hono/adapter'
 import { eq } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/d1'
 import * as schema from '../../db/schema'
 import { authMiddleware, Variables } from '../../middleware/auth'
 
-export const meApp = new Hono<{ Bindings: { DB: D1Database }, Variables: Variables }>()
+export const meApp = new Hono<{ Variables: Variables }>()
 
 meApp.use('*', authMiddleware)
 
 meApp.get('/', async (c) => {
   const membroId = c.get('membroId')
-  const db = drizzle(c.env.DB, { schema })
+  const db = c.get('db')
+  if (!db) {
+    return c.json({ error: 'Banco de dados indisponível', code: 'INTERNAL_ERROR' }, 500)
+  }
 
-  const membro = await db.query.membros.findFirst({
-    where: eq(schema.membros.id, membroId)
-  })
+  const [membro] = await db
+    .select()
+    .from(schema.membros)
+    .where(eq(schema.membros.id, membroId))
+    .limit(1)
 
   if (!membro) {
     return c.json({ error: 'Membro não encontrado' }, 404)

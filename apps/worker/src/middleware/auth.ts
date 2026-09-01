@@ -1,21 +1,16 @@
 import { Context, Next } from 'hono'
-import { env } from 'hono/adapter'
 import { eq, and, isNull, gt } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/d1'
 import * as schema from '../db/schema'
 import { hashToken } from '../security/tokens'
 import { carregarContextoPermissoes, ContextoPermissoes } from '../security/permissoes'
 
-type Bindings = {
-  DB: D1Database
-}
-
 export type Variables = {
+  db: any
   membroId: string
   contextoPermissoes: ContextoPermissoes
 }
 
-export async function authMiddleware(c: Context<{ Bindings: Bindings, Variables: Variables }>, next: Next) {
+export async function authMiddleware(c: Context<{ Variables: Variables }>, next: Next) {
   const authHeader = c.req.header('Authorization')
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -30,33 +25,42 @@ export async function authMiddleware(c: Context<{ Bindings: Bindings, Variables:
 
   const hashedToken = await hashToken(token)
 
-  const db = drizzle(c.env.DB, { schema })
+  const db = c.get('db')
+  if (!db) {
+    return c.json({ error: 'Banco de dados indisponível', code: 'INTERNAL_ERROR' }, 500)
+  }
 
-  // Busca a sessão
+  // Busca a sessão e o membro manualmente com JOIN
   const agora = new Date().toISOString()
   
-  const sessao = await db.query.sessoes.findFirst({
-    where: and(
-      eq(schema.sessoes.tokenHash, hashedToken),
-      isNull(schema.sessoes.revogadoEm),
-      gt(schema.sessoes.expiraEm, agora)
-    ),
-    with: {
-      membro: true
-    }
-  })
+  const [result] = await db
+    .select({
+      sessao: schema.sessoes,
+      membro: schema.membros
+    })
+    .from(schema.sessoes)
+    .innerJoin(schema.membros, eq(schema.sessoes.membroId, schema.membros.id))
+    .where(
+      and(
+        eq(schema.sessoes.tokenHash, hashedToken),
+        isNull(schema.sessoes.revogadoEm),
+        gt(schema.sessoes.expiraEm, agora)
+      )
+    )
+    .limit(1)
 
-  if (!sessao || !sessao.membro) {
+  if (!result || !result.membro) {
     return c.json({ error: 'Sessão inválida ou expirada', code: 'UNAUTHORIZED' }, 401)
   }
 
+  const { sessao, membro } = result
+
   // Verifica se membro está ativo e tem autenticação ativa
-  if (!sessao.membro.ativo || !sessao.membro.autenticacaoAtiva) {
+  if (!membro.ativo || !membro.autenticacaoAtiva) {
     return c.json({ error: 'Acesso bloqueado', code: 'FORBIDDEN' }, 403)
   }
 
-  // Atualizar último acesso em background (promises.all ou apenas ignorar o await no Hono context? No Cloudflare Workers, waitUntil() é o ideal, mas por agora atualizamos sync ou ignoramos para simplificar na S03)
-  // Vamos usar waitUntil() se c.executionCtx estiver disponível
+  // Atualizar último acesso em background
   if (c.executionCtx) {
     c.executionCtx.waitUntil(
       db.update(schema.sessoes)

@@ -1,12 +1,10 @@
 import { Hono } from 'hono'
-import { env } from 'hono/adapter'
 import { eq } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/d1'
 import * as schema from '../../db/schema'
 import { authMiddleware, Variables } from '../../middleware/auth'
 import { hashToken } from '../../security/tokens'
 
-export const logoutApp = new Hono<{ Bindings: { DB: D1Database }, Variables: Variables }>()
+export const logoutApp = new Hono<{ Variables: Variables }>()
 
 logoutApp.use('*', authMiddleware)
 
@@ -15,7 +13,11 @@ logoutApp.post('/', async (c) => {
   const token = authHeader.substring(7)
   const hashedToken = await hashToken(token)
 
-  const db = drizzle(c.env.DB, { schema })
+  const db = c.get('db')
+  if (!db) {
+    return c.json({ error: 'Banco de dados indisponível', code: 'INTERNAL_ERROR' }, 500)
+  }
+
   const membroId = c.get('membroId')
   const agora = new Date().toISOString()
 
@@ -29,7 +31,7 @@ logoutApp.post('/', async (c) => {
       tipo: 'LOGOUT',
       sucesso: true
     })
-  ])
+  ] as any)
 
   return c.json({ message: 'Logout realizado com sucesso' }, 200)
 })

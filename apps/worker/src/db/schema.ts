@@ -117,6 +117,12 @@ export const membros = sqliteTable('membros', {
     .notNull()
     .references(() => casas.id),
   ativo: ativoDefault,
+  autenticacaoAtiva: integer('autenticacao_ativa', { mode: 'boolean' }).notNull().default(false),
+  pinHash: text('pin_hash'),
+  pinSalt: text('pin_salt'),
+  bloqueadoAte: text('bloqueado_ate'),
+  tentativasPin: integer('tentativas_pin').notNull().default(0),
+  ativadoEm: text('ativado_em'),
   ...timestampsS02,
 })
 
@@ -177,3 +183,43 @@ export const vinculosFuncionais = sqliteTable(
       .where(sql`${table.grupoTrabalhoId} IS NOT NULL AND ${table.ativo} = 1`),
   })
 )
+
+// ============================================================
+// Autenticação e Permissões (S03)
+// ============================================================
+
+export const linksAtivacao = sqliteTable('links_ativacao', {
+  id: text('id').primaryKey(), // UUID
+  membroId: text('membro_id')
+    .notNull()
+    .references(() => membros.id),
+  tokenHash: text('token_hash').notNull().unique(),
+  expiraEm: text('expira_em').notNull(),
+  utilizadoEm: text('utilizado_em'),
+  revogadoEm: text('revogado_em'),
+  ...timestampsS02,
+})
+
+export const sessoes = sqliteTable('sessoes', {
+  id: text('id').primaryKey(), // UUID
+  membroId: text('membro_id')
+    .notNull()
+    .references(() => membros.id),
+  tokenHash: text('token_hash').notNull().unique(),
+  expiraEm: text('expira_em').notNull(),
+  revogadoEm: text('revogado_em'),
+  ultimoAcessoEm: text('ultimo_acesso_em'),
+  userAgent: text('user_agent'),
+  ...timestampsS02,
+})
+
+export const tentativasAcesso = sqliteTable('tentativas_acesso', {
+  id: text('id').primaryKey(), // UUID
+  membroId: text('membro_id').references(() => membros.id),
+  tipo: text('tipo').notNull(), // ATIVACAO, LOGIN_PIN, RECUPERACAO_ADMIN, LOGOUT
+  sucesso: integer('sucesso', { mode: 'boolean' }).notNull(),
+  motivo: text('motivo'),
+  createdAt: text('created_at')
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+})

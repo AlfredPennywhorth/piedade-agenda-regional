@@ -1,22 +1,27 @@
 import { Hono } from 'hono'
-import { env } from 'hono/adapter'
 import { eq, and, isNull } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/d1'
 import * as schema from '../../db/schema'
 import { hashToken, gerarTokenAleatorio } from '../../security/tokens'
 
 // AVISO: Estas rotas não possuem autorização administrativa completa ainda.
-// Elas servem como infraestrutura para a S03 e devem ser protegidas futuramente (S04+).
-export const adminMembrosApp = new Hono<{ Bindings: { DB: D1Database } }>()
+// O acesso a elas deve ser estritamente controlado via injetando a configuração enableAdminRoutes = true no createApp.
+export const adminMembrosApp = new Hono<{ Variables: { db: any } }>()
 
 adminMembrosApp.post('/:id/link-ativacao', async (c) => {
   const membroId = c.req.param('id')
-  const db = drizzle(c.env.DB, { schema })
+  
+  const db = c.get('db')
+  if (!db) {
+    return c.json({ error: 'Banco de dados indisponível', code: 'INTERNAL_ERROR' }, 500)
+  }
+
   const agora = new Date()
 
-  const membro = await db.query.membros.findFirst({
-    where: eq(schema.membros.id, membroId)
-  })
+  const [membro] = await db
+    .select()
+    .from(schema.membros)
+    .where(eq(schema.membros.id, membroId))
+    .limit(1)
 
   if (!membro || !membro.ativo) {
     return c.json({ error: 'Membro não encontrado ou inativo' }, 404)
@@ -45,12 +50,19 @@ adminMembrosApp.post('/:id/link-ativacao', async (c) => {
 
 adminMembrosApp.post('/:id/reset-autenticacao', async (c) => {
   const membroId = c.req.param('id')
-  const db = drizzle(c.env.DB, { schema })
+  
+  const db = c.get('db')
+  if (!db) {
+    return c.json({ error: 'Banco de dados indisponível', code: 'INTERNAL_ERROR' }, 500)
+  }
+
   const agora = new Date().toISOString()
 
-  const membro = await db.query.membros.findFirst({
-    where: eq(schema.membros.id, membroId)
-  })
+  const [membro] = await db
+    .select()
+    .from(schema.membros)
+    .where(eq(schema.membros.id, membroId))
+    .limit(1)
 
   if (!membro) {
     return c.json({ error: 'Membro não encontrado' }, 404)
@@ -91,7 +103,7 @@ adminMembrosApp.post('/:id/reset-autenticacao', async (c) => {
       tipo: 'RECUPERACAO_ADMIN',
       sucesso: true
     })
-  ])
+  ] as any)
 
   return c.json({ message: 'Autenticação do membro resetada com sucesso' }, 200)
 })
