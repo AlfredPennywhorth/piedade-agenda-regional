@@ -1,0 +1,81 @@
+export function setupDb(sqlite: any) {
+  const setupSql = `
+    CREATE TABLE IF NOT EXISTS regionais (id text PRIMARY KEY NOT NULL, nome text NOT NULL, codigo text, ativo integer DEFAULT true NOT NULL, created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL);
+    CREATE TABLE IF NOT EXISTS administracoes (id text PRIMARY KEY NOT NULL, regional_id text NOT NULL, nome text NOT NULL, codigo text, ativo integer DEFAULT true NOT NULL, created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, FOREIGN KEY (regional_id) REFERENCES regionais(id));
+    CREATE TABLE IF NOT EXISTS setores (id text PRIMARY KEY NOT NULL, administracao_id text NOT NULL, nome text NOT NULL, codigo text, ativo integer DEFAULT true NOT NULL, created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, FOREIGN KEY (administracao_id) REFERENCES administracoes(id));
+    CREATE TABLE IF NOT EXISTS casas (id text PRIMARY KEY NOT NULL, setor_id text NOT NULL, nome text NOT NULL, codigo text, ativo integer DEFAULT true NOT NULL, created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, FOREIGN KEY (setor_id) REFERENCES setores(id));
+    CREATE TABLE IF NOT EXISTS grupos_trabalho (id text PRIMARY KEY NOT NULL, nome text NOT NULL, ativo integer DEFAULT true NOT NULL, regional_id text, administracao_id text, setor_id text, created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, FOREIGN KEY (regional_id) REFERENCES regionais(id), FOREIGN KEY (administracao_id) REFERENCES administracoes(id), FOREIGN KEY (setor_id) REFERENCES setores(id));
+    
+    CREATE TABLE IF NOT EXISTS membros (
+      id text PRIMARY KEY NOT NULL,
+      nome text NOT NULL,
+      data_nascimento text,
+      celular text,
+      casa_id text NOT NULL,
+      ativo integer DEFAULT true NOT NULL,
+      autenticacao_ativa integer DEFAULT false NOT NULL,
+      pin_hash text,
+      pin_salt text,
+      bloqueado_ate text,
+      tentativas_pin integer DEFAULT 0 NOT NULL,
+      ativado_em text,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (casa_id) REFERENCES casas(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS funcoes (id text PRIMARY KEY NOT NULL, nome text NOT NULL, codigo text, descricao text, ativo integer DEFAULT true NOT NULL, created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL);
+    
+    CREATE TABLE IF NOT EXISTS vinculos_funcionais (
+      id text PRIMARY KEY NOT NULL,
+      membro_id text NOT NULL,
+      funcao_id text NOT NULL,
+      regional_id text,
+      administracao_id text,
+      setor_id text,
+      casa_id text,
+      grupo_trabalho_id text,
+      ativo integer DEFAULT true NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (membro_id) REFERENCES membros(id),
+      FOREIGN KEY (funcao_id) REFERENCES funcoes(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS links_ativacao (
+      id text PRIMARY KEY NOT NULL,
+      membro_id text NOT NULL,
+      token_hash text NOT NULL UNIQUE,
+      expira_em text NOT NULL,
+      utilizado_em text,
+      revogado_em text,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (membro_id) REFERENCES membros(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS sessoes (
+      id text PRIMARY KEY NOT NULL,
+      membro_id text NOT NULL,
+      token_hash text NOT NULL UNIQUE,
+      expira_em text NOT NULL,
+      revogado_em text,
+      ultimo_acesso_em text,
+      user_agent text,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (membro_id) REFERENCES membros(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS tentativas_acesso (
+      id text PRIMARY KEY NOT NULL,
+      membro_id text,
+      tipo text NOT NULL,
+      sucesso integer NOT NULL,
+      motivo text,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (membro_id) REFERENCES membros(id)
+    );
+  `
+  sqlite.exec(setupSql)
+}

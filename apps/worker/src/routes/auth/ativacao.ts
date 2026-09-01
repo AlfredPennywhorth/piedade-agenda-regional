@@ -4,6 +4,7 @@ import { ativacaoSchema } from '@piedade/shared'
 import * as schema from '../../db/schema'
 import { hashToken, gerarTokenAleatorio } from '../../security/tokens'
 import { gerarSalt, hashPin } from '../../security/pin'
+import { executeBatch } from '../../db/batch'
 
 export const ativacaoApp = new Hono<{ Variables: { db: any } }>()
 
@@ -134,7 +135,7 @@ ativacaoApp.post('/', async (c) => {
   )
 
   // Executa as operações
-  await db.batch(dbBatch as any)
+  await executeBatch(db, dbBatch)
 
   return c.json({
     message: 'Ativação concluída com sucesso',

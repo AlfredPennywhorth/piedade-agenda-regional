@@ -4,6 +4,7 @@ import { loginSchema } from '@piedade/shared'
 import * as schema from '../../db/schema'
 import { verifyPin } from '../../security/pin'
 import { hashToken, gerarTokenAleatorio } from '../../security/tokens'
+import { executeBatch } from '../../db/batch'
 
 export const loginApp = new Hono<{ Variables: { db: any } }>()
 
@@ -70,7 +71,7 @@ loginApp.post('/', async (c) => {
       ? new Date(agora.getTime() + TEMPO_BLOQUEIO_MS).toISOString() 
       : null
 
-    await db.batch([
+    await executeBatch(db, [
       db.update(schema.membros)
         .set({
           tentativasPin: tentativas,
@@ -85,7 +86,7 @@ loginApp.post('/', async (c) => {
         sucesso: false,
         motivo: 'PIN inválido'
       })
-    ] as any)
+    ])
 
     return c.json({ error: errorMsg }, 401)
   }
@@ -95,7 +96,7 @@ loginApp.post('/', async (c) => {
   const hashedSessionToken = await hashToken(sessionToken)
   const expiraEm = new Date(agora.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 dias
 
-  await db.batch([
+  await executeBatch(db, [
     // Zera contadores
     db.update(schema.membros)
       .set({
@@ -119,7 +120,7 @@ loginApp.post('/', async (c) => {
       tipo: 'LOGIN_PIN',
       sucesso: true
     })
-  ] as any)
+  ])
 
   return c.json({ sessionToken }, 200)
 })

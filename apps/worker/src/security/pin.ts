@@ -44,7 +44,17 @@ export async function hashPin(pin: string, saltHex: string): Promise<string> {
 export async function verifyPin(pin: string, saltHex: string, expectedHashHex: string): Promise<boolean> {
   const hash = await hashPin(pin, saltHex)
   
-  // Comparação em tempo constante não é estritamente necessária no Cloudflare via JS puro
-  // mas faremos uma comparação simples (em V8 strings curtas não expõem muito por timing)
-  return hash === expectedHashHex
+  const hashBytes = hexToBuffer(hash)
+  const expectedBytes = hexToBuffer(expectedHashHex)
+
+  if (hashBytes.length !== expectedBytes.length) {
+    return false
+  }
+
+  let result = 0
+  for (let i = 0; i < hashBytes.length; i++) {
+    result |= hashBytes[i] ^ expectedBytes[i]
+  }
+
+  return result === 0
 }

@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { eq, and, isNull } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { hashToken, gerarTokenAleatorio } from '../../security/tokens'
+import { executeBatch } from '../../db/batch'
 
 // AVISO: Estas rotas não possuem autorização administrativa completa ainda.
 // O acesso a elas deve ser estritamente controlado via injetando a configuração enableAdminRoutes = true no createApp.
@@ -69,7 +70,7 @@ adminMembrosApp.post('/:id/reset-autenticacao', async (c) => {
   }
 
   // Revoga sessoes ativas, links e remove PIN
-  await db.batch([
+  await executeBatch(db, [
     db.update(schema.sessoes)
       .set({ revogadoEm: agora })
       .where(
@@ -103,7 +104,7 @@ adminMembrosApp.post('/:id/reset-autenticacao', async (c) => {
       tipo: 'RECUPERACAO_ADMIN',
       sucesso: true
     })
-  ] as any)
+  ])
 
   return c.json({ message: 'Autenticação do membro resetada com sucesso' }, 200)
 })

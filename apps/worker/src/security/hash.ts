@@ -1,6 +1,6 @@
 // Converte buffer para string hex
-export function bufferToHex(buffer: ArrayBuffer): string {
-  const hashArray = Array.from(new Uint8Array(buffer))
+export function bufferToHex(buffer: ArrayBuffer | Uint8Array): string {
+  const hashArray = Array.from(buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer))
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 

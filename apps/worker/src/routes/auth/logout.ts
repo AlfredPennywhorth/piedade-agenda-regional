@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { authMiddleware, Variables } from '../../middleware/auth'
 import { hashToken } from '../../security/tokens'
+import { executeBatch } from '../../db/batch'
 
 export const logoutApp = new Hono<{ Variables: Variables }>()
 
@@ -21,7 +22,7 @@ logoutApp.post('/', async (c) => {
   const membroId = c.get('membroId')
   const agora = new Date().toISOString()
 
-  await db.batch([
+  await executeBatch(db, [
     db.update(schema.sessoes)
       .set({ revogadoEm: agora })
       .where(eq(schema.sessoes.tokenHash, hashedToken)),
@@ -31,7 +32,7 @@ logoutApp.post('/', async (c) => {
       tipo: 'LOGOUT',
       sucesso: true
     })
-  ] as any)
+  ])
 
   return c.json({ message: 'Logout realizado com sucesso' }, 200)
 })

@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import Database from 'better-sqlite3'
 import { createApp } from '../index'
 import * as schema from '../db/schema'
+import { setupDb } from './setup'
 
 type MembroResponse = {
   id: string
@@ -15,92 +16,24 @@ type ErroResponse = {
   error: string
 }
 
-const sqlite = new Database(':memory:')
-sqlite.pragma('foreign_keys = ON')
+describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
+  let sqlite: any
+  let db: ReturnType<typeof drizzle>
+  let app: any
 
-const db = drizzle(sqlite, { schema })
-const app = createApp(db)
+  beforeEach(() => {
+    sqlite = new Database(':memory:')
+    sqlite.pragma('foreign_keys = ON')
+    db = drizzle(sqlite, { schema })
+    setupDb(sqlite)
+    app = createApp(db)
+  })
 
-beforeAll(() => {
-  const setupSql = `
-    CREATE TABLE regionais (
-      id text PRIMARY KEY NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL
-    );
+  const req = async (path: string, options?: RequestInit) => {
+    const request = new Request(`http://localhost${path}`, options)
+    return app.request(request)
+  }
 
-    CREATE TABLE administracoes (
-      id text PRIMARY KEY NOT NULL,
-      regional_id text NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (regional_id) REFERENCES regionais(id)
-    );
-
-    CREATE TABLE setores (
-      id text PRIMARY KEY NOT NULL,
-      administracao_id text NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (administracao_id) REFERENCES administracoes(id)
-    );
-
-    CREATE TABLE casas (
-      id text PRIMARY KEY NOT NULL,
-      setor_id text NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (setor_id) REFERENCES setores(id)
-    );
-
-    CREATE TABLE grupos_trabalho (
-      id text PRIMARY KEY NOT NULL,
-      nome text NOT NULL,
-      ativo integer DEFAULT true NOT NULL,
-      regional_id text,
-      administracao_id text,
-      setor_id text,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (regional_id) REFERENCES regionais(id),
-      FOREIGN KEY (administracao_id) REFERENCES administracoes(id),
-      FOREIGN KEY (setor_id) REFERENCES setores(id)
-    );
-
-    CREATE TABLE membros (
-      id text PRIMARY KEY NOT NULL,
-      nome text NOT NULL,
-      data_nascimento text,
-      celular text,
-      casa_id text NOT NULL,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (casa_id) REFERENCES casas(id)
-    );
-  `
-
-  sqlite.exec(setupSql)
-})
-
-const req = async (path: string, options?: RequestInit) => {
-  const request = new Request(`http://localhost${path}`, options)
-  return app.request(request)
-}
-
-describe('Testes de Membros', () => {
   const regionalId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
   const administracaoId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
   const setorId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
@@ -110,7 +43,7 @@ describe('Testes de Membros', () => {
 
   let membroId = ''
 
-  beforeAll(() => {
+  beforeEach(() => {
     sqlite.exec(`
       INSERT INTO regionais (id, nome)
       VALUES ('${regionalId}', 'Regional 1');

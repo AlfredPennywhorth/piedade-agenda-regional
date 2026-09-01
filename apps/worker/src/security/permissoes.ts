@@ -1,5 +1,4 @@
 import { eq, and } from 'drizzle-orm'
-import { DrizzleD1Database } from 'drizzle-orm/d1'
 import * as schema from '../db/schema'
 
 export interface ContextoPermissoes {
