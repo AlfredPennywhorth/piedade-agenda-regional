@@ -402,6 +402,8 @@ describe('Autenticação e Sessões S03', () => {
 
     const sessoesCount = sqlite.prepare('SELECT COUNT(*) as count FROM sessoes WHERE membro_id = ? AND revogado_em IS NULL').get(membroId) as any
     expect(sessoesCount.count).toBe(0)
+  })
+
   it('41. Atomicidade: falha no meio da transação reverte alterações anteriores (rollback)', async () => {
     // Membro 1 acabou de ser resetado no teste 40.
     // Vamos gerar um novo link de ativação

@@ -11,11 +11,11 @@ export async function executeAtomic<T = any>(
     const queries = buildQueries(db)
     return db.batch(queries)
   } else if (db && 'transaction' in db && typeof db.transaction === 'function') {
-    return db.transaction(async (tx: any) => {
+    return db.transaction((tx: any) => {
       const queries = buildQueries(tx)
       const results = []
       for (const query of queries) {
-        results.push(await query)
+        results.push(query.run())
       }
       return results
     })
