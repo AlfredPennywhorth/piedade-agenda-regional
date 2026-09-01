@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import Database from 'better-sqlite3'
 import { createApp } from '../index'
 import * as schema from '../db/schema'
+import { eq, and } from 'drizzle-orm'
 import { setupDb } from './setup'
 
 type MembroResponse = {
@@ -158,7 +159,7 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     expect(res.status).toBe(201)
     
     // Verifica no banco se foi salvo normalizado
-    const salvo = await db.select().from(schema.membros).where(schema.eq(schema.membros.id, json.id)).get()
+    const salvo = await db.select().from(schema.membros).where(eq(schema.membros.id, json.id)).get()
     expect(salvo?.celular).toBe('11988887777')
   })
 
@@ -171,7 +172,7 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     expect(res.status).toBe(409)
     expect(json.code).toBe('CELULAR_JA_VINCULADO')
 
-    const tentativa = await db.select().from(schema.tentativasAcesso).where(schema.eq(schema.tentativasAcesso.tipo, 'CONFLITO_CELULAR')).get()
+    const tentativa = await db.select().from(schema.tentativasAcesso).where(eq(schema.tentativasAcesso.tipo, 'CONFLITO_CELULAR')).get()
     expect(tentativa).toBeDefined()
     expect(tentativa?.sucesso).toBe(false)
     expect(tentativa?.motivo).toBe('Celular já vinculado a outro membro')
@@ -197,9 +198,9 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
 
     // Deve ter registrado tentativa ligada ao ID do membro que tentou
     const tentativa = await db.select().from(schema.tentativasAcesso)
-      .where(schema.and(
-        schema.eq(schema.tentativasAcesso.tipo, 'CONFLITO_CELULAR'),
-        schema.eq(schema.tentativasAcesso.membroId, segundoMembroId)
+      .where(and(
+        eq(schema.tentativasAcesso.tipo, 'CONFLITO_CELULAR'),
+        eq(schema.tentativasAcesso.membroId, segundoMembroId)
       ))
       .get()
     expect(tentativa).toBeDefined()

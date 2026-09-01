@@ -21,6 +21,7 @@ describe('Autenticação e Sessões S03', () => {
   const casaId = 'casa-1'
   const membroId = 'mem-1'
   const membroInativoId = 'mem-inativo'
+  const membroAtivoNormalizadoId = 'mem-ativo-norm'
   let tokenAtivacaoPuro = ''
   let sessionTokenPuro = ''
 
@@ -42,6 +43,9 @@ describe('Autenticação e Sessões S03', () => {
 
       INSERT INTO membros (id, nome, celular, data_nascimento, casa_id, ativo)
       VALUES ('${membroInativoId}', 'Maria Silva', '11988888888', '1990-01-01', '${casaId}', 0);
+      
+      INSERT INTO membros (id, nome, celular, data_nascimento, casa_id, ativo)
+      VALUES ('${membroAtivoNormalizadoId}', 'Pedro Normalizado', '11977777777', '1990-01-01', '${casaId}', 1);
       
       INSERT INTO funcoes (id, nome) VALUES ('func-1', 'Função 1');
       INSERT INTO vinculos_funcionais (id, membro_id, funcao_id, regional_id, ativo) VALUES ('vinc-1', '${membroId}', 'func-1', '${regionalId}', 1);
@@ -489,24 +493,26 @@ describe('Autenticação e Sessões S03', () => {
   })
 
   it('45. Login com celular normalizado', async () => {
-    // Primeiro cria um link e ativa membroInativoId para poder logar
-    const resLink = await req(`/api/v1/admin/membros/${membroInativoId}/link-ativacao`, { method: 'POST' })
+    // a) gerar link para esse membro ativo
+    const resLink = await req(`/api/v1/admin/membros/${membroAtivoNormalizadoId}/link-ativacao`, { method: 'POST' })
     const { token } = await resLink.json() as any
 
+    // b) ativar usando celular nacional normalizado (o backend espera string numérica ou transformará no schema)
     const resAtivar = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, celular: '11988888888', dataNascimento: '1990-01-01', pin: '654321', confirmacaoPin: '654321' })
+      body: JSON.stringify({ token, celular: '11977777777', dataNascimento: '1990-01-01', pin: '654321', confirmacaoPin: '654321' })
     })
     expect(resAtivar.status).toBe(200)
 
-    // Tenta logar usando formato formatado/sujo
+    // c) logar usando formato +55 11 97777-7777
     const resLogin = await req('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identificador: '+55 11 98888-8888', pin: '654321' })
+      body: JSON.stringify({ identificador: '+55 11 97777-7777', pin: '654321' })
     })
     
+    // d) esperar 200
     expect(resLogin.status).toBe(200)
     const json = await resLogin.json() as any
     expect(json.sessionToken).toBeDefined()
