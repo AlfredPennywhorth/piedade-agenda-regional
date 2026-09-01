@@ -32,7 +32,7 @@ export function createApp(injectedDb?: any) {
     '/api/*',
     cors({
       origin: ['http://localhost:5173'], // Dev local — produção: configurar via variável
-      allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
     })
   )
 
