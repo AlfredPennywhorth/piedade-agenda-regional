@@ -7,6 +7,11 @@
 
 import { z } from 'zod'
 
+export * from './schemas/institucional'
+export * from './schemas/membros'
+export * from './schemas/funcoes'
+export * from './schemas/vinculos'
+
 // ============================================================
 // Metadados da aplicação
 // ============================================================

@@ -13,55 +13,86 @@ import { logger } from 'hono/logger'
 export interface Env {
   APP_ENV: string
   APP_VERSION: string
-  // DB: D1Database  // Ativar após: wrangler d1 create piedade-agenda-db
+  DB: D1Database
 }
 
-const app = new Hono<{ Bindings: Env }>()
+import { drizzle } from 'drizzle-orm/d1'
+import { regionaisRouter } from './routes/regionais'
+import { administracoesRouter } from './routes/administracoes'
+import { setoresRouter } from './routes/setores'
+import { casasRouter } from './routes/casas'
+import { gruposTrabalhoRouter } from './routes/grupos_trabalho'
+import { membrosRouter } from './routes/membros'
+import { funcoesRouter } from './routes/funcoes'
+import { vinculosFuncionaisRouter } from './routes/vinculos_funcionais'
+export function createApp(injectedDb?: any) {
+  const app = new Hono<{ Bindings: Env; Variables: { db: any } }>()
 
-// Middlewares globais
-app.use('*', logger())
-app.use(
-  '/api/*',
-  cors({
-    origin: ['http://localhost:5173'], // Dev local — produção: configurar via variável
-    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  // Middlewares globais
+  app.use('*', logger())
+  app.use(
+    '/api/*',
+    cors({
+      origin: ['http://localhost:5173'], // Dev local — produção: configurar via variável
+      allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+    })
+  )
+
+  // ============================================================
+  // Rotas de infraestrutura — S00
+  // ============================================================
+
+  app.get('/', c => {
+    return c.json({
+      app: 'Agenda Regional São Paulo',
+      version: c.env?.APP_VERSION ?? '0.0.1-s00',
+      sprint: 'S02',
+      status: 'scaffolding',
+    })
   })
-)
 
-// ============================================================
-// Rotas de infraestrutura — S00
-// ============================================================
-
-app.get('/', c => {
-  return c.json({
-    app: 'Agenda Regional São Paulo',
-    version: c.env.APP_VERSION ?? '0.0.1-s00',
-    sprint: 'S00',
-    status: 'scaffolding',
+  app.get('/health', c => {
+    return c.json({
+      healthy: true,
+      env: c.env?.APP_ENV ?? 'unknown',
+      ts: new Date().toISOString(),
+    })
   })
-})
 
-app.get('/health', c => {
-  return c.json({
-    healthy: true,
-    env: c.env.APP_ENV ?? 'unknown',
-    ts: new Date().toISOString(),
+  // ============================================================
+  // Middlewares da API
+  // ============================================================
+  app.use('/api/v1/*', async (c, next) => {
+    if (injectedDb) {
+      c.set('db', injectedDb)
+    } else if (!c.get('db') && c.env?.DB) {
+      c.set('db', drizzle(c.env.DB))
+    }
+    await next()
   })
-})
 
-// ============================================================
-// Placeholder de rota de API — aguarda Sprint S01
-// ============================================================
-app.get('/api/v1', c => {
-  return c.json({
-    message: 'API v1 — Sprint S01 pendente de autorização PMO',
-    docs: '/docs',
+  // ============================================================
+  // Rotas da API (S01)
+  // ============================================================
+  app.route('/api/v1/regionais', regionaisRouter)
+  app.route('/api/v1/administracoes', administracoesRouter)
+  app.route('/api/v1/setores', setoresRouter)
+  app.route('/api/v1/casas', casasRouter)
+  app.route('/api/v1/grupos-trabalho', gruposTrabalhoRouter)
+
+  // ============================================================
+  // Rotas da API (S02)
+  // ============================================================
+  app.route('/api/v1/membros', membrosRouter)
+  app.route('/api/v1/funcoes', funcoesRouter)
+  app.route('/api/v1/vinculos-funcionais', vinculosFuncionaisRouter)
+
+  // 404 padrão
+  app.notFound(c => {
+    return c.json({ error: 'Rota não encontrada' }, 404)
   })
-})
 
-// 404 padrão
-app.notFound(c => {
-  return c.json({ error: 'Rota não encontrada' }, 404)
-})
+  return app
+}
 
-export default app
+export default createApp()

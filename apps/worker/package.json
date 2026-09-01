@@ -4,14 +4,14 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --env development",
     "deploy": "wrangler deploy",
-    "build": "wrangler deploy --dry-run --outdir .wrangler/output",
+    "build": "wrangler deploy --dry-run --env development --outdir .wrangler/output",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint src",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "wrangler d1 migrations apply piedade-agenda-db --local"
+    "db:migrate:local": "wrangler d1 migrations apply piedade-agenda-db --local --env development"
   },
   "dependencies": {
     "@piedade/shared": "workspace:*",
@@ -20,6 +20,8 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241230.0",
+    "@types/better-sqlite3": "^7.6.12",
+    "better-sqlite3": "^11.7.0",
     "drizzle-kit": "^0.30.1",
     "vitest": "^2.1.8",
     "wrangler": "^3.103.2"
