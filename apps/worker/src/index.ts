@@ -22,7 +22,9 @@ import { administracoesRouter } from './routes/administracoes'
 import { setoresRouter } from './routes/setores'
 import { casasRouter } from './routes/casas'
 import { gruposTrabalhoRouter } from './routes/grupos_trabalho'
-
+import { membrosRouter } from './routes/membros'
+import { funcoesRouter } from './routes/funcoes'
+import { vinculosFuncionaisRouter } from './routes/vinculos_funcionais'
 export function createApp(injectedDb?: any) {
   const app = new Hono<{ Bindings: Env; Variables: { db: any } }>()
 
@@ -44,7 +46,7 @@ export function createApp(injectedDb?: any) {
     return c.json({
       app: 'Agenda Regional São Paulo',
       version: c.env?.APP_VERSION ?? '0.0.1-s00',
-      sprint: 'S01',
+      sprint: 'S02',
       status: 'scaffolding',
     })
   })
@@ -77,6 +79,13 @@ export function createApp(injectedDb?: any) {
   app.route('/api/v1/setores', setoresRouter)
   app.route('/api/v1/casas', casasRouter)
   app.route('/api/v1/grupos-trabalho', gruposTrabalhoRouter)
+
+  // ============================================================
+  // Rotas da API (S02)
+  // ============================================================
+  app.route('/api/v1/membros', membrosRouter)
+  app.route('/api/v1/funcoes', funcoesRouter)
+  app.route('/api/v1/vinculos-funcionais', vinculosFuncionaisRouter)
 
   // 404 padrão
   app.notFound(c => {

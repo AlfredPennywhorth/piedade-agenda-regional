@@ -15,7 +15,7 @@ describe('Worker — Rotas de infraestrutura', () => {
     const json = (await res.json()) as Record<string, unknown>
 
     expect(json.app).toBe('Agenda Regional São Paulo')
-    expect(json.sprint).toBe('S01')
+    expect(json.sprint).toBe('S02')
     expect(json.status).toBe('scaffolding')
   })
 
