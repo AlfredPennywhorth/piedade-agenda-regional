@@ -16,8 +16,10 @@ Foi decidido implementar:
    - A ativação exige token, além da confirmação de celular e data de nascimento.
 
 2. **Mecanismo de Autenticação (PIN):**
-   - **PIN de 6 dígitos**, não complexo para facilitar o uso, mas protegido adequadamente.
-   - Derivação e proteção usando **PBKDF2-SHA256**, com salt individual aleatório e 100.000 iterações (usando `Web Crypto API`).
+   - **PIN de 6 dígitos**, não complexo para facilitar o uso.
+   - Proteção com **Pepper (HMAC-SHA256)** utilizando chave de configuração (injetada via variável de ambiente), impedindo ataques offline caso o D1 seja vazado isoladamente.
+   - Derivação e proteção complementar usando **PBKDF2-SHA256**, com salt individual aleatório e 100.000 iterações (usando `Web Crypto API`). *Benchmark pendente para refinar o número de iterações no Cloudflare Workers.*
+   - **Hash Versionado**: O resultado é persistido no banco no formato PHC (`$v1$pbkdf2-sha256$i=100000$salt$hash`), garantindo a evolução flexível do algoritmo no futuro. (O campo pin_salt do esquema é residual e o próprio hash é a fonte da verdade).
 
 3. **Gerenciamento de Sessões e Tokens:**
    - **Nunca persistir o token puro**. Somente o hash `SHA-256` é guardado no banco. O token puro é gerado aleatoriamente (32 bytes) e devolvido uma única vez ao cliente.
@@ -32,5 +34,5 @@ Foi decidido implementar:
 
 ## Consequências
 
-- Alta segurança e dependência zero de sistemas externos ou bibliotecas Node que quebram no Workers (criptografia nativa Web).
-- Em caso de vazamento do D1, nenhum PIN ou Token de Sessão pode ser revertido rapidamente.
+- Alta segurança com criptografia nativa (Web Crypto API) e resistência a ataques offline usando Pepper no PIN.
+- Flexibilidade na atualização do hash do PIN devido ao uso de string versionada (PHC format).

@@ -6,7 +6,8 @@ import { hashToken, gerarTokenAleatorio } from '../../security/tokens'
 import { gerarSalt, hashPin } from '../../security/pin'
 import { executeAtomic } from '../../db/batch'
 
-export const ativacaoApp = new Hono<{ Variables: { db: any } }>()
+import { Env } from '../../index'
+export const ativacaoApp = new Hono<{ Bindings: Env; Variables: { db: any } }>()
 
 ativacaoApp.post('/', async (c) => {
   const body = await c.req.json()
@@ -81,8 +82,9 @@ ativacaoApp.post('/', async (c) => {
   }
 
   // Gera salt e hash do PIN
+  const pepper = c.env?.PIN_PEPPER || 'test-pepper'
   const salt = gerarSalt()
-  const hashedPin = await hashPin(pin, salt)
+  const hashedPin = await hashPin(pin, salt, pepper)
 
   // 4. (Opcional - Requisito) Criar sessão automática
   const sessionToken = gerarTokenAleatorio()

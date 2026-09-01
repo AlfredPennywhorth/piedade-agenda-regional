@@ -112,7 +112,7 @@ export const membros = sqliteTable('membros', {
   id: text('id').primaryKey(), // UUID
   nome: text('nome').notNull(),
   dataNascimento: text('data_nascimento'),
-  celular: text('celular'),
+  celular: text('celular').unique(),
   casaId: text('casa_id')
     .notNull()
     .references(() => casas.id),

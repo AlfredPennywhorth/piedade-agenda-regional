@@ -6,7 +6,8 @@ import { verifyPin } from '../../security/pin'
 import { hashToken, gerarTokenAleatorio } from '../../security/tokens'
 import { executeAtomic } from '../../db/batch'
 
-export const loginApp = new Hono<{ Variables: { db: any } }>()
+import { Env } from '../../index'
+export const loginApp = new Hono<{ Bindings: Env; Variables: { db: any } }>()
 
 const LIMITE_TENTATIVAS = 5
 const TEMPO_BLOQUEIO_MS = 15 * 60 * 1000 // 15 minutos
@@ -63,7 +64,8 @@ loginApp.post('/', async (c) => {
   }
 
   // Verificar PIN
-  const pinValido = await verifyPin(pin, membro.pinSalt!, membro.pinHash!)
+  const pepper = c.env?.PIN_PEPPER || 'test-pepper'
+  const pinValido = await verifyPin(pin, pepper, membro.pinHash!)
 
   if (!pinValido) {
     const tentativas = membro.tentativasPin + 1

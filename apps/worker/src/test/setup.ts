@@ -10,7 +10,7 @@ export function setupDb(sqlite: any) {
       id text PRIMARY KEY NOT NULL,
       nome text NOT NULL,
       data_nascimento text,
-      celular text,
+      celular text UNIQUE,
       casa_id text NOT NULL,
       ativo integer DEFAULT true NOT NULL,
       autenticacao_ativa integer DEFAULT false NOT NULL,

@@ -9,6 +9,7 @@ import { z } from 'zod'
 
 export * from './schemas/institucional'
 export * from './schemas/membros'
+export * from './utils/celular'
 export * from './schemas/funcoes'
 export * from './schemas/vinculos'
 export * from './schemas/auth'

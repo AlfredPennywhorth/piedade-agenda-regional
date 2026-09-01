@@ -138,4 +138,70 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
 
     expect(resPatch.status).toBe(404)
   })
+
+  it('19. Deve rejeitar celular com formato inválido no POST', async () => {
+    const res = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({ nome: 'Membro Teste', casaId, celular: '123' }), // Inválido
+    })
+    const json = await res.json() as any
+    expect(res.status).toBe(400)
+    expect(JSON.stringify(json.error)).toContain('Formato de celular inválido')
+  })
+
+  it('20. Deve normalizar celular corretamente no POST', async () => {
+    const res = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({ nome: 'Membro Normalizado', casaId, celular: '+55 (11) 98888-7777' }),
+    })
+    const json = await res.json() as any
+    expect(res.status).toBe(201)
+    
+    // Verifica no banco se foi salvo normalizado
+    const salvo = await db.select().from(schema.membros).where(schema.eq(schema.membros.id, json.id)).get()
+    expect(salvo?.celular).toBe('11988887777')
+  })
+
+  it('21. Deve bloquear celular duplicado no POST e registrar tentativa', async () => {
+    const res = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({ nome: 'Duplicado', casaId, celular: '+55 11 99999-9999' }), // celular do membroId base ('11999999999')
+    })
+    const json = await res.json() as any
+    expect(res.status).toBe(409)
+    expect(json.code).toBe('CELULAR_JA_VINCULADO')
+
+    const tentativa = await db.select().from(schema.tentativasAcesso).where(schema.eq(schema.tentativasAcesso.tipo, 'CONFLITO_CELULAR')).get()
+    expect(tentativa).toBeDefined()
+    expect(tentativa?.sucesso).toBe(false)
+    expect(tentativa?.motivo).toBe('Celular já vinculado a outro membro')
+  })
+
+  it('22. Deve bloquear celular duplicado no PATCH e registrar tentativa', async () => {
+    // Cria um segundo membro com celular diferente
+    const resCreate = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({ nome: 'Segundo Membro', casaId, celular: '11977777777' }),
+    })
+    const jsonCreate = await resCreate.json() as any
+    const segundoMembroId = jsonCreate.id
+
+    // Tenta atualizar para o celular do membro base
+    const resPatch = await req(`/api/v1/membros/${segundoMembroId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ celular: '11999999999' }),
+    })
+    const jsonPatch = await resPatch.json() as any
+    expect(resPatch.status).toBe(409)
+    expect(jsonPatch.code).toBe('CELULAR_JA_VINCULADO')
+
+    // Deve ter registrado tentativa ligada ao ID do membro que tentou
+    const tentativa = await db.select().from(schema.tentativasAcesso)
+      .where(schema.and(
+        schema.eq(schema.tentativasAcesso.tipo, 'CONFLITO_CELULAR'),
+        schema.eq(schema.tentativasAcesso.membroId, segundoMembroId)
+      ))
+      .get()
+    expect(tentativa).toBeDefined()
+  })
 })

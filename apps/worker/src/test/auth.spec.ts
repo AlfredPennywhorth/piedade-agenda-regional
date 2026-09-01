@@ -442,4 +442,73 @@ describe('Autenticação e Sessões S03', () => {
     expect(membro.autenticacao_ativa).toBe(0)
     expect(membro.pin_hash).toBeNull()
   })
+
+  it('42. Hash versionado (PHC): hash gerado contém versão, algoritmo, salt e iterações', async () => {
+    const { hashPin, gerarSalt } = await import('../security/pin')
+    const salt = gerarSalt()
+    const pepper = 'meu-pepper'
+    const phc = await hashPin('123456', salt, pepper)
+    
+    // $v1$pbkdf2-sha256$i=100000$salt$hash
+    const parts = phc.split('$')
+    expect(parts.length).toBe(6)
+    expect(parts[1]).toBe('v1')
+    expect(parts[2]).toBe('pbkdf2-sha256')
+    expect(parts[3]).toBe('i=100000')
+    expect(parts[4]).toBe(salt)
+  })
+
+  it('43. Pepper correto e incorreto funcionam conforme esperado', async () => {
+    const { hashPin, verifyPin, gerarSalt } = await import('../security/pin')
+    const salt = gerarSalt()
+    
+    const pin = '123456'
+    const pepperCerto = 'chave-secreta'
+    const pepperErrado = 'outra-chave'
+    
+    const phc = await hashPin(pin, salt, pepperCerto)
+    
+    // Testa pepper correto
+    const valido = await verifyPin(pin, pepperCerto, phc)
+    expect(valido).toBe(true)
+
+    // Testa pepper incorreto
+    const invalido = await verifyPin(pin, pepperErrado, phc)
+    expect(invalido).toBe(false)
+  })
+
+  it('44. Versão desconhecida de Hash deve ser rejeitada', async () => {
+    const { verifyPin } = await import('../security/pin')
+    
+    // $v2 não é suportado, deve retornar falso e não quebrar a aplicação
+    const pin = '123456'
+    const fakePhc = '$v2$pbkdf2-sha256$i=100000$salt$hash'
+    
+    const valido = await verifyPin(pin, 'pepper', fakePhc)
+    expect(valido).toBe(false)
+  })
+
+  it('45. Login com celular normalizado', async () => {
+    // Primeiro cria um link e ativa membroInativoId para poder logar
+    const resLink = await req(`/api/v1/admin/membros/${membroInativoId}/link-ativacao`, { method: 'POST' })
+    const { token } = await resLink.json() as any
+
+    const resAtivar = await req('/api/v1/auth/ativar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, celular: '11988888888', dataNascimento: '1990-01-01', pin: '654321', confirmacaoPin: '654321' })
+    })
+    expect(resAtivar.status).toBe(200)
+
+    // Tenta logar usando formato formatado/sujo
+    const resLogin = await req('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identificador: '+55 11 98888-8888', pin: '654321' })
+    })
+    
+    expect(resLogin.status).toBe(200)
+    const json = await resLogin.json() as any
+    expect(json.sessionToken).toBeDefined()
+  })
 })

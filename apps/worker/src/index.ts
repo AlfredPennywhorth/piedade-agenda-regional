@@ -13,6 +13,7 @@ import { logger } from 'hono/logger'
 export interface Env {
   APP_ENV: string
   APP_VERSION: string
+  PIN_PEPPER: string
   DB: D1Database
 }
 

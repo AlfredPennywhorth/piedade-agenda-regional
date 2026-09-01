@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
-import { membros, vinculosFuncionais } from '../db/schema'
+import { membros, vinculosFuncionais, tentativasAcesso } from '../db/schema'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 
 export const membrosRouter = new Hono<any>()
@@ -37,6 +37,21 @@ membrosRouter.post('/', async (c) => {
     const body = await c.req.json()
     const parsed = CreateMembroSchema.parse(body)
     
+    if (parsed.celular) {
+      const conflito = await db.select().from(membros).where(eq(membros.celular, parsed.celular)).get()
+      if (conflito) {
+        // Celular já vinculado a outro membro. Registra auditoria genérica.
+        await db.insert(tentativasAcesso).values({
+          id: crypto.randomUUID(),
+          membroId: null,
+          tipo: 'CONFLITO_CELULAR',
+          sucesso: false,
+          motivo: 'Celular já vinculado a outro membro',
+        })
+        return c.json({ error: 'Celular já vinculado a outro membro', code: 'CELULAR_JA_VINCULADO' }, 409)
+      }
+    }
+
     const id = crypto.randomUUID()
     const result = await db.insert(membros).values({ id, ...parsed }).returning().get()
     return c.json(result, 201)
@@ -57,6 +72,20 @@ membrosRouter.patch('/:id', async (c) => {
     
     const existing = await db.select().from(membros).where(eq(membros.id, id)).get()
     if (!existing) return c.json({ error: 'Membro não encontrado' }, 404)
+
+    if (parsed.celular && parsed.celular !== existing.celular) {
+      const conflito = await db.select().from(membros).where(eq(membros.celular, parsed.celular)).get()
+      if (conflito) {
+        await db.insert(tentativasAcesso).values({
+          id: crypto.randomUUID(),
+          membroId: id,
+          tipo: 'CONFLITO_CELULAR',
+          sucesso: false,
+          motivo: 'Celular já vinculado a outro membro',
+        })
+        return c.json({ error: 'Celular já vinculado a outro membro', code: 'CELULAR_JA_VINCULADO' }, 409)
+      }
+    }
 
     const updated = await db.update(membros)
       .set({ ...parsed, updatedAt: new Date().toISOString() })
