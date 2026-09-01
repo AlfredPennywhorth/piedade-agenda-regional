@@ -4,7 +4,7 @@ import { loginSchema } from '@piedade/shared'
 import * as schema from '../../db/schema'
 import { verifyPin } from '../../security/pin'
 import { hashToken, gerarTokenAleatorio } from '../../security/tokens'
-import { executeBatch } from '../../db/batch'
+import { executeAtomic } from '../../db/batch'
 
 export const loginApp = new Hono<{ Variables: { db: any } }>()
 
@@ -71,15 +71,15 @@ loginApp.post('/', async (c) => {
       ? new Date(agora.getTime() + TEMPO_BLOQUEIO_MS).toISOString() 
       : null
 
-    await executeBatch(db, [
-      db.update(schema.membros)
+    await executeAtomic(db, (tx) => [
+      tx.update(schema.membros)
         .set({
           tentativasPin: tentativas,
           bloqueadoAte: bloqueadoAteStr,
           updatedAt: agora.toISOString()
         })
         .where(eq(schema.membros.id, membro.id)),
-      db.insert(schema.tentativasAcesso).values({
+      tx.insert(schema.tentativasAcesso).values({
         id: crypto.randomUUID(),
         membroId: membro.id,
         tipo: 'LOGIN_PIN',
@@ -96,9 +96,9 @@ loginApp.post('/', async (c) => {
   const hashedSessionToken = await hashToken(sessionToken)
   const expiraEm = new Date(agora.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 dias
 
-  await executeBatch(db, [
+  await executeAtomic(db, (tx) => [
     // Zera contadores
-    db.update(schema.membros)
+    tx.update(schema.membros)
       .set({
         tentativasPin: 0,
         bloqueadoAte: null,
@@ -106,7 +106,7 @@ loginApp.post('/', async (c) => {
       })
       .where(eq(schema.membros.id, membro.id)),
     // Cria sessão
-    db.insert(schema.sessoes).values({
+    tx.insert(schema.sessoes).values({
       id: crypto.randomUUID(),
       membroId: membro.id,
       tokenHash: hashedSessionToken,
@@ -114,7 +114,7 @@ loginApp.post('/', async (c) => {
       userAgent: c.req.header('User-Agent') || null
     }),
     // Registra tentativa
-    db.insert(schema.tentativasAcesso).values({
+    tx.insert(schema.tentativasAcesso).values({
       id: crypto.randomUUID(),
       membroId: membro.id,
       tipo: 'LOGIN_PIN',

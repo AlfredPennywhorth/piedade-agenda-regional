@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { eq, and, isNull } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { hashToken, gerarTokenAleatorio } from '../../security/tokens'
-import { executeBatch } from '../../db/batch'
+import { executeAtomic } from '../../db/batch'
 
 // AVISO: Estas rotas não possuem autorização administrativa completa ainda.
 // O acesso a elas deve ser estritamente controlado via injetando a configuração enableAdminRoutes = true no createApp.
@@ -70,8 +70,8 @@ adminMembrosApp.post('/:id/reset-autenticacao', async (c) => {
   }
 
   // Revoga sessoes ativas, links e remove PIN
-  await executeBatch(db, [
-    db.update(schema.sessoes)
+  await executeAtomic(db, (tx) => [
+    tx.update(schema.sessoes)
       .set({ revogadoEm: agora })
       .where(
         and(
@@ -79,7 +79,7 @@ adminMembrosApp.post('/:id/reset-autenticacao', async (c) => {
           isNull(schema.sessoes.revogadoEm)
         )
       ),
-    db.update(schema.linksAtivacao)
+    tx.update(schema.linksAtivacao)
       .set({ revogadoEm: agora, updatedAt: agora })
       .where(
         and(
@@ -88,7 +88,7 @@ adminMembrosApp.post('/:id/reset-autenticacao', async (c) => {
           isNull(schema.linksAtivacao.revogadoEm)
         )
       ),
-    db.update(schema.membros)
+    tx.update(schema.membros)
       .set({
         autenticacaoAtiva: false,
         pinHash: null,
@@ -98,7 +98,7 @@ adminMembrosApp.post('/:id/reset-autenticacao', async (c) => {
         updatedAt: agora
       })
       .where(eq(schema.membros.id, membroId)),
-    db.insert(schema.tentativasAcesso).values({
+    tx.insert(schema.tentativasAcesso).values({
       id: crypto.randomUUID(),
       membroId,
       tipo: 'RECUPERACAO_ADMIN',

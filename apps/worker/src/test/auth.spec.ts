@@ -402,5 +402,43 @@ describe('Autenticação e Sessões S03', () => {
 
     const sessoesCount = sqlite.prepare('SELECT COUNT(*) as count FROM sessoes WHERE membro_id = ? AND revogado_em IS NULL').get(membroId) as any
     expect(sessoesCount.count).toBe(0)
+  it('41. Atomicidade: falha no meio da transação reverte alterações anteriores (rollback)', async () => {
+    // Membro 1 acabou de ser resetado no teste 40.
+    // Vamos gerar um novo link de ativação
+    const resLink = await req(`/api/v1/admin/membros/${membroId}/link-ativacao`, { method: 'POST' })
+    const { token } = await resLink.json() as any
+
+    // Criamos um gatilho temporário no SQLite para forçar um erro na tabela sessoes
+    // Como a sessão é inserida no final do executeAtomic de ativação, as tabelas links_ativacao e membros
+    // já teriam sido alteradas se fosse execução sequencial. Com transação (atomicidade), elas devem sofrer rollback.
+    sqlite.exec(`
+      CREATE TRIGGER force_error_on_session BEFORE INSERT ON sessoes
+      BEGIN
+        SELECT RAISE(ABORT, 'Simulated failure');
+      END;
+    `)
+
+    // Tenta ativar (os dados básicos estão corretos)
+    const resAtivar = await req('/api/v1/auth/ativar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, celular: '11999999999', dataNascimento: '1990-01-01', pin: '654321', confirmacaoPin: '654321' })
+    })
+
+    // Deve falhar pois o banco rejeitou o insert
+    expect(resAtivar.status).toBe(500)
+
+    // Removemos o trigger
+    sqlite.exec('DROP TRIGGER force_error_on_session')
+
+    // VERIFICAÇÃO DO ROLLBACK
+    // 1. O link gerado NÃO deve ter sido marcado como utilizado
+    const linkBanco = sqlite.prepare('SELECT utilizado_em FROM links_ativacao WHERE membro_id = ? ORDER BY created_at DESC LIMIT 1').get(membroId) as any
+    expect(linkBanco.utilizado_em).toBeNull()
+
+    // 2. O membro NÃO deve ter recebido a autenticacao_ativa (pois deu erro no final)
+    const membro = sqlite.prepare('SELECT autenticacao_ativa, pin_hash FROM membros WHERE id = ?').get(membroId) as any
+    expect(membro.autenticacao_ativa).toBe(0)
+    expect(membro.pin_hash).toBeNull()
   })
 })

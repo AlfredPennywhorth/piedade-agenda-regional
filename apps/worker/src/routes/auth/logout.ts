@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { authMiddleware, Variables } from '../../middleware/auth'
 import { hashToken } from '../../security/tokens'
-import { executeBatch } from '../../db/batch'
+import { executeAtomic } from '../../db/batch'
 
 export const logoutApp = new Hono<{ Variables: Variables }>()
 
@@ -22,11 +22,11 @@ logoutApp.post('/', async (c) => {
   const membroId = c.get('membroId')
   const agora = new Date().toISOString()
 
-  await executeBatch(db, [
-    db.update(schema.sessoes)
+  await executeAtomic(db, (tx) => [
+    tx.update(schema.sessoes)
       .set({ revogadoEm: agora })
       .where(eq(schema.sessoes.tokenHash, hashedToken)),
-    db.insert(schema.tentativasAcesso).values({
+    tx.insert(schema.tentativasAcesso).values({
       id: crypto.randomUUID(),
       membroId,
       tipo: 'LOGOUT',
