@@ -4,14 +4,14 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --env development",
     "deploy": "wrangler deploy",
-    "build": "wrangler deploy --dry-run --outdir .wrangler/output",
+    "build": "wrangler deploy --dry-run --env development --outdir .wrangler/output",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint src",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "wrangler d1 migrations apply piedade-agenda-db --local"
+    "db:migrate:local": "wrangler d1 migrations apply piedade-agenda-db --local --env development"
   },
   "dependencies": {
     "@piedade/shared": "workspace:*",
