@@ -9,26 +9,18 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 # ============================================================
-# D1 Database
-# ============================================================
-
-[[d1_databases]]
-binding = "DB"
-database_name = "piedade-agenda-db"
-database_id = "local"
-migrations_dir = "drizzle"
-
-# ============================================================
-# Variáveis não-secretas
-# ============================================================
-
-[vars]
-APP_ENV = "development"
-APP_VERSION = "0.0.1-s01"
-
-# ============================================================
-# Ambiente de Desenvolvimento
+# Ambiente de Desenvolvimento Local
 # ============================================================
 
 [env.development]
 name = "piedade-agenda-worker-dev"
+
+[env.development.vars]
+APP_ENV = "development"
+APP_VERSION = "0.0.1-s01"
+
+[[env.development.d1_databases]]
+binding = "DB"
+database_name = "piedade-agenda-db"
+database_id = "local"
+migrations_dir = "drizzle"
