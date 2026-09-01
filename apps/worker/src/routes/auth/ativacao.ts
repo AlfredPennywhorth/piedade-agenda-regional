@@ -1,0 +1,136 @@
+import { Hono } from 'hono'
+import { env } from 'hono/adapter'
+import { eq, and, isNull, gt } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/d1'
+import { ativacaoSchema } from '@piedade/shared'
+import * as schema from '../../db/schema'
+import { hashToken, gerarTokenAleatorio } from '../../security/tokens'
+import { gerarSalt, hashPin } from '../../security/pin'
+
+export const ativacaoApp = new Hono<{ Bindings: { DB: D1Database } }>()
+
+ativacaoApp.post('/', async (c) => {
+  const body = await c.req.json()
+  const result = ativacaoSchema.safeParse(body)
+
+  if (!result.success) {
+    return c.json({ error: 'Dados inválidos', details: result.error.flatten() }, 400)
+  }
+
+  const { token, celular, dataNascimento, pin } = result.data
+  const hashedToken = await hashToken(token)
+
+  const db = drizzle(c.env.DB, { schema })
+  const agora = new Date().toISOString()
+
+  // Buscar link de ativação válido
+  const link = await db.query.linksAtivacao.findFirst({
+    where: and(
+      eq(schema.linksAtivacao.tokenHash, hashedToken),
+      isNull(schema.linksAtivacao.utilizadoEm),
+      isNull(schema.linksAtivacao.revogadoEm),
+      gt(schema.linksAtivacao.expiraEm, agora)
+    ),
+    with: {
+      membro: true
+    }
+  })
+
+  if (!link || !link.membro) {
+    // Registrar tentativa falha sem expor erro específico de membro
+    await db.insert(schema.tentativasAcesso).values({
+      id: crypto.randomUUID(),
+      membroId: link?.membroId || null,
+      tipo: 'ATIVACAO',
+      sucesso: false,
+      motivo: 'Token inválido, expirado ou revogado'
+    })
+    return c.json({ error: 'Link de ativação inválido ou expirado' }, 400)
+  }
+
+  const membro = link.membro
+
+  if (!membro.ativo) {
+    await db.insert(schema.tentativasAcesso).values({
+      id: crypto.randomUUID(),
+      membroId: membro.id,
+      tipo: 'ATIVACAO',
+      sucesso: false,
+      motivo: 'Membro inativo'
+    })
+    return c.json({ error: 'Link de ativação inválido ou expirado' }, 400)
+  }
+
+  if (membro.celular !== celular || membro.dataNascimento !== dataNascimento) {
+    await db.insert(schema.tentativasAcesso).values({
+      id: crypto.randomUUID(),
+      membroId: membro.id,
+      tipo: 'ATIVACAO',
+      sucesso: false,
+      motivo: 'Dados cadastrais não conferem'
+    })
+    return c.json({ error: 'Dados informados não conferem com o cadastro' }, 400)
+  }
+
+  // Gera salt e hash do PIN
+  const salt = gerarSalt()
+  const hashedPin = await hashPin(pin, salt)
+
+  // Inicia transação para garantir atomicidade
+  const dbBatch = []
+
+  // 1. Marcar link como utilizado
+  dbBatch.push(
+    db.update(schema.linksAtivacao)
+      .set({ utilizadoEm: agora, updatedAt: agora })
+      .where(eq(schema.linksAtivacao.id, link.id))
+  )
+
+  // 2. Atualizar membro
+  dbBatch.push(
+    db.update(schema.membros)
+      .set({
+        autenticacaoAtiva: true,
+        pinHash: hashedPin,
+        pinSalt: salt,
+        tentativasPin: 0,
+        bloqueadoAte: null,
+        ativadoEm: agora,
+        updatedAt: agora
+      })
+      .where(eq(schema.membros.id, membro.id))
+  )
+
+  // 3. Registrar tentativa de sucesso
+  dbBatch.push(
+    db.insert(schema.tentativasAcesso).values({
+      id: crypto.randomUUID(),
+      membroId: membro.id,
+      tipo: 'ATIVACAO',
+      sucesso: true
+    })
+  )
+
+  // 4. (Opcional - Requisito) Criar sessão automática
+  const sessionToken = gerarTokenAleatorio()
+  const hashedSessionToken = await hashToken(sessionToken)
+  const expiraEmSessao = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 dias
+
+  dbBatch.push(
+    db.insert(schema.sessoes).values({
+      id: crypto.randomUUID(),
+      membroId: membro.id,
+      tokenHash: hashedSessionToken,
+      expiraEm: expiraEmSessao,
+      userAgent: c.req.header('User-Agent') || null
+    })
+  )
+
+  // Executa as operações
+  await db.batch(dbBatch as any)
+
+  return c.json({
+    message: 'Ativação concluída com sucesso',
+    sessionToken // Token puro retornado 1 única vez
+  }, 200)
+})

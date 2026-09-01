@@ -11,6 +11,8 @@ export * from './schemas/institucional'
 export * from './schemas/membros'
 export * from './schemas/funcoes'
 export * from './schemas/vinculos'
+export * from './schemas/auth'
+export * from './schemas/utils'
 
 // ============================================================
 // Metadados da aplicação
