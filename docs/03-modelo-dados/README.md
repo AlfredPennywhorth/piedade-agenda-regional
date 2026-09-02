@@ -104,18 +104,58 @@ Essa proteção é implementada por cinco índices únicos parciais, um para cad
 
 Vínculos inativos são preservados e não impedem a criação de um novo vínculo ativo equivalente.
 
+## Entidades da Sprint S04 — Locais e Eventos
+
+### `locais`
+
+Representa espaços físicos que podem sediar eventos presencias ou híbridos.
+É uma entidade reutilizável.
+
+Campos principais:
+- `id` — UUID textual
+- `nome`
+- `endereco`, `numero`, `complemento`, `bairro`, `cidade`, `uf`, `cep` — Dados de localização
+- `latitude`, `longitude` — Coordenadas opcionais
+- `url_maps`, `url_waze` — URLs (restritas a http/https)
+- `ativo`
+- `created_at` e `updated_at`
+
+### `eventos`
+
+Representa o cadastro-base de um evento de ocorrência única na S04 (sem exclusão física, sem recorrência nesta sprint).
+
+Campos principais:
+- `id` — UUID textual
+- `titulo`, `descricao`, `pauta`
+- `modalidade` — `PRESENCIAL`, `ONLINE` ou `HIBRIDO`
+- `inicio_em`, `fim_em` — Persistidos em ISO 8601 UTC
+- `local_id` — Opcional, requerido se PRESENCIAL ou HIBRIDO
+- `url_online` — Opcional (restrito a http/https), requerido se ONLINE ou HIBRIDO
+- `organizador_membro_id` — Opcional
+- `ativo`
+- `created_at` e `updated_at`
+
+### Regra de Escopo Único
+
+Semelhante aos vínculos funcionais, cada evento deve possuir **exatamente um** dos seguintes escopos institucionais:
+- Regional (`regional_id`);
+- Administração (`administracao_id`);
+- Setor (`setor_id`);
+- Casa de Oração (`casa_id`);
+- Grupo de Trabalho (`grupo_trabalho_id`).
+
+Essa regra é validada tanto na API (Zod superRefine) quanto no D1 (CHECK constraint `check_evento_escopo_unico`).
+
+### Regra de Fuso e Horário
+
+- O fim do evento (`fim_em`) deve ser sempre estritamente posterior ao seu início (`inicio_em`).
+- O evento não pode atravessar mais de um dia considerando o timezone operacional `America/Sao_Paulo`.
+
 ---
 
 ## Integridade referencial
 
-As entidades da S02 utilizam foreign keys para garantir:
-
-- membro vinculado a uma Casa existente;
-- vínculo funcional associado a um membro existente;
-- vínculo funcional associado a uma função existente;
-- escopo funcional associado a uma entidade institucional existente.
-
-Nos testes SQLite, `foreign_keys` é explicitamente habilitado.
+As entidades da S02, S03 e S04 utilizam foreign keys para garantir a validade dos relacionamentos (membros, casas, vínculos, locais, eventos). Nos testes SQLite, `foreign_keys = ON` é explicitamente habilitado.
 
 ---
 
@@ -135,11 +175,15 @@ Nos testes SQLite, `foreign_keys` é explicitamente habilitado.
 | `setores`             | Finalizado   | S01           |
 | `casas`               | Finalizado   | S01           |
 | `grupos_trabalho`     | Finalizado   | S01           |
-| `membros`             | Implementado | S02           |
-| `funcoes`             | Implementado | S02           |
-| `vinculos_funcionais` | Implementado | S02           |
+| `membros`             | Finalizado   | S02           |
+| `funcoes`             | Finalizado   | S02           |
+| `vinculos_funcionais` | Finalizado   | S02           |
+| `links_ativacao`      | Finalizado   | S03           |
+| `sessoes`             | Finalizado   | S03           |
+| `tentativas_acesso`   | Finalizado   | S03           |
+| `locais`              | Implementado | S04           |
+| `eventos`             | Implementado | S04           |
 | `reunioes`            | Planejado    | Sprint futura |
 | `convocacoes`         | Planejado    | Sprint futura |
-| `sessoes`             | Planejado    | Sprint futura |
 
-> **Status:** Modelo institucional da S01 preservado e modelo de Membros, Funções e Vínculos Funcionais implementado na S02.
+> **Status:** Modelo base (S01), Membros e Vínculos (S02), Autenticação (S03) preservados, e Locais e Eventos adicionados e validados na S04 via Migration 0004.

@@ -13,6 +13,9 @@ export * from './utils/celular'
 export * from './schemas/funcoes'
 export * from './schemas/vinculos'
 export * from './schemas/auth'
+export * from './schemas/locais'
+export * from './schemas/eventos'
+export * from './utils/date-utils'
 
 
 // ============================================================
