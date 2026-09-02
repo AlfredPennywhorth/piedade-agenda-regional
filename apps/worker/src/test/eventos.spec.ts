@@ -4,7 +4,7 @@ import { setupDb } from './setup'
 import { createApp } from '../index'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import BetterSqlite3 from 'better-sqlite3'
-import { regionais, locais } from '../db/schema'
+import { regionais, locais, eventos } from '../db/schema'
 
 describe('Eventos API (S04)', () => {
   let sqlite: Database
@@ -307,8 +307,8 @@ describe('Eventos API (S04)', () => {
   it('24. constraint de escopo único direto no banco', () => {
     // We try to insert an event with two scopes using drizzle directly, 
     // it should fail due to sqlite CHECK constraint
-    expect(async () => {
-      await db.insert(eventos).values({
+    expect(() => {
+      db.insert(eventos).values({
         id: crypto.randomUUID(),
         titulo: 'Evento DB',
         modalidade: 'ONLINE',
@@ -317,7 +317,7 @@ describe('Eventos API (S04)', () => {
         regionalId: crypto.randomUUID(),
         administracaoId: crypto.randomUUID()
       }).run()
-    }).rejects.toThrow(/CHECK constraint failed: check_evento_escopo_unico/)
+    }).toThrow(/CHECK constraint failed: check_evento_escopo_unico/)
   })
 
   // =========================================================================

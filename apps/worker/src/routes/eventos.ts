@@ -11,7 +11,7 @@ eventosRouter.get('/', async (c) => {
   const ativo = c.req.query('ativo')
   const modalidade = c.req.query('modalidade')
 
-  let conditions = []
+  const conditions = []
   if (ativo !== undefined) {
     conditions.push(eq(eventos.ativo, ativo === 'true'))
   }
