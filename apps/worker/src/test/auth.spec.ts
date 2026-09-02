@@ -52,6 +52,12 @@ describe('Autenticação e Sessões S03', () => {
     `)
   })
 
+  it('0. Banco de dados inicializado possui coluna updated_at na tabela sessoes', () => {
+    const tableInfo = sqlite.prepare("PRAGMA table_info('sessoes')").all() as any[]
+    const hasUpdatedAt = tableInfo.some(col => col.name === 'updated_at')
+    expect(hasUpdatedAt).toBe(true)
+  })
+
   // 1-5: Geração de Link (Admin)
   it('1. Admin pode gerar link de ativação para membro válido', async () => {
     const res = await req(`/api/v1/admin/membros/${membroId}/link-ativacao`, { method: 'POST' })
