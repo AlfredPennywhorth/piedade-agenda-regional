@@ -76,7 +76,6 @@ export function setupDb(sqlite: any) {
       ultimo_acesso_em text,
       user_agent text,
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       FOREIGN KEY (membro_id) REFERENCES membros(id)
     );
 

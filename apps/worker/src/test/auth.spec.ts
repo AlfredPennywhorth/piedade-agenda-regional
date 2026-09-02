@@ -52,10 +52,12 @@ describe('Autenticação e Sessões S03', () => {
     `)
   })
 
-  it('0. Banco de dados inicializado possui coluna updated_at na tabela sessoes', () => {
+  it('0. Banco de dados inicializado possui coluna ultimo_acesso_em e não possui updated_at na tabela sessoes', () => {
     const tableInfo = sqlite.prepare("PRAGMA table_info('sessoes')").all() as any[]
     const hasUpdatedAt = tableInfo.some(col => col.name === 'updated_at')
-    expect(hasUpdatedAt).toBe(true)
+    const hasUltimoAcessoEm = tableInfo.some(col => col.name === 'ultimo_acesso_em')
+    expect(hasUpdatedAt).toBe(false)
+    expect(hasUltimoAcessoEm).toBe(true)
   })
 
   // 1-5: Geração de Link (Admin)

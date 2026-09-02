@@ -210,7 +210,9 @@ export const sessoes = sqliteTable('sessoes', {
   revogadoEm: text('revogado_em'),
   ultimoAcessoEm: text('ultimo_acesso_em'),
   userAgent: text('user_agent'),
-  ...timestampsS02,
+  createdAt: text('created_at')
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 })
 
 export const tentativasAcesso = sqliteTable('tentativas_acesso', {
