@@ -1,7 +1,9 @@
 import { Hono } from 'hono'
-import { eq, and, gt, gte, lte } from 'drizzle-orm'
+import { eq, and, gt, gte, lte, inArray } from 'drizzle-orm'
 import { eventos, seriesRecorrencia } from '../db/schema'
-import { SerieCreate, SerieUpdatePayload, generateOccurrences } from '@piedade/shared'
+import { SerieCreate, SerieUpdatePayload, generateOccurrences, getLocalDateFromUtc } from '@piedade/shared'
+import { EventoCreate } from '@piedade/shared'
+import { executeAtomic } from '../db/batch'
 
 export const seriesRecorrenciaRouter = new Hono<any>()
 
@@ -75,14 +77,14 @@ seriesRecorrenciaRouter.post('/', async (c) => {
       }
     })
 
-    // Transação Drizzle para garantir Atomicidade (já suportada nativamente ou por batching)
-    // O D1 suporta .batch(), que é preferível no Cloudflare. 
-    // Para simplificar localmente com SQLite e D1, podemos usar tx ou apenas realizar em lote:
-    await db.transaction(async (tx: any) => {
-      await tx.insert(seriesRecorrencia).values(resultSerie).run()
+    // Transação usando executeAtomic para atomicidade nativa Cloudflare/SQLite
+    await executeAtomic(db, (qdb) => {
+      const queries = []
+      queries.push(qdb.insert(seriesRecorrencia).values(resultSerie))
       if (eventosToInsert.length > 0) {
-        await tx.insert(eventos).values(eventosToInsert).run()
+        queries.push(qdb.insert(eventos).values(eventosToInsert))
       }
+      return queries
     })
 
     return c.json({ serie: resultSerie, generatedOccurrences: eventosToInsert.length }, 201)
@@ -118,8 +120,11 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
          return c.json({ error: 'Evento origem não encontrado ou não pertence a esta série' }, 400)
       }
       
+      const mergedEvent = { ...existingEvent, ...parsed.changes }
+      EventoCreate.parse(mergedEvent) // Valida regras S04
+      
       const updatedEvent = await db.update(eventos)
-        .set({ ...parsed.changes, recorrenciaExcecao: true, updatedAt: nowIso })
+        .set({ ...parsed.changes, recorrenciaExcecao: true, updatedAt: nowIso }) // serieRecorrenciaId intacto
         .where(eq(eventos.id, parsed.fromEventId))
         .returning().get()
         
@@ -128,69 +133,74 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
     
     if (parsed.updateMode === 'ALL') {
       const mergedSerieData = { ...existingSerie, ...parsed.changes }
-      // Validar nova série
       SerieCreate.parse(mergedSerieData)
       
-      // Encontrar todos os eventos da série no futuro que NÃO SÃO exceção, e no passado (passado a gente não mexe, futuro a gente recalcula)
-      // Recalcular pode ser complexo. Se a regra da série mudar (frequencia), precisamos apagar os não-exceção futuros e recriar.
-      // Se for apenas título, podemos dar um update em todos não-exceção.
+      const exceptions = await db.select().from(eventos).where(and(
+        eq(eventos.serieRecorrenciaId, serieId),
+        gte(eventos.inicioEm, nowIso),
+        eq(eventos.recorrenciaExcecao, true)
+      )).all()
+      const exceptionDates = new Set(exceptions.map((e: any) => getLocalDateFromUtc(e.inicioEm)))
       
-      // Solução universal robusta:
-      // 1. Apagar eventos futuros (inicioEm >= agora) que não são exceção
-      // 2. Gerar eventos futuros a partir da mergedSerieData
-      
-      await db.transaction(async (tx: any) => {
-        // Atualiza a série
-        await tx.update(seriesRecorrencia)
-          .set({ ...parsed.changes, updatedAt: nowIso })
-          .where(eq(seriesRecorrencia.id, serieId))
-          .run()
-          
-        // Exclui os eventos que iam acontecer e que não foram modificados individualmente
-        await tx.delete(eventos)
-          .where(and(
-            eq(eventos.serieRecorrenciaId, serieId),
-            gte(eventos.inicioEm, nowIso),
-            eq(eventos.recorrenciaExcecao, false)
-          ))
-          .run()
-          
-        // Agora, se a dataInicio do mergeSerieData for no passado, o recurrence-engine vai calcular todos.
-        // Devemos apenas inserir os eventos cuja data é >= nowIso.
-        const occurrencesDates = generateOccurrences(mergedSerieData)
-        const futureOccurrences = occurrencesDates.filter(occ => occ.inicioEm >= nowIso)
+      const occurrencesDates = generateOccurrences(mergedSerieData)
+      const futureOccurrences = occurrencesDates
+        .filter(occ => occ.inicioEm >= nowIso)
+        .filter(occ => !exceptionDates.has(getLocalDateFromUtc(occ.inicioEm)))
         
-        const eventosToInsert = futureOccurrences.map(occ => {
-          return {
-            id: crypto.randomUUID(),
-            titulo: mergedSerieData.titulo,
-            descricao: mergedSerieData.descricao,
-            pauta: mergedSerieData.pauta,
-            modalidade: mergedSerieData.modalidade,
-            localId: mergedSerieData.localId,
-            urlOnline: mergedSerieData.urlOnline,
-            organizadorMembroId: mergedSerieData.organizadorMembroId,
-            regionalId: mergedSerieData.regionalId,
-            administracaoId: mergedSerieData.administracaoId,
-            setorId: mergedSerieData.setorId,
-            casaId: mergedSerieData.casaId,
-            grupoTrabalhoId: mergedSerieData.grupoTrabalhoId,
-            observacoes: mergedSerieData.observacoes,
-            ativo: mergedSerieData.ativo ?? true,
-            
-            inicioEm: occ.inicioEm,
-            fimEm: occ.fimEm,
-            
-            serieRecorrenciaId: serieId,
-            recorrenciaExcecao: false,
-            createdAt: nowIso,
-            updatedAt: nowIso
-          }
-        })
+      const eventosToInsert = futureOccurrences.map(occ => {
+        const { ...serieBaseData } = mergedSerieData
+        return {
+          id: crypto.randomUUID(),
+          titulo: serieBaseData.titulo,
+          descricao: serieBaseData.descricao,
+          pauta: serieBaseData.pauta,
+          modalidade: serieBaseData.modalidade,
+          localId: serieBaseData.localId,
+          urlOnline: serieBaseData.urlOnline,
+          organizadorMembroId: serieBaseData.organizadorMembroId,
+          regionalId: serieBaseData.regionalId,
+          administracaoId: serieBaseData.administracaoId,
+          setorId: serieBaseData.setorId,
+          casaId: serieBaseData.casaId,
+          grupoTrabalhoId: serieBaseData.grupoTrabalhoId,
+          observacoes: serieBaseData.observacoes,
+          ativo: serieBaseData.ativo ?? true,
+          
+          inicioEm: occ.inicioEm,
+          fimEm: occ.fimEm,
+          
+          serieRecorrenciaId: serieId,
+          recorrenciaExcecao: false,
+          createdAt: nowIso,
+          updatedAt: nowIso
+        }
+      })
+      
+      await executeAtomic(db, (qdb) => {
+        const queries = []
+        queries.push(
+          qdb.update(seriesRecorrencia)
+            .set({ ...parsed.changes, updatedAt: nowIso })
+            .where(eq(seriesRecorrencia.id, serieId))
+        )
+        
+        // Em vez de delete, marcar ativo=false nas ocorrências substituídas
+        queries.push(
+          qdb.update(eventos)
+            .set({ ativo: false, updatedAt: nowIso })
+            .where(and(
+              eq(eventos.serieRecorrenciaId, serieId),
+              gte(eventos.inicioEm, nowIso),
+              eq(eventos.recorrenciaExcecao, false),
+              eq(eventos.ativo, true) // Não precisa inativar o que já está inativo
+            ))
+        )
         
         if (eventosToInsert.length > 0) {
-          await tx.insert(eventos).values(eventosToInsert).run()
+          queries.push(qdb.insert(eventos).values(eventosToInsert))
         }
+        
+        return queries
       })
       
       return c.json({ message: 'Série inteira e futuros eventos atualizados com sucesso' })
@@ -206,78 +216,51 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       
       const pivotDateIso = existingEvent.inicioEm
       
-      // Série B (Nova) = Merge (existingSerie + parsed.changes)
-      // Ajustar a dataInicio da Série B para ser a mesma data em America/Sao_Paulo (pegamos do pivot)
-      // A dataFim da Série B mantém a original (ou modificada)
-      
-      const newSerieId = crypto.randomUUID()
-      const mergedSerieData = { ...existingSerie, ...parsed.changes }
-      
-      // Precisamos inferir a data de início (YYYY-MM-DD) do pivotDateIso
-      // Na prática, basta passarmos a date-string original correspondente àquela ocorrência, 
-      // mas como temos o UTC ISO: YYYY-MM-DDTHH:MM:SS, ele já aproxima bastante. 
-      // A recurrence-engine pode ter uma defasagem. Vamos converter ISO UTC para o "YYYY-MM-DD" em SP (-3).
-      const pivotDt = new Date(pivotDateIso)
-      pivotDt.setUTCHours(pivotDt.getUTCHours() - 3) 
-      const newStartDateStr = pivotDt.toISOString().split('T')[0]
-      
+      // Cálculo correto com timezone
+      const newStartDateStr = getLocalDateFromUtc(pivotDateIso)
       mergedSerieData.dataInicio = newStartDateStr
       SerieCreate.parse(mergedSerieData)
       
-      // Série A (Antiga) termina no dia antes
-      const prevDt = new Date(pivotDateIso)
-      prevDt.setUTCDate(prevDt.getUTCDate() - 1)
-      prevDt.setUTCHours(prevDt.getUTCHours() - 3)
-      const oldEndDateStr = prevDt.toISOString().split('T')[0]
+      // Série A (Antiga) termina no dia anterior a novaStartDateStr
+      // Para saber isso facilmente no mesmo timezone de SP: 
+      // Em Javascript local é perigoso por causa de fusos da máquina.
+      // Porém getLocalDateFromUtc pega exatamente o "hoje" em SP e podemos subtrair os dias
+      // convertendo Date UTC + Math. Uma forma segura é simplesmente:
+      const msPerDay = 1000 * 60 * 60 * 24
+      // Pegamos o meio do dia em UTC equivalente ao início da data de hoje, 
+      // garantindo que não vamos cair no dia errado.
+      const pivotDate = new Date(`${newStartDateStr}T12:00:00Z`)
+      pivotDate.setTime(pivotDate.getTime() - msPerDay)
+      const oldEndDateStr = pivotDate.toISOString().split('T')[0]
       
-      await db.transaction(async (tx: any) => {
-        // 1. Atualizar Série A
-        await tx.update(seriesRecorrencia)
-          .set({ dataFim: oldEndDateStr, updatedAt: nowIso })
-          .where(eq(seriesRecorrencia.id, serieId))
-          .run()
-          
-        // 2. Criar Série B
-        const resultSerieB = { id: newSerieId, ...mergedSerieData, createdAt: nowIso, updatedAt: nowIso }
-        await tx.insert(seriesRecorrencia).values(resultSerieB).run()
-        
-        // 3. Atualizar todos os eventos >= pivotDateIso (exceções ou não) para apontar para a nova Série B
-        await tx.update(eventos)
-          .set({ serieRecorrenciaId: newSerieId, updatedAt: nowIso })
-          .where(and(
-            eq(eventos.serieRecorrenciaId, serieId),
-            gte(eventos.inicioEm, pivotDateIso)
-          ))
-          .run()
-          
-        // 4. Regenerar apenas os futuros eventos da Série B que NÃO SÃO EXCEÇÕES, pois a regra (horário, título) pode ter mudado.
-        // Apaga os não exceção
-        await tx.delete(eventos)
-          .where(and(
-            eq(eventos.serieRecorrenciaId, newSerieId),
-            eq(eventos.recorrenciaExcecao, false)
-          ))
-          .run()
-          
-        // Recalcular e inserir
-        const occurrencesDates = generateOccurrences(mergedSerieData)
-        const eventosToInsert = occurrencesDates.map(occ => {
+      const exceptions = await db.select().from(eventos).where(and(
+        eq(eventos.serieRecorrenciaId, serieId),
+        gte(eventos.inicioEm, pivotDateIso),
+        eq(eventos.recorrenciaExcecao, true)
+      )).all()
+      const exceptionDates = new Set(exceptions.map((e: any) => getLocalDateFromUtc(e.inicioEm)))
+      
+      const occurrencesDates = generateOccurrences(mergedSerieData)
+      const eventosToInsert = occurrencesDates
+        .filter(occ => !exceptionDates.has(getLocalDateFromUtc(occ.inicioEm)))
+        .map(occ => {
+          const { ...serieBaseData } = mergedSerieData
           return {
             id: crypto.randomUUID(),
-            titulo: mergedSerieData.titulo,
-            descricao: mergedSerieData.descricao,
-            pauta: mergedSerieData.pauta,
-            modalidade: mergedSerieData.modalidade,
-            localId: mergedSerieData.localId,
-            urlOnline: mergedSerieData.urlOnline,
-            organizadorMembroId: mergedSerieData.organizadorMembroId,
-            regionalId: mergedSerieData.regionalId,
-            administracaoId: mergedSerieData.administracaoId,
-            setorId: mergedSerieData.setorId,
-            casaId: mergedSerieData.casaId,
-            grupoTrabalhoId: mergedSerieData.grupoTrabalhoId,
-            observacoes: mergedSerieData.observacoes,
-            ativo: mergedSerieData.ativo ?? true,
+            titulo: serieBaseData.titulo,
+            descricao: serieBaseData.descricao,
+            pauta: serieBaseData.pauta,
+            modalidade: serieBaseData.modalidade,
+            localId: serieBaseData.localId,
+            urlOnline: serieBaseData.urlOnline,
+            organizadorMembroId: serieBaseData.organizadorMembroId,
+            regionalId: serieBaseData.regionalId,
+            administracaoId: serieBaseData.administracaoId,
+            setorId: serieBaseData.setorId,
+            casaId: serieBaseData.casaId,
+            grupoTrabalhoId: serieBaseData.grupoTrabalhoId,
+            observacoes: serieBaseData.observacoes,
+            ativo: serieBaseData.ativo ?? true,
             
             inicioEm: occ.inicioEm,
             fimEm: occ.fimEm,
@@ -288,10 +271,52 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
             updatedAt: nowIso
           }
         })
+      
+      await executeAtomic(db, (qdb) => {
+        const queries = []
+        // 1. Atualizar Série A
+        queries.push(
+          qdb.update(seriesRecorrencia)
+            .set({ dataFim: oldEndDateStr, updatedAt: nowIso })
+            .where(eq(seriesRecorrencia.id, serieId))
+        )
+          
+        // 2. Criar Série B
+        const resultSerieB = { id: newSerieId, ...mergedSerieData, createdAt: nowIso, updatedAt: nowIso }
+        queries.push(qdb.insert(seriesRecorrencia).values(resultSerieB))
         
+        // 3. Atualizar as EXCEÇÕES futuras (e a própria pivot se for exceção) para apontar para a Série B
+        // As ocorrências normais serão inativadas e recriadas.
+        // Assim respeitamos a regra de que as ocorrências velhas (não exceção) devem ser inativadas sem DELETE.
+        
+        queries.push(
+          qdb.update(eventos)
+            .set({ serieRecorrenciaId: newSerieId, updatedAt: nowIso })
+            .where(and(
+              eq(eventos.serieRecorrenciaId, serieId),
+              gte(eventos.inicioEm, pivotDateIso),
+              eq(eventos.recorrenciaExcecao, true)
+            ))
+        )
+        
+        // 4. Inativar ocorrências normais da Série A a partir do pivot
+        queries.push(
+          qdb.update(eventos)
+            .set({ ativo: false, updatedAt: nowIso })
+            .where(and(
+              eq(eventos.serieRecorrenciaId, serieId),
+              gte(eventos.inicioEm, pivotDateIso),
+              eq(eventos.recorrenciaExcecao, false),
+              eq(eventos.ativo, true)
+            ))
+        )
+          
+        // 5. Inserir eventos gerados
         if (eventosToInsert.length > 0) {
-          await tx.insert(eventos).values(eventosToInsert).run()
+          queries.push(qdb.insert(eventos).values(eventosToInsert))
         }
+        
+        return queries
       })
       
       return c.json({ message: 'Série dividida e eventos atualizados', novaSerieId: newSerieId })

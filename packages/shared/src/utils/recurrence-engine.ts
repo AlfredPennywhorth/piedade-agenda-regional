@@ -18,13 +18,50 @@ export interface RecurrenceOccurrence {
 }
 
 /**
- * Cria uma data UTC a partir de YYYY-MM-DD, HH:MM no fuso America/Sao_Paulo.
- * Como o Brasil aboliu o horário de verão em 2019, o fuso atual é estaticamente -03:00.
+ * Cria uma data UTC a partir de YYYY-MM-DD, HH:MM iterando reversamente a partir de um alvo no fuso America/Sao_Paulo
+ * utilizando APIs nativas (Intl.DateTimeFormat) para resolver a defasagem real (inclusive com DST histórico).
  */
-function createUtcDateFromSaoPaulo(dateStr: string, timeStr: string): string {
-  // ISO string with explicit timezone offset for Sao Paulo (-03:00)
-  const dt = new Date(`${dateStr}T${timeStr}:00.000-03:00`)
-  return dt.toISOString()
+export function createUtcDateFromSaoPaulo(dateStr: string, timeStr: string): string {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const [hour, minute] = timeStr.split(':').map(Number)
+  const targetLocalMs = Date.UTC(year, month - 1, day, hour, minute, 0)
+  
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: 'numeric', minute: 'numeric', second: 'numeric',
+    hour12: false
+  })
+  
+  const parts = formatter.formatToParts(new Date(targetLocalMs))
+  const p: any = {}
+  parts.forEach(part => p[part.type] = part.value)
+  
+  let parsedHour = Number(p.hour)
+  // Alguns motores Node formatam 00:00 como 24:00 quando hour12: false
+  if (parsedHour === 24) parsedHour = 0
+  
+  const guessLocalMs = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), parsedHour, Number(p.minute), Number(p.second))
+  
+  const offsetMs = guessLocalMs - targetLocalMs
+  const trueUtcMs = targetLocalMs - offsetMs
+  return new Date(trueUtcMs).toISOString()
+}
+
+/**
+ * Extrai a data local (YYYY-MM-DD) correspondente a um timestamp UTC no fuso America/Sao_Paulo.
+ */
+export function getLocalDateFromUtc(utcIso: string): string {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  })
+  
+  const parts = formatter.formatToParts(new Date(utcIso))
+  const p: any = {}
+  parts.forEach(part => p[part.type] = part.value)
+  
+  return `${p.year}-${p.month}-${p.day}`
 }
 
 /**

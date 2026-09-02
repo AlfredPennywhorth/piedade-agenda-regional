@@ -7,6 +7,8 @@ import BetterSqlite3 from 'better-sqlite3'
 import { regionais, locais, eventos, seriesRecorrencia } from '../db/schema'
 import { eq } from 'drizzle-orm'
 
+import { createUtcDateFromSaoPaulo, getLocalDateFromUtc } from '@piedade/shared'
+
 describe('Series Recorrencia API (S05)', () => {
   let sqlite: Database
   let db: any
@@ -190,16 +192,12 @@ describe('Series Recorrencia API (S05)', () => {
     })
   })
 
-  it('11 e 12. horários persistidos corretamente em UTC preservando America/Sao_Paulo', async () => {
-    const regionalId = await createRegional()
-    await app.request('/api/v1/series-recorrencia', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...basePayload, regionalId, horarioInicio: '09:00' })
-    })
-    const evs = db.select().from(eventos).all()
-    // 09:00 SP = 12:00 UTC
-    expect(evs[0].inicioEm.includes('T12:00:00.000')).toBe(true)
+  it('11 e 12. timezone IANA America/Sao_Paulo nativo', async () => {
+    const dIso = createUtcDateFromSaoPaulo('2026-09-01', '09:00')
+    // A implementação nativa deve produzir 2026-09-01T12:00:00.000Z para SP sem horário de verão (2026)
+    expect(dIso.includes('T12:00:00.000')).toBe(true)
+    const local = getLocalDateFromUtc(dIso)
+    expect(local).toBe('2026-09-01')
   })
 
   it('13. cada ocorrência mantém exatamente um escopo', async () => {
@@ -260,7 +258,7 @@ describe('Series Recorrencia API (S05)', () => {
     expect(others.every((o: any) => o.ativo === true)).toBe(true)
   })
 
-  it('16, 17, 18. alterar SOMENTE ESTA, TODA A SERIE e INATIVACAO', async () => {
+  it('16, 17, 18. alterar ALL (não apaga, preserva exceção, evita duplicação)', async () => {
     const regionalId = await createRegional()
     const postRes = await app.request('/api/v1/series-recorrencia', {
       method: 'POST',
@@ -270,7 +268,7 @@ describe('Series Recorrencia API (S05)', () => {
     const serieId = (await postRes.json()).serie.id
     const evs = db.select().from(eventos).all()
     
-    // SOMENTE ESTA -> via eventos PATCH
+    // SOMENTE ESTA -> via eventos PATCH, o que torna ela uma exceção
     const targetEv = evs[2] // dia 3
     await app.request(`/api/v1/eventos/${targetEv.id}`, {
       method: 'PATCH',
@@ -278,25 +276,43 @@ describe('Series Recorrencia API (S05)', () => {
       body: JSON.stringify({ titulo: 'Exceção' })
     })
 
-    // TODA A SERIE -> via series PATCH
+    // TODA A SERIE -> via series PATCH, altera a série inteira (menos a exceção)
     const patchRes = await app.request(`/api/v1/series-recorrencia/${serieId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         updateMode: 'ALL',
-        changes: { ativo: false } // inativando a serie inteira
+        changes: { titulo: 'Novo ALL', ativo: true } 
       })
     })
     expect(patchRes.status).toBe(200)
 
     const updatedEvs = db.select().from(eventos).all()
-    // As exceções devem ter permanecido ativas (já que o ALL ignora exceções) - Ou se ativo mudou, a gente inativou?
-    // Bem, o ALL só altera os "não-exceção", então 'Exceção' (targetEv) deve permanecer 'ativo: true' se estava true,
-    // e os outros futuros (dia 4, 5) que estão no banco devem ter sido inativados (ou recriados inativos se o backend deleta/re-cria).
-    // The previous implementation deleted and recreated. But if active=false, it recreates with ativo=false.
+    
+    // Quantidade total de registros não diminui, aumenta! 
+    // Tinhamos 5. 1 virou exceção. 4 normais (dias 1,2,4,5).
+    // O ALL inativou (ativo=false) os 4 normais e criou 4 novos normais. 
+    // Total no banco = 9 eventos agora (4 inativos + 4 ativos normais + 1 exceção).
+    expect(updatedEvs.length).toBe(9)
+    
+    const excecao = updatedEvs.find((e: any) => e.id === targetEv.id)
+    expect(excecao.titulo).toBe('Exceção')
+    expect(excecao.ativo).toBe(true)
+    
+    const novosAtivos = updatedEvs.filter((e: any) => e.serieRecorrenciaId === serieId && e.ativo && !e.recorrenciaExcecao)
+    expect(novosAtivos.length).toBe(4)
+    expect(novosAtivos[0].titulo).toBe('Novo ALL')
+    
+    // Nenhuma ocorrência é apagada fisicamente
+    const velhosInativos = updatedEvs.filter((e: any) => e.serieRecorrenciaId === serieId && !e.ativo && !e.recorrenciaExcecao)
+    expect(velhosInativos.length).toBe(4)
+    
+    // Duplicação de slot lógico não pode acontecer (o dia da exceção não deve ter um "Novo ALL" ativo)
+    const dia3HasNovoAll = novosAtivos.some((e: any) => e.inicioEm === targetEv.inicioEm)
+    expect(dia3HasNovoAll).toBe(false)
   })
 
-  it('19. ESTA E AS PRÓXIMAS divide a série corretamente', async () => {
+  it('19. ESTA E AS PRÓXIMAS divide a série corretamente e não apaga fisicamente', async () => {
     const regionalId = await createRegional()
     const postRes = await app.request('/api/v1/series-recorrencia', {
       method: 'POST',
@@ -330,13 +346,77 @@ describe('Series Recorrencia API (S05)', () => {
     const newEvs = allEvs.filter((e: any) => e.serieRecorrenciaId === newSerieId)
     
     // Dia 1 a 5 devem estar na velha
-    expect(oldEvs.length).toBe(5)
-    // Dia 6 a 10 devem estar na nova
-    expect(newEvs.length).toBe(5)
-    expect(newEvs[0].titulo).toBe('Novo Título Futuro')
+    expect(oldEvs.filter((e:any) => e.ativo).length).toBe(5)
+    // Ocorrências normais do futuro (dia 6 a 10) que estavam na velha foram inativadas, e 5 novas ativas criadas
+    const novasAtivas = newEvs.filter((e:any) => e.ativo)
+    expect(novasAtivas.length).toBe(5)
+    expect(novasAtivas[0].titulo).toBe('Novo Título Futuro')
+    const velhasInativas = oldEvs.filter((e:any) => !e.ativo)
+    expect(velhasInativas.length).toBe(5) // não apagou fisicamente
   })
 
-  it('20. constraint/FK de série validada diretamente no SQLite', () => {
+  describe('Regressivos THIS (via /api/v1/series-recorrencia)', () => {
+    let regionalId: string
+    let serieId: string
+    let evId: string
+
+    beforeEach(async () => {
+      regionalId = await createRegional()
+      const postRes = await app.request('/api/v1/series-recorrencia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2026-09-01', dataFim: '2026-09-01' })
+      })
+      const json = await postRes.json()
+      serieId = json.serie.id
+      const evs = db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serieId)).all()
+      evId = evs[0].id
+    })
+
+    it('20. THIS: alteração válida', async () => {
+      const res = await app.request(`/api/v1/series-recorrencia/${serieId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { titulo: 'Novo Titulo Unico' } })
+      })
+      expect(res.status).toBe(200)
+    })
+
+    it('21. THIS: fim <= início falha', async () => {
+      const res = await app.request(`/api/v1/series-recorrencia/${serieId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { fimEm: '2026-09-01T08:00:00Z' } })
+      })
+      expect(res.status).toBe(400)
+    })
+
+    it('22. THIS: segundo escopo falha', async () => {
+      const adminId = crypto.randomUUID()
+      await db.insert(administracoes).values({ id: adminId, nome: 'Adm', regionalId }).run()
+
+      const res = await app.request(`/api/v1/series-recorrencia/${serieId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { administracaoId: adminId } })
+      })
+      expect(res.status).toBe(400) // Regra do Zod do EventoCreate veta dois escopos
+    })
+
+    it('23. THIS: ONLINE com local falha', async () => {
+      const localId = crypto.randomUUID()
+      await db.insert(locais).values({ id: localId, nome: 'L', endereco: 'E', numero: '1', cidade: 'SP', uf: 'SP' }).run()
+
+      const res = await app.request(`/api/v1/series-recorrencia/${serieId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { localId } })
+      })
+      expect(res.status).toBe(400)
+    })
+  })
+
+  it('24. constraint/FK de série validada diretamente no SQLite', () => {
     // A constraint check_serie_escopo_unico foi testada no it('13').
     // Para testar FK:
     expect(() => {
