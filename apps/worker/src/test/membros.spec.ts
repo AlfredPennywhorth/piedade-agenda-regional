@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import Database from 'better-sqlite3'
 import { createApp } from '../index'
 import * as schema from '../db/schema'
+import { eq, and } from 'drizzle-orm'
+import { setupDb } from './setup'
 
 type MembroResponse = {
   id: string
@@ -15,102 +17,31 @@ type ErroResponse = {
   error: string
 }
 
-const sqlite = new Database(':memory:')
-sqlite.pragma('foreign_keys = ON')
+describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
+  let sqlite: any
+  let db: ReturnType<typeof drizzle>
+  let app: any
 
-const db = drizzle(sqlite, { schema })
-const app = createApp(db)
+  const req = async (path: string, options?: RequestInit) => {
+    const request = new Request(`http://localhost${path}`, options)
+    return app.request(request)
+  }
 
-beforeAll(() => {
-  const setupSql = `
-    CREATE TABLE regionais (
-      id text PRIMARY KEY NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL
-    );
-
-    CREATE TABLE administracoes (
-      id text PRIMARY KEY NOT NULL,
-      regional_id text NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (regional_id) REFERENCES regionais(id)
-    );
-
-    CREATE TABLE setores (
-      id text PRIMARY KEY NOT NULL,
-      administracao_id text NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (administracao_id) REFERENCES administracoes(id)
-    );
-
-    CREATE TABLE casas (
-      id text PRIMARY KEY NOT NULL,
-      setor_id text NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (setor_id) REFERENCES setores(id)
-    );
-
-    CREATE TABLE grupos_trabalho (
-      id text PRIMARY KEY NOT NULL,
-      nome text NOT NULL,
-      ativo integer DEFAULT true NOT NULL,
-      regional_id text,
-      administracao_id text,
-      setor_id text,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (regional_id) REFERENCES regionais(id),
-      FOREIGN KEY (administracao_id) REFERENCES administracoes(id),
-      FOREIGN KEY (setor_id) REFERENCES setores(id)
-    );
-
-    CREATE TABLE membros (
-      id text PRIMARY KEY NOT NULL,
-      nome text NOT NULL,
-      data_nascimento text,
-      celular text,
-      casa_id text NOT NULL,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (casa_id) REFERENCES casas(id)
-    );
-  `
-
-  sqlite.exec(setupSql)
-})
-
-const req = async (path: string, options?: RequestInit) => {
-  const request = new Request(`http://localhost${path}`, options)
-  return app.request(request)
-}
-
-describe('Testes de Membros', () => {
   const regionalId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
   const administracaoId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
   const setorId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
   const casaId = '11111111-1111-4111-8111-111111111111'
   const casaId2 = '22222222-2222-4222-8222-222222222222'
   const casaInexistenteId = '99999999-9999-4999-8999-999999999999'
+  const membroId = '33333333-3333-4333-8333-333333333333'
 
-  let membroId = ''
+  beforeEach(() => {
+    sqlite = new Database(':memory:')
+    sqlite.pragma('foreign_keys = ON')
+    db = drizzle(sqlite, { schema })
+    setupDb(sqlite)
+    app = createApp(db)
 
-  beforeAll(() => {
     sqlite.exec(`
       INSERT INTO regionais (id, nome)
       VALUES ('${regionalId}', 'Regional 1');
@@ -126,6 +57,9 @@ describe('Testes de Membros', () => {
 
       INSERT INTO casas (id, setor_id, nome)
       VALUES ('${casaId2}', '${setorId}', 'Casa 2');
+
+      INSERT INTO membros (id, nome, celular, data_nascimento, casa_id, ativo)
+      VALUES ('${membroId}', 'Pessoa Teste Base', '11999999999', '1990-01-01', '${casaId}', 1);
     `)
   })
 
@@ -142,8 +76,7 @@ describe('Testes de Membros', () => {
 
     expect(res.status).toBe(201)
     expect(json.nome).toBe('Pessoa Teste A')
-
-    membroId = json.id
+    expect(json.id).toBeDefined()
   })
 
   it('2. Deve rejeitar membro com Casa inexistente', async () => {
@@ -205,5 +138,71 @@ describe('Testes de Membros', () => {
     })
 
     expect(resPatch.status).toBe(404)
+  })
+
+  it('19. Deve rejeitar celular com formato inválido no POST', async () => {
+    const res = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({ nome: 'Membro Teste', casaId, celular: '123' }), // Inválido
+    })
+    const json = await res.json() as any
+    expect(res.status).toBe(400)
+    expect(JSON.stringify(json.error)).toContain('Formato de celular inválido')
+  })
+
+  it('20. Deve normalizar celular corretamente no POST', async () => {
+    const res = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({ nome: 'Membro Normalizado', casaId, celular: '+55 (11) 98888-7777' }),
+    })
+    const json = await res.json() as any
+    expect(res.status).toBe(201)
+    
+    // Verifica no banco se foi salvo normalizado
+    const salvo = await db.select().from(schema.membros).where(eq(schema.membros.id, json.id)).get()
+    expect(salvo?.celular).toBe('11988887777')
+  })
+
+  it('21. Deve bloquear celular duplicado no POST e registrar tentativa', async () => {
+    const res = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({ nome: 'Duplicado', casaId, celular: '+55 11 99999-9999' }), // celular do membroId base ('11999999999')
+    })
+    const json = await res.json() as any
+    expect(res.status).toBe(409)
+    expect(json.code).toBe('CELULAR_JA_VINCULADO')
+
+    const tentativa = await db.select().from(schema.tentativasAcesso).where(eq(schema.tentativasAcesso.tipo, 'CONFLITO_CELULAR')).get()
+    expect(tentativa).toBeDefined()
+    expect(tentativa?.sucesso).toBe(false)
+    expect(tentativa?.motivo).toBe('Celular já vinculado a outro membro')
+  })
+
+  it('22. Deve bloquear celular duplicado no PATCH e registrar tentativa', async () => {
+    // Cria um segundo membro com celular diferente
+    const resCreate = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({ nome: 'Segundo Membro', casaId, celular: '11977777777' }),
+    })
+    const jsonCreate = await resCreate.json() as any
+    const segundoMembroId = jsonCreate.id
+
+    // Tenta atualizar para o celular do membro base
+    const resPatch = await req(`/api/v1/membros/${segundoMembroId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ celular: '11999999999' }),
+    })
+    const jsonPatch = await resPatch.json() as any
+    expect(resPatch.status).toBe(409)
+    expect(jsonPatch.code).toBe('CELULAR_JA_VINCULADO')
+
+    // Deve ter registrado tentativa ligada ao ID do membro que tentou
+    const tentativa = await db.select().from(schema.tentativasAcesso)
+      .where(and(
+        eq(schema.tentativasAcesso.tipo, 'CONFLITO_CELULAR'),
+        eq(schema.tentativasAcesso.membroId, segundoMembroId)
+      ))
+      .get()
+    expect(tentativa).toBeDefined()
   })
 })

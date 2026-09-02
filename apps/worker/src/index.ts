@@ -13,6 +13,7 @@ import { logger } from 'hono/logger'
 export interface Env {
   APP_ENV: string
   APP_VERSION: string
+  PIN_PEPPER: string
   DB: D1Database
 }
 
@@ -25,7 +26,17 @@ import { gruposTrabalhoRouter } from './routes/grupos_trabalho'
 import { membrosRouter } from './routes/membros'
 import { funcoesRouter } from './routes/funcoes'
 import { vinculosFuncionaisRouter } from './routes/vinculos_funcionais'
-export function createApp(injectedDb?: any) {
+import { ativacaoApp } from './routes/auth/ativacao'
+import { loginApp } from './routes/auth/login'
+import { logoutApp } from './routes/auth/logout'
+import { meApp } from './routes/auth/me'
+import { adminMembrosApp } from './routes/admin/membros'
+
+export interface AppOptions {
+  enableAdminRoutes?: boolean
+}
+
+export function createApp(injectedDb?: any, options?: AppOptions) {
   const app = new Hono<{ Bindings: Env; Variables: { db: any } }>()
 
   // Middlewares globais
@@ -66,7 +77,8 @@ export function createApp(injectedDb?: any) {
     if (injectedDb) {
       c.set('db', injectedDb)
     } else if (!c.get('db') && c.env?.DB) {
-      c.set('db', drizzle(c.env.DB))
+      const cfDb = c.env.DB
+      c.set('db', drizzle(cfDb))
     }
     await next()
   })
@@ -86,6 +98,18 @@ export function createApp(injectedDb?: any) {
   app.route('/api/v1/membros', membrosRouter)
   app.route('/api/v1/funcoes', funcoesRouter)
   app.route('/api/v1/vinculos-funcionais', vinculosFuncionaisRouter)
+
+  // ============================================================
+  // Rotas da API (S03 - Autenticação e Permissões)
+  // ============================================================
+  app.route('/api/v1/auth/ativar', ativacaoApp)
+  app.route('/api/v1/auth/login', loginApp)
+  app.route('/api/v1/auth/logout', logoutApp)
+  app.route('/api/v1/auth/me', meApp)
+
+  if (options?.enableAdminRoutes) {
+    app.route('/api/v1/admin/membros', adminMembrosApp)
+  }
 
   // 404 padrão
   app.notFound(c => {
