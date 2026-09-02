@@ -88,6 +88,66 @@ export function setupDb(sqlite: any) {
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       FOREIGN KEY (membro_id) REFERENCES membros(id)
     );
+
+    CREATE TABLE IF NOT EXISTS locais (
+      id text PRIMARY KEY NOT NULL,
+      nome text NOT NULL,
+      endereco text NOT NULL,
+      numero text NOT NULL,
+      complemento text,
+      bairro text,
+      cidade text NOT NULL,
+      uf text NOT NULL,
+      cep text,
+      referencia text,
+      latitude real,
+      longitude real,
+      url_maps text,
+      url_waze text,
+      ativo integer DEFAULT true NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS eventos (
+      id text PRIMARY KEY NOT NULL,
+      titulo text NOT NULL,
+      descricao text,
+      pauta text,
+      modalidade text NOT NULL,
+      inicio_em text NOT NULL,
+      fim_em text NOT NULL,
+      local_id text,
+      url_online text,
+      organizador_membro_id text,
+      regional_id text,
+      administracao_id text,
+      setor_id text,
+      casa_id text,
+      grupo_trabalho_id text,
+      observacoes text,
+      ativo integer DEFAULT true NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (local_id) REFERENCES locais(id),
+      FOREIGN KEY (organizador_membro_id) REFERENCES membros(id),
+      FOREIGN KEY (regional_id) REFERENCES regionais(id),
+      FOREIGN KEY (administracao_id) REFERENCES administracoes(id),
+      FOREIGN KEY (setor_id) REFERENCES setores(id),
+      FOREIGN KEY (casa_id) REFERENCES casas(id),
+      FOREIGN KEY (grupo_trabalho_id) REFERENCES grupos_trabalho(id),
+      CONSTRAINT check_evento_escopo_unico CHECK (
+        (CASE WHEN regional_id IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN administracao_id IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN setor_id IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN casa_id IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN grupo_trabalho_id IS NOT NULL THEN 1 ELSE 0 END) = 1
+      )
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_eventos_inicio_em ON eventos (inicio_em);
+    CREATE INDEX IF NOT EXISTS idx_eventos_ativo ON eventos (ativo);
+    CREATE INDEX IF NOT EXISTS idx_eventos_local_id ON eventos (local_id);
   `
   sqlite.exec(setupSql)
 }

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, check, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, check, uniqueIndex, real, index } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 
 // ============================================================
@@ -225,3 +225,64 @@ export const tentativasAcesso = sqliteTable('tentativas_acesso', {
     .notNull()
     .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 })
+
+// ============================================================
+// Locais e Eventos (S04)
+// ============================================================
+
+export const locais = sqliteTable('locais', {
+  id: text('id').primaryKey(), // UUID
+  nome: text('nome').notNull(),
+  endereco: text('endereco').notNull(),
+  numero: text('numero').notNull(),
+  complemento: text('complemento'),
+  bairro: text('bairro'),
+  cidade: text('cidade').notNull(),
+  uf: text('uf').notNull(),
+  cep: text('cep'),
+  referencia: text('referencia'),
+  latitude: real('latitude'),
+  longitude: real('longitude'),
+  urlMaps: text('url_maps'),
+  urlWaze: text('url_waze'),
+  ativo: ativoDefault,
+  ...timestampsS02,
+})
+
+export const eventos = sqliteTable('eventos', {
+  id: text('id').primaryKey(), // UUID
+  titulo: text('titulo').notNull(),
+  descricao: text('descricao'),
+  pauta: text('pauta'),
+  modalidade: text('modalidade').notNull(), // PRESENCIAL, ONLINE, HIBRIDO
+  inicioEm: text('inicio_em').notNull(), // ISO 8601 UTC
+  fimEm: text('fim_em').notNull(), // ISO 8601 UTC
+  localId: text('local_id').references(() => locais.id),
+  urlOnline: text('url_online'),
+  organizadorMembroId: text('organizador_membro_id').references(() => membros.id),
+
+  // Escopo Institucional (Exatamente UM preenchido)
+  regionalId: text('regional_id').references(() => regionais.id),
+  administracaoId: text('administracao_id').references(() => administracoes.id),
+  setorId: text('setor_id').references(() => setores.id),
+  casaId: text('casa_id').references(() => casas.id),
+  grupoTrabalhoId: text('grupo_trabalho_id').references(() => gruposTrabalho.id),
+
+  observacoes: text('observacoes'),
+  ativo: ativoDefault,
+  ...timestampsS02,
+}, table => ({
+  checkEscopo: check(
+    'check_evento_escopo_unico',
+    sql`
+      (CASE WHEN ${table.regionalId} IS NOT NULL THEN 1 ELSE 0 END) +
+      (CASE WHEN ${table.administracaoId} IS NOT NULL THEN 1 ELSE 0 END) +
+      (CASE WHEN ${table.setorId} IS NOT NULL THEN 1 ELSE 0 END) +
+      (CASE WHEN ${table.casaId} IS NOT NULL THEN 1 ELSE 0 END) +
+      (CASE WHEN ${table.grupoTrabalhoId} IS NOT NULL THEN 1 ELSE 0 END) = 1
+    `
+  ),
+  idxInicioEm: index('idx_eventos_inicio_em').on(table.inicioEm),
+  idxAtivo: index('idx_eventos_ativo').on(table.ativo),
+  idxLocalId: index('idx_eventos_local_id').on(table.localId),
+}))

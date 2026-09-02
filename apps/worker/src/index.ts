@@ -31,7 +31,8 @@ import { loginApp } from './routes/auth/login'
 import { logoutApp } from './routes/auth/logout'
 import { meApp } from './routes/auth/me'
 import { adminMembrosApp } from './routes/admin/membros'
-
+import { locaisRouter } from './routes/locais'
+import { eventosRouter } from './routes/eventos'
 export interface AppOptions {
   enableAdminRoutes?: boolean
 }
@@ -98,6 +99,12 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.route('/api/v1/membros', membrosRouter)
   app.route('/api/v1/funcoes', funcoesRouter)
   app.route('/api/v1/vinculos-funcionais', vinculosFuncionaisRouter)
+
+  // ============================================================
+  // Rotas da API (S04 - Locais e Eventos)
+  // ============================================================
+  app.route('/api/v1/locais', locaisRouter)
+  app.route('/api/v1/eventos', eventosRouter)
 
   // ============================================================
   // Rotas da API (S03 - Autenticação e Permissões)
