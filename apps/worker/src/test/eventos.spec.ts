@@ -4,7 +4,7 @@ import { setupDb } from './setup'
 import { createApp } from '../index'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import BetterSqlite3 from 'better-sqlite3'
-import { regionais, locais, eventos } from '../db/schema'
+import { regionais, locais, eventos, administracoes, setores, casas, gruposTrabalho } from '../db/schema'
 
 describe('Eventos API (S04)', () => {
   let sqlite: Database
@@ -501,5 +501,94 @@ describe('Eventos API (S04)', () => {
       })
     })
     expect(res.status).toBe(400)
+  })
+
+  // =========================================================================
+  // SCOPE TESTS (S04)
+  // =========================================================================
+  it('17. criar evento de Administração', async () => {
+    const regionalId = await createRegional()
+    const administracaoId = crypto.randomUUID()
+    await db.insert(administracoes).values({ id: administracaoId, nome: 'Adm', regionalId }).run()
+
+    const res = await app.request('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Evento Adm',
+        modalidade: 'ONLINE',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        urlOnline: 'https://meet.google.com/abc',
+        administracaoId
+      })
+    })
+    expect(res.status).toBe(201)
+  })
+
+  it('18. criar evento de Setor', async () => {
+    const regionalId = await createRegional()
+    const administracaoId = crypto.randomUUID()
+    await db.insert(administracoes).values({ id: administracaoId, nome: 'Adm', regionalId }).run()
+    const setorId = crypto.randomUUID()
+    await db.insert(setores).values({ id: setorId, nome: 'Setor', administracaoId }).run()
+
+    const res = await app.request('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Evento Setor',
+        modalidade: 'ONLINE',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        urlOnline: 'https://meet.google.com/abc',
+        setorId
+      })
+    })
+    expect(res.status).toBe(201)
+  })
+
+  it('19. criar evento de Casa', async () => {
+    const regionalId = await createRegional()
+    const administracaoId = crypto.randomUUID()
+    await db.insert(administracoes).values({ id: administracaoId, nome: 'Adm', regionalId }).run()
+    const setorId = crypto.randomUUID()
+    await db.insert(setores).values({ id: setorId, nome: 'Setor', administracaoId }).run()
+    const casaId = crypto.randomUUID()
+    await db.insert(casas).values({ id: casaId, nome: 'Casa', setorId }).run()
+
+    const res = await app.request('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Evento Casa',
+        modalidade: 'ONLINE',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        urlOnline: 'https://meet.google.com/abc',
+        casaId
+      })
+    })
+    expect(res.status).toBe(201)
+  })
+
+  it('20. criar evento de Grupo de Trabalho', async () => {
+    const regionalId = await createRegional()
+    const grupoTrabalhoId = crypto.randomUUID()
+    await db.insert(gruposTrabalho).values({ id: grupoTrabalhoId, nome: 'GT', regionalId }).run()
+
+    const res = await app.request('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Evento GT',
+        modalidade: 'ONLINE',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        urlOnline: 'https://meet.google.com/abc',
+        grupoTrabalhoId
+      })
+    })
+    expect(res.status).toBe(201)
   })
 })
