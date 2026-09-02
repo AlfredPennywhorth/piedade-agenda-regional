@@ -151,11 +151,28 @@ Essa regra é validada tanto na API (Zod superRefine) quanto no D1 (CHECK constr
 - O fim do evento (`fim_em`) deve ser sempre estritamente posterior ao seu início (`inicio_em`).
 - O evento não pode atravessar mais de um dia considerando o timezone operacional `America/Sao_Paulo`.
 
+## Entidades da Sprint S05 — Recorrência de Eventos
+
+### `series_recorrencia`
+
+Modela a regra de recorrência, isolada da materialização física.
+Campos principais:
+- `frequencia` — DIARIA, SEMANAL, QUINZENAL, MENSAL_DIA_FIXO, MENSAL_POSICAO_SEMANA
+- `data_inicio`, `data_fim` — Obrigatórias, ditam o horizonte de materialização (YYYY-MM-DD em fuso local).
+- `horario_inicio`, `horario_fim` — Horários estáticos (America/Sao_Paulo).
+- Demais atributos herdam características do Evento (título, escopo institucional, url_online, etc).
+
+### Alterações em `eventos`
+
+Para suportar a recorrência, a tabela `eventos` recebeu:
+- `serie_recorrencia_id` — Vínculo FK para identificar a qual série a ocorrência pertence.
+- `recorrencia_excecao` — Flag indicando se a ocorrência sofreu mutação individual ("SOMENTE ESTA"), desconectando algumas das regras da matriz, mas mantendo a FK.
+
 ---
 
 ## Integridade referencial
 
-As entidades da S02, S03 e S04 utilizam foreign keys para garantir a validade dos relacionamentos (membros, casas, vínculos, locais, eventos). Nos testes SQLite, `foreign_keys = ON` é explicitamente habilitado.
+As entidades da S02, S03, S04 e S05 utilizam foreign keys para garantir a validade dos relacionamentos (membros, casas, vínculos, locais, eventos, series_recorrencia). Nos testes SQLite, `foreign_keys = ON` é explicitamente habilitado.
 
 ---
 
@@ -181,9 +198,10 @@ As entidades da S02, S03 e S04 utilizam foreign keys para garantir a validade do
 | `links_ativacao`      | Finalizado   | S03           |
 | `sessoes`             | Finalizado   | S03           |
 | `tentativas_acesso`   | Finalizado   | S03           |
-| `locais`              | Implementado | S04           |
-| `eventos`             | Implementado | S04           |
+| `locais`              | Finalizado   | S04           |
+| `eventos`             | Finalizado   | S04           |
+| `series_recorrencia`  | Implementado | S05           |
 | `reunioes`            | Planejado    | Sprint futura |
 | `convocacoes`         | Planejado    | Sprint futura |
 
-> **Status:** Modelo base (S01), Membros e Vínculos (S02), Autenticação (S03) preservados, e Locais e Eventos adicionados e validados na S04 via Migration 0004.
+> **Status:** Modelo base (S01), Membros e Vínculos (S02), Autenticação (S03), e Locais/Eventos (S04) preservados. Séries de Recorrência (S05) introduzidas pela Migration 0005.

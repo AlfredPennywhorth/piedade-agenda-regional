@@ -15,7 +15,9 @@ export * from './schemas/vinculos'
 export * from './schemas/auth'
 export * from './schemas/locais'
 export * from './schemas/eventos'
+export * from './schemas/series'
 export * from './utils/date-utils'
+export * from './utils/recurrence-engine'
 
 
 // ============================================================

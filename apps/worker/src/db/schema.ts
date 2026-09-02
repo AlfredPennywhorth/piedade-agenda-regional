@@ -249,6 +249,53 @@ export const locais = sqliteTable('locais', {
   ...timestampsS02,
 })
 
+export const seriesRecorrencia = sqliteTable('series_recorrencia', {
+  id: text('id').primaryKey(),
+  titulo: text('titulo').notNull(),
+  descricao: text('descricao'),
+  pauta: text('pauta'),
+  modalidade: text('modalidade').notNull(),
+  
+  frequencia: text('frequencia').notNull(), // DIARIA, SEMANAL, QUINZENAL, MENSAL_DIA_FIXO, MENSAL_POSICAO_SEMANA
+  intervalo: integer('intervalo').notNull().default(1),
+  dataInicio: text('data_inicio').notNull(), // YYYY-MM-DD (local America/Sao_Paulo)
+  dataFim: text('data_fim').notNull(),       // YYYY-MM-DD (local America/Sao_Paulo)
+  horarioInicio: text('horario_inicio').notNull(), // HH:MM
+  horarioFim: text('horario_fim').notNull(),       // HH:MM
+  timezone: text('timezone').notNull().default('America/Sao_Paulo'),
+  
+  diaSemana: integer('dia_semana'), // 0-6
+  diaMes: integer('dia_mes'), // 1-31
+  posicaoSemanaMes: integer('posicao_semana_mes'), // 1-5, -1
+  
+  localId: text('local_id').references(() => locais.id),
+  urlOnline: text('url_online'),
+  organizadorMembroId: text('organizador_membro_id').references(() => membros.id),
+  
+  regionalId: text('regional_id').references(() => regionais.id),
+  administracaoId: text('administracao_id').references(() => administracoes.id),
+  setorId: text('setor_id').references(() => setores.id),
+  casaId: text('casa_id').references(() => casas.id),
+  grupoTrabalhoId: text('grupo_trabalho_id').references(() => gruposTrabalho.id),
+  
+  observacoes: text('observacoes'),
+  ativo: ativoDefault,
+  ...timestampsS02,
+}, table => ({
+  checkEscopo: check(
+    'check_serie_escopo_unico',
+    sql`
+      (CASE WHEN ${table.regionalId} IS NOT NULL THEN 1 ELSE 0 END) +
+      (CASE WHEN ${table.administracaoId} IS NOT NULL THEN 1 ELSE 0 END) +
+      (CASE WHEN ${table.setorId} IS NOT NULL THEN 1 ELSE 0 END) +
+      (CASE WHEN ${table.casaId} IS NOT NULL THEN 1 ELSE 0 END) +
+      (CASE WHEN ${table.grupoTrabalhoId} IS NOT NULL THEN 1 ELSE 0 END) = 1
+    `
+  ),
+  idxDataInicio: index('idx_series_data_inicio').on(table.dataInicio),
+  idxAtivo: index('idx_series_ativo').on(table.ativo),
+}))
+
 export const eventos = sqliteTable('eventos', {
   id: text('id').primaryKey(), // UUID
   titulo: text('titulo').notNull(),
@@ -269,6 +316,8 @@ export const eventos = sqliteTable('eventos', {
   grupoTrabalhoId: text('grupo_trabalho_id').references(() => gruposTrabalho.id),
 
   observacoes: text('observacoes'),
+  serieRecorrenciaId: text('serie_recorrencia_id').references(() => seriesRecorrencia.id),
+  recorrenciaExcecao: integer('recorrencia_excecao', { mode: 'boolean' }).notNull().default(false),
   ativo: ativoDefault,
   ...timestampsS02,
 }, table => ({
@@ -285,4 +334,5 @@ export const eventos = sqliteTable('eventos', {
   idxInicioEm: index('idx_eventos_inicio_em').on(table.inicioEm),
   idxAtivo: index('idx_eventos_ativo').on(table.ativo),
   idxLocalId: index('idx_eventos_local_id').on(table.localId),
+  idxSerieRecorrenciaId: index('idx_eventos_serie_recorrencia_id').on(table.serieRecorrenciaId),
 }))

@@ -34,6 +34,24 @@ Este diretório contém a documentação da API do projeto **Agenda Regional Sã
 - **Validação de Data**: O campo `fimEm` deve ser posterior ao `inicioEm`. O evento inteiro (início e fim) deve estar compreendido no mesmo dia, considerando o fuso `America/Sao_Paulo`. As datas são persistidas e retornadas em ISO 8601 / UTC.
 - **Escopo Institucional**: Cada evento exige e aceita **exatamente um** escopo institucional (`regionalId`, `administracaoId`, `setorId`, `casaId` ou `grupoTrabalhoId`).
 
+## Rotas Séries de Recorrência (S05)
+
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/api/v1/series-recorrencia` | Lista as séries de recorrência. Filtro opcional: `?ativo=true/false` |
+| GET | `/api/v1/series-recorrencia/:id` | Retorna os detalhes de uma série |
+| POST | `/api/v1/series-recorrencia` | Cria uma nova série e materializa os eventos automaticamente |
+| PATCH | `/api/v1/series-recorrencia/:id` | Atualiza a série e gerencia os eventos vinculados de acordo com o `updateMode` |
+
+### Regras Essenciais da S05
+- **Materialização no Banco**: A recorrência não é resolvida sob demanda; ao criar uma série, a engine gera *física e independentemente* todos os eventos na tabela `eventos` com o campo `serie_recorrencia_id` associado.
+- **Data Final Obrigatória**: A série possui horizonte de materialização delimitado (usualmente 1 ano).
+- **Timezone Estrito**: O fuso da série é amarrado a `America/Sao_Paulo`. A materialização dos eventos injeta na base as datas UTC perfeitamente alinhadas (ex: 09:00 BRT -> 12:00 UTC).
+- **Modos de Atualização (`updateMode`)**: 
+  - `THIS`: Preserva a série, edita o evento único em questão e o marca como `recorrencia_excecao = true`.
+  - `THIS_AND_FUTURE`: Encerra a série A no evento escolhido e cria a série B daquele ponto em diante.
+  - `ALL`: Edita as especificações da série original. Mantém os eventos do passado intocados, apaga os futuros não excepcionados e os recria com base nas novas especificações da regra.
+
 ## Formato de resposta
 
 ### Sucesso
@@ -55,7 +73,6 @@ Este diretório contém a documentação da API do projeto **Agenda Regional Sã
 
 ## Limites de Evolução (Planejamento Futuro)
 
-- **S05** — recorrência
 - **S06** — convocação
 - **S07** — agenda/PWA
 - **S08** — RSVP
@@ -63,4 +80,4 @@ Este diretório contém a documentação da API do projeto **Agenda Regional Sã
 - **S10** — notificações
 - **S11** — check-in
 
-> **Status:** Rotas de suporte (S00) operacionais. Rotas institucionais e de vínculos (S01, S02), autenticação (S03) e eventos/locais base (S04) implementadas.
+> **Status:** Rotas de suporte (S00) operacionais. Rotas institucionais e de vínculos (S01, S02), autenticação (S03), eventos/locais base (S04) e séries de recorrência (S05) implementadas.
