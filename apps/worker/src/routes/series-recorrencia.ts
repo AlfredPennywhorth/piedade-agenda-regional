@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, gt, gte, lte, inArray } from 'drizzle-orm'
+import { eq, and, gte } from 'drizzle-orm'
 import { eventos, seriesRecorrencia } from '../db/schema'
 import { SerieCreate, SerieUpdatePayload, generateOccurrences, getLocalDateFromUtc } from '@piedade/shared'
 import { EventoCreate } from '@piedade/shared'

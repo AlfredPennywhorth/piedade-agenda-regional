@@ -172,7 +172,7 @@ export function generateOccurrences(input: RecurrenceInput): RecurrenceOccurrenc
   }
   else if (input.frequencia === 'MENSAL_DIA_FIXO') {
     const targetDay = input.diaMes ?? 1
-    let [y, m, d] = currentDate.split('-').map(Number)
+    const [y, m] = currentDate.split('-').map(Number)
     let monthsToAdd = 0
     
     while (true) {
@@ -201,7 +201,7 @@ export function generateOccurrences(input: RecurrenceInput): RecurrenceOccurrenc
   }
   else if (input.frequencia === 'MENSAL_POSICAO_SEMANA') {
     const position = input.posicaoSemanaMes ?? 1
-    let [y, m, d] = currentDate.split('-').map(Number)
+    const [y, m] = currentDate.split('-').map(Number)
     let monthsToAdd = 0
     
     while (true) {
