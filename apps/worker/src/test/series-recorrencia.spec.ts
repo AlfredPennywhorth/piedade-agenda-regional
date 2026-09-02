@@ -4,7 +4,7 @@ import { setupDb } from './setup'
 import { createApp } from '../index'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import BetterSqlite3 from 'better-sqlite3'
-import { regionais, locais, eventos, seriesRecorrencia } from '../db/schema'
+import { regionais, locais, eventos, seriesRecorrencia, administracoes } from '../db/schema'
 import { eq } from 'drizzle-orm'
 
 import { createUtcDateFromSaoPaulo, getLocalDateFromUtc } from '@piedade/shared'

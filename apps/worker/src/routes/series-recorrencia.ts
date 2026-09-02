@@ -216,6 +216,12 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       
       const pivotDateIso = existingEvent.inicioEm
       
+      const newSerieId = crypto.randomUUID()
+      const mergedSerieData = {
+        ...existingSerie,
+        ...parsed.changes
+      }
+      
       // Cálculo correto com timezone
       const newStartDateStr = getLocalDateFromUtc(pivotDateIso)
       mergedSerieData.dataInicio = newStartDateStr

@@ -92,7 +92,7 @@ function addDays(dateStr: string, days: number): string {
  * Entao nós não arredondamos para trás.
  */
 function addMonthsExactDay(dateStr: string, months: number, targetDay: number): string | null {
-  const [y, m, d] = dateStr.split('-').map(Number)
+  const [y, m] = dateStr.split('-').map(Number)
   const dt = new Date(Date.UTC(y, m - 1 + months, 1))
   const newY = dt.getUTCFullYear()
   const newM = dt.getUTCMonth()
