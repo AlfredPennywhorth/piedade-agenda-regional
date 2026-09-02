@@ -319,4 +319,187 @@ describe('Eventos API (S04)', () => {
       }).run()
     }).rejects.toThrow(/CHECK constraint failed: check_evento_escopo_unico/)
   })
+
+  // =========================================================================
+  // PATCH REGRESSION TESTS (S04 Corrreções)
+  // =========================================================================
+  it('a) PRESENCIAL -> ONLINE sem urlOnline deve falhar no PATCH', async () => {
+    const regionalId = await createRegional()
+    const localId = await createLocal()
+
+    const createRes = await app.request('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Patch Test',
+        modalidade: 'PRESENCIAL',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        localId,
+        regionalId
+      })
+    })
+    const { id } = await createRes.json()
+
+    const patchRes = await app.request(`/api/v1/eventos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ modalidade: 'ONLINE' }) // Misses urlOnline
+    })
+    expect(patchRes.status).toBe(400)
+  })
+
+  it('b) ONLINE -> HIBRIDO sem localId deve falhar no PATCH', async () => {
+    const regionalId = await createRegional()
+
+    const createRes = await app.request('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Patch Test',
+        modalidade: 'ONLINE',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        urlOnline: 'https://meet.google.com/abc',
+        regionalId
+      })
+    })
+    const { id } = await createRes.json()
+
+    const patchRes = await app.request(`/api/v1/eventos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ modalidade: 'HIBRIDO' }) // Misses localId
+    })
+    expect(patchRes.status).toBe(400)
+  })
+
+  it('c) alterar apenas fimEm para horário anterior ao inicioEm deve falhar', async () => {
+    const regionalId = await createRegional()
+
+    const createRes = await app.request('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Patch Test',
+        modalidade: 'ONLINE',
+        inicioEm: validDate2,
+        fimEm: '2026-09-10T14:00:00Z',
+        urlOnline: 'https://meet.google.com/abc',
+        regionalId
+      })
+    })
+    const { id } = await createRes.json()
+
+    const patchRes = await app.request(`/api/v1/eventos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fimEm: validDate1 }) // validDate1 is BEFORE validDate2
+    })
+    expect(patchRes.status).toBe(400)
+  })
+
+  it('d) PATCH que introduza segundo escopo deve falhar', async () => {
+    const regionalId = await createRegional()
+
+    const createRes = await app.request('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Patch Test',
+        modalidade: 'ONLINE',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        urlOnline: 'https://meet.google.com/abc',
+        regionalId
+      })
+    })
+    const { id } = await createRes.json()
+
+    const patchRes = await app.request(`/api/v1/eventos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ administracaoId: crypto.randomUUID() }) // Introduces a second scope
+    })
+    expect(patchRes.status).toBe(400)
+  })
+
+  it('e) PATCH válido deve continuar funcionando', async () => {
+    const regionalId = await createRegional()
+
+    const createRes = await app.request('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Patch Test',
+        modalidade: 'ONLINE',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        urlOnline: 'https://meet.google.com/abc',
+        regionalId
+      })
+    })
+    const { id } = await createRes.json()
+
+    const patchRes = await app.request(`/api/v1/eventos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pauta: 'Nova pauta test' }) 
+    })
+    expect(patchRes.status).toBe(200)
+  })
+
+  // =========================================================================
+  // URL PROTOCOL TESTS (S04 Corrreções)
+  // =========================================================================
+  it('URL https válida', async () => {
+    const regionalId = await createRegional()
+    const res = await app.request('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Evento Online HTTPS',
+        modalidade: 'ONLINE',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        urlOnline: 'https://meet.google.com/abc',
+        regionalId
+      })
+    })
+    expect(res.status).toBe(201)
+  })
+
+  it('URL http válida', async () => {
+    const regionalId = await createRegional()
+    const res = await app.request('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Evento Online HTTP',
+        modalidade: 'ONLINE',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        urlOnline: 'http://meet.google.com/abc',
+        regionalId
+      })
+    })
+    expect(res.status).toBe(201)
+  })
+
+  it('URL ftp inválida', async () => {
+    const regionalId = await createRegional()
+    const res = await app.request('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Evento Online FTP',
+        modalidade: 'ONLINE',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        urlOnline: 'ftp://meet.google.com/abc',
+        regionalId
+      })
+    })
+    expect(res.status).toBe(400)
+  })
 })

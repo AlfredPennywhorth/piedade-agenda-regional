@@ -110,4 +110,55 @@ describe('Locais API (S04)', () => {
 
     expect(res.status).toBe(400)
   })
+
+  // =========================================================================
+  // URL PROTOCOL TESTS (S04 Corrreções)
+  // =========================================================================
+  it('URL https válida no local', async () => {
+    const res = await app.request('/api/v1/locais', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome: 'Local Teste',
+        endereco: 'Rua Teste',
+        numero: '123',
+        cidade: 'São Paulo',
+        uf: 'SP',
+        urlMaps: 'https://maps.google.com/abc'
+      })
+    })
+    expect(res.status).toBe(201)
+  })
+
+  it('URL http válida no local', async () => {
+    const res = await app.request('/api/v1/locais', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome: 'Local Teste',
+        endereco: 'Rua Teste',
+        numero: '123',
+        cidade: 'São Paulo',
+        uf: 'SP',
+        urlMaps: 'http://maps.google.com/abc'
+      })
+    })
+    expect(res.status).toBe(201)
+  })
+
+  it('URL ftp inválida no local', async () => {
+    const res = await app.request('/api/v1/locais', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome: 'Local Teste',
+        endereco: 'Rua Teste',
+        numero: '123',
+        cidade: 'São Paulo',
+        uf: 'SP',
+        urlMaps: 'ftp://maps.google.com/abc'
+      })
+    })
+    expect(res.status).toBe(400)
+  })
 })

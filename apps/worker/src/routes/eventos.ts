@@ -66,6 +66,10 @@ eventosRouter.patch('/:id', async (c) => {
     const existing = await db.select().from(eventos).where(eq(eventos.id, id)).get()
     if (!existing) return c.json({ error: 'Evento não encontrado' }, 404)
 
+    // Validar estado final mesclado (existente + patch) com EventoCreate
+    const merged = { ...existing, ...parsed }
+    EventoCreate.parse(merged)
+
     const updated = await db.update(eventos)
       .set({ ...parsed, updatedAt: new Date().toISOString() })
       .where(eq(eventos.id, id))

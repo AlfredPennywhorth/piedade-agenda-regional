@@ -1,5 +1,10 @@
 import { z } from 'zod'
 
+const HttpUrl = z.string().url('URL inválida').refine(
+  val => val.startsWith('http://') || val.startsWith('https://'), 
+  { message: 'URL deve usar protocolo http ou https' }
+)
+
 export const LocalCreate = z.object({
   nome: z.string().min(1, 'Nome é obrigatório'),
   endereco: z.string().min(1, 'Endereço é obrigatório'),
@@ -12,8 +17,8 @@ export const LocalCreate = z.object({
   referencia: z.string().nullable().optional(),
   latitude: z.number().nullable().optional(),
   longitude: z.number().nullable().optional(),
-  urlMaps: z.string().url('URL inválida').nullable().optional(),
-  urlWaze: z.string().url('URL inválida').nullable().optional(),
+  urlMaps: HttpUrl.nullable().optional(),
+  urlWaze: HttpUrl.nullable().optional(),
   ativo: z.boolean().default(true).optional(),
 })
 

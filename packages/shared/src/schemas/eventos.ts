@@ -4,6 +4,11 @@ import { isSameDayInSaoPaulo } from '../utils/date-utils'
 export const ModalidadeEvento = z.enum(['PRESENCIAL', 'ONLINE', 'HIBRIDO'])
 export type ModalidadeEventoEnum = z.infer<typeof ModalidadeEvento>
 
+const HttpUrl = z.string().url('URL inválida').refine(
+  val => val.startsWith('http://') || val.startsWith('https://'), 
+  { message: 'URL deve usar protocolo http ou https' }
+)
+
 const baseEvento = {
   titulo: z.string().min(1, 'Título é obrigatório'),
   descricao: z.string().nullable().optional(),
@@ -12,7 +17,7 @@ const baseEvento = {
   inicioEm: z.string().datetime({ message: 'A data de início deve ser uma string ISO 8601 válida' }),
   fimEm: z.string().datetime({ message: 'A data de fim deve ser uma string ISO 8601 válida' }),
   localId: z.string().uuid('Local ID inválido').nullable().optional(),
-  urlOnline: z.string().url('URL inválida').nullable().optional(),
+  urlOnline: HttpUrl.nullable().optional(),
   organizadorMembroId: z.string().uuid('Membro ID inválido').nullable().optional(),
   
   // Escopos (pelo menos um e no máximo um)
