@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ModalidadeEvento, baseEvento } from './eventos'
 import { ModalidadeEvento } from './eventos'
 
 export const FrequenciaSerie = z.enum([
@@ -111,13 +112,22 @@ export type SerieCreateInput = z.infer<typeof SerieCreate>
 export const SerieUpdateMode = z.enum(['THIS', 'THIS_AND_FUTURE', 'ALL'])
 export type SerieUpdateModeEnum = z.infer<typeof SerieUpdateMode>
 
-export const SerieUpdatePayload = z.object({
-  updateMode: SerieUpdateMode,
-  fromEventId: z.string().uuid('ID do evento de origem inválido').optional(), // Obrigatório para THIS e THIS_AND_FUTURE
-  changes: z.object(baseSerie).partial(),
-}).superRefine((data: any, ctx: z.RefinementCtx) => {
-  if (data.updateMode !== 'ALL' && !data.fromEventId) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'fromEventId é obrigatório para edição com escopo THIS ou THIS_AND_FUTURE', path: ['fromEventId'] })
-  }
-})
+export const SerieUpdatePayload = z.discriminatedUnion('updateMode', [
+  z.object({
+    updateMode: z.literal('THIS'),
+    fromEventId: z.string().uuid('ID do evento de origem inválido'),
+    changes: z.object(baseEvento).partial().strict('O modo THIS permite apenas campos de Evento e rejeita campos de Série (ex: dataFim, frequencia)')
+  }),
+  z.object({
+    updateMode: z.literal('THIS_AND_FUTURE'),
+    fromEventId: z.string().uuid('ID do evento de origem inválido'),
+    changes: z.object(baseSerie).partial().strict('Campos desconhecidos rejeitados')
+  }),
+  z.object({
+    updateMode: z.literal('ALL'),
+    fromEventId: z.string().uuid().optional(),
+    changes: z.object(baseSerie).partial().strict('Campos desconhecidos rejeitados')
+  })
+])
+
 export type SerieUpdatePayloadInput = z.infer<typeof SerieUpdatePayload>
