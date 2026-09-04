@@ -65,4 +65,5 @@ export function AgendaView() {
       )}
     </div>
   )
+}
 
