@@ -469,4 +469,87 @@ describe('Series Recorrencia API (S05)', () => {
       }).run()
     }).toThrow(/FOREIGN KEY constraint failed/)
   })
+  
+  it('25. ALL com ativo=false inativa série e eventos futuros sem apagar ou regenerar', async () => {
+    // 1. Criar série futura distante para isolar do relógio (2099)
+    const regionalId = await createRegional()
+    const createRes = await app.request('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Série Inativação Teste',
+        modalidade: 'ONLINE',
+        urlOnline: 'https://meet.google.com/test',
+        horarioInicio: '09:00',
+        horarioFim: '10:00',
+        dataInicio: '2099-01-01',
+        dataFim: '2099-01-05',
+        frequencia: 'DIARIA',
+        intervalo: 1,
+        regionalId
+      })
+    })
+    expect(createRes.status).toBe(201)
+    const { serie } = await createRes.json()
+    const serieId = serie.id
+
+    // 2. Obter as ocorrências materializadas
+    let ocorrencias = db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serieId)).all()
+    expect(ocorrencias.length).toBe(5)
+
+    // 3. Escolher uma ocorrência e transformá-la em exceção via PATCH THIS
+    const evParaExcecao = ocorrencias[2]
+    const patchThisRes = await app.request(`/api/v1/series-recorrencia/${serieId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'THIS',
+        fromEventId: evParaExcecao.id,
+        changes: { titulo: 'Exceção Modificada' }
+      })
+    })
+    expect(patchThisRes.status).toBe(200)
+
+    // 4. Capturar estado ANTES da inativação
+    ocorrencias = db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serieId)).all()
+    const totalAntes = ocorrencias.length
+    const idsAntes = ocorrencias.map((o: any) => o.id).sort()
+    
+    // Verifica se a exceção foi criada
+    const excecaoCriada = ocorrencias.find((o: any) => o.id === evParaExcecao.id)
+    expect(excecaoCriada.recorrenciaExcecao).toBe(1)
+    expect(excecaoCriada.ativo).toBe(1) // O SQLite booleano retorna 1
+
+    // 5. Executar PATCH ALL com ativo = false
+    const patchAllRes = await app.request(`/api/v1/series-recorrencia/${serieId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'ALL',
+        changes: { ativo: false }
+      })
+    })
+    expect(patchAllRes.status).toBe(200)
+
+    // 6. Afirmar resultados PÓS inativação
+    const seriePos = db.select().from(seriesRecorrencia).where(eq(seriesRecorrencia.id, serieId)).get()
+    expect(seriePos.ativo).toBe(0) // 0 = false
+
+    const ocorrenciasPos = db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serieId)).all()
+    const totalPos = ocorrenciasPos.length
+    const idsPos = ocorrenciasPos.map((o: any) => o.id).sort()
+
+    // - Quantidade total não mudou, conjunto de IDs não mudou
+    expect(totalPos).toBe(totalAntes)
+    expect(idsPos).toEqual(idsAntes)
+
+    // - TODOS os eventos estão inativos, inclusive a exceção
+    for (const o of ocorrenciasPos) {
+      expect(o.ativo).toBe(0)
+    }
+
+    // A exceção ainda deve existir e estar como exceção (embora inativa)
+    const excecaoPos = ocorrenciasPos.find((o: any) => o.id === evParaExcecao.id)
+    expect(excecaoPos.recorrenciaExcecao).toBe(1)
+  })
 })
