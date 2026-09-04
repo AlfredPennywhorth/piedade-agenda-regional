@@ -324,6 +324,51 @@ describe('S06 - Convocações', () => {
       expect(err.message).toMatch(/UNIQUE constraint failed/)
     }
   })
+
+  it('28. OCC garante que estado alterado evita publicação de snapshot obsoleto', async () => {
+    const ctx = await setupBaseData()
+    const convRes = await app.request('/api/v1/convocacoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventoId: ctx.evSetorId }) })
+    const conv = await convRes.json()
+    await app.request(`/api/v1/convocacoes/${conv.id}/funcoes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ funcaoId: ctx.f1Id }) })
+    
+    // Para simular a concorrência (estado alterado ANTES do commit final),
+    // vamos interceptar o db.batch/transaction (executeAtomic) localmente
+    // alterando o updated_at no banco de dados na surdina, para que a query do OCC falhe.
+    
+    // Adiciona um trigger temporário que dispara ANTES do update otimista da convocacao
+    // alterando a própria tabela convocacoes (isso simula que outro processo alterou o status/updatedAt
+    // logoo após o select e antes do executeAtomic processar a atualização otimista).
+    // O SQLite não permite atualizar a mesma tabela no trigger BEFORE UPDATE dela mesma,
+    // mas como a nossa cláusula de OCC usa `updated_at = (valor lido)`,
+    // podemos simplesmente forçar o valor lido ser falso.
+    
+    // Como a rota depende do db do contexto, a forma mais limpa em Node.js com better-sqlite3:
+    const originalUpdate = db.update
+    let interceptado = false
+    db.update = (...args: any[]) => {
+      if (!interceptado) {
+        interceptado = true
+        // Simulando que ALGUÉM alterou o updatedAt no banco DEPOIS da leitura
+        sqlite.prepare(`UPDATE convocacoes SET updated_at = '2099-01-01T00:00:00.000Z' WHERE id = ?`).run(conv.id)
+      }
+      return originalUpdate.apply(db, args)
+    }
+
+    const pubRes = await app.request(`/api/v1/convocacoes/${conv.id}/publicar`, { method: 'POST' })
+    expect(pubRes.status).toBe(409) // OCC Abort
+    const pubBody = await pubRes.json()
+    expect(pubBody.error).toMatch(/Conflito: a convocação foi alterada/)
+
+    // Restaurar mock
+    db.update = originalUpdate
+
+    // Confirmar que nada mudou
+    const getRes = await app.request(`/api/v1/convocacoes/${conv.id}`)
+    expect((await getRes.json()).status).toBe('RASCUNHO')
+
+    const destRes = await app.request(`/api/v1/convocacoes/${conv.id}/destinatarios`)
+    expect((await destRes.json()).length).toBe(0)
+  })
 })
 
 import { sql } from 'drizzle-orm'

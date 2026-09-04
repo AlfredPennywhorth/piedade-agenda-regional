@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, sql } from 'drizzle-orm'
 import { convocacoes, convocacaoFuncoes, convocacaoDestinatarios, convocacaoDestinatarioEvidencias, eventos, vinculosFuncionais, membros, funcoes } from '../db/schema'
 import { ConvocacaoCreate, ConvocacaoUpdate, ConvocacaoFuncaoCreate } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
@@ -234,22 +234,44 @@ convocacoesRouter.post('/:id/publicar', async (c) => {
   try {
     await executeAtomic(db, (qdb) => {
       const queries = []
+      
+      // 1. UPDATE OTIMISTA
+      // Só atualiza se o updatedAt não foi modificado concorrentemente
       queries.push(
         qdb.update(convocacoes)
           .set({ status: 'PUBLICADA', publicadaEm: nowIso, updatedAt: nowIso })
-          .where(eq(convocacoes.id, id))
+          .where(and(
+            eq(convocacoes.id, id),
+            eq(convocacoes.status, 'RASCUNHO'),
+            eq(convocacoes.updatedAt, convocacao.updatedAt)
+          ))
       )
+      
+      // 2. INSERÇÕES
       if (destinatariosToInsert.length > 0) {
         queries.push(qdb.insert(convocacaoDestinatarios).values(destinatariosToInsert))
       }
       if (evidenciasToInsert.length > 0) {
         queries.push(qdb.insert(convocacaoDestinatarioEvidencias).values(evidenciasToInsert))
       }
+      
+      // 3. ABORTO CONDICIONAL VIA CONSTRAINT
+      // Se a row não foi atualizada no passo 1 (concorrência), o updatedAt ainda é antigo.
+      // Nesse caso, injetamos 'ABORT_OCC' no status, forçando o D1 a lançar CHECK constraint failed e abortar tudo.
+      queries.push(
+        qdb.update(convocacoes)
+          .set({ status: sql`CASE WHEN ${convocacoes.updatedAt} = ${nowIso} THEN ${convocacoes.status} ELSE 'ABORT_OCC' END` as any })
+          .where(eq(convocacoes.id, id))
+      )
+      
       return queries
     })
     
     return c.json({ success: true, destinatariosGerados: destinatariosToInsert.length })
-  } catch {
+  } catch (err: any) {
+    if (err.message && err.message.includes('check_status_convocacao')) {
+      return c.json({ error: 'Conflito: a convocação foi alterada enquanto o snapshot era processado.' }, 409)
+    }
     return c.json({ error: 'Falha ao materializar destinatários' }, 400)
   }
 })
