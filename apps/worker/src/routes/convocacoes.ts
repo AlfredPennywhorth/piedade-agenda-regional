@@ -202,8 +202,8 @@ convocacoesRouter.post('/:id/publicar', async (c) => {
     agrupadoPorMembro.get(dest.membroId)!.push({ funcaoId: dest.funcaoId, vinculoId: dest.vinculoId })
   }
 
-  const destinatariosToInsert = []
-  const evidenciasToInsert = []
+  const destinatariosToInsert: typeof convocacaoDestinatarios.$inferInsert[] = []
+  const evidenciasToInsert: typeof convocacaoDestinatarioEvidencias.$inferInsert[] = []
 
   for (const [membroId, evidencias] of agrupadoPorMembro.entries()) {
     const destId = crypto.randomUUID()
