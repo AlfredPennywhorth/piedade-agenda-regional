@@ -263,7 +263,7 @@ describe('Series Recorrencia API (S05)', () => {
     const postRes = await app.request('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2026-09-01', dataFim: '2026-09-05' })
+      body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2099-09-01', dataFim: '2099-09-05' })
     })
     const serieId = (await postRes.json()).serie.id
     const evs = db.select().from(eventos).all()
