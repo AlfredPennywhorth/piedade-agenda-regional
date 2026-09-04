@@ -134,6 +134,13 @@ function getPositionalDayOfMonth(year: number, month: number, targetDayOfWeek: n
 export function generateOccurrences(input: RecurrenceInput): RecurrenceOccurrence[] {
   const occurrences: RecurrenceOccurrence[] = []
   
+  const pushOccurrence = (occ: RecurrenceOccurrence) => {
+    if (occurrences.length >= 400) {
+      throw new Error('A série excede o limite máximo de 400 ocorrências')
+    }
+    occurrences.push(occ)
+  }
+
   let currentDate = input.dataInicio
   const endDate = input.dataFim
   const interval = input.intervalo || 1
@@ -147,7 +154,7 @@ export function generateOccurrences(input: RecurrenceInput): RecurrenceOccurrenc
   
   if (input.frequencia === 'DIARIA') {
     while (currentDate <= endDate) {
-      occurrences.push({
+      pushOccurrence({
         inicioEm: createUtcDateFromSaoPaulo(currentDate, input.horarioInicio),
         fimEm: createUtcDateFromSaoPaulo(currentDate, input.horarioFim)
       })
@@ -163,7 +170,7 @@ export function generateOccurrences(input: RecurrenceInput): RecurrenceOccurrenc
     }
     
     while (currentDate <= endDate) {
-      occurrences.push({
+      pushOccurrence({
         inicioEm: createUtcDateFromSaoPaulo(currentDate, input.horarioInicio),
         fimEm: createUtcDateFromSaoPaulo(currentDate, input.horarioFim)
       })
@@ -180,7 +187,7 @@ export function generateOccurrences(input: RecurrenceInput): RecurrenceOccurrenc
       if (candidateDate) {
         if (candidateDate > endDate) break
         if (candidateDate >= input.dataInicio) {
-          occurrences.push({
+          pushOccurrence({
             inicioEm: createUtcDateFromSaoPaulo(candidateDate, input.horarioInicio),
             fimEm: createUtcDateFromSaoPaulo(candidateDate, input.horarioFim)
           })
@@ -214,7 +221,7 @@ export function generateOccurrences(input: RecurrenceInput): RecurrenceOccurrenc
       if (candidateDate) {
         if (candidateDate > endDate) break
         if (candidateDate >= input.dataInicio) {
-          occurrences.push({
+          pushOccurrence({
             inicioEm: createUtcDateFromSaoPaulo(candidateDate, input.horarioInicio),
             fimEm: createUtcDateFromSaoPaulo(candidateDate, input.horarioFim)
           })

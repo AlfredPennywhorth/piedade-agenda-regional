@@ -125,6 +125,43 @@ describe('Series Recorrencia API (S05)', () => {
     expect(json.generatedOccurrences).toBe(3) // 1st sunday of Sept, Oct, Nov
   })
 
+  it('5.1 rejeitar intervalo diferente de 1', async () => {
+    const regionalId = await createRegional()
+    const res = await app.request('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...basePayload, regionalId, intervalo: 2 })
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('5.2 rejeitar série com > 400 ocorrências sem persistir nada', async () => {
+    const regionalId = await createRegional()
+    const oldCountSeries = db.select().from(seriesRecorrencia).all().length
+    const oldCountEvents = db.select().from(eventos).all().length
+
+    const res = await app.request('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        ...basePayload, 
+        regionalId, 
+        dataInicio: '2026-01-01', 
+        dataFim: '2028-01-01' // 2 anos diarios > 700 dias > 400 
+      })
+    })
+    
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/400 ocorrências/)
+    
+    const newCountSeries = db.select().from(seriesRecorrencia).all().length
+    const newCountEvents = db.select().from(eventos).all().length
+    expect(newCountSeries).toBe(oldCountSeries)
+    expect(newCountEvents).toBe(oldCountEvents)
+  })
+
+
   it('6. rejeitar série sem data final', async () => {
     const regionalId = await createRegional()
     const payload = { ...basePayload, regionalId }

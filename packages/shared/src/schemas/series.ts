@@ -24,7 +24,7 @@ const baseSerie = {
   modalidade: ModalidadeEvento,
   
   frequencia: FrequenciaSerie,
-  intervalo: z.number().int().min(1).default(1),
+  intervalo: z.literal(1).default(1),
   
   dataInicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato deve ser YYYY-MM-DD'),
   dataFim: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato deve ser YYYY-MM-DD'),
