@@ -90,7 +90,8 @@ Este diretório contém a documentação da API do projeto **Agenda Regional Sã
 | POST | `/api/v1/convocacoes/:id/cancelar` | Cancela a convocação (muda para inativa e CANCELADA), preservando todo o histórico do snapshot. |
 
 ### Regras Essenciais da S06
-- **Snapshot Imutável**: A publicação de uma convocação calcula atomicamente quais membros ativos possuem vínculos ativos para as funções selecionadas dentro do estrito escopo institucional do evento. Esta lista é salva em um snapshot (`convocacao_destinatarios`) que não será alterado caso o membro mude de casa ou perca a função no futuro.
+- **Snapshot Imutável e Deduplicado**: A publicação de uma convocação calcula atomicamente quais membros ativos possuem vínculos ativos para as funções selecionadas dentro do estrito escopo institucional do evento. Esta lista é salva em um snapshot (`convocacao_destinatarios`) que não será alterado caso o membro mude de casa ou perca a função no futuro.
+- **Deduplicação de Membro e Evidências Múltiplas**: Cada pessoa aparece estritamente uma única vez como destinatário lógico. Se ela possuir múltiplos vínculos ou funções elegíveis no escopo, todos são salvos como `evidencias` do mesmo destinatário lógico para auditoria.
 - **Escopo Herdado e Rigoroso**: O escopo da convocação é exclusivamente derivado de seu evento. Não há inferência de hierarquia descendente; um evento de Setor convocará estritamente quem tiver um vínculo com a função naquele Setor, ignorando vínculos de Casas sob ele.
 - **Limites de Ciclo de Vida**: Convocação PUBLICADA e CANCELADA não permite alterações em suas funções ou regras.
 

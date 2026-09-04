@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and, inArray } from 'drizzle-orm'
-import { convocacoes, convocacaoFuncoes, convocacaoDestinatarios, eventos, vinculosFuncionais, membros, funcoes } from '../db/schema'
+import { convocacoes, convocacaoFuncoes, convocacaoDestinatarios, convocacaoDestinatarioEvidencias, eventos, vinculosFuncionais, membros, funcoes } from '../db/schema'
 import { ConvocacaoCreate, ConvocacaoUpdate, ConvocacaoFuncaoCreate } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
 
@@ -192,14 +192,44 @@ convocacoesRouter.post('/:id/publicar', async (c) => {
   
   const nowIso = new Date().toISOString()
   
-  const destinatariosToInsert = destinatariosValidos.map((dest: { membroId: string; funcaoId: string; vinculoId: string }) => ({
-    id: crypto.randomUUID(),
-    convocacaoId: id,
-    membroId: dest.membroId,
-    funcaoId: dest.funcaoId,
-    vinculoFuncionalId: dest.vinculoId,
-    createdAt: nowIso
-  }))
+  // Agrupar por membroId para criar destinatários lógicos únicos
+  const agrupadoPorMembro = new Map<string, { funcaoId: string, vinculoId: string }[]>()
+  
+  for (const dest of destinatariosValidos) {
+    if (!agrupadoPorMembro.has(dest.membroId)) {
+      agrupadoPorMembro.set(dest.membroId, [])
+    }
+    agrupadoPorMembro.get(dest.membroId)!.push({ funcaoId: dest.funcaoId, vinculoId: dest.vinculoId })
+  }
+
+  const destinatariosToInsert = []
+  const evidenciasToInsert = []
+
+  for (const [membroId, evidencias] of agrupadoPorMembro.entries()) {
+    const destId = crypto.randomUUID()
+    destinatariosToInsert.push({
+      id: destId,
+      convocacaoId: id,
+      membroId,
+      createdAt: nowIso
+    })
+    
+    // Deduplicar evidências exatas
+    const evidenciasUnicas = new Set<string>()
+    for (const ev of evidencias) {
+      const key = `${ev.funcaoId}_${ev.vinculoId}`
+      if (!evidenciasUnicas.has(key)) {
+        evidenciasUnicas.add(key)
+        evidenciasToInsert.push({
+          id: crypto.randomUUID(),
+          convocacaoDestinatarioId: destId,
+          funcaoId: ev.funcaoId,
+          vinculoFuncionalId: ev.vinculoId,
+          createdAt: nowIso
+        })
+      }
+    }
+  }
 
   try {
     await executeAtomic(db, (qdb) => {
@@ -211,6 +241,9 @@ convocacoesRouter.post('/:id/publicar', async (c) => {
       )
       if (destinatariosToInsert.length > 0) {
         queries.push(qdb.insert(convocacaoDestinatarios).values(destinatariosToInsert))
+      }
+      if (evidenciasToInsert.length > 0) {
+        queries.push(qdb.insert(convocacaoDestinatarioEvidencias).values(evidenciasToInsert))
       }
       return queries
     })
@@ -244,6 +277,16 @@ convocacoesRouter.post('/:id/cancelar', async (c) => {
 convocacoesRouter.get('/:id/destinatarios', async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')
-  const data = await db.select().from(convocacaoDestinatarios).where(eq(convocacaoDestinatarios.convocacaoId, id)).all()
-  return c.json(data)
+  const destinatarios = await db.select().from(convocacaoDestinatarios).where(eq(convocacaoDestinatarios.convocacaoId, id)).all()
+  if (destinatarios.length === 0) return c.json([])
+  
+  const destIds = destinatarios.map((d: any) => d.id)
+  const evidencias = await db.select().from(convocacaoDestinatarioEvidencias).where(inArray(convocacaoDestinatarioEvidencias.convocacaoDestinatarioId, destIds)).all()
+  
+  const resultado = destinatarios.map((d: any) => ({
+    ...d,
+    evidencias: evidencias.filter((e: any) => e.convocacaoDestinatarioId === d.id)
+  }))
+  
+  return c.json(resultado)
 })

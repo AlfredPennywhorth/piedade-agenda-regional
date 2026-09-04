@@ -172,9 +172,12 @@ O banco armazena de forma independente eventos gerados em lote, sendo cada ocorr
   - Campos: ID, eventoId, status (RASCUNHO, PUBLICADA, CANCELADA), observacoes, datas de lifecycle.
   - Herda o escopo institucional diretamente do evento atrelado; não possui escopo próprio.
 - `convocacao_funcoes` — tabela associativa entre convocação e as funções requeridas para o evento (ex: "Porteiro", "Músico").
-- `convocacao_destinatarios` — snapshot materializado no ato da publicação da convocação.
-  - Campos: ID, convocacaoId, membroId, funcaoId, vinculoFuncionalId.
-  - Como é um snapshot, não reflete retroativamente alterações de escopo ou de status de inativação feitas no membro ou no vínculo após a publicação da convocação.
+- `convocacao_destinatarios` — snapshot do destinatário lógico (pessoa).
+  - Campos: ID, convocacaoId, membroId.
+- `convocacao_destinatario_evidencias` — evidências (vínculos e funções) que tornaram aquele destinatário elegível.
+  - Campos: ID, convocacaoDestinatarioId, funcaoId, vinculoFuncionalId.
+  - Um destinatário pode ter múltiplas evidências caso seja elegível por diferentes funções ou vínculos no mesmo escopo.
+  - Como é um snapshot gerado na publicação, não reflete retroativamente alterações feitas no membro ou no vínculo posteriormente.
 
 ### Alterações em `eventos`
 
@@ -215,7 +218,7 @@ As entidades da S02, S03, S04 e S05 utilizam foreign keys para garantir a valida
 | `locais`              | Finalizado   | S04           |
 | `eventos`             | Finalizado   | S04           |
 | `series_recorrencia`  | Implementado | S05           |
+| `convocacoes`         | Implementado | S06           |
 | `reunioes`            | Planejado    | Sprint futura |
-| `convocacoes`         | Planejado    | Sprint futura |
 
 > **Status:** Modelo base (S01), Membros e Vínculos (S02), Autenticação (S03), e Locais/Eventos (S04) preservados. Séries de Recorrência (S05) introduzidas pela Migration 0005.

@@ -123,6 +123,42 @@ describe('S06 - Convocações', () => {
     expect((await destRes.json()).length).toBe(0)
   })
 
+  it('9. deduplica membro com múltiplas funções e cria múltiplas evidências', async () => {
+    const ctx = await setupBaseData()
+    // Criar um novo vinculo para mem1, no mesmo setor, mas para funcao f2
+    // mem1 já possui v1Id associado à f1Id no setId
+    const v5Id = crypto.randomUUID()
+    await db.insert(vinculosFuncionais).values({ id: v5Id, membroId: ctx.mem1Id, funcaoId: ctx.f2Id, setorId: ctx.setId, ativo: true })
+
+    const convRes = await app.request('/api/v1/convocacoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventoId: ctx.evSetorId }) })
+    const conv = await convRes.json()
+    
+    // Associar F1 e F2
+    await app.request(`/api/v1/convocacoes/${conv.id}/funcoes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ funcaoId: ctx.f1Id }) })
+    await app.request(`/api/v1/convocacoes/${conv.id}/funcoes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ funcaoId: ctx.f2Id }) })
+    
+    const pubRes = await app.request(`/api/v1/convocacoes/${conv.id}/publicar`, { method: 'POST' })
+    expect(pubRes.status).toBe(200)
+
+    const destRes = await app.request(`/api/v1/convocacoes/${conv.id}/destinatarios`)
+    const dests = await destRes.json()
+    
+    // Deve haver apenas 1 destinatário para mem1
+    expect(dests.length).toBe(1)
+    expect(dests[0].membroId).toBe(ctx.mem1Id)
+    
+    // Deve haver 2 evidências
+    expect(dests[0].evidencias.length).toBe(2)
+    const evF1 = dests[0].evidencias.find((e: any) => e.funcaoId === ctx.f1Id)
+    const evF2 = dests[0].evidencias.find((e: any) => e.funcaoId === ctx.f2Id)
+    
+    expect(evF1).toBeDefined()
+    expect(evF1.vinculoFuncionalId).toBe(ctx.v1Id)
+    
+    expect(evF2).toBeDefined()
+    expect(evF2.vinculoFuncionalId).toBe(v5Id)
+  })
+
   it('11–14. publicar exclui vínculos inativos, membros inativos e escopos não solicitados', async () => {
     const ctx = await setupBaseData()
     
@@ -150,7 +186,8 @@ describe('S06 - Convocações', () => {
     // vNaoSelecionadaId descartado pois a função nao foi requerida
     expect(dests.length).toBe(1)
     expect(dests[0].membroId).toBe(ctx.mem1Id)
-    expect(dests[0].vinculoFuncionalId).toBe(ctx.v1Id)
+    expect(dests[0].evidencias.length).toBe(1)
+    expect(dests[0].evidencias[0].vinculoFuncionalId).toBe(ctx.v1Id)
   })
 
   it('15. evento de Setor não captura vínculo de Casa', async () => {
@@ -163,7 +200,7 @@ describe('S06 - Convocações', () => {
     const destRes = await app.request(`/api/v1/convocacoes/${conv.id}/destinatarios`)
     const dests = await destRes.json()
     
-    const vinculoCasaIncluso = dests.some((d: any) => d.vinculoFuncionalId === ctx.v3Id)
+    const vinculoCasaIncluso = dests.some((d: any) => d.evidencias.some((e: any) => e.vinculoFuncionalId === ctx.v3Id))
     expect(vinculoCasaIncluso).toBe(false)
   })
 
@@ -183,8 +220,9 @@ describe('S06 - Convocações', () => {
     const dests = await destRes.json()
     expect(dests.length).toBe(1)
     expect(dests[0].membroId).toBe(ctx.mem1Id)
-    expect(dests[0].funcaoId).toBe(ctx.f1Id)
-    expect(dests[0].vinculoFuncionalId).toBe(ctx.v1Id)
+    expect(dests[0].evidencias.length).toBe(1)
+    expect(dests[0].evidencias[0].funcaoId).toBe(ctx.f1Id)
+    expect(dests[0].evidencias[0].vinculoFuncionalId).toBe(ctx.v1Id)
   })
 
   it('25. convocação possui apenas eventoId, série ignorada na tabela', async () => {
@@ -273,13 +311,15 @@ describe('S06 - Convocações', () => {
       expect(err.message).toMatch(/UNIQUE constraint failed/)
     }
 
-    // Teste UNIQUE do snapshot (convocacao_destinatarios)
+    // Teste UNIQUE do snapshot (convocacao_destinatarios_evidencias)
     const destConvId = crypto.randomUUID()
     sqlite.prepare(`INSERT INTO convocacoes (id, evento_id, status) VALUES (?, ?, 'RASCUNHO')`).run(destConvId, ctx.evSetorId)
-    sqlite.prepare(`INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id, funcao_id, vinculo_funcional_id) VALUES (?, ?, ?, ?, ?)`).run(crypto.randomUUID(), destConvId, ctx.mem1Id, ctx.f1Id, ctx.v1Id)
+    const destId = crypto.randomUUID()
+    sqlite.prepare(`INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES (?, ?, ?)`).run(destId, destConvId, ctx.mem1Id)
+    sqlite.prepare(`INSERT INTO convocacao_destinatario_evidencias (id, convocacao_destinatario_id, funcao_id, vinculo_funcional_id) VALUES (?, ?, ?, ?)`).run(crypto.randomUUID(), destId, ctx.f1Id, ctx.v1Id)
     try {
-      sqlite.prepare(`INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id, funcao_id, vinculo_funcional_id) VALUES (?, ?, ?, ?, ?)`).run(crypto.randomUUID(), destConvId, ctx.mem1Id, ctx.f1Id, ctx.v1Id)
-      expect.fail('Deveria ter falhado no UNIQUE do snapshot')
+      sqlite.prepare(`INSERT INTO convocacao_destinatario_evidencias (id, convocacao_destinatario_id, funcao_id, vinculo_funcional_id) VALUES (?, ?, ?, ?)`).run(crypto.randomUUID(), destId, ctx.f1Id, ctx.v1Id)
+      expect.fail('Deveria ter falhado no UNIQUE do snapshot (evidencias)')
     } catch (err: any) {
       expect(err.message).toMatch(/UNIQUE constraint failed/)
     }
