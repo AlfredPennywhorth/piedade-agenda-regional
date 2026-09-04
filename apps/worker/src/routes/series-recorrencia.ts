@@ -217,15 +217,15 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       const pivotDateIso = existingEvent.inicioEm
       
       const newSerieId = crypto.randomUUID()
-      const mergedSerieData = {
-        ...existingSerie,
-        ...parsed.changes
-      }
       
       // Cálculo correto com timezone
       const newStartDateStr = getLocalDateFromUtc(pivotDateIso)
-      mergedSerieData.dataInicio = newStartDateStr
-      SerieCreate.parse(mergedSerieData)
+      
+      const serieBData = SerieCreate.parse({
+        ...existingSerie,
+        ...parsed.changes,
+        dataInicio: newStartDateStr
+      })
       
       // Série A (Antiga) termina no dia anterior a novaStartDateStr
       // Para saber isso facilmente no mesmo timezone de SP: 
@@ -246,11 +246,11 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       )).all()
       const exceptionDates = new Set(exceptions.map((e: any) => getLocalDateFromUtc(e.inicioEm)))
       
-      const occurrencesDates = generateOccurrences(mergedSerieData)
+      const occurrencesDates = generateOccurrences(serieBData)
       const eventosToInsert = occurrencesDates
         .filter(occ => !exceptionDates.has(getLocalDateFromUtc(occ.inicioEm)))
         .map(occ => {
-          const { ...serieBaseData } = mergedSerieData
+          const { ...serieBaseData } = serieBData
           return {
             id: crypto.randomUUID(),
             titulo: serieBaseData.titulo,
@@ -288,7 +288,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         )
           
         // 2. Criar Série B
-        const resultSerieB = { id: newSerieId, ...mergedSerieData, createdAt: nowIso, updatedAt: nowIso }
+        const resultSerieB = { id: newSerieId, ...serieBData, createdAt: nowIso, updatedAt: nowIso }
         queries.push(qdb.insert(seriesRecorrencia).values(resultSerieB))
         
         // 3. Atualizar as EXCEÇÕES futuras (e a própria pivot se for exceção) para apontar para a Série B
