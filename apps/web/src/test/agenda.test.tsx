@@ -99,4 +99,96 @@ describe('S07 - Minha Agenda e Calendário', () => {
       expect(screen.getByText('Sessão expirada')).toBeInTheDocument()
     })
   })
+
+  it('6. Seleciona dia com evento no calendário e exibe lista', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+    
+    // Go to calendar
+    fireEvent.click(screen.getByText('Calendário'))
+    await waitFor(() => expect(screen.getByText('Dom')).toBeInTheDocument())
+    
+    // Find the day button (tomorrow)
+    const tmrw = new Date(Date.now() + 86400000)
+    const dayBtn = screen.getByLabelText(`Selecionar dia ${tmrw.getDate()}`)
+    fireEvent.click(dayBtn)
+    
+    // Expect event in list below calendar
+    await waitFor(() => {
+      expect(screen.getByText('Reunião de Setor')).toBeInTheDocument()
+    })
+  })
+
+  it('7. Seleciona dia sem evento no calendário', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+    
+    // Go to calendar
+    fireEvent.click(screen.getByText('Calendário'))
+    await waitFor(() => expect(screen.getByText('Dom')).toBeInTheDocument())
+    
+    // Find a day without event (assuming day 1 has no events in mock)
+    // We mock events for tomorrow and in 2 days. Let's just click today.
+    const today = new Date()
+    const dayBtn = screen.getByLabelText(`Selecionar dia ${today.getDate()}`)
+    fireEvent.click(dayBtn)
+    
+    // Expect empty state
+    await waitFor(() => {
+      expect(screen.getByText('Nenhum evento agendado para este dia.')).toBeInTheDocument()
+    })
+  })
+
+  it('8. Abre detalhe pela Minha Agenda e verifica conteúdo (HIBRIDO/PRESENCIAL)', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+    
+    await waitFor(() => {
+      expect(screen.getByText('Reunião de Setor')).toBeInTheDocument()
+    })
+    
+    fireEvent.click(screen.getByText('Reunião de Setor'))
+    
+    await waitFor(() => {
+      // It's a dialog, so it should be visible
+      const dialog = screen.getByRole('dialog')
+      expect(dialog).toBeInTheDocument()
+      expect(screen.getByText('Sede Regional')).toBeInTheDocument()
+      expect(screen.getByText('Rua X')).toBeInTheDocument()
+      expect(screen.getByText('Levar caderno')).toBeInTheDocument()
+    })
+    
+    // Fechar modal
+    fireEvent.click(screen.getByLabelText('Fechar detalhes'))
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+  })
+
+  it('9. Abre detalhe pelo Calendário e verifica conteúdo ONLINE', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+    
+    // Go to calendar
+    fireEvent.click(screen.getByText('Calendário'))
+    await waitFor(() => expect(screen.getByText('Dom')).toBeInTheDocument())
+    
+    // Click day
+    const day = new Date(Date.now() + 172800000)
+    const dayBtn = screen.getByLabelText(`Selecionar dia ${day.getDate()}`)
+    fireEvent.click(dayBtn)
+    
+    await waitFor(() => {
+      expect(screen.getByText('Encontro Online')).toBeInTheDocument()
+    })
+    
+    // Open details
+    fireEvent.click(screen.getByText('Encontro Online'))
+    
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      // "Sede Regional" should NOT be here (it is ONLINE)
+      expect(screen.queryByText('Sede Regional')).not.toBeInTheDocument()
+    })
+  })
 })

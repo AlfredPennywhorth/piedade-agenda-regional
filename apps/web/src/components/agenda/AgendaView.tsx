@@ -1,31 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import { fetchWithAuth } from '../../api/apiClient'
-
-interface AgendaItem {
-  evento: {
-    id: string
-    titulo: string
-    inicioEm: string
-    fimEm: string
-    modalidade: 'PRESENCIAL' | 'ONLINE' | 'HIBRIDO'
-    urlOnline?: string | null
-    urlMaps?: string | null
-    urlWaze?: string | null
-  }
-  convocacao: {
-    id: string
-    observacoes: string | null
-  }
-  local: {
-    nome: string
-    endereco: string
-  } | null
-}
+import { AgendaItem } from './types'
+import { EventoDetalhe } from './EventoDetalhe'
+import { EventCard } from './EventCard'
 
 export function AgendaView() {
   const [items, setItems] = useState<AgendaItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedItem, setSelectedItem] = useState<AgendaItem | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -74,43 +57,12 @@ export function AgendaView() {
   return (
     <div className="p-4 space-y-4">
       {items.map((item) => (
-        <EventCard key={item.evento.id} item={item} />
+        <EventCard key={item.evento.id} item={item} onClick={() => setSelectedItem(item)} />
       ))}
+      
+      {selectedItem && (
+        <EventoDetalhe item={selectedItem} onClose={() => setSelectedItem(null)} />
+      )}
     </div>
   )
-}
 
-function EventCard({ item }: { item: AgendaItem }) {
-  const dateObj = new Date(item.evento.inicioEm)
-  const day = String(dateObj.getDate()).padStart(2, '0')
-  const month = String(dateObj.getMonth() + 1).padStart(2, '0')
-  const year = dateObj.getFullYear()
-  const time = dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-
-  return (
-    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex gap-4 active:bg-slate-50 transition-colors cursor-pointer">
-      <div className="flex flex-col items-center justify-center bg-brand-50 text-brand-900 rounded-lg p-3 min-w-[70px]">
-        <span className="text-2xl font-bold leading-none">{day}</span>
-        <span className="text-xs uppercase font-semibold tracking-wider mt-1">{month}/{year}</span>
-      </div>
-      <div className="flex-1 min-w-0">
-        <h3 className="font-semibold text-slate-900 truncate">{item.evento.titulo}</h3>
-        <p className="text-sm text-slate-500 mt-1 flex items-center gap-1">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          {time}
-        </p>
-        
-        <div className="mt-2 flex gap-2 flex-wrap">
-          <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
-            {item.evento.modalidade}
-          </span>
-          {item.local && (
-            <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium truncate max-w-[120px]">
-              {item.local.nome}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}

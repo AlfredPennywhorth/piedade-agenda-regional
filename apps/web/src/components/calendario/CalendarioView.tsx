@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react'
 import { fetchWithAuth } from '../../api/apiClient'
+import { AgendaItem } from '../agenda/types'
+import { EventCard } from '../agenda/EventCard'
+import { EventoDetalhe } from '../agenda/EventoDetalhe'
 
 export function CalendarioView() {
   const [currentDate, setCurrentDate] = useState(new Date())
-  const [items, setItems] = useState<any[]>([])
+  const [items, setItems] = useState<AgendaItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedDayEvents, setSelectedDayEvents] = useState<AgendaItem[] | null>(null)
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<AgendaItem | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -44,7 +50,12 @@ export function CalendarioView() {
     if (!acc[key]) acc[key] = []
     acc[key].push(item)
     return acc
-  }, {} as Record<string, any[]>)
+  }, {} as Record<string, AgendaItem[]>)
+
+  const handleDayClick = (day: number, hasEvent: boolean, dayEvents: AgendaItem[]) => {
+    setSelectedDate(new Date(year, month, day))
+    setSelectedDayEvents(dayEvents)
+  }
 
   return (
     <div className="p-4">
@@ -78,16 +89,26 @@ export function CalendarioView() {
           {Array.from({ length: daysInMonth }).map((_, i) => {
             const day = i + 1
             const isToday = year === today.getFullYear() && month === today.getMonth() && day === today.getDate()
+            const isSelected = selectedDate?.getFullYear() === year && selectedDate?.getMonth() === month && selectedDate?.getDate() === day
             const key = `${year}-${month}-${day}`
             const dayEvents = eventsByDay[key] || []
             const hasEvent = dayEvents.length > 0
             
             return (
-              <div 
+              <button
                 key={day} 
-                className={`p-1 border-b border-r border-slate-50 aspect-square flex flex-col items-center justify-center relative ${hasEvent ? 'cursor-pointer hover:bg-brand-50' : ''}`}
+                onClick={() => handleDayClick(day, hasEvent, dayEvents)}
+                aria-label={`Selecionar dia ${day}`}
+                aria-pressed={isSelected}
+                className={`p-1 border-b border-r border-slate-50 aspect-square flex flex-col items-center justify-center relative transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-inset
+                  ${hasEvent ? 'cursor-pointer hover:bg-brand-50' : 'hover:bg-slate-50'}
+                  ${isSelected ? 'bg-brand-50 ring-2 ring-brand-200 ring-inset' : ''}
+                `}
               >
-                <span className={`text-sm w-7 h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-brand-600 text-white font-bold' : 'text-slate-700'}`}>
+                <span className={`text-sm w-7 h-7 flex items-center justify-center rounded-full 
+                  ${isToday && !isSelected ? 'bg-brand-600 text-white font-bold' : ''}
+                  ${isSelected ? 'bg-brand-700 text-white font-bold' : 'text-slate-700'}
+                `}>
                   {day}
                 </span>
                 {hasEvent && (
@@ -97,11 +118,36 @@ export function CalendarioView() {
                     ))}
                   </div>
                 )}
-              </div>
+              </button>
             )
           })}
         </div>
       </div>
+      
+      {/* Selected Day Events List */}
+      {selectedDate && (
+        <div className="mt-6">
+          <h3 className="font-semibold text-slate-800 mb-4">
+            Eventos em {selectedDate.toLocaleDateString('pt-BR')}
+          </h3>
+          
+          {selectedDayEvents && selectedDayEvents.length > 0 ? (
+            <div className="space-y-4">
+              {selectedDayEvents.map(item => (
+                <EventCard key={item.evento.id} item={item} onClick={() => setSelectedEvent(item)} />
+              ))}
+            </div>
+          ) : (
+            <div className="p-6 text-center bg-slate-50 rounded-xl border border-slate-100 text-slate-500 text-sm">
+              Nenhum evento agendado para este dia.
+            </div>
+          )}
+        </div>
+      )}
+
+      {selectedEvent && (
+        <EventoDetalhe item={selectedEvent} onClose={() => setSelectedEvent(null)} />
+      )}
       
       {loading && (
         <div className="text-center mt-4 text-xs text-slate-500">Atualizando...</div>
