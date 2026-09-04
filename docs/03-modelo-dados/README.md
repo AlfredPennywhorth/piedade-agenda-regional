@@ -160,7 +160,21 @@ Campos principais:
 - `frequencia` — DIARIA, SEMANAL, QUINZENAL, MENSAL_DIA_FIXO, MENSAL_POSICAO_SEMANA
 - `data_inicio`, `data_fim` — Obrigatórias, ditam o horizonte de materialização (YYYY-MM-DD em fuso local).
 - `horario_inicio`, `horario_fim` — Horários estáticos (America/Sao_Paulo).
-- Demais atributos herdam características do Evento (título, escopo institucional, url_online, etc).
+- Demais atributos
+
+### Séries de Recorrência e Exceções
+
+O banco armazena de forma independente eventos gerados em lote, sendo cada ocorrência um registro na tabela `eventos`. A tabela `series_recorrencia` atua apenas como geradora, mas a chave estrangeira em `eventos.serie_recorrencia_id` mantém o vínculo histórico. Quando um evento singular dessa série for alterado, o flag `recorrencia_excecao` vira `true`.
+
+## Entidades da Sprint S06 — Convocações
+
+- `convocacoes` — entidade que centraliza o convite institucional atrelado a um evento.
+  - Campos: ID, eventoId, status (RASCUNHO, PUBLICADA, CANCELADA), observacoes, datas de lifecycle.
+  - Herda o escopo institucional diretamente do evento atrelado; não possui escopo próprio.
+- `convocacao_funcoes` — tabela associativa entre convocação e as funções requeridas para o evento (ex: "Porteiro", "Músico").
+- `convocacao_destinatarios` — snapshot materializado no ato da publicação da convocação.
+  - Campos: ID, convocacaoId, membroId, funcaoId, vinculoFuncionalId.
+  - Como é um snapshot, não reflete retroativamente alterações de escopo ou de status de inativação feitas no membro ou no vínculo após a publicação da convocação.
 
 ### Alterações em `eventos`
 
