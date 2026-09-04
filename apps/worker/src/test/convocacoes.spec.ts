@@ -194,14 +194,15 @@ describe('S06 - Convocações', () => {
     await db.insert(seriesRecorrencia).values({
       id: serieId,
       titulo: 'Serie Teste',
+      modalidade: 'PRESENCIAL',
       frequencia: 'DIARIA',
+      intervalo: 1,
       dataInicio: '2026-01-01',
       dataFim: '2026-01-05',
-      horarioInicio: '10:00:00',
-      horarioFim: '11:00:00',
-      regionalId: ctx.regId,
-      modoVisualizacao: 'PUBLICO',
-      tipoEvento: 'REGULAR',
+      horarioInicio: '10:00',
+      horarioFim: '11:00',
+      localId: ctx.locId,
+      setorId: ctx.setId,
       ativo: true
     })
     // Atualizar evento com serie
@@ -264,10 +265,21 @@ describe('S06 - Convocações', () => {
     // Teste UNIQUE(convocacao_id, funcao_id)
     const convId = crypto.randomUUID()
     sqlite.prepare(`INSERT INTO convocacoes (id, evento_id, status) VALUES (?, ?, 'RASCUNHO')`).run(convId, ctx.evSetorId)
-    sqlite.prepare(`INSERT INTO convocacao_funcoes (convocacao_id, funcao_id) VALUES (?, ?)`).run(convId, ctx.f1Id)
+    sqlite.prepare(`INSERT INTO convocacao_funcoes (id, convocacao_id, funcao_id) VALUES (?, ?, ?)`).run(crypto.randomUUID(), convId, ctx.f1Id)
     try {
-      sqlite.prepare(`INSERT INTO convocacao_funcoes (convocacao_id, funcao_id) VALUES (?, ?)`).run(convId, ctx.f1Id)
+      sqlite.prepare(`INSERT INTO convocacao_funcoes (id, convocacao_id, funcao_id) VALUES (?, ?, ?)`).run(crypto.randomUUID(), convId, ctx.f1Id)
       expect.fail('Deveria ter falhado no UNIQUE de função')
+    } catch (err: any) {
+      expect(err.message).toMatch(/UNIQUE constraint failed/)
+    }
+
+    // Teste UNIQUE do snapshot (convocacao_destinatarios)
+    const destConvId = crypto.randomUUID()
+    sqlite.prepare(`INSERT INTO convocacoes (id, evento_id, status) VALUES (?, ?, 'RASCUNHO')`).run(destConvId, ctx.evSetorId)
+    sqlite.prepare(`INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id, funcao_id, vinculo_funcional_id) VALUES (?, ?, ?, ?, ?)`).run(crypto.randomUUID(), destConvId, ctx.mem1Id, ctx.f1Id, ctx.v1Id)
+    try {
+      sqlite.prepare(`INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id, funcao_id, vinculo_funcional_id) VALUES (?, ?, ?, ?, ?)`).run(crypto.randomUUID(), destConvId, ctx.mem1Id, ctx.f1Id, ctx.v1Id)
+      expect.fail('Deveria ter falhado no UNIQUE do snapshot')
     } catch (err: any) {
       expect(err.message).toMatch(/UNIQUE constraint failed/)
     }
