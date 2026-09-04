@@ -50,7 +50,7 @@ Este diretório contém a documentação da API do projeto **Agenda Regional Sã
 - **Modos de Atualização (`updateMode`)**: 
   - `THIS`: Preserva a série, edita o evento único em questão e o marca como `recorrencia_excecao = true`.
   - `THIS_AND_FUTURE`: Encerra a série A no evento escolhido e cria a série B daquele ponto em diante.
-  - `ALL`: Edita as especificações da série original. Mantém os eventos do passado intocados, apaga os futuros não excepcionados e os recria com base nas novas especificações da regra.
+  - `ALL`: Edita as especificações da série original. Mantém os eventos do passado intocados, inativa os eventos futuros não excepcionados substituídos e materializa novas ocorrências com base nas novas especificações da série.
 
 ## Formato de resposta
 
