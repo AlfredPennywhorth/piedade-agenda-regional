@@ -517,8 +517,8 @@ describe('Series Recorrencia API (S05)', () => {
     
     // Verifica se a exceção foi criada
     const excecaoCriada = ocorrencias.find((o: any) => o.id === evParaExcecao.id)
-    expect(excecaoCriada.recorrenciaExcecao).toBe(1)
-    expect(excecaoCriada.ativo).toBe(1) // O SQLite booleano retorna 1
+    expect(excecaoCriada.recorrenciaExcecao).toBe(true)
+    expect(excecaoCriada.ativo).toBe(true)
 
     // 5. Executar PATCH ALL com ativo = false
     const patchAllRes = await app.request(`/api/v1/series-recorrencia/${serieId}`, {
@@ -533,7 +533,7 @@ describe('Series Recorrencia API (S05)', () => {
 
     // 6. Afirmar resultados PÓS inativação
     const seriePos = db.select().from(seriesRecorrencia).where(eq(seriesRecorrencia.id, serieId)).get()
-    expect(seriePos.ativo).toBe(0) // 0 = false
+    expect(seriePos.ativo).toBe(false)
 
     const ocorrenciasPos = db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serieId)).all()
     const totalPos = ocorrenciasPos.length
@@ -545,11 +545,11 @@ describe('Series Recorrencia API (S05)', () => {
 
     // - TODOS os eventos estão inativos, inclusive a exceção
     for (const o of ocorrenciasPos) {
-      expect(o.ativo).toBe(0)
+      expect(o.ativo).toBe(false)
     }
 
     // A exceção ainda deve existir e estar como exceção (embora inativa)
     const excecaoPos = ocorrenciasPos.find((o: any) => o.id === evParaExcecao.id)
-    expect(excecaoPos.recorrenciaExcecao).toBe(1)
+    expect(excecaoPos.recorrenciaExcecao).toBe(true)
   })
 })
