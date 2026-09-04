@@ -199,6 +199,58 @@ export function setupDb(sqlite: any) {
     CREATE INDEX IF NOT EXISTS idx_eventos_ativo ON eventos (ativo);
     CREATE INDEX IF NOT EXISTS idx_eventos_local_id ON eventos (local_id);
     CREATE INDEX IF NOT EXISTS idx_eventos_serie_recorrencia_id ON eventos (serie_recorrencia_id);
+
+    CREATE TABLE IF NOT EXISTS convocacoes (
+      id text PRIMARY KEY NOT NULL,
+      evento_id text NOT NULL,
+      status text NOT NULL,
+      observacoes text,
+      publicada_em text,
+      cancelada_em text,
+      ativo integer DEFAULT true NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (evento_id) REFERENCES eventos(id),
+      CONSTRAINT check_status_convocacao CHECK (status IN ('RASCUNHO','PUBLICADA','CANCELADA'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_convocacoes_evento_id ON convocacoes (evento_id);
+    CREATE INDEX IF NOT EXISTS idx_convocacoes_status ON convocacoes (status);
+
+    CREATE TABLE IF NOT EXISTS convocacao_funcoes (
+      id text PRIMARY KEY NOT NULL,
+      convocacao_id text NOT NULL,
+      funcao_id text NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (convocacao_id) REFERENCES convocacoes(id),
+      FOREIGN KEY (funcao_id) REFERENCES funcoes(id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_convocacao_funcao_unico ON convocacao_funcoes (convocacao_id, funcao_id);
+    CREATE INDEX IF NOT EXISTS idx_convocacao_funcoes_convocacao_id ON convocacao_funcoes (convocacao_id);
+
+    CREATE TABLE IF NOT EXISTS convocacao_destinatarios (
+      id text PRIMARY KEY NOT NULL,
+      convocacao_id text NOT NULL,
+      membro_id text NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (convocacao_id) REFERENCES convocacoes(id),
+      FOREIGN KEY (membro_id) REFERENCES membros(id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_convocacao_destinatario_unico ON convocacao_destinatarios (convocacao_id, membro_id);
+    CREATE INDEX IF NOT EXISTS idx_convocacao_destinatarios_convocacao_id ON convocacao_destinatarios (convocacao_id);
+    CREATE INDEX IF NOT EXISTS idx_convocacao_destinatarios_membro_id ON convocacao_destinatarios (membro_id);
+
+    CREATE TABLE IF NOT EXISTS convocacao_destinatario_evidencias (
+      id text PRIMARY KEY NOT NULL,
+      convocacao_destinatario_id text NOT NULL,
+      funcao_id text NOT NULL,
+      vinculo_funcional_id text NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (convocacao_destinatario_id) REFERENCES convocacao_destinatarios(id),
+      FOREIGN KEY (funcao_id) REFERENCES funcoes(id),
+      FOREIGN KEY (vinculo_funcional_id) REFERENCES vinculos_funcionais(id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_convocacao_evidencia_unica ON convocacao_destinatario_evidencias (convocacao_destinatario_id, funcao_id, vinculo_funcional_id);
+    CREATE INDEX IF NOT EXISTS idx_convocacao_evidencias_dest_id ON convocacao_destinatario_evidencias (convocacao_destinatario_id);
   `
   sqlite.exec(setupSql)
 }

@@ -34,6 +34,7 @@ import { adminMembrosApp } from './routes/admin/membros'
 import { locaisRouter } from './routes/locais'
 import { eventosRouter } from './routes/eventos'
 import { seriesRecorrenciaRouter } from './routes/series-recorrencia'
+import { convocacoesRouter } from './routes/convocacoes'
 export interface AppOptions {
   enableAdminRoutes?: boolean
 }
@@ -107,6 +108,11 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.route('/api/v1/locais', locaisRouter)
   app.route('/api/v1/eventos', eventosRouter)
   app.route('/api/v1/series-recorrencia', seriesRecorrenciaRouter)
+
+  // ============================================================
+  // Rotas da API (S06 - Convocações)
+  // ============================================================
+  app.route('/api/v1/convocacoes', convocacoesRouter)
 
   // ============================================================
   // Rotas da API (S03 - Autenticação e Permissões)

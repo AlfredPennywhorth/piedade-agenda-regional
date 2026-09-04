@@ -336,3 +336,54 @@ export const eventos = sqliteTable('eventos', {
   idxLocalId: index('idx_eventos_local_id').on(table.localId),
   idxSerieRecorrenciaId: index('idx_eventos_serie_recorrencia_id').on(table.serieRecorrenciaId),
 }))
+
+// ============================================================
+// Convocações (S06)
+// ============================================================
+
+export const convocacoes = sqliteTable('convocacoes', {
+  id: text('id').primaryKey(),
+  eventoId: text('evento_id').notNull().references(() => eventos.id),
+  status: text('status').notNull(), // RASCUNHO, PUBLICADA, CANCELADA
+  observacoes: text('observacoes'),
+  publicadaEm: text('publicada_em'),
+  canceladaEm: text('cancelada_em'),
+  ativo: ativoDefault,
+  ...timestampsS02
+}, table => ({
+  checkStatus: check('check_status_convocacao', sql`${table.status} IN ('RASCUNHO','PUBLICADA','CANCELADA')`),
+  idxEventoId: index('idx_convocacoes_evento_id').on(table.eventoId),
+  idxStatus: index('idx_convocacoes_status').on(table.status),
+}))
+
+export const convocacaoFuncoes = sqliteTable('convocacao_funcoes', {
+  id: text('id').primaryKey(),
+  convocacaoId: text('convocacao_id').notNull().references(() => convocacoes.id),
+  funcaoId: text('funcao_id').notNull().references(() => funcoes.id),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`)
+}, table => ({
+  uniqueConvocacaoFuncao: uniqueIndex('idx_convocacao_funcao_unico').on(table.convocacaoId, table.funcaoId),
+  idxConvocacaoId: index('idx_convocacao_funcoes_convocacao_id').on(table.convocacaoId),
+}))
+
+export const convocacaoDestinatarios = sqliteTable('convocacao_destinatarios', {
+  id: text('id').primaryKey(),
+  convocacaoId: text('convocacao_id').notNull().references(() => convocacoes.id),
+  membroId: text('membro_id').notNull().references(() => membros.id),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`)
+}, table => ({
+  uniqueDestinatario: uniqueIndex('idx_convocacao_destinatario_unico').on(table.convocacaoId, table.membroId),
+  idxConvocacaoId: index('idx_convocacao_destinatarios_convocacao_id').on(table.convocacaoId),
+  idxMembroId: index('idx_convocacao_destinatarios_membro_id').on(table.membroId),
+}))
+
+export const convocacaoDestinatarioEvidencias = sqliteTable('convocacao_destinatario_evidencias', {
+  id: text('id').primaryKey(),
+  convocacaoDestinatarioId: text('convocacao_destinatario_id').notNull().references(() => convocacaoDestinatarios.id),
+  funcaoId: text('funcao_id').notNull().references(() => funcoes.id),
+  vinculoFuncionalId: text('vinculo_funcional_id').notNull().references(() => vinculosFuncionais.id),
+  createdAt: text('created_at').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`)
+}, table => ({
+  uniqueEvidencia: uniqueIndex('idx_convocacao_evidencia_unica').on(table.convocacaoDestinatarioId, table.funcaoId, table.vinculoFuncionalId),
+  idxDestinatarioId: index('idx_convocacao_evidencias_dest_id').on(table.convocacaoDestinatarioId),
+}))

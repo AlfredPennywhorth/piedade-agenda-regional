@@ -160,7 +160,24 @@ Campos principais:
 - `frequencia` — DIARIA, SEMANAL, QUINZENAL, MENSAL_DIA_FIXO, MENSAL_POSICAO_SEMANA
 - `data_inicio`, `data_fim` — Obrigatórias, ditam o horizonte de materialização (YYYY-MM-DD em fuso local).
 - `horario_inicio`, `horario_fim` — Horários estáticos (America/Sao_Paulo).
-- Demais atributos herdam características do Evento (título, escopo institucional, url_online, etc).
+- Demais atributos
+
+### Séries de Recorrência e Exceções
+
+O banco armazena de forma independente eventos gerados em lote, sendo cada ocorrência um registro na tabela `eventos`. A tabela `series_recorrencia` atua apenas como geradora, mas a chave estrangeira em `eventos.serie_recorrencia_id` mantém o vínculo histórico. Quando um evento singular dessa série for alterado, o flag `recorrencia_excecao` vira `true`.
+
+## Entidades da Sprint S06 — Convocações
+
+- `convocacoes` — entidade que centraliza o convite institucional atrelado a um evento.
+  - Campos: ID, eventoId, status (RASCUNHO, PUBLICADA, CANCELADA), observacoes, datas de lifecycle.
+  - Herda o escopo institucional diretamente do evento atrelado; não possui escopo próprio.
+- `convocacao_funcoes` — tabela associativa entre convocação e as funções requeridas para o evento (ex: "Porteiro", "Músico").
+- `convocacao_destinatarios` — snapshot do destinatário lógico (pessoa).
+  - Campos: ID, convocacaoId, membroId.
+- `convocacao_destinatario_evidencias` — evidências (vínculos e funções) que tornaram aquele destinatário elegível.
+  - Campos: ID, convocacaoDestinatarioId, funcaoId, vinculoFuncionalId.
+  - Um destinatário pode ter múltiplas evidências caso seja elegível por diferentes funções ou vínculos no mesmo escopo.
+  - Como é um snapshot gerado na publicação, não reflete retroativamente alterações feitas no membro ou no vínculo posteriormente.
 
 ### Alterações em `eventos`
 
@@ -201,7 +218,7 @@ As entidades da S02, S03, S04 e S05 utilizam foreign keys para garantir a valida
 | `locais`              | Finalizado   | S04           |
 | `eventos`             | Finalizado   | S04           |
 | `series_recorrencia`  | Implementado | S05           |
+| `convocacoes`         | Implementado | S06           |
 | `reunioes`            | Planejado    | Sprint futura |
-| `convocacoes`         | Planejado    | Sprint futura |
 
 > **Status:** Modelo base (S01), Membros e Vínculos (S02), Autenticação (S03), e Locais/Eventos (S04) preservados. Séries de Recorrência (S05) introduzidas pela Migration 0005.
