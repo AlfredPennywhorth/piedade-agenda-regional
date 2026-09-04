@@ -33,6 +33,7 @@ import { meApp } from './routes/auth/me'
 import { adminMembrosApp } from './routes/admin/membros'
 import { locaisRouter } from './routes/locais'
 import { eventosRouter } from './routes/eventos'
+import { seriesRecorrenciaRouter } from './routes/series-recorrencia'
 export interface AppOptions {
   enableAdminRoutes?: boolean
 }
@@ -101,10 +102,11 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.route('/api/v1/vinculos-funcionais', vinculosFuncionaisRouter)
 
   // ============================================================
-  // Rotas da API (S04 - Locais e Eventos)
+  // Rotas da API (S04 e S05 - Locais, Eventos e Recorrência)
   // ============================================================
   app.route('/api/v1/locais', locaisRouter)
   app.route('/api/v1/eventos', eventosRouter)
+  app.route('/api/v1/series-recorrencia', seriesRecorrenciaRouter)
 
   // ============================================================
   // Rotas da API (S03 - Autenticação e Permissões)

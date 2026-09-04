@@ -9,7 +9,7 @@ const HttpUrl = z.string().url('URL inválida').refine(
   { message: 'URL deve usar protocolo http ou https' }
 )
 
-const baseEvento = {
+export const baseEvento = {
   titulo: z.string().min(1, 'Título é obrigatório'),
   descricao: z.string().nullable().optional(),
   pauta: z.string().nullable().optional(),

@@ -109,14 +109,22 @@ export function setupDb(sqlite: any) {
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS eventos (
+    CREATE TABLE IF NOT EXISTS series_recorrencia (
       id text PRIMARY KEY NOT NULL,
       titulo text NOT NULL,
       descricao text,
       pauta text,
       modalidade text NOT NULL,
-      inicio_em text NOT NULL,
-      fim_em text NOT NULL,
+      frequencia text NOT NULL,
+      intervalo integer DEFAULT 1 NOT NULL,
+      data_inicio text NOT NULL,
+      data_fim text NOT NULL,
+      horario_inicio text NOT NULL,
+      horario_fim text NOT NULL,
+      timezone text DEFAULT 'America/Sao_Paulo' NOT NULL,
+      dia_semana integer,
+      dia_mes integer,
+      posicao_semana_mes integer,
       local_id text,
       url_online text,
       organizador_membro_id text,
@@ -136,6 +144,48 @@ export function setupDb(sqlite: any) {
       FOREIGN KEY (setor_id) REFERENCES setores(id),
       FOREIGN KEY (casa_id) REFERENCES casas(id),
       FOREIGN KEY (grupo_trabalho_id) REFERENCES grupos_trabalho(id),
+      CONSTRAINT check_serie_escopo_unico CHECK (
+        (CASE WHEN regional_id IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN administracao_id IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN setor_id IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN casa_id IS NOT NULL THEN 1 ELSE 0 END) +
+        (CASE WHEN grupo_trabalho_id IS NOT NULL THEN 1 ELSE 0 END) = 1
+      )
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_series_data_inicio ON series_recorrencia (data_inicio);
+    CREATE INDEX IF NOT EXISTS idx_series_ativo ON series_recorrencia (ativo);
+
+    CREATE TABLE IF NOT EXISTS eventos (
+      id text PRIMARY KEY NOT NULL,
+      titulo text NOT NULL,
+      descricao text,
+      pauta text,
+      modalidade text NOT NULL,
+      inicio_em text NOT NULL,
+      fim_em text NOT NULL,
+      local_id text,
+      url_online text,
+      organizador_membro_id text,
+      regional_id text,
+      administracao_id text,
+      setor_id text,
+      casa_id text,
+      grupo_trabalho_id text,
+      observacoes text,
+      ativo integer DEFAULT true NOT NULL,
+      serie_recorrencia_id text,
+      recorrencia_excecao integer DEFAULT false NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (local_id) REFERENCES locais(id),
+      FOREIGN KEY (organizador_membro_id) REFERENCES membros(id),
+      FOREIGN KEY (regional_id) REFERENCES regionais(id),
+      FOREIGN KEY (administracao_id) REFERENCES administracoes(id),
+      FOREIGN KEY (setor_id) REFERENCES setores(id),
+      FOREIGN KEY (casa_id) REFERENCES casas(id),
+      FOREIGN KEY (grupo_trabalho_id) REFERENCES grupos_trabalho(id),
+      FOREIGN KEY (serie_recorrencia_id) REFERENCES series_recorrencia(id),
       CONSTRAINT check_evento_escopo_unico CHECK (
         (CASE WHEN regional_id IS NOT NULL THEN 1 ELSE 0 END) +
         (CASE WHEN administracao_id IS NOT NULL THEN 1 ELSE 0 END) +
@@ -148,6 +198,7 @@ export function setupDb(sqlite: any) {
     CREATE INDEX IF NOT EXISTS idx_eventos_inicio_em ON eventos (inicio_em);
     CREATE INDEX IF NOT EXISTS idx_eventos_ativo ON eventos (ativo);
     CREATE INDEX IF NOT EXISTS idx_eventos_local_id ON eventos (local_id);
+    CREATE INDEX IF NOT EXISTS idx_eventos_serie_recorrencia_id ON eventos (serie_recorrencia_id);
   `
   sqlite.exec(setupSql)
 }

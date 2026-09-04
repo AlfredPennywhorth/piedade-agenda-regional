@@ -70,8 +70,11 @@ eventosRouter.patch('/:id', async (c) => {
     const merged = { ...existing, ...parsed }
     EventoCreate.parse(merged)
 
+    // PMO Rule: Ao alterar uma ocorrência individual, preservar serie_recorrencia_id e marcar recorrencia_excecao = true.
+    const isExcecao = existing.serieRecorrenciaId !== null ? true : existing.recorrenciaExcecao
+
     const updated = await db.update(eventos)
-      .set({ ...parsed, updatedAt: new Date().toISOString() })
+      .set({ ...parsed, recorrenciaExcecao: isExcecao, updatedAt: new Date().toISOString() })
       .where(eq(eventos.id, id))
       .returning().get()
       
