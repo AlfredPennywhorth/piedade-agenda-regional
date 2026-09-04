@@ -368,6 +368,18 @@ describe('S06 - Convocações', () => {
 
     const destRes = await app.request(`/api/v1/convocacoes/${conv.id}/destinatarios`)
     expect((await destRes.json()).length).toBe(0)
+
+    // Confirmar DIRETAMENTE no banco de dados (zero rows em ambas as tabelas)
+    const countDests = sqlite.prepare(`SELECT count(*) as c FROM convocacao_destinatarios WHERE convocacao_id = ?`).get(conv.id) as any
+    expect(countDests.c).toBe(0)
+    
+    const countEvidencias = sqlite.prepare(`
+      SELECT count(*) as c 
+      FROM convocacao_destinatario_evidencias e
+      JOIN convocacao_destinatarios d ON e.convocacao_destinatario_id = d.id
+      WHERE d.convocacao_id = ?
+    `).get(conv.id) as any
+    expect(countEvidencias.c).toBe(0)
   })
 })
 
