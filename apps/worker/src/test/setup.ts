@@ -210,7 +210,8 @@ export function setupDb(sqlite: any) {
       ativo integer DEFAULT true NOT NULL,
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (evento_id) REFERENCES eventos(id)
+      FOREIGN KEY (evento_id) REFERENCES eventos(id),
+      CONSTRAINT check_status_convocacao CHECK (status IN ('RASCUNHO','PUBLICADA','CANCELADA'))
     );
     CREATE INDEX IF NOT EXISTS idx_convocacoes_evento_id ON convocacoes (evento_id);
     CREATE INDEX IF NOT EXISTS idx_convocacoes_status ON convocacoes (status);

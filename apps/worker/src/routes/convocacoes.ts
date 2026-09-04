@@ -155,6 +155,16 @@ convocacoesRouter.post('/:id/publicar', async (c) => {
   
   const funcaoIds = funcoesConvocadas.map(f => f.funcaoId)
   
+  // Validar se todas as funções existem e estão ativas
+  const funcoesAtivas = await db.select().from(funcoes).where(inArray(funcoes.id, funcaoIds)).all()
+  if (funcoesAtivas.length !== funcaoIds.length) {
+    return c.json({ error: 'Uma ou mais funções associadas não existem' }, 400)
+  }
+  const algumaInativa = funcoesAtivas.some(f => !f.ativo)
+  if (algumaInativa) {
+    return c.json({ error: 'Uma ou mais funções associadas estão inativas' }, 400)
+  }
+
   // Derivação dos destinatários
   // Condições: vinculo ativo, membro ativo, escopo bate com evento, funcaoId IN funcaoIds
   const conditions = [

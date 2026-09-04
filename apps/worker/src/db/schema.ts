@@ -351,6 +351,7 @@ export const convocacoes = sqliteTable('convocacoes', {
   ativo: ativoDefault,
   ...timestampsS02
 }, table => ({
+  checkStatus: check('check_status_convocacao', sql`${table.status} IN ('RASCUNHO','PUBLICADA','CANCELADA')`),
   idxEventoId: index('idx_convocacoes_evento_id').on(table.eventoId),
   idxStatus: index('idx_convocacoes_status').on(table.status),
 }))
