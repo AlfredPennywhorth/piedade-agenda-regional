@@ -3,7 +3,7 @@ import { createApp } from '../index'
 import { setupDb } from './setup'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import Database from 'better-sqlite3'
-import { regionais, administracoes, setores, casas, gruposTrabalho, membros, funcoes, vinculosFuncionais, locais, eventos, convocacoes, convocacaoFuncoes, convocacaoDestinatarios, seriesRecorrencia } from '../db/schema'
+import { regionais, administracoes, setores, casas, gruposTrabalho, membros, funcoes, vinculosFuncionais, locais, eventos, convocacoes, seriesRecorrencia } from '../db/schema'
 import { eq } from 'drizzle-orm'
 
 describe('S06 - Convocações', () => {
@@ -193,12 +193,16 @@ describe('S06 - Convocações', () => {
     const serieId = crypto.randomUUID()
     await db.insert(seriesRecorrencia).values({
       id: serieId,
+      titulo: 'Serie Teste',
       frequencia: 'DIARIA',
       dataInicio: '2026-01-01',
       dataFim: '2026-01-05',
       horarioInicio: '10:00:00',
       horarioFim: '11:00:00',
-      regionalId: ctx.regId
+      regionalId: ctx.regId,
+      modoVisualizacao: 'PUBLICO',
+      tipoEvento: 'REGULAR',
+      ativo: true
     })
     // Atualizar evento com serie
     await db.update(eventos).set({ serieRecorrenciaId: serieId }).where(eq(eventos.id, ctx.evSetorId))
@@ -219,8 +223,7 @@ describe('S06 - Convocações', () => {
     await app.request(`/api/v1/convocacoes/${conv.id}/funcoes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ funcaoId: ctx.f1Id }) })
     
     // Inserir deliberadamente um destinatário com FK inválida para quebrar o D1 no momento da gravação
-    const fnBackup = app.fetch
-    app = createApp(db) // Reset for direct manipulate if needed, not needed, we can just insert bad data before commit.
+
     
     // Como a operação usa executeAtomic, para forçar o erro a API deveria quebrar dentro do run().
     // Um jeito fácil é apagar o membroId logo antes de rodar, ou injetar uma restrição FK que vai falhar
@@ -244,7 +247,7 @@ describe('S06 - Convocações', () => {
     const ctx = await setupBaseData()
     // Teste de status invalido (deve ser RASCUNHO, PUBLICADA ou CANCELADA)
     try {
-      await db.run(sql`INSERT INTO convocacoes (id, evento_id, status) VALUES ('id1', ${ctx.evSetorId}, 'INVALIDO')`)
+      sqlite.prepare(`INSERT INTO convocacoes (id, evento_id, status) VALUES ('id1', ?, 'INVALIDO')`).run(ctx.evSetorId)
       expect.fail('Deveria ter falhado na restrição CHECK')
     } catch (err: any) {
       expect(err.message).toMatch(/check_status_convocacao|CHECK constraint failed/)
@@ -252,7 +255,7 @@ describe('S06 - Convocações', () => {
 
     // Teste de FK evento
     try {
-      await db.run(sql`INSERT INTO convocacoes (id, evento_id, status) VALUES ('id2', 'evento-inexistente', 'RASCUNHO')`)
+      sqlite.prepare(`INSERT INTO convocacoes (id, evento_id, status) VALUES ('id2', 'evento-inexistente', 'RASCUNHO')`).run()
       expect.fail('Deveria ter falhado na FK')
     } catch (err: any) {
       expect(err.message).toMatch(/FOREIGN KEY constraint failed/)
@@ -260,10 +263,10 @@ describe('S06 - Convocações', () => {
     
     // Teste UNIQUE(convocacao_id, funcao_id)
     const convId = crypto.randomUUID()
-    await db.run(sql`INSERT INTO convocacoes (id, evento_id, status) VALUES (${convId}, ${ctx.evSetorId}, 'RASCUNHO')`)
-    await db.run(sql`INSERT INTO convocacao_funcoes (convocacao_id, funcao_id) VALUES (${convId}, ${ctx.f1Id})`)
+    sqlite.prepare(`INSERT INTO convocacoes (id, evento_id, status) VALUES (?, ?, 'RASCUNHO')`).run(convId, ctx.evSetorId)
+    sqlite.prepare(`INSERT INTO convocacao_funcoes (convocacao_id, funcao_id) VALUES (?, ?)`).run(convId, ctx.f1Id)
     try {
-      await db.run(sql`INSERT INTO convocacao_funcoes (convocacao_id, funcao_id) VALUES (${convId}, ${ctx.f1Id})`)
+      sqlite.prepare(`INSERT INTO convocacao_funcoes (convocacao_id, funcao_id) VALUES (?, ?)`).run(convId, ctx.f1Id)
       expect.fail('Deveria ter falhado no UNIQUE de função')
     } catch (err: any) {
       expect(err.message).toMatch(/UNIQUE constraint failed/)

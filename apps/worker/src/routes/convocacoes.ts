@@ -153,14 +153,14 @@ convocacoesRouter.post('/:id/publicar', async (c) => {
   const funcoesConvocadas = await db.select().from(convocacaoFuncoes).where(eq(convocacaoFuncoes.convocacaoId, id)).all()
   if (funcoesConvocadas.length === 0) return c.json({ error: 'É necessário ter pelo menos uma função associada para publicar' }, 400)
   
-  const funcaoIds = funcoesConvocadas.map(f => f.funcaoId)
+  const funcaoIds = funcoesConvocadas.map((f: { funcaoId: string }) => f.funcaoId)
   
   // Validar se todas as funções existem e estão ativas
   const funcoesAtivas = await db.select().from(funcoes).where(inArray(funcoes.id, funcaoIds)).all()
   if (funcoesAtivas.length !== funcaoIds.length) {
     return c.json({ error: 'Uma ou mais funções associadas não existem' }, 400)
   }
-  const algumaInativa = funcoesAtivas.some(f => !f.ativo)
+  const algumaInativa = funcoesAtivas.some((f: { ativo: boolean }) => !f.ativo)
   if (algumaInativa) {
     return c.json({ error: 'Uma ou mais funções associadas estão inativas' }, 400)
   }
@@ -192,7 +192,7 @@ convocacoesRouter.post('/:id/publicar', async (c) => {
   
   const nowIso = new Date().toISOString()
   
-  const destinatariosToInsert = destinatariosValidos.map(dest => ({
+  const destinatariosToInsert = destinatariosValidos.map((dest: { membroId: string; funcaoId: string; vinculoId: string }) => ({
     id: crypto.randomUUID(),
     convocacaoId: id,
     membroId: dest.membroId,
@@ -216,7 +216,7 @@ convocacoesRouter.post('/:id/publicar', async (c) => {
     })
     
     return c.json({ success: true, destinatariosGerados: destinatariosToInsert.length })
-  } catch (err: any) {
+  } catch {
     return c.json({ error: 'Falha ao materializar destinatários' }, 400)
   }
 })
