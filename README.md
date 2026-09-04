@@ -4,11 +4,77 @@ Sistema de gestão de reuniões e convocações regionais.
 
 [![CI](https://github.com/SEU_ORG/piedade-agenda-regional/actions/workflows/ci.yml/badge.svg)](https://github.com/SEU_ORG/piedade-agenda-regional/actions/workflows/ci.yml)
 
-> **Sprint S00** — Fundação técnica. Funcionalidades de negócio aguardam Sprint S01.
+## Ambientes e responsabilidades
+
+Este projeto possui separação obrigatória entre ambiente de edição
+e ambiente de execução.
+
+### Antigravity — Lead Developer
+
+Responsável por:
+- edição de código;
+- criação e alteração de arquivos;
+- inspeção estática;
+- git;
+- commits;
+- push de branches.
+
+No ambiente local do Antigravity é PROIBIDO executar ou instalar:
+- node
+- npm
+- npx
+- pnpm
+- tsc
+- eslint
+- vitest
+- wrangler via Node
+- qualquer dependência do ecossistema Node.js
+
+Não instalar Node.js ou pnpm para contornar essa restrição.
+
+Comandos permitidos localmente incluem apenas operações sem runtime
+da aplicação, como:
+- git status
+- git diff
+- git diff --check
+- git log
+- git branch
+- git fetch
+- git rebase
+- git commit
+- git push
+
+### GitHub Codespaces — ambiente executável de homologação
+
+É o ambiente autorizado para:
+- pnpm install;
+- testes;
+- typecheck;
+- lint;
+- build;
+- Wrangler;
+- D1 local;
+- aplicação de migrations;
+- validações executáveis.
+
+### GitHub Actions
+
+Responsável pela validação automatizada em CI.
+
+### Regra de precedência
+
+Se qualquer seção abaixo mencionar "desenvolvimento local",
+"pré-requisitos" ou comandos Node/pnpm, essas instruções se aplicam
+ao Codespaces ou a ambientes explicitamente autorizados para execução.
+
+Elas NÃO autorizam o Antigravity a instalar ou executar Node.js,
+npm, npx ou pnpm localmente.
+
+> **Sprints Consolidadas** — Fundação técnica, modelo institucional, membros e convocações já estabelecidos (S00 a S06).
 
 ---
 
-## Pré-requisitos
+## Pré-requisitos do ambiente executável
 
 | Ferramenta | Versão mínima |
 |---|---|
@@ -44,7 +110,7 @@ pnpm test
 
 ---
 
-## Desenvolvimento local
+## Execução em ambiente autorizado
 
 ### Frontend (React + Vite)
 
