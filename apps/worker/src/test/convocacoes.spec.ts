@@ -82,7 +82,7 @@ describe('S06 - Convocações', () => {
       casaId: casId, localId: locId, ativo: true
     })
 
-    return { regId, setId, casId, gtId, mem1Id, mem2Id, mem3Id, f1Id, f2Id, evSetorId, evCasaId, v1Id, v2Id, v3Id, v4Id }
+    return { regId, setId, casId, gtId, mem1Id, mem2Id, mem3Id, f1Id, f2Id, evSetorId, evCasaId, v1Id, v2Id, v3Id, v4Id, locId }
   }
 
   it('1. criar convocação RASCUNHO', async () => {
