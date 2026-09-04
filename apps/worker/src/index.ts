@@ -35,6 +35,7 @@ import { locaisRouter } from './routes/locais'
 import { eventosRouter } from './routes/eventos'
 import { seriesRecorrenciaRouter } from './routes/series-recorrencia'
 import { convocacoesRouter } from './routes/convocacoes'
+import { agendaRouter } from './routes/agenda'
 export interface AppOptions {
   enableAdminRoutes?: boolean
 }
@@ -113,6 +114,11 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   // Rotas da API (S06 - Convocações)
   // ============================================================
   app.route('/api/v1/convocacoes', convocacoesRouter)
+
+  // ============================================================
+  // Rotas da API (S07 - Agenda)
+  // ============================================================
+  app.route('/api/v1/minha-agenda', agendaRouter)
 
   // ============================================================
   // Rotas da API (S03 - Autenticação e Permissões)
