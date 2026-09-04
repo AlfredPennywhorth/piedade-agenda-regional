@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { ModalidadeEvento, baseEvento } from './eventos'
-import { ModalidadeEvento } from './eventos'
+
 
 export const FrequenciaSerie = z.enum([
   'DIARIA',
