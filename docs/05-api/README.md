@@ -71,13 +71,27 @@ Este diretório contém a documentação da API do projeto **Agenda Regional Sã
 }
 ```
 
-## Limites de Evolução (Planejamento Futuro)
+## Rotas Séries de Recorrência (S05)
+(veja acima)
 
-- **S06** — convocação
-- **S07** — agenda/PWA
-- **S08** — RSVP
-- **S09** — períodos/alimentação
-- **S10** — notificações
-- **S11** — check-in
+## Rotas de Convocações (S06)
 
-> **Status:** Rotas de suporte (S00) operacionais. Rotas institucionais e de vínculos (S01, S02), autenticação (S03), eventos/locais base (S04) e séries de recorrência (S05) implementadas.
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/api/v1/convocacoes` | Lista as convocações cadastradas. |
+| GET | `/api/v1/convocacoes/:id` | Retorna os detalhes de uma convocação. |
+| POST | `/api/v1/convocacoes` | Cria uma nova convocação com status inicial RASCUNHO. Requer `eventoId`. |
+| PATCH | `/api/v1/convocacoes/:id` | Atualiza propriedades da convocação (ex: `observacoes`). Permitido apenas em RASCUNHO. |
+| GET | `/api/v1/convocacoes/:id/funcoes` | Lista as funções vinculadas a esta convocação. |
+| POST | `/api/v1/convocacoes/:id/funcoes` | Adiciona uma função requerida à convocação. Apenas em RASCUNHO. |
+| DELETE | `/api/v1/convocacoes/:id/funcoes/:funcaoId` | Remove uma função da convocação. Apenas em RASCUNHO. |
+| GET | `/api/v1/convocacoes/:id/destinatarios` | Lista os destinatários que foram materializados no snapshot desta convocação. |
+| POST | `/api/v1/convocacoes/:id/publicar` | Publica a convocação e gera atomicamente o snapshot de destinatários, bloqueando novas alterações de funções. |
+| POST | `/api/v1/convocacoes/:id/cancelar` | Cancela a convocação (muda para inativa e CANCELADA), preservando todo o histórico do snapshot. |
+
+### Regras Essenciais da S06
+- **Snapshot Imutável**: A publicação de uma convocação calcula atomicamente quais membros ativos possuem vínculos ativos para as funções selecionadas dentro do estrito escopo institucional do evento. Esta lista é salva em um snapshot (`convocacao_destinatarios`) que não será alterado caso o membro mude de casa ou perca a função no futuro.
+- **Escopo Herdado e Rigoroso**: O escopo da convocação é exclusivamente derivado de seu evento. Não há inferência de hierarquia descendente; um evento de Setor convocará estritamente quem tiver um vínculo com a função naquele Setor, ignorando vínculos de Casas sob ele.
+- **Limites de Ciclo de Vida**: Convocação PUBLICADA e CANCELADA não permite alterações em suas funções ou regras.
+
+> **Status:** Rotas de suporte (S00) operacionais. Rotas institucionais e de vínculos (S01, S02), autenticação (S03), eventos/locais base (S04), séries de recorrência (S05) e Convocações Snapshot (S06) implementadas.
