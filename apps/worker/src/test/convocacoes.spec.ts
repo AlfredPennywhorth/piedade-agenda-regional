@@ -342,25 +342,29 @@ describe('S06 - Convocações', () => {
     // mas como a nossa cláusula de OCC usa `updated_at = (valor lido)`,
     // podemos simplesmente forçar o valor lido ser falso.
     
-    // Como a rota depende do db do contexto, a forma mais limpa em Node.js com better-sqlite3:
-    const originalUpdate = db.update
+    // Como a rota usa executeAtomic (que no better-sqlite3 mapeia para db.transaction),
+    // vamos interceptar db.transaction para garantir que a alteração concorrente ocorra
+    // no momento exato em que o batch seria iniciado.
+    const originalTransaction = db.transaction.bind(db)
     let interceptado = false
-    db.update = (...args: any[]) => {
+    db.transaction = (...args: any[]) => {
       if (!interceptado) {
         interceptado = true
-        // Simulando que ALGUÉM alterou o updatedAt no banco DEPOIS da leitura
+        // Simulando que ALGUÉM alterou o updatedAt no banco ANTES do commit final do lote
         sqlite.prepare(`UPDATE convocacoes SET updated_at = '2099-01-01T00:00:00.000Z' WHERE id = ?`).run(conv.id)
       }
-      return originalUpdate.apply(db, args)
+      return originalTransaction(...args)
     }
 
-    const pubRes = await app.request(`/api/v1/convocacoes/${conv.id}/publicar`, { method: 'POST' })
-    expect(pubRes.status).toBe(409) // OCC Abort
-    const pubBody = await pubRes.json()
-    expect(pubBody.error).toMatch(/Conflito: a convocação foi alterada/)
-
-    // Restaurar mock
-    db.update = originalUpdate
+    try {
+      const pubRes = await app.request(`/api/v1/convocacoes/${conv.id}/publicar`, { method: 'POST' })
+      expect(pubRes.status).toBe(409) // OCC Abort
+      const pubBody = await pubRes.json()
+      expect(pubBody.error).toMatch(/Conflito: a convocação foi alterada/)
+    } finally {
+      // Restaurar mock independentemente de erro no assert
+      db.transaction = originalTransaction
+    }
 
     // Confirmar que nada mudou
     const getRes = await app.request(`/api/v1/convocacoes/${conv.id}`)
