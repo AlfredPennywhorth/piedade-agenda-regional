@@ -132,6 +132,23 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
     }
     
     if (parsed.updateMode === 'ALL') {
+      if (parsed.changes.ativo === false) {
+        await executeAtomic(db, (qdb) => {
+          return [
+            qdb.update(seriesRecorrencia)
+              .set({ ativo: false, updatedAt: nowIso })
+              .where(eq(seriesRecorrencia.id, serieId)),
+            qdb.update(eventos)
+              .set({ ativo: false, updatedAt: nowIso })
+              .where(and(
+                eq(eventos.serieRecorrenciaId, serieId),
+                gte(eventos.inicioEm, nowIso)
+              ))
+          ]
+        })
+        return c.json({ message: 'Série e eventos futuros inativados com sucesso' })
+      }
+
       const mergedSerieData = { ...existingSerie, ...parsed.changes }
       SerieCreate.parse(mergedSerieData)
       
