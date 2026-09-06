@@ -24,7 +24,7 @@ describe('App — S07 Minha Agenda', () => {
   it('exibe a navegação principal da S07', () => {
     ;(apiClient.fetchWithAuth as any).mockResolvedValue([])
     render(<App />)
-    expect(screen.getByText('Agenda')).toBeDefined()
+    expect(screen.getByText('Minha Agenda')).toBeDefined()
     expect(screen.getByText('Calendário')).toBeDefined()
   })
 })

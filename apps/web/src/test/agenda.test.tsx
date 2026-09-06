@@ -44,7 +44,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     render(<App />)
     
     expect(screen.getByText('Agenda Regional SP')).toBeInTheDocument()
-    expect(screen.getByText('Agenda')).toBeInTheDocument()
+    expect(screen.getByText('Minha Agenda')).toBeInTheDocument()
     expect(screen.getByText('Calendário')).toBeInTheDocument()
   })
 
