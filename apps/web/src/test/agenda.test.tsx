@@ -267,7 +267,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     })
 
     // Fecha o dialog
-    const btnFechar = dialogQueries.getByLabelText('Fechar')
+    const btnFechar = dialogQueries.getByLabelText('Fechar detalhes')
     fireEvent.click(btnFechar)
 
     await waitFor(() => {
