@@ -4,15 +4,18 @@
 ALTER TABLE eventos ADD COLUMN possui_manha INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE eventos ADD COLUMN possui_tarde INTEGER NOT NULL DEFAULT 0;
 
--- 2. Adicionar período de participação no RSVP
-ALTER TABLE rsvp ADD COLUMN periodo_participacao TEXT;
--- Constraint de check (adicionado a nível de código, mas implicitamente aplicado)
+-- 2. Adicionar período de participação no RSVP com CHECK
+ALTER TABLE rsvp ADD COLUMN periodo_participacao TEXT
+  CHECK (
+    periodo_participacao IS NULL OR
+    periodo_participacao IN ('MANHA','TARDE','INTEGRAL')
+  );
 
 -- 3. Tabela de Refeições do Evento (configurada pelo organizador)
 CREATE TABLE evento_refeicoes (
   id TEXT PRIMARY KEY NOT NULL,
   evento_id TEXT NOT NULL REFERENCES eventos(id),
-  tipo TEXT NOT NULL,
+  tipo TEXT NOT NULL CHECK (tipo IN ('CAFE_MANHA','ALMOCO','LANCHE_TARDE')),
   ativo INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
