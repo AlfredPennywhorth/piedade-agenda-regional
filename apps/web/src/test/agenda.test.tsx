@@ -142,22 +142,18 @@ describe('S07 - Minha Agenda e Calendário', () => {
   it('8. Abre detalhe pela Minha Agenda e verifica conteúdo (HIBRIDO/PRESENCIAL)', async () => {
     ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
     render(<App />)
-    
-    await waitFor(() => {
-      expect(screen.getByText('Reunião de Setor')).toBeInTheDocument()
-    })
-    
-    fireEvent.click(screen.getByText('Reunião de Setor'))
-    
-    await waitFor(() => {
-      // It's a dialog, so it should be visible
-      const dialog = screen.getByRole('dialog')
-      expect(dialog).toBeInTheDocument()
-      expect(screen.getByText('Sede Regional')).toBeInTheDocument()
-      expect(screen.getByText('Rua X')).toBeInTheDocument()
-      expect(screen.getByText('Levar caderno')).toBeInTheDocument()
-    })
-    
+
+    // Aguarda o botão do card aparecer e clica semanticamente no elemento interativo
+    const cardBtn = await screen.findByRole('button', { name: /Reunião de Setor/i })
+    fireEvent.click(cardBtn)
+
+    // Aguarda o dialog aparecer de forma assíncrona (showModal define o atributo open)
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toBeInTheDocument()
+    expect(screen.getByText('Sede Regional')).toBeInTheDocument()
+    expect(screen.getByText('Rua X')).toBeInTheDocument()
+    expect(screen.getByText('Levar caderno')).toBeInTheDocument()
+
     // Fechar modal
     fireEvent.click(screen.getByLabelText('Fechar detalhes'))
     await waitFor(() => {
