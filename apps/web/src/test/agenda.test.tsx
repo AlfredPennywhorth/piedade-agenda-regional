@@ -3,9 +3,9 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import App from '../App'
 import * as apiClient from '../api/apiClient'
 
-// Mock the API client
 vi.mock('../api/apiClient', () => ({
   fetchWithAuth: vi.fn(),
+  putWithAuth: vi.fn(),
   API_BASE_URL: 'http://test'
 }))
 
@@ -19,7 +19,9 @@ const mockEventos = [
       modalidade: 'HIBRIDO',
     },
     convocacao: { id: 'c1', observacoes: 'Levar caderno' },
-    local: { nome: 'Sede Regional', endereco: 'Rua X' }
+    local: { nome: 'Sede Regional', endereco: 'Rua X' },
+    destinatarioId: 'dest-1',
+    rsvp: null
   },
   {
     evento: {
@@ -30,7 +32,9 @@ const mockEventos = [
       modalidade: 'ONLINE',
     },
     convocacao: { id: 'c2', observacoes: null },
-    local: null
+    local: null,
+    destinatarioId: 'dest-2',
+    rsvp: null
   }
 ]
 
@@ -189,5 +193,120 @@ describe('S07 - Minha Agenda e Calendário', () => {
       // "Sede Regional" should NOT be here (it is ONLINE)
       expect(screen.queryByText('Sede Regional')).not.toBeInTheDocument()
     })
+  })
+
+  it('10. Exibe seção de RSVP no detalhe', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Minha Agenda')).toBeInTheDocument()
+    })
+
+    const evt = await screen.findByText('Reunião de Setor')
+    fireEvent.click(evt)
+
+    const dialog = await screen.findByRole('dialog')
+    const dialogQueries = within(dialog)
+
+    expect(dialogQueries.getByText('Sua Participação')).toBeInTheDocument()
+    expect(dialogQueries.getByText('✓ Vou participar')).toBeInTheDocument()
+    expect(dialogQueries.getByText('? Não sei ainda')).toBeInTheDocument()
+    expect(dialogQueries.getByLabelText('✗ Não vou participar')).toBeInTheDocument()
+  })
+
+  it('11. Confirma participação', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    ;(apiClient.putWithAuth as any).mockResolvedValue({})
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Minha Agenda')).toBeInTheDocument()
+    })
+
+    const evt = await screen.findByText('Reunião de Setor')
+    fireEvent.click(evt)
+
+    const dialog = await screen.findByRole('dialog')
+    const dialogQueries = within(dialog)
+
+    const btnParticiparei = dialogQueries.getByText('✓ Vou participar')
+    fireEvent.click(btnParticiparei)
+
+    await waitFor(() => {
+      expect(apiClient.putWithAuth).toHaveBeenCalledWith('/minha-agenda/rsvp/dest-1', {
+        resposta: 'PARTICIPAREI',
+        justificativa: null
+      })
+    })
+
+    expect(dialogQueries.getByText(/confirmado/i)).toBeInTheDocument()
+  })
+
+  it('12. Persiste estado visual ao fechar e reabrir evento', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    ;(apiClient.putWithAuth as any).mockResolvedValue({})
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Minha Agenda')).toBeInTheDocument()
+    })
+
+    let evt = await screen.findByText('Reunião de Setor')
+    fireEvent.click(evt)
+
+    let dialog = await screen.findByRole('dialog')
+    let dialogQueries = within(dialog)
+
+    // Confirma presença
+    const btnParticiparei = dialogQueries.getByText('✓ Vou participar')
+    fireEvent.click(btnParticiparei)
+
+    await waitFor(() => {
+      expect(dialogQueries.getByText(/confirmado/i)).toBeInTheDocument()
+    })
+
+    // Fecha o dialog
+    const btnFechar = dialogQueries.getByLabelText('Fechar detalhes')
+    fireEvent.click(btnFechar)
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    // Reabre o evento
+    evt = await screen.findByText('Reunião de Setor')
+    fireEvent.click(evt)
+
+    dialog = await screen.findByRole('dialog')
+    dialogQueries = within(dialog)
+
+    // Verifica se continua Confirmado (badge)
+    expect(dialogQueries.getByText(/confirmado/i)).toBeInTheDocument()
+  })
+
+  it('13. Selecionar ausência sem salvar não altera o badge', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Minha Agenda')).toBeInTheDocument()
+    })
+
+    const evt = await screen.findByText('Reunião de Setor')
+    fireEvent.click(evt)
+
+    const dialog = await screen.findByRole('dialog')
+    const dialogQueries = within(dialog)
+
+    // Clica no rádio mas NÃO salva
+    const radioNaoVou = dialogQueries.getByLabelText('✗ Não vou participar')
+    fireEvent.click(radioNaoVou)
+
+    // O text-area de justificativa deve aparecer
+    expect(dialogQueries.getByPlaceholderText(/justifique sua ausência/i)).toBeInTheDocument()
+
+    // Mas o badge "Ausente" NÃO deve estar na tela (já que o backend não confirmou)
+    expect(dialogQueries.queryByText(/ausente/i)).not.toBeInTheDocument()
   })
 })

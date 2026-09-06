@@ -1,13 +1,27 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AgendaItem } from './types'
+import * as apiClient from '../../api/apiClient'
 
 interface EventoDetalheProps {
   item: AgendaItem
   onClose: () => void
+  onRsvpUpdated?: (
+    destinatarioId: string,
+    rsvp: {
+      resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI'
+      justificativa?: string | null
+    }
+  ) => void
 }
 
-export function EventoDetalhe({ item, onClose }: EventoDetalheProps) {
+export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalheProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
+  
+  const [respostaLocal, setRespostaLocal] = useState<string | null>(item.rsvp?.resposta ?? null)
+  const [ausenciaSelecionada, setAusenciaSelecionada] = useState(false)
+  const [justificativa, setJustificativa] = useState(item.rsvp?.justificativa ?? '')
+  const [isLoadingRsvp, setIsLoadingRsvp] = useState(false)
+  const [rsvpError, setRsvpError] = useState('')
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -21,6 +35,39 @@ export function EventoDetalhe({ item, onClose }: EventoDetalheProps) {
       dialogRef.current.close()
     }
     onClose()
+  }
+
+  const handleRsvp = async (resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI') => {
+    if (resposta === 'NAO_PARTICIPAREI' && !justificativa.trim()) {
+      setRsvpError('Justificativa é obrigatória para ausência.')
+      return
+    }
+
+    setRsvpError('')
+    setIsLoadingRsvp(true)
+
+    try {
+      await apiClient.putWithAuth(`/minha-agenda/rsvp/${item.destinatarioId}`, {
+        resposta,
+        justificativa: resposta === 'NAO_PARTICIPAREI' ? justificativa : null
+      })
+      const rsvpAtualizado = {
+        resposta,
+        justificativa: resposta === 'NAO_PARTICIPAREI' ? justificativa : null
+      }
+      setRespostaLocal(resposta)
+      if (onRsvpUpdated) {
+        onRsvpUpdated(item.destinatarioId, rsvpAtualizado)
+      }
+      if (resposta !== 'NAO_PARTICIPAREI') {
+        setJustificativa('')
+      }
+      setAusenciaSelecionada(false)
+    } catch (err: any) {
+      setRsvpError(err.message || 'Erro ao registrar resposta.')
+    } finally {
+      setIsLoadingRsvp(false)
+    }
   }
 
   const dateObjInicio = new Date(item.evento.inicioEm)
@@ -116,6 +163,89 @@ export function EventoDetalhe({ item, onClose }: EventoDetalheProps) {
           </div>
         )}
 
+        <div className="border-t border-slate-100 pt-6 pb-2">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Sua Participação</h3>
+            {respostaLocal === 'PARTICIPAREI' && <span className="text-xs font-bold px-2 py-1 bg-green-100 text-green-700 rounded uppercase">Confirmado</span>}
+            {respostaLocal === 'NAO_PARTICIPAREI' && <span className="text-xs font-bold px-2 py-1 bg-red-100 text-red-700 rounded uppercase">Ausente</span>}
+            {respostaLocal === 'NAO_SEI' && <span className="text-xs font-bold px-2 py-1 bg-slate-200 text-slate-700 rounded uppercase">Pendente</span>}
+          </div>
+
+          {dateObjInicio <= new Date() ? (
+            <div className="bg-slate-50 text-slate-600 p-4 rounded-lg text-sm text-center">
+              Resposta bloqueada após início do evento
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleRsvp('PARTICIPAREI')}
+                  disabled={isLoadingRsvp}
+                  className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-colors border ${
+                    respostaLocal === 'PARTICIPAREI' 
+                      ? 'bg-green-50 border-green-200 text-green-700' 
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  ✓ Vou participar
+                </button>
+                <button
+                  onClick={() => handleRsvp('NAO_SEI')}
+                  disabled={isLoadingRsvp}
+                  className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-colors border ${
+                    respostaLocal === 'NAO_SEI' 
+                      ? 'bg-slate-100 border-slate-300 text-slate-800' 
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  ? Não sei ainda
+                </button>
+              </div>
+              
+              <div className="pt-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <input 
+                    type="radio" 
+                    id="radio-nao-vou" 
+                    checked={ausenciaSelecionada || respostaLocal === 'NAO_PARTICIPAREI'}
+                    onChange={() => setAusenciaSelecionada(true)}
+                    disabled={isLoadingRsvp}
+                    className="w-4 h-4 text-red-600 focus:ring-red-500"
+                  />
+                  <label htmlFor="radio-nao-vou" className="text-sm font-medium text-slate-700 cursor-pointer">
+                    ✗ Não vou participar
+                  </label>
+                </div>
+
+                {(ausenciaSelecionada || respostaLocal === 'NAO_PARTICIPAREI') && (
+                  <div className="pl-6 animate-in slide-in-from-top-2">
+                    <textarea
+                      value={justificativa}
+                      onChange={(e) => setJustificativa(e.target.value)}
+                      placeholder="Por favor, justifique sua ausência..."
+                      className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                      rows={2}
+                      disabled={isLoadingRsvp}
+                    />
+                    <button
+                      onClick={() => handleRsvp('NAO_PARTICIPAREI')}
+                      disabled={isLoadingRsvp}
+                      className="mt-2 w-full py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
+                    >
+                      {isLoadingRsvp ? 'Salvando...' : 'Confirmar Ausência'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {rsvpError && (
+                <div className="text-red-600 text-sm mt-2 font-medium bg-red-50 p-2 rounded">
+                  {rsvpError}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </dialog>
   )

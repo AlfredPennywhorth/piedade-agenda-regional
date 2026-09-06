@@ -17,7 +17,7 @@ name = "piedade-agenda-worker-dev"
 
 [env.development.vars]
 APP_ENV = "development"
-APP_VERSION = "0.0.1-s07"
+APP_VERSION = "0.0.1-s08"
 
 [[env.development.d1_databases]]
 binding = "DB"

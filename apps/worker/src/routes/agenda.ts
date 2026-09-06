@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and, asc } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, locais } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, locais, rsvp } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 
 export const agendaRouter = new Hono<{ Variables: Variables }>()
@@ -19,12 +19,15 @@ agendaRouter.get('/', async (c) => {
     const records = await db.select({
       evento: eventos,
       convocacao: convocacoes,
-      local: locais
+      local: locais,
+      destinatario: convocacaoDestinatarios,
+      rsvp: rsvp
     })
     .from(eventos)
     .innerJoin(convocacoes, eq(eventos.id, convocacoes.eventoId))
     .innerJoin(convocacaoDestinatarios, eq(convocacoes.id, convocacaoDestinatarios.convocacaoId))
     .leftJoin(locais, eq(eventos.localId, locais.id))
+    .leftJoin(rsvp, eq(convocacaoDestinatarios.id, rsvp.convocacaoDestinatarioId))
     .where(
       and(
         eq(convocacaoDestinatarios.membroId, membroId),
@@ -36,7 +39,18 @@ agendaRouter.get('/', async (c) => {
     .orderBy(asc(eventos.inicioEm))
     .all()
 
-    return c.json(records, 200)
+    const result = records.map((r: any) => ({
+      evento: r.evento,
+      convocacao: r.convocacao,
+      local: r.local,
+      destinatarioId: r.destinatario.id,
+      rsvp: r.rsvp ? {
+        resposta: r.rsvp.resposta,
+        justificativa: r.rsvp.justificativa
+      } : null
+    }))
+
+    return c.json(result, 200)
   } catch (error: any) {
     return c.json({ error: error.message || 'Falha ao consultar agenda' }, 500)
   }

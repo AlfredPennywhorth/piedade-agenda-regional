@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { AppInfo, ApiErrorSchema, HealthSchema, isApiError } from '../index'
+import { AppInfo, ApiErrorSchema, HealthSchema, isApiError, RsvpUpsert } from '../index'
 
 describe('Shared — AppInfo', () => {
   it('contém o nome correto da aplicação', () => {
@@ -8,6 +8,26 @@ describe('Shared — AppInfo', () => {
 
   it('identifica sprint S00', () => {
     expect(AppInfo.sprint).toBe('S00')
+  })
+})
+
+describe('S08 - RSVP', () => {
+  it('RsvpUpsert aceita PARTICIPAREI sem justificativa', () => {
+    const result = RsvpUpsert.safeParse({ resposta: 'PARTICIPAREI' })
+    expect(result.success).toBe(true)
+  })
+
+  it('RsvpUpsert rejeita NAO_PARTICIPAREI sem justificativa', () => {
+    const result = RsvpUpsert.safeParse({ resposta: 'NAO_PARTICIPAREI' })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0].message).toMatch(/Justificativa é obrigatória/)
+    }
+  })
+
+  it('RsvpUpsert aceita NAO_PARTICIPAREI com justificativa', () => {
+    const result = RsvpUpsert.safeParse({ resposta: 'NAO_PARTICIPAREI', justificativa: 'Motivo de teste' })
+    expect(result.success).toBe(true)
   })
 })
 

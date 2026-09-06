@@ -20,3 +20,13 @@ export async function fetchWithAuth(endpoint: string, options: RequestInit = {})
   
   return response.json()
 }
+
+export async function putWithAuth(endpoint: string, body: any) {
+  return fetchWithAuth(endpoint, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  })
+}
