@@ -217,7 +217,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
 
   it('11. Confirma participação', async () => {
     ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
-    ;(apiClient.putWithAuth as any) = vi.fn().mockResolvedValue({})
+    vi.spyOn(apiClient, 'putWithAuth').mockResolvedValue({} as any)
     render(<App />)
 
     await waitFor(() => {
