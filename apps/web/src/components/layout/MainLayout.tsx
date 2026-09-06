@@ -1,7 +1,7 @@
-import React from 'react'
+import type { ReactNode } from 'react'
 
 interface MainLayoutProps {
-  children: React.ReactNode
+  children: ReactNode
   currentTab: 'agenda' | 'calendario' | 'avisos' | 'cadastro'
   onTabChange: (tab: 'agenda' | 'calendario' | 'avisos' | 'cadastro') => void
 }

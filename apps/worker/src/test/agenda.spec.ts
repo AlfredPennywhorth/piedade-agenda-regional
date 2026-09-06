@@ -40,8 +40,8 @@ describe('S07 - Minha Agenda', () => {
 
       INSERT INTO locais (id, nome, endereco, numero, cidade, uf) VALUES ('loc-1', 'Local 1', 'Rua A', '1', 'SP', 'SP');
 
-      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, local_id, ativo)
-      VALUES ('ev-1', 'Evento Teste', 'PRESENCIAL', '2026-01-01T10:00:00Z', '2026-01-01T11:00:00Z', 'loc-1', 1);
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, local_id, regional_id, ativo)
+      VALUES ('ev-1', 'Evento Teste', 'PRESENCIAL', '2026-01-01T10:00:00Z', '2026-01-01T11:00:00Z', 'loc-1', 'reg-1', 1);
 
       INSERT INTO convocacoes (id, evento_id, status, ativo)
       VALUES ('conv-1', 'ev-1', 'PUBLICADA', 1);

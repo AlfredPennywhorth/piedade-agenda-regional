@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { fetchWithAuth } from '../../api/apiClient'
 import { AgendaItem } from '../agenda/types'
 import { EventCard } from '../agenda/EventCard'
@@ -52,7 +52,7 @@ export function CalendarioView() {
     return acc
   }, {} as Record<string, AgendaItem[]>)
 
-  const handleDayClick = (day: number, hasEvent: boolean, dayEvents: AgendaItem[]) => {
+  const handleDayClick = (day: number, dayEvents: AgendaItem[]) => {
     setSelectedDate(new Date(year, month, day))
     setSelectedDayEvents(dayEvents)
   }
@@ -97,7 +97,7 @@ export function CalendarioView() {
             return (
               <button
                 key={day} 
-                onClick={() => handleDayClick(day, hasEvent, dayEvents)}
+                onClick={() => handleDayClick(day, dayEvents)}
                 aria-label={`Selecionar dia ${day}`}
                 aria-pressed={isSelected}
                 className={`p-1 border-b border-r border-slate-50 aspect-square flex flex-col items-center justify-center relative transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-inset

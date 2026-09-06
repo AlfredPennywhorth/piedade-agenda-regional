@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { fetchWithAuth } from '../../api/apiClient'
 import { AgendaItem } from './types'
 import { EventoDetalhe } from './EventoDetalhe'
