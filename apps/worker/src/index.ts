@@ -33,6 +33,7 @@ import { meApp } from './routes/auth/me'
 import { adminMembrosApp } from './routes/admin/membros'
 import { locaisRouter } from './routes/locais'
 import { eventosRouter } from './routes/eventos'
+import { eventoRefeicoesRouter } from './routes/evento-refeicoes'
 import { seriesRecorrenciaRouter } from './routes/series-recorrencia'
 import { convocacoesRouter } from './routes/convocacoes'
 import { agendaRouter } from './routes/agenda'
@@ -109,6 +110,7 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   // ============================================================
   app.route('/api/v1/locais', locaisRouter)
   app.route('/api/v1/eventos', eventosRouter)
+  app.route('/api/v1/eventos', eventoRefeicoesRouter)
   app.route('/api/v1/series-recorrencia', seriesRecorrenciaRouter)
 
   // ============================================================

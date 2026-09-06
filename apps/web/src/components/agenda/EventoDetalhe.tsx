@@ -10,6 +10,8 @@ interface EventoDetalheProps {
     rsvp: {
       resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI'
       justificativa?: string | null
+      periodoParticipacao?: string | null
+      refeicoesSelecionadas?: string[]
     }
   ) => void
 }
@@ -19,7 +21,12 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
   
   const [respostaLocal, setRespostaLocal] = useState<string | null>(item.rsvp?.resposta ?? null)
   const [ausenciaSelecionada, setAusenciaSelecionada] = useState(false)
+  const [isEditingParticipacao, setIsEditingParticipacao] = useState(false)
+  
   const [justificativa, setJustificativa] = useState(item.rsvp?.justificativa ?? '')
+  const [periodoLocal, setPeriodoLocal] = useState<string | null>(item.rsvp?.periodoParticipacao ?? null)
+  const [refeicoesLocal, setRefeicoesLocal] = useState<string[]>(item.rsvp?.refeicoesSelecionadas ?? [])
+  
   const [isLoadingRsvp, setIsLoadingRsvp] = useState(false)
   const [rsvpError, setRsvpError] = useState('')
 
@@ -37,24 +44,55 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
     onClose()
   }
 
-  const handleRsvp = async (resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI') => {
+  const handleRsvp = async (resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI', bypassEditCheck = false) => {
     if (resposta === 'NAO_PARTICIPAREI' && !justificativa.trim()) {
       setRsvpError('Justificativa é obrigatória para ausência.')
       return
+    }
+
+    if (resposta === 'PARTICIPAREI' && !bypassEditCheck) {
+      const exigePeriodo = item.evento.possuiManha && item.evento.possuiTarde
+      const temRefeicoes = item.evento.refeicoesOferecidas && item.evento.refeicoesOferecidas.length > 0
+      
+      if (exigePeriodo || temRefeicoes) {
+        setIsEditingParticipacao(true)
+        setAusenciaSelecionada(false)
+        return
+      }
+    }
+
+    // Se exige período e está confirmando
+    if (resposta === 'PARTICIPAREI' && bypassEditCheck) {
+      const exigePeriodo = item.evento.possuiManha && item.evento.possuiTarde
+      if (exigePeriodo && !periodoLocal) {
+        setRsvpError('Por favor, selecione um período de participação.')
+        return
+      }
     }
 
     setRsvpError('')
     setIsLoadingRsvp(true)
 
     try {
-      await apiClient.putWithAuth(`/minha-agenda/rsvp/${item.destinatarioId}`, {
-        resposta,
-        justificativa: resposta === 'NAO_PARTICIPAREI' ? justificativa : null
-      })
-      const rsvpAtualizado = {
+      const payload: any = {
         resposta,
         justificativa: resposta === 'NAO_PARTICIPAREI' ? justificativa : null
       }
+      
+      if (resposta === 'PARTICIPAREI') {
+        if (periodoLocal) payload.periodoParticipacao = periodoLocal
+        if (refeicoesLocal.length > 0) payload.refeicoesSelecionadas = refeicoesLocal
+      }
+
+      await apiClient.putWithAuth(`/minha-agenda/rsvp/${item.destinatarioId}`, payload)
+      
+      const rsvpAtualizado = {
+        resposta,
+        justificativa: resposta === 'NAO_PARTICIPAREI' ? justificativa : null,
+        periodoParticipacao: resposta === 'PARTICIPAREI' ? periodoLocal : null,
+        refeicoesSelecionadas: resposta === 'PARTICIPAREI' ? refeicoesLocal : []
+      }
+      
       setRespostaLocal(resposta)
       if (onRsvpUpdated) {
         onRsvpUpdated(item.destinatarioId, rsvpAtualizado)
@@ -62,11 +100,32 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
       if (resposta !== 'NAO_PARTICIPAREI') {
         setJustificativa('')
       }
+      if (resposta !== 'PARTICIPAREI') {
+        setPeriodoLocal(null)
+        setRefeicoesLocal([])
+      }
+      
       setAusenciaSelecionada(false)
+      setIsEditingParticipacao(false)
     } catch (err: any) {
       setRsvpError(err.message || 'Erro ao registrar resposta.')
     } finally {
       setIsLoadingRsvp(false)
+    }
+  }
+
+  const handleRefeicaoToggle = (tipo: string) => {
+    setRefeicoesLocal(prev => 
+      prev.includes(tipo) ? prev.filter(t => t !== tipo) : [...prev, tipo]
+    )
+  }
+
+  const getRefeicaoLabel = (tipo: string) => {
+    switch(tipo) {
+      case 'CAFE_MANHA': return 'Café da manhã'
+      case 'ALMOCO': return 'Almoço'
+      case 'LANCHE_TARDE': return 'Lanche da tarde'
+      default: return tipo
     }
   }
 
@@ -182,7 +241,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
                   onClick={() => handleRsvp('PARTICIPAREI')}
                   disabled={isLoadingRsvp}
                   className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-colors border ${
-                    respostaLocal === 'PARTICIPAREI' 
+                    (respostaLocal === 'PARTICIPAREI' || isEditingParticipacao)
                       ? 'bg-green-50 border-green-200 text-green-700' 
                       : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
@@ -190,10 +249,10 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
                   ✓ Vou participar
                 </button>
                 <button
-                  onClick={() => handleRsvp('NAO_SEI')}
+                  onClick={() => { setIsEditingParticipacao(false); handleRsvp('NAO_SEI') }}
                   disabled={isLoadingRsvp}
                   className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-colors border ${
-                    respostaLocal === 'NAO_SEI' 
+                    respostaLocal === 'NAO_SEI' && !isEditingParticipacao
                       ? 'bg-slate-100 border-slate-300 text-slate-800' 
                       : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
@@ -202,13 +261,80 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
                 </button>
               </div>
               
+              {isEditingParticipacao && (
+                <div className="p-4 bg-green-50/50 border border-green-100 rounded-lg animate-in slide-in-from-top-2">
+                  {item.evento.possuiManha && item.evento.possuiTarde && (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-semibold text-slate-700 mb-2">Período de participação *</h4>
+                      <div className="flex flex-col gap-2">
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                          <input type="radio" name="periodo" value="MANHA" 
+                            checked={periodoLocal === 'MANHA'}
+                            onChange={() => setPeriodoLocal('MANHA')}
+                            className="text-green-600 focus:ring-green-500" />
+                          Manhã
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                          <input type="radio" name="periodo" value="TARDE" 
+                            checked={periodoLocal === 'TARDE'}
+                            onChange={() => setPeriodoLocal('TARDE')}
+                            className="text-green-600 focus:ring-green-500" />
+                          Tarde
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                          <input type="radio" name="periodo" value="INTEGRAL" 
+                            checked={periodoLocal === 'INTEGRAL'}
+                            onChange={() => setPeriodoLocal('INTEGRAL')}
+                            className="text-green-600 focus:ring-green-500" />
+                          Manhã e tarde
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
+                  {item.evento.refeicoesOferecidas && item.evento.refeicoesOferecidas.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-semibold text-slate-700 mb-2">Alimentação (opcional)</h4>
+                      <p className="text-xs text-slate-500 mb-2">Selecione as refeições que irá necessitar:</p>
+                      <div className="flex flex-col gap-2">
+                        {item.evento.refeicoesOferecidas.map((tipo: string) => (
+                          <label key={tipo} className="flex items-center gap-2 text-sm text-slate-600">
+                            <input 
+                              type="checkbox" 
+                              checked={refeicoesLocal.includes(tipo)}
+                              onChange={() => handleRefeicaoToggle(tipo)}
+                              className="rounded text-green-600 focus:ring-green-500" />
+                            {getRefeicaoLabel(tipo)}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => handleRsvp('PARTICIPAREI', true)}
+                    disabled={isLoadingRsvp}
+                    className="w-full py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                  >
+                    {isLoadingRsvp ? 'Salvando...' : 'Confirmar Participação'}
+                  </button>
+                  <button
+                    onClick={() => setIsEditingParticipacao(false)}
+                    disabled={isLoadingRsvp}
+                    className="w-full mt-2 py-2 text-slate-500 rounded-lg text-sm font-medium hover:bg-slate-100 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
+
               <div className="pt-2">
                 <div className="flex items-center gap-2 mb-2">
                   <input 
                     type="radio" 
                     id="radio-nao-vou" 
-                    checked={ausenciaSelecionada || respostaLocal === 'NAO_PARTICIPAREI'}
-                    onChange={() => setAusenciaSelecionada(true)}
+                    checked={ausenciaSelecionada || (respostaLocal === 'NAO_PARTICIPAREI' && !isEditingParticipacao)}
+                    onChange={() => { setAusenciaSelecionada(true); setIsEditingParticipacao(false) }}
                     disabled={isLoadingRsvp}
                     className="w-4 h-4 text-red-600 focus:ring-red-500"
                   />
@@ -217,7 +343,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
                   </label>
                 </div>
 
-                {(ausenciaSelecionada || respostaLocal === 'NAO_PARTICIPAREI') && (
+                {(ausenciaSelecionada || (respostaLocal === 'NAO_PARTICIPAREI' && !isEditingParticipacao)) && (
                   <div className="pl-6 animate-in slide-in-from-top-2">
                     <textarea
                       value={justificativa}

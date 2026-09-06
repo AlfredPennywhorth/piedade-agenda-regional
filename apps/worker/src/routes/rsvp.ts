@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
-import { rsvp, convocacoes, convocacaoDestinatarios, eventos } from '../db/schema'
+import { rsvp, convocacoes, convocacaoDestinatarios, eventos, eventoRefeicoes, rsvpRefeicoes } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { RsvpUpsert } from '@piedade/shared'
+import { executeAtomic } from '../db/batch'
 
 export const rsvpRouter = new Hono<{ Variables: Variables }>()
 
@@ -61,7 +62,10 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
     const record = await db.select({
       destinatarioId: convocacaoDestinatarios.id,
       convocacaoStatus: convocacoes.status,
+      eventoId: eventos.id,
       eventoInicio: eventos.inicioEm,
+      possuiManha: eventos.possuiManha,
+      possuiTarde: eventos.possuiTarde
     })
     .from(convocacaoDestinatarios)
     .innerJoin(convocacoes, eq(convocacaoDestinatarios.convocacaoId, convocacoes.id))
@@ -86,18 +90,62 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
       return c.json({ error: 'O evento já iniciou. Não é possível alterar a resposta.' }, 400)
     }
 
-    const rsvpId = crypto.randomUUID()
+    // Validações S09 (Worker-side)
+    let finalPeriodo = null
+    const refeicoesDesejadas: string[] = []
+
+    if (parsed.resposta === 'PARTICIPAREI') {
+      // 1. Normalizar período
+      if (record.possuiManha && !record.possuiTarde) {
+        finalPeriodo = 'MANHA'
+      } else if (!record.possuiManha && record.possuiTarde) {
+        finalPeriodo = 'TARDE'
+      } else if (record.possuiManha && record.possuiTarde) {
+        if (!parsed.periodoParticipacao) {
+           return c.json({ error: 'Período de participação é obrigatório para este evento.' }, 400)
+        }
+        finalPeriodo = parsed.periodoParticipacao
+      }
+
+      // 2. Validar Refeições
+      if (parsed.refeicoesSelecionadas && parsed.refeicoesSelecionadas.length > 0) {
+        const ativasDb = await db.select().from(eventoRefeicoes)
+          .where(and(
+            eq(eventoRefeicoes.eventoId, record.eventoId),
+            eq(eventoRefeicoes.ativo, true)
+          )).all()
+        
+        const tiposAtivos = ativasDb.map(r => r.tipo)
+        for (const tipo of parsed.refeicoesSelecionadas) {
+          if (!tiposAtivos.includes(tipo)) {
+            return c.json({ error: `Refeição ${tipo} não está disponível ou está inativa neste evento.` }, 400)
+          }
+          const idDaRefeicao = ativasDb.find(r => r.tipo === tipo)!.id
+          refeicoesDesejadas.push(idDaRefeicao)
+        }
+      }
+    }
+
+    // Prepara Atomic Batch
+    const batchQueries = []
     
-    // Upsert onConflictDoUpdate
-    await db.insert(rsvp)
+    // Precisamos do ID do RSVP. Vamos buscar se existe.
+    let existingRsvp = await db.select().from(rsvp)
+      .where(eq(rsvp.convocacaoDestinatarioId, destinatarioId)).get()
+    
+    const rsvpId = existingRsvp ? existingRsvp.id : crypto.randomUUID()
+    
+    // 1. Upsert RSVP
+    const qRsvp = db.insert(rsvp)
       .values({
         id: rsvpId,
         convocacaoDestinatarioId: destinatarioId,
         resposta: parsed.resposta,
         justificativa: parsed.justificativa,
-        respondidoEm: nowIso,
+        periodoParticipacao: finalPeriodo,
+        respondidoEm: existingRsvp ? existingRsvp.respondidoEm : nowIso,
         atualizadoEm: nowIso,
-        createdAt: nowIso,
+        createdAt: existingRsvp ? existingRsvp.createdAt : nowIso,
         updatedAt: nowIso
       })
       .onConflictDoUpdate({
@@ -105,11 +153,51 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
         set: {
           resposta: parsed.resposta,
           justificativa: parsed.justificativa,
+          periodoParticipacao: finalPeriodo,
           atualizadoEm: nowIso,
           updatedAt: nowIso
         }
       })
-      .execute()
+    
+    batchQueries.push(qRsvp)
+
+    // 2. Tratar Refeições
+    // Buscar seleções anteriores (ativas e inativas)
+    if (existingRsvp) {
+      const escolhasAnteriores = await db.select().from(rsvpRefeicoes)
+        .where(eq(rsvpRefeicoes.rsvpId, existingRsvp.id)).all()
+        
+      for (const ref of escolhasAnteriores) {
+        const deveEstarAtiva = refeicoesDesejadas.includes(ref.eventoRefeicaoId)
+        if (ref.ativo !== deveEstarAtiva) {
+          batchQueries.push(
+            db.update(rsvpRefeicoes)
+              .set({ ativo: deveEstarAtiva, updatedAt: nowIso })
+              .where(eq(rsvpRefeicoes.id, ref.id))
+          )
+        }
+        // Retira da lista de desejadas para não fazer insert duplicado
+        const idx = refeicoesDesejadas.indexOf(ref.eventoRefeicaoId)
+        if (idx > -1) refeicoesDesejadas.splice(idx, 1)
+      }
+    }
+
+    // 3. Insert novas refeições
+    for (const refId of refeicoesDesejadas) {
+      batchQueries.push(
+        db.insert(rsvpRefeicoes).values({
+          id: crypto.randomUUID(),
+          rsvpId,
+          eventoRefeicaoId: refId,
+          ativo: true,
+          createdAt: nowIso,
+          updatedAt: nowIso
+        })
+      )
+    }
+
+    // Execute de forma atômica (D1 Batch)
+    await executeAtomic(db, batchQueries)
 
     const updated = await db.select().from(rsvp)
       .where(eq(rsvp.convocacaoDestinatarioId, destinatarioId))

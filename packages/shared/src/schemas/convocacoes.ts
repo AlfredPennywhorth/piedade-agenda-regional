@@ -71,11 +71,19 @@ export type ConvocacaoDestinatario = z.infer<typeof ConvocacaoDestinatarioSchema
 export const StatusRsvp = z.enum(['PARTICIPAREI', 'NAO_PARTICIPAREI', 'NAO_SEI'])
 export type StatusRsvpEnum = z.infer<typeof StatusRsvp>
 
+export const PeriodoParticipacao = z.enum(['MANHA', 'TARDE', 'INTEGRAL'])
+export type PeriodoParticipacaoEnum = z.infer<typeof PeriodoParticipacao>
+
+export const TipoRefeicao = z.enum(['CAFE_MANHA', 'ALMOCO', 'LANCHE_TARDE'])
+export type TipoRefeicaoEnum = z.infer<typeof TipoRefeicao>
+
 export const RsvpSchema = z.object({
   id: z.string().uuid(),
   convocacaoDestinatarioId: z.string().uuid(),
   resposta: StatusRsvp,
   justificativa: z.string().nullable().optional(),
+  periodoParticipacao: PeriodoParticipacao.nullable().optional(),
+  refeicoesSelecionadas: z.array(TipoRefeicao).optional(),
   respondidoEm: z.string(),
   atualizadoEm: z.string(),
   createdAt: z.string(),
@@ -86,6 +94,8 @@ export type Rsvp = z.infer<typeof RsvpSchema>
 export const RsvpUpsert = z.object({
   resposta: StatusRsvp,
   justificativa: z.string().nullable().optional(),
+  periodoParticipacao: PeriodoParticipacao.nullable().optional(),
+  refeicoesSelecionadas: z.array(TipoRefeicao).optional()
 }).superRefine((data, ctx) => {
   if (data.resposta === 'NAO_PARTICIPAREI' && !data.justificativa?.trim()) {
     ctx.addIssue({
@@ -93,6 +103,16 @@ export const RsvpUpsert = z.object({
       message: 'Justificativa é obrigatória quando resposta é NAO_PARTICIPAREI',
       path: ['justificativa'],
     })
+  }
+  
+  if (data.resposta !== 'PARTICIPAREI') {
+    if (data.periodoParticipacao || (data.refeicoesSelecionadas && data.refeicoesSelecionadas.length > 0)) {
+       ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Período e refeições não devem ser enviados quando resposta não é PARTICIPAREI',
+        path: ['periodoParticipacao'], // Genérico, o Worker filtrará ou recusará.
+      })
+    }
   }
 })
 export type RsvpUpsertPayload = z.infer<typeof RsvpUpsert>

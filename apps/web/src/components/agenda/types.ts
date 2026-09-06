@@ -8,6 +8,9 @@ export interface AgendaItem {
     urlOnline?: string | null
     urlMaps?: string | null
     urlWaze?: string | null
+    possuiManha?: boolean
+    possuiTarde?: boolean
+    refeicoesOferecidas?: string[]
   }
   convocacao: {
     id: string
@@ -21,5 +24,7 @@ export interface AgendaItem {
   rsvp: {
     resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI'
     justificativa?: string | null
+    periodoParticipacao?: string | null
+    refeicoesSelecionadas?: string[]
   } | null
 }

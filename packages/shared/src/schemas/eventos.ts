@@ -29,6 +29,10 @@ export const baseEvento = {
 
   observacoes: z.string().nullable().optional(),
   ativo: z.boolean().default(true).optional(),
+
+  // S09
+  possuiManha: z.boolean().default(false).optional(),
+  possuiTarde: z.boolean().default(false).optional(),
 }
 
 const eventoSuperRefine = (data: any, ctx: z.RefinementCtx) => {
