@@ -66,20 +66,20 @@ describe('S08 - RSVP', () => {
     sqlite.exec(baseSql)
 
     // Helper para gerar sessão
-    const genSession = async (mid: string, cel: string) => {
+    const genSession = async (mid: string, cel: string, dataNascimento: string) => {
       const resLink = await req(`/api/v1/admin/membros/${mid}/link-ativacao`, { method: 'POST' })
       const linkJson = await resLink.json() as any
       const resAtivar = await req('/api/v1/auth/ativar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: linkJson.token, celular: cel, dataNascimento: '1990-01-01', pin: '123456', confirmacaoPin: '123456' })
+        body: JSON.stringify({ token: linkJson.token, celular: cel, dataNascimento, pin: '123456', confirmacaoPin: '123456' })
       })
       const ativarJson = await resAtivar.json() as any
       return ativarJson.sessionToken
     }
 
-    sessionToken = await genSession(membroId, '11999999999')
-    sessionTokenOutro = await genSession(membroIdOutro, '11888888888')
+    sessionToken = await genSession(membroId, '11999999999', '1990-01-01')
+    sessionTokenOutro = await genSession(membroIdOutro, '11888888888', '1990-01-02')
   })
 
   it('1. GET sem RSVP -> 404', async () => {

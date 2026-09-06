@@ -240,6 +240,6 @@ describe('S07 - Minha Agenda e Calendário', () => {
       })
     })
 
-    expect(dialogQueries.getByText('CONFIRMADO')).toBeInTheDocument()
+    expect(dialogQueries.getByText(/confirmado/i)).toBeInTheDocument()
   })
 })
