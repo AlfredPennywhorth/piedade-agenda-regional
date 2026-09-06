@@ -63,3 +63,36 @@ export const ConvocacaoDestinatarioSchema = z.object({
 }).strict()
 
 export type ConvocacaoDestinatario = z.infer<typeof ConvocacaoDestinatarioSchema>
+
+// ============================================================
+// RSVP — S08
+// ============================================================
+
+export const StatusRsvp = z.enum(['PARTICIPAREI', 'NAO_PARTICIPAREI', 'NAO_SEI'])
+export type StatusRsvpEnum = z.infer<typeof StatusRsvp>
+
+export const RsvpSchema = z.object({
+  id: z.string().uuid(),
+  convocacaoDestinatarioId: z.string().uuid(),
+  resposta: StatusRsvp,
+  justificativa: z.string().nullable().optional(),
+  respondidoEm: z.string(),
+  atualizadoEm: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+export type Rsvp = z.infer<typeof RsvpSchema>
+
+export const RsvpUpsert = z.object({
+  resposta: StatusRsvp,
+  justificativa: z.string().nullable().optional(),
+}).superRefine((data, ctx) => {
+  if (data.resposta === 'NAO_PARTICIPAREI' && !data.justificativa?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Justificativa é obrigatória quando resposta é NAO_PARTICIPAREI',
+      path: ['justificativa'],
+    })
+  }
+})
+export type RsvpUpsertPayload = z.infer<typeof RsvpUpsert>

@@ -76,5 +76,7 @@ describe('S07 - Minha Agenda', () => {
     expect(json[0].evento.id).toBe('ev-1')
     expect(json[0].convocacao.id).toBe('conv-1')
     expect(json[0].local.id).toBe('loc-1')
+    expect(json[0].destinatarioId).toBe('dest-1')
+    expect(json[0].rsvp).toBeNull()
   })
 })

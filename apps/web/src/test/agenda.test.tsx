@@ -19,7 +19,9 @@ const mockEventos = [
       modalidade: 'HIBRIDO',
     },
     convocacao: { id: 'c1', observacoes: 'Levar caderno' },
-    local: { nome: 'Sede Regional', endereco: 'Rua X' }
+    local: { nome: 'Sede Regional', endereco: 'Rua X' },
+    destinatarioId: 'dest-1',
+    rsvp: null
   },
   {
     evento: {
@@ -30,7 +32,9 @@ const mockEventos = [
       modalidade: 'ONLINE',
     },
     convocacao: { id: 'c2', observacoes: null },
-    local: null
+    local: null,
+    destinatarioId: 'dest-2',
+    rsvp: null
   }
 ]
 
@@ -189,5 +193,53 @@ describe('S07 - Minha Agenda e Calendário', () => {
       // "Sede Regional" should NOT be here (it is ONLINE)
       expect(screen.queryByText('Sede Regional')).not.toBeInTheDocument()
     })
+  })
+
+  it('10. Exibe seção de RSVP no detalhe', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Minha Agenda')).toBeInTheDocument()
+    })
+
+    const evt = await screen.findByText('Reunião de Setor')
+    fireEvent.click(evt)
+
+    const dialog = await screen.findByRole('dialog')
+    const dialogQueries = within(dialog)
+
+    expect(dialogQueries.getByText('Sua Participação')).toBeInTheDocument()
+    expect(dialogQueries.getByText('✓ Vou participar')).toBeInTheDocument()
+    expect(dialogQueries.getByText('? Não sei ainda')).toBeInTheDocument()
+    expect(dialogQueries.getByLabelText('✗ Não vou participar')).toBeInTheDocument()
+  })
+
+  it('11. Confirma participação', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    ;(apiClient.putWithAuth as any) = vi.fn().mockResolvedValue({})
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Minha Agenda')).toBeInTheDocument()
+    })
+
+    const evt = await screen.findByText('Reunião de Setor')
+    fireEvent.click(evt)
+
+    const dialog = await screen.findByRole('dialog')
+    const dialogQueries = within(dialog)
+
+    const btnParticiparei = dialogQueries.getByText('✓ Vou participar')
+    fireEvent.click(btnParticiparei)
+
+    await waitFor(() => {
+      expect(apiClient.putWithAuth).toHaveBeenCalledWith('/minha-agenda/rsvp/dest-1', {
+        resposta: 'PARTICIPAREI',
+        justificativa: null
+      })
+    })
+
+    expect(dialogQueries.getByText('CONFIRMADO')).toBeInTheDocument()
   })
 })

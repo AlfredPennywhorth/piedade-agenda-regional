@@ -17,4 +17,9 @@ export interface AgendaItem {
     nome: string
     endereco: string
   } | null
+  destinatarioId: string
+  rsvp: {
+    resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI'
+    justificativa?: string | null
+  } | null
 }

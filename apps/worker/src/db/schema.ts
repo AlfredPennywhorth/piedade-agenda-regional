@@ -387,3 +387,19 @@ export const convocacaoDestinatarioEvidencias = sqliteTable('convocacao_destinat
   uniqueEvidencia: uniqueIndex('idx_convocacao_evidencia_unica').on(table.convocacaoDestinatarioId, table.funcaoId, table.vinculoFuncionalId),
   idxDestinatarioId: index('idx_convocacao_evidencias_dest_id').on(table.convocacaoDestinatarioId),
 }))
+
+export const rsvp = sqliteTable('rsvp', {
+  id: text('id').primaryKey(),
+  convocacaoDestinatarioId: text('convocacao_destinatario_id')
+    .notNull()
+    .unique()
+    .references(() => convocacaoDestinatarios.id),
+  resposta: text('resposta').notNull(),
+  justificativa: text('justificativa'),
+  respondidoEm: text('respondido_em').notNull(),
+  atualizadoEm: text('atualizado_em').notNull(),
+  ...timestampsS02
+}, table => ({
+  checkResposta: check('check_rsvp_resposta', sql`${table.resposta} IN ('PARTICIPAREI','NAO_PARTICIPAREI','NAO_SEI')`),
+  idxRsvpDestId: index('idx_rsvp_convocacao_dest_id').on(table.convocacaoDestinatarioId),
+}))

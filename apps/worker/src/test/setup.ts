@@ -251,6 +251,20 @@ export function setupDb(sqlite: any) {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_convocacao_evidencia_unica ON convocacao_destinatario_evidencias (convocacao_destinatario_id, funcao_id, vinculo_funcional_id);
     CREATE INDEX IF NOT EXISTS idx_convocacao_evidencias_dest_id ON convocacao_destinatario_evidencias (convocacao_destinatario_id);
+
+    CREATE TABLE IF NOT EXISTS rsvp (
+      id text PRIMARY KEY NOT NULL,
+      convocacao_destinatario_id text NOT NULL UNIQUE,
+      resposta text NOT NULL,
+      justificativa text,
+      respondido_em text NOT NULL,
+      atualizado_em text NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (convocacao_destinatario_id) REFERENCES convocacao_destinatarios(id),
+      CONSTRAINT check_rsvp_resposta CHECK (resposta IN ('PARTICIPAREI','NAO_PARTICIPAREI','NAO_SEI'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_rsvp_convocacao_dest_id ON rsvp (convocacao_destinatario_id);
   `
   sqlite.exec(setupSql)
 }
