@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import App from '../App'
 import * as apiClient from '../api/apiClient'
 
@@ -150,12 +150,15 @@ describe('S07 - Minha Agenda e Calendário', () => {
     // Aguarda o dialog aparecer de forma assíncrona (showModal define o atributo open)
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toBeInTheDocument()
-    expect(screen.getByText('Sede Regional')).toBeInTheDocument()
-    expect(screen.getByText('Rua X')).toBeInTheDocument()
-    expect(screen.getByText('Levar caderno')).toBeInTheDocument()
 
-    // Fechar modal
-    fireEvent.click(screen.getByLabelText('Fechar detalhes'))
+    // Restringe asserções ao dialog para evitar falsa duplicidade com o EventCard
+    const dq = within(dialog)
+    expect(dq.getByText('Sede Regional')).toBeInTheDocument()
+    expect(dq.getByText('Rua X')).toBeInTheDocument()
+    expect(dq.getByText('Levar caderno')).toBeInTheDocument()
+
+    // Fechar modal usando escopo do dialog
+    fireEvent.click(dq.getByLabelText('Fechar detalhes'))
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
