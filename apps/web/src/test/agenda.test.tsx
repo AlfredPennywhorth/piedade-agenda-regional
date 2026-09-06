@@ -242,4 +242,71 @@ describe('S07 - Minha Agenda e Calendário', () => {
 
     expect(dialogQueries.getByText(/confirmado/i)).toBeInTheDocument()
   })
+
+  it('12. Persiste estado visual ao fechar e reabrir evento', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    ;(apiClient.putWithAuth as any).mockResolvedValue({})
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Minha Agenda')).toBeInTheDocument()
+    })
+
+    let evt = await screen.findByText('Reunião de Setor')
+    fireEvent.click(evt)
+
+    let dialog = await screen.findByRole('dialog')
+    let dialogQueries = within(dialog)
+
+    // Confirma presença
+    const btnParticiparei = dialogQueries.getByText('✓ Vou participar')
+    fireEvent.click(btnParticiparei)
+
+    await waitFor(() => {
+      expect(dialogQueries.getByText(/confirmado/i)).toBeInTheDocument()
+    })
+
+    // Fecha o dialog
+    const btnFechar = dialogQueries.getByLabelText('Fechar')
+    fireEvent.click(btnFechar)
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    // Reabre o evento
+    evt = await screen.findByText('Reunião de Setor')
+    fireEvent.click(evt)
+
+    dialog = await screen.findByRole('dialog')
+    dialogQueries = within(dialog)
+
+    // Verifica se continua Confirmado (badge)
+    expect(dialogQueries.getByText(/confirmado/i)).toBeInTheDocument()
+  })
+
+  it('13. Selecionar ausência sem salvar não altera o badge', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Minha Agenda')).toBeInTheDocument()
+    })
+
+    const evt = await screen.findByText('Reunião de Setor')
+    fireEvent.click(evt)
+
+    const dialog = await screen.findByRole('dialog')
+    const dialogQueries = within(dialog)
+
+    // Clica no rádio mas NÃO salva
+    const radioNaoVou = dialogQueries.getByLabelText('✗ Não vou participar')
+    fireEvent.click(radioNaoVou)
+
+    // O text-area de justificativa deve aparecer
+    expect(dialogQueries.getByPlaceholderText(/justifique sua ausência/i)).toBeInTheDocument()
+
+    // Mas o badge "Ausente" NÃO deve estar na tela (já que o backend não confirmou)
+    expect(dialogQueries.queryByText(/ausente/i)).not.toBeInTheDocument()
+  })
 })

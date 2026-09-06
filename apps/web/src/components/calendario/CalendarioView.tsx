@@ -26,6 +26,15 @@ export function CalendarioView() {
     load()
   }, [])
 
+  const handleRsvpUpdated = (destinatarioId: string, rsvp: any) => {
+    setItems(current => current.map(item => 
+      item.destinatarioId === destinatarioId ? { ...item, rsvp } : item
+    ))
+    if (selectedEvent?.destinatarioId === destinatarioId) {
+      setSelectedEvent({ ...selectedEvent, rsvp })
+    }
+  }
+
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
 
@@ -146,7 +155,11 @@ export function CalendarioView() {
       )}
 
       {selectedEvent && (
-        <EventoDetalhe item={selectedEvent} onClose={() => setSelectedEvent(null)} />
+        <EventoDetalhe 
+          item={selectedEvent} 
+          onClose={() => setSelectedEvent(null)} 
+          onRsvpUpdated={handleRsvpUpdated}
+        />
       )}
       
       {loading && (

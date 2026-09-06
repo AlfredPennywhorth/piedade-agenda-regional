@@ -29,6 +29,15 @@ export function AgendaView() {
     load()
   }, [])
 
+  const handleRsvpUpdated = (destinatarioId: string, rsvp: any) => {
+    setItems(current => current.map(item => 
+      item.destinatarioId === destinatarioId ? { ...item, rsvp } : item
+    ))
+    if (selectedItem?.destinatarioId === destinatarioId) {
+      setSelectedItem({ ...selectedItem, rsvp })
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-48">
@@ -61,9 +70,12 @@ export function AgendaView() {
       ))}
       
       {selectedItem && (
-        <EventoDetalhe item={selectedItem} onClose={() => setSelectedItem(null)} />
+        <EventoDetalhe 
+          item={selectedItem} 
+          onClose={() => setSelectedItem(null)} 
+          onRsvpUpdated={handleRsvpUpdated}
+        />
       )}
     </div>
   )
 }
-
