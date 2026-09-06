@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, sql } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { rsvp, convocacoes, convocacaoDestinatarios, eventos } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { RsvpUpsert } from '@piedade/shared'

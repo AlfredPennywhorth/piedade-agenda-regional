@@ -3,9 +3,9 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import App from '../App'
 import * as apiClient from '../api/apiClient'
 
-// Mock the API client
 vi.mock('../api/apiClient', () => ({
   fetchWithAuth: vi.fn(),
+  putWithAuth: vi.fn(),
   API_BASE_URL: 'http://test'
 }))
 
@@ -217,7 +217,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
 
   it('11. Confirma participação', async () => {
     ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
-    vi.spyOn(apiClient, 'putWithAuth').mockResolvedValue({} as any)
+    ;(apiClient.putWithAuth as any).mockResolvedValue({})
     render(<App />)
 
     await waitFor(() => {
