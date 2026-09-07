@@ -39,8 +39,13 @@ agendaRouter.get('/', async (c) => {
     .orderBy(asc(eventos.inicioEm))
     .all()
 
-    const eventoIds = records.map(r => r.evento.id)
-    const rsvpIds = records.map(r => r.rsvp?.id).filter(Boolean) as string[]
+    type AgendaRecord = {
+      evento: { id: string }
+      rsvp: { id: string } | null
+    }
+
+    const eventoIds = records.map((r: AgendaRecord) => r.evento.id)
+    const rsvpIds = records.map((r: AgendaRecord) => r.rsvp?.id).filter(Boolean) as string[]
 
     let refOferecidas: any[] = []
     let refSelecionadas: any[] = []

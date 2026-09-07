@@ -115,12 +115,13 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
             eq(eventoRefeicoes.ativo, true)
           )).all()
         
-        const tiposAtivos = ativasDb.map(r => r.tipo)
+        type EventoRefeicaoRow = { id: string; tipo: string }
+        const tiposAtivos = ativasDb.map((r: EventoRefeicaoRow) => r.tipo)
         for (const tipo of parsed.refeicoesSelecionadas) {
           if (!tiposAtivos.includes(tipo)) {
             return c.json({ error: `Refeição ${tipo} não está disponível ou está inativa neste evento.` }, 400)
           }
-          const idDaRefeicao = ativasDb.find(r => r.tipo === tipo)!.id
+          const idDaRefeicao = ativasDb.find((r: EventoRefeicaoRow) => r.tipo === tipo)!.id
           refeicoesDesejadas.push(idDaRefeicao)
         }
       }
