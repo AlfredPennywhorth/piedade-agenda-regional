@@ -127,7 +127,7 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
     }
 
     // Precisamos do ID do RSVP. Vamos buscar se existe.
-    let existingRsvp = await db.select().from(rsvp)
+    const existingRsvp = await db.select().from(rsvp)
       .where(eq(rsvp.convocacaoDestinatarioId, destinatarioId)).get()
     
     const rsvpId = existingRsvp ? existingRsvp.id : crypto.randomUUID()
