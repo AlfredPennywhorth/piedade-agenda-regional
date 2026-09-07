@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { RsvpUpsert, TipoRefeicao } from './convocacoes'
+import { EventoRefeicaoCreate } from './eventos'
 
 describe('S09 - Shared - Convocacoes', () => {
   it('1. PeriodoParticipacao aceita MANHA, TARDE, INTEGRAL e rejeita invalidos', () => {
@@ -59,5 +60,19 @@ describe('S09 - Shared - Convocacoes', () => {
       refeicoesSelecionadas: ['ALMOCO']
     })
     expect(res.success).toBe(false)
+  })
+})
+
+describe('S09 - Shared - EventoRefeicaoCreate', () => {
+  it('7. aceita tipo de refeição válido', () => {
+    expect(EventoRefeicaoCreate.safeParse({ tipo: 'CAFE_MANHA' }).success).toBe(true)
+    expect(EventoRefeicaoCreate.safeParse({ tipo: 'ALMOCO' }).success).toBe(true)
+    expect(EventoRefeicaoCreate.safeParse({ tipo: 'LANCHE_TARDE' }).success).toBe(true)
+  })
+
+  it('8. rejeita tipo de refeição inválido', () => {
+    expect(EventoRefeicaoCreate.safeParse({ tipo: 'JANTAR' }).success).toBe(false)
+    expect(EventoRefeicaoCreate.safeParse({ tipo: '' }).success).toBe(false)
+    expect(EventoRefeicaoCreate.safeParse({}).success).toBe(false)
   })
 })

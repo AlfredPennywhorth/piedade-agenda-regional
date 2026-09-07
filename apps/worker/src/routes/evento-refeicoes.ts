@@ -1,14 +1,9 @@
 import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
 import { eventos, eventoRefeicoes } from '../db/schema'
-import { z } from 'zod'
-import { TipoRefeicao } from '@piedade/shared'
+import { EventoRefeicaoCreate } from '@piedade/shared'
 
 export const eventoRefeicoesRouter = new Hono<any>()
-
-const RefeicaoCreate = z.object({
-  tipo: TipoRefeicao
-})
 
 eventoRefeicoesRouter.get('/:eventoId/refeicoes', async (c) => {
   const db = c.get('db')
@@ -32,7 +27,7 @@ eventoRefeicoesRouter.post('/:eventoId/refeicoes', async (c) => {
   
   try {
     const body = await c.req.json()
-    const parsed = RefeicaoCreate.parse(body)
+    const parsed = EventoRefeicaoCreate.parse(body)
     
     const evento = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
     if (!evento) return c.json({ error: 'Evento não encontrado' }, 404)

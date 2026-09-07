@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { isSameDayInSaoPaulo } from '../utils/date-utils'
+import { TipoRefeicao } from './convocacoes'
 
 export const ModalidadeEvento = z.enum(['PRESENCIAL', 'ONLINE', 'HIBRIDO'])
 export type ModalidadeEventoEnum = z.infer<typeof ModalidadeEvento>
@@ -146,3 +147,17 @@ export const EventoUpdate = z.object(baseEvento).partial().superRefine((data: an
   }
 })
 export type EventoUpdateInput = z.infer<typeof EventoUpdate>
+
+// ============================================================
+// S09 — Refeições oferecidas por evento
+// ============================================================
+
+/**
+ * Schema de criação/upsert de refeição para um evento.
+ * O Worker consome este schema de @piedade/shared para evitar
+ * dependência direta de zod no bundle Cloudflare Workers.
+ */
+export const EventoRefeicaoCreate = z.object({
+  tipo: TipoRefeicao
+})
+export type EventoRefeicaoCreatePayload = z.infer<typeof EventoRefeicaoCreate>
