@@ -564,4 +564,57 @@ describe('S07 - Minha Agenda e Calendário', () => {
       expect(rCafe.checked).toBe(false)
     })
   })
+
+  it('43. Cancelar edição descarta draft e restaura estado persistido', async () => {
+    // 1. Mocka RSVP inicial com TARDE e ALMOCO
+    const mockComRsvp = JSON.parse(JSON.stringify(mockEventos))
+    mockComRsvp[2].rsvp = {
+      resposta: 'PARTICIPAREI',
+      periodoParticipacao: 'TARDE',
+      refeicoesSelecionadas: ['ALMOCO']
+    }
+    
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockComRsvp)
+    ;(apiClient.putWithAuth as any).mockClear()
+    
+    render(<App />)
+    await waitFor(() => screen.getByText('Evento S09 Integral'))
+    
+    // Abre evento
+    fireEvent.click(screen.getByText('Evento S09 Integral'))
+    let dq = within(await screen.findByRole('dialog'))
+    
+    // 2. Abre edição
+    fireEvent.click(dq.getByText('✓ Vou participar'))
+    
+    // 3. Altera drafts para MANHA e CAFE_MANHA
+    fireEvent.click(dq.getByLabelText('Manhã'))
+    fireEvent.click(dq.getByLabelText('Café da manhã'))
+    
+    // Verifica visualmente que mudou
+    const rManha = dq.getByLabelText('Manhã') as HTMLInputElement
+    expect(rManha.checked).toBe(true)
+    
+    // 4. Clica Cancelar
+    fireEvent.click(dq.getByText('Cancelar'))
+    
+    // 5. Reabre edição
+    fireEvent.click(dq.getByText('✓ Vou participar'))
+    
+    // 6. Verifica se valores persistidos foram restaurados e draft descartado
+    await waitFor(() => {
+      const rTardeAfter = dq.getByLabelText('Tarde') as HTMLInputElement
+      const rAlmocoAfter = dq.getByLabelText('Almoço') as HTMLInputElement
+      const rManhaAfter = dq.getByLabelText('Manhã') as HTMLInputElement
+      const rCafeAfter = dq.getByLabelText('Café da manhã') as HTMLInputElement
+      
+      expect(rTardeAfter.checked).toBe(true)
+      expect(rAlmocoAfter.checked).toBe(true)
+      expect(rManhaAfter.checked).toBe(false)
+      expect(rCafeAfter.checked).toBe(false)
+    })
+    
+    // 7. Confirma que nenhum PUT foi feito
+    expect(apiClient.putWithAuth).not.toHaveBeenCalled()
+  })
 })

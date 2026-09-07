@@ -419,6 +419,10 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     expect(res.status).toBe(200)
     const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdPeriodos)).get()
     expect(dbRecord!.periodoParticipacao).toBeNull()
+    const antigas = await db.select().from(schema.rsvpRefeicoes).where(eq(schema.rsvpRefeicoes.rsvpId, dbRecord!.id)).all()
+    for (const antiga of antigas) {
+      expect(antiga.ativo).toBe(false)
+    }
   })
 
   it('27. PARTICIPAREI -> NAO_PARTICIPAREI limpa período/refeições', async () => {
@@ -437,6 +441,10 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     expect(res.status).toBe(200)
     const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdPeriodos)).get()
     expect(dbRecord!.periodoParticipacao).toBeNull()
+    const antigas = await db.select().from(schema.rsvpRefeicoes).where(eq(schema.rsvpRefeicoes.rsvpId, dbRecord!.id)).all()
+    for (const antiga of antigas) {
+      expect(antiga.ativo).toBe(false)
+    }
   })
 
   it('28. evento iniciado bloqueia alteração', async () => {

@@ -55,6 +55,8 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
       const temRefeicoes = item.evento.refeicoesOferecidas && item.evento.refeicoesOferecidas.length > 0
       
       if (exigePeriodo || temRefeicoes) {
+        setPeriodoLocal(item.rsvp?.periodoParticipacao ?? null)
+        setRefeicoesLocal(item.rsvp?.refeicoesSelecionadas ?? [])
         setIsEditingParticipacao(true)
         setAusenciaSelecionada(false)
         return
@@ -319,7 +321,11 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
                     {isLoadingRsvp ? 'Salvando...' : 'Confirmar Participação'}
                   </button>
                   <button
-                    onClick={() => setIsEditingParticipacao(false)}
+                    onClick={() => {
+                      setIsEditingParticipacao(false)
+                      setPeriodoLocal(item.rsvp?.periodoParticipacao ?? null)
+                      setRefeicoesLocal(item.rsvp?.refeicoesSelecionadas ?? [])
+                    }}
                     disabled={isLoadingRsvp}
                     className="w-full mt-2 py-2 text-slate-500 rounded-lg text-sm font-medium hover:bg-slate-100 transition-colors"
                   >
