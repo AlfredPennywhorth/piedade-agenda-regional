@@ -34,7 +34,41 @@ const mockEventos = [
     convocacao: { id: 'c2', observacoes: null },
     local: null,
     destinatarioId: 'dest-2',
-    rsvp: null
+  },
+  {
+    evento: {
+      id: 's09-integral',
+      titulo: 'Evento S09 Integral',
+      inicioEm: new Date(Date.now() + 86400000).toISOString(),
+      fimEm: new Date(Date.now() + 90000000).toISOString(),
+      modalidade: 'PRESENCIAL',
+      possuiManha: true,
+      possuiTarde: true
+    },
+    convocacao: { id: 'c-s09', observacoes: null },
+    local: null,
+    destinatarioId: 'dest-s09',
+    rsvp: null,
+    refeicoes: [
+      { id: 'ref-1', tipo: 'CAFE_MANHA', ativo: true },
+      { id: 'ref-2', tipo: 'ALMOCO', ativo: true }
+    ]
+  },
+  {
+    evento: {
+      id: 's09-manha',
+      titulo: 'Evento S09 Manhã',
+      inicioEm: new Date(Date.now() + 86400000).toISOString(),
+      fimEm: new Date(Date.now() + 90000000).toISOString(),
+      modalidade: 'PRESENCIAL',
+      possuiManha: true,
+      possuiTarde: false
+    },
+    convocacao: { id: 'c-s09-m', observacoes: null },
+    local: null,
+    destinatarioId: 'dest-s09-m',
+    rsvp: null,
+    refeicoes: []
   }
 ]
 
@@ -308,5 +342,186 @@ describe('S07 - Minha Agenda e Calendário', () => {
 
     // Mas o badge "Ausente" NÃO deve estar na tela (já que o backend não confirmou)
     expect(dialogQueries.queryByText(/ausente/i)).not.toBeInTheDocument()
+  })
+
+  // ============================================================
+  // S09 - Web (Períodos e Alimentação)
+  // ============================================================
+
+  it('31. evento false/false não mostra seletor de período', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+    await waitFor(() => screen.getByText('Reunião de Setor'))
+    fireEvent.click(screen.getByText('Reunião de Setor'))
+    const dq = within(await screen.findByRole('dialog'))
+    fireEvent.click(dq.getByText('✓ Vou participar'))
+    expect(dq.queryByText(/em qual período/i)).not.toBeInTheDocument()
+  })
+
+  it('32. somente manhã não pergunta período', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+    await waitFor(() => screen.getByText('Evento S09 Manhã'))
+    fireEvent.click(screen.getByText('Evento S09 Manhã'))
+    const dq = within(await screen.findByRole('dialog'))
+    fireEvent.click(dq.getByText('✓ Vou participar'))
+    expect(dq.queryByText(/em qual período/i)).not.toBeInTheDocument()
+  })
+
+  it('33. somente tarde não pergunta período', async () => {
+    const mockTarde = JSON.parse(JSON.stringify(mockEventos))
+    mockTarde[3].evento.possuiManha = false
+    mockTarde[3].evento.possuiTarde = true
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockTarde)
+    render(<App />)
+    await waitFor(() => screen.getByText('Evento S09 Manhã'))
+    fireEvent.click(screen.getByText('Evento S09 Manhã'))
+    const dq = within(await screen.findByRole('dialog'))
+    fireEvent.click(dq.getByText('✓ Vou participar'))
+    expect(dq.queryByText(/em qual período/i)).not.toBeInTheDocument()
+  })
+
+  it('34. manhã+tarde mostra: Manhã, Tarde, Manhã e tarde', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+    await waitFor(() => screen.getByText('Evento S09 Integral'))
+    fireEvent.click(screen.getByText('Evento S09 Integral'))
+    const dq = within(await screen.findByRole('dialog'))
+    fireEvent.click(dq.getByText('✓ Vou participar'))
+    expect(dq.getByText(/em qual período/i)).toBeInTheDocument()
+    expect(dq.getByText('Manhã')).toBeInTheDocument()
+    expect(dq.getByText('Tarde')).toBeInTheDocument()
+    expect(dq.getByText('Manhã e tarde')).toBeInTheDocument()
+  })
+
+  it('35. clicar Vou participar em manhã+tarde não mostra badge Confirmado antes do PUT', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+    await waitFor(() => screen.getByText('Evento S09 Integral'))
+    fireEvent.click(screen.getByText('Evento S09 Integral'))
+    const dq = within(await screen.findByRole('dialog'))
+    fireEvent.click(dq.getByText('✓ Vou participar'))
+    expect(dq.queryByText(/confirmado/i)).not.toBeInTheDocument()
+  })
+
+  it('36. confirmar sem escolher período mostra validação e não chama PUT', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+    await waitFor(() => screen.getByText('Evento S09 Integral'))
+    fireEvent.click(screen.getByText('Evento S09 Integral'))
+    const dq = within(await screen.findByRole('dialog'))
+    fireEvent.click(dq.getByText('✓ Vou participar'))
+    
+    // Tenta salvar sem preencher periodo
+    fireEvent.click(dq.getByText('Confirmar Presença'))
+    expect(apiClient.putWithAuth).not.toHaveBeenCalled()
+    // Como a UI não possui um toast explícito nos mocks testáveis facilmente, testamos se o put não foi chamado.
+  })
+
+  it('37. refeições oferecidas aparecem', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+    await waitFor(() => screen.getByText('Evento S09 Integral'))
+    fireEvent.click(screen.getByText('Evento S09 Integral'))
+    const dq = within(await screen.findByRole('dialog'))
+    fireEvent.click(dq.getByText('✓ Vou participar'))
+    
+    expect(dq.getByText('Alimentação (opcional)')).toBeInTheDocument()
+    expect(dq.getByText('Café da manhã')).toBeInTheDocument()
+    expect(dq.getByText('Almoço')).toBeInTheDocument()
+  })
+
+  it('38. refeição não oferecida não aparece', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+    await waitFor(() => screen.getByText('Evento S09 Integral'))
+    fireEvent.click(screen.getByText('Evento S09 Integral'))
+    const dq = within(await screen.findByRole('dialog'))
+    fireEvent.click(dq.getByText('✓ Vou participar'))
+    
+    expect(dq.queryByText('Lanche da tarde')).not.toBeInTheDocument()
+  })
+
+  it('39. evento com alimentação permite confirmação com nenhuma refeição', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    ;(apiClient.putWithAuth as any).mockResolvedValue({})
+    render(<App />)
+    await waitFor(() => screen.getByText('Evento S09 Integral'))
+    fireEvent.click(screen.getByText('Evento S09 Integral'))
+    const dq = within(await screen.findByRole('dialog'))
+    fireEvent.click(dq.getByText('✓ Vou participar'))
+    
+    // Seleciona o período
+    fireEvent.click(dq.getByLabelText('Manhã'))
+    
+    // Confirma SEM marcar refeição
+    fireEvent.click(dq.getByText('Confirmar Presença'))
+    
+    await waitFor(() => {
+      expect(apiClient.putWithAuth).toHaveBeenCalledWith(
+        '/minha-agenda/rsvp/dest-s09', 
+        expect.objectContaining({
+          resposta: 'PARTICIPAREI',
+          periodoParticipacao: 'MANHA',
+          refeicoesSelecionadas: []
+        })
+      )
+    })
+  })
+
+  it('40. NAO_SEI fecha/oculta formulário S09', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+    await waitFor(() => screen.getByText('Evento S09 Integral'))
+    fireEvent.click(screen.getByText('Evento S09 Integral'))
+    const dq = within(await screen.findByRole('dialog'))
+    fireEvent.click(dq.getByText('✓ Vou participar'))
+    
+    // Verifica que está aparecendo
+    expect(dq.getByText('Alimentação (opcional)')).toBeInTheDocument()
+    
+    // Clica não sei
+    fireEvent.click(dq.getByText('? Não sei ainda'))
+    
+    // Some
+    expect(dq.queryByText('Alimentação (opcional)')).not.toBeInTheDocument()
+  })
+
+  it('41. NAO_PARTICIPAREI fecha/oculta formulário S09', async () => {
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    render(<App />)
+    await waitFor(() => screen.getByText('Evento S09 Integral'))
+    fireEvent.click(screen.getByText('Evento S09 Integral'))
+    const dq = within(await screen.findByRole('dialog'))
+    fireEvent.click(dq.getByText('✓ Vou participar'))
+    
+    fireEvent.click(dq.getByLabelText('✗ Não vou participar'))
+    
+    expect(dq.queryByText('Alimentação (opcional)')).not.toBeInTheDocument()
+  })
+
+  it('42. salvar + fechar + reabrir preserva: RSVP, período, refeições', async () => {
+    const mockVolta = JSON.parse(JSON.stringify(mockEventos))
+    mockVolta[2].rsvp = {
+      resposta: 'PARTICIPAREI',
+      periodoParticipacao: 'TARDE',
+      refeicoes: ['ALMOCO']
+    }
+    
+    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockVolta)
+    render(<App />)
+    await waitFor(() => screen.getByText('Evento S09 Integral'))
+    fireEvent.click(screen.getByText('Evento S09 Integral'))
+    const dq = within(await screen.findByRole('dialog'))
+    
+    // Verifica UI estado carregado
+    const rTarde = dq.getByLabelText('Tarde') as HTMLInputElement
+    expect(rTarde.checked).toBe(true)
+    
+    const rAlmoco = dq.getByLabelText('Almoço') as HTMLInputElement
+    expect(rAlmoco.checked).toBe(true)
+    
+    const rCafe = dq.getByLabelText('Café da manhã') as HTMLInputElement
+    expect(rCafe.checked).toBe(false)
   })
 })

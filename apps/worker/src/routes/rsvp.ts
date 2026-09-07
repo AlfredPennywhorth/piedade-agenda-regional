@@ -126,78 +126,80 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
       }
     }
 
-    // Prepara Atomic Batch
-    const batchQueries = []
-    
     // Precisamos do ID do RSVP. Vamos buscar se existe.
     let existingRsvp = await db.select().from(rsvp)
       .where(eq(rsvp.convocacaoDestinatarioId, destinatarioId)).get()
     
     const rsvpId = existingRsvp ? existingRsvp.id : crypto.randomUUID()
     
-    // 1. Upsert RSVP
-    const qRsvp = db.insert(rsvp)
-      .values({
-        id: rsvpId,
-        convocacaoDestinatarioId: destinatarioId,
-        resposta: parsed.resposta,
-        justificativa: parsed.justificativa,
-        periodoParticipacao: finalPeriodo,
-        respondidoEm: existingRsvp ? existingRsvp.respondidoEm : nowIso,
-        atualizadoEm: nowIso,
-        createdAt: existingRsvp ? existingRsvp.createdAt : nowIso,
-        updatedAt: nowIso
-      })
-      .onConflictDoUpdate({
-        target: rsvp.convocacaoDestinatarioId,
-        set: {
+    let escolhasAnteriores: any[] = []
+    if (existingRsvp) {
+      escolhasAnteriores = await db.select().from(rsvpRefeicoes)
+        .where(eq(rsvpRefeicoes.rsvpId, existingRsvp.id)).all()
+    }
+
+    // Execute de forma atômica (D1 Batch ou Transaction local)
+    await executeAtomic(db, (tx) => {
+      // Como já construímos as queries com `db`, elas não usarão a transação `tx` no SQLite in-memory,
+      // pois drizzle-orm no SQLite (better-sqlite3) exige que a query seja gerada pelo tx.
+      // Vamos reconstruir as queries usando o construtor correto (tx ou db):
+      
+      const txQueries = []
+      
+      const txRsvp = tx.insert(rsvp)
+        .values({
+          id: rsvpId,
+          convocacaoDestinatarioId: destinatarioId,
           resposta: parsed.resposta,
           justificativa: parsed.justificativa,
           periodoParticipacao: finalPeriodo,
+          respondidoEm: existingRsvp ? existingRsvp.respondidoEm : nowIso,
           atualizadoEm: nowIso,
-          updatedAt: nowIso
-        }
-      })
-    
-    batchQueries.push(qRsvp)
-
-    // 2. Tratar Refeições
-    // Buscar seleções anteriores (ativas e inativas)
-    if (existingRsvp) {
-      const escolhasAnteriores = await db.select().from(rsvpRefeicoes)
-        .where(eq(rsvpRefeicoes.rsvpId, existingRsvp.id)).all()
-        
-      for (const ref of escolhasAnteriores) {
-        const deveEstarAtiva = refeicoesDesejadas.includes(ref.eventoRefeicaoId)
-        if (ref.ativo !== deveEstarAtiva) {
-          batchQueries.push(
-            db.update(rsvpRefeicoes)
-              .set({ ativo: deveEstarAtiva, updatedAt: nowIso })
-              .where(eq(rsvpRefeicoes.id, ref.id))
-          )
-        }
-        // Retira da lista de desejadas para não fazer insert duplicado
-        const idx = refeicoesDesejadas.indexOf(ref.eventoRefeicaoId)
-        if (idx > -1) refeicoesDesejadas.splice(idx, 1)
-      }
-    }
-
-    // 3. Insert novas refeições
-    for (const refId of refeicoesDesejadas) {
-      batchQueries.push(
-        db.insert(rsvpRefeicoes).values({
-          id: crypto.randomUUID(),
-          rsvpId,
-          eventoRefeicaoId: refId,
-          ativo: true,
-          createdAt: nowIso,
+          createdAt: existingRsvp ? existingRsvp.createdAt : nowIso,
           updatedAt: nowIso
         })
-      )
-    }
+        .onConflictDoUpdate({
+          target: rsvp.convocacaoDestinatarioId,
+          set: {
+            resposta: parsed.resposta,
+            justificativa: parsed.justificativa,
+            periodoParticipacao: finalPeriodo,
+            atualizadoEm: nowIso,
+            updatedAt: nowIso
+          }
+        })
+      txQueries.push(txRsvp)
 
-    // Execute de forma atômica (D1 Batch)
-    await executeAtomic(db, batchQueries)
+      if (existingRsvp) {
+        for (const ref of escolhasAnteriores) {
+          const deveEstarAtiva = refeicoesDesejadas.includes(ref.eventoRefeicaoId)
+          if (ref.ativo !== deveEstarAtiva) {
+            txQueries.push(
+              tx.update(rsvpRefeicoes)
+                .set({ ativo: deveEstarAtiva, updatedAt: nowIso })
+                .where(eq(rsvpRefeicoes.id, ref.id))
+            )
+          }
+          const idx = refeicoesDesejadas.indexOf(ref.eventoRefeicaoId)
+          if (idx > -1) refeicoesDesejadas.splice(idx, 1)
+        }
+      }
+
+      for (const refId of refeicoesDesejadas) {
+        txQueries.push(
+          tx.insert(rsvpRefeicoes).values({
+            id: crypto.randomUUID(),
+            rsvpId,
+            eventoRefeicaoId: refId,
+            ativo: true,
+            createdAt: nowIso,
+            updatedAt: nowIso
+          })
+        )
+      }
+
+      return txQueries
+    })
 
     const updated = await db.select().from(rsvp)
       .where(eq(rsvp.convocacaoDestinatarioId, destinatarioId))
