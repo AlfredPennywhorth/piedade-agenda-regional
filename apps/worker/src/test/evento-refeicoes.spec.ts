@@ -31,7 +31,7 @@ describe('S09 - Eventos e Refeicoes', () => {
       INSERT INTO administracoes (id, regional_id, nome) VALUES ('adm-1', 'reg-1', 'Adm 1');
       INSERT INTO setores (id, administracao_id, nome) VALUES ('set-1', 'adm-1', 'Set 1');
       INSERT INTO casas (id, setor_id, nome) VALUES ('casa-1', 'set-1', 'Casa 1');
-      INSERT INTO locais (id, nome, endereco, regional_id) VALUES ('loc-1', 'Local 1', 'End 1', 'reg-1');
+      INSERT INTO locais (id, nome, endereco, numero, cidade, uf) VALUES ('loc-1', 'Local 1', 'Rua de Teste', '100', 'São Paulo', 'SP');
       
       INSERT INTO membros (id, nome, celular, data_nascimento, casa_id, ativo)
       VALUES 
