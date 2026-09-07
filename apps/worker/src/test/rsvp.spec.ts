@@ -31,6 +31,10 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
   let destIdPeriodos = ''
   let cafeId = ''
 
+  // UUIDs válidos exigidos pelo EventoCreate (z.string().uuid())
+  const regionalId = crypto.randomUUID()
+  const localId = crypto.randomUUID()
+
   beforeAll(async () => {
     sqlite = new Database(':memory:')
     sqlite.pragma('foreign_keys = ON')
@@ -39,23 +43,23 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     setupDb(sqlite)
 
     const baseSql = `
-      INSERT INTO regionais (id, nome) VALUES ('reg-1', 'Reg 1');
-      INSERT INTO administracoes (id, regional_id, nome) VALUES ('adm-1', 'reg-1', 'Adm 1');
+      INSERT INTO regionais (id, nome) VALUES ('${regionalId}', 'Reg 1');
+      INSERT INTO administracoes (id, regional_id, nome) VALUES ('adm-1', '${regionalId}', 'Adm 1');
       INSERT INTO setores (id, administracao_id, nome) VALUES ('set-1', 'adm-1', 'Set 1');
       INSERT INTO casas (id, setor_id, nome) VALUES ('casa-1', 'set-1', 'Casa 1');
-      INSERT INTO locais (id, nome, endereco, numero, cidade, uf) VALUES ('loc-1', 'Local 1', 'Rua de Teste', '100', 'São Paulo', 'SP');
+      INSERT INTO locais (id, nome, endereco, numero, cidade, uf) VALUES ('${localId}', 'Local 1', 'Rua de Teste', '100', 'São Paulo', 'SP');
       
       INSERT INTO membros (id, nome, celular, data_nascimento, casa_id, ativo)
       VALUES 
         ('${membroId}', 'João Silva', '11999999999', '1990-01-01', 'casa-1', 1),
         ('${membroIdOutro}', 'Maria Souza', '11888888888', '1990-01-02', 'casa-1', 1);
       
-      -- Eventos Lote 1/S08
+      -- Eventos Lote 1/S08 (inserção direta SQL, não passa por Zod)
       INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo, possui_manha, possui_tarde)
       VALUES 
-        ('ev-futuro', 'Evento Futuro', 'ONLINE', '2030-01-01T10:00:00Z', '2030-01-01T11:00:00Z', 'reg-1', 1, 0, 0),
-        ('ev-cancel', 'Evento Cancelado', 'ONLINE', '2030-02-01T10:00:00Z', '2030-02-01T11:00:00Z', 'reg-1', 1, 0, 0),
-        ('ev-passado', 'Evento Iniciado', 'ONLINE', '2020-01-01T10:00:00Z', '2020-01-01T11:00:00Z', 'reg-1', 1, 0, 0);
+        ('ev-futuro', 'Evento Futuro', 'ONLINE', '2030-01-01T10:00:00Z', '2030-01-01T11:00:00Z', '${regionalId}', 1, 0, 0),
+        ('ev-cancel', 'Evento Cancelado', 'ONLINE', '2030-02-01T10:00:00Z', '2030-02-01T11:00:00Z', '${regionalId}', 1, 0, 0),
+        ('ev-passado', 'Evento Iniciado', 'ONLINE', '2020-01-01T10:00:00Z', '2020-01-01T11:00:00Z', '${regionalId}', 1, 0, 0);
 
       INSERT INTO convocacoes (id, evento_id, status, ativo)
       VALUES 
@@ -87,7 +91,7 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     sessionToken = await genSession(membroId, '11999999999', '1990-01-01')
     sessionTokenOutro = await genSession(membroIdOutro, '11888888888', '1990-01-02')
 
-    // Prepara evento S09
+    // Prepara evento S09 via API (passa pelo EventoCreate — exige UUIDs válidos)
     const resEv = await req('/api/v1/eventos', {
       method: 'POST',
       headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
@@ -96,12 +100,13 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
         modalidade: 'PRESENCIAL',
         inicioEm: '2030-05-01T10:00:00Z',
         fimEm: '2030-05-01T18:00:00Z',
-        regionalId: 'reg-1',
-        localId: 'loc-1',
+        regionalId,
+        localId,
         possuiManha: true,
         possuiTarde: true
       })
     })
+    expect(resEv.status).toBe(201)
     const ev = await resEv.json() as any
     eventoComPeriodos = ev.id
 
