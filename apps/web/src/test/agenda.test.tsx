@@ -43,13 +43,13 @@ const mockEventos = [
       fimEm: new Date(Date.now() + 90000000).toISOString(),
       modalidade: 'PRESENCIAL',
       possuiManha: true,
-      possuiTarde: true
+      possuiTarde: true,
+      refeicoesOferecidas: ['CAFE_MANHA', 'ALMOCO']
     },
     convocacao: { id: 'c-s09', observacoes: null },
     local: null,
     destinatarioId: 'dest-s09',
-    rsvp: null,
-    refeicoesOferecidas: ['CAFE_MANHA', 'ALMOCO']
+    rsvp: null
   },
   {
     evento: {
@@ -59,13 +59,13 @@ const mockEventos = [
       fimEm: new Date(Date.now() + 90000000).toISOString(),
       modalidade: 'PRESENCIAL',
       possuiManha: true,
-      possuiTarde: false
+      possuiTarde: false,
+      refeicoesOferecidas: []
     },
     convocacao: { id: 'c-s09-m', observacoes: null },
     local: null,
     destinatarioId: 'dest-s09-m',
-    rsvp: null,
-    refeicoesOferecidas: []
+    rsvp: null
   }
 ]
 
