@@ -49,10 +49,7 @@ const mockEventos = [
     local: null,
     destinatarioId: 'dest-s09',
     rsvp: null,
-    refeicoes: [
-      { id: 'ref-1', tipo: 'CAFE_MANHA', ativo: true },
-      { id: 'ref-2', tipo: 'ALMOCO', ativo: true }
-    ]
+    refeicoesOferecidas: ['CAFE_MANHA', 'ALMOCO']
   },
   {
     evento: {
@@ -68,7 +65,7 @@ const mockEventos = [
     local: null,
     destinatarioId: 'dest-s09-m',
     rsvp: null,
-    refeicoes: []
+    refeicoesOferecidas: []
   }
 ]
 
@@ -413,7 +410,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     fireEvent.click(dq.getByText('✓ Vou participar'))
     
     // Tenta salvar sem preencher periodo
-    fireEvent.click(dq.getByText('Confirmar Presença'))
+    fireEvent.click(dq.getByText('Confirmar Participação'))
     expect(apiClient.putWithAuth).not.toHaveBeenCalled()
     // Como a UI não possui um toast explícito nos mocks testáveis facilmente, testamos se o put não foi chamado.
   })
@@ -455,7 +452,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     fireEvent.click(dq.getByLabelText('Manhã'))
     
     // Confirma SEM marcar refeição
-    fireEvent.click(dq.getByText('Confirmar Presença'))
+    fireEvent.click(dq.getByText('Confirmar Participação'))
     
     await waitFor(() => {
       expect(apiClient.putWithAuth).toHaveBeenCalledWith(
@@ -505,7 +502,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     mockVolta[2].rsvp = {
       resposta: 'PARTICIPAREI',
       periodoParticipacao: 'TARDE',
-      refeicoes: ['ALMOCO']
+      refeicoesSelecionadas: ['ALMOCO']
     }
     
     ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockVolta)

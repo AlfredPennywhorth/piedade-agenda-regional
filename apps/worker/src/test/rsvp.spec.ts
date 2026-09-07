@@ -43,6 +43,7 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
       INSERT INTO administracoes (id, regional_id, nome) VALUES ('adm-1', 'reg-1', 'Adm 1');
       INSERT INTO setores (id, administracao_id, nome) VALUES ('set-1', 'adm-1', 'Set 1');
       INSERT INTO casas (id, setor_id, nome) VALUES ('casa-1', 'set-1', 'Casa 1');
+      INSERT INTO locais (id, nome, endereco, regional_id) VALUES ('loc-1', 'Local 1', 'End 1', 'reg-1');
       
       INSERT INTO membros (id, nome, celular, data_nascimento, casa_id, ativo)
       VALUES 
@@ -95,6 +96,8 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
         modalidade: 'PRESENCIAL',
         inicioEm: '2030-05-01T10:00:00Z',
         fimEm: '2030-05-01T18:00:00Z',
+        regionalId: 'reg-1',
+        localId: 'loc-1',
         possuiManha: true,
         possuiTarde: true
       })
@@ -110,28 +113,44 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
   })
 
   // ============================================================
-  // S08
+  // S08 - Original Preservado (8 testes)
   // ============================================================
   it('1. GET sem RSVP -> 404', async () => {
-    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdNormal}`, { headers: { Authorization: `Bearer ${sessionToken}` } })
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdNormal}`, {
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    })
     expect(res.status).toBe(404)
   })
 
-  it('2. PUT com PARTICIPAREI -> 200', async () => {
+  it('2. PUT com PARTICIPAREI -> 200/201 (e GET confirma)', async () => {
     const res = await req(`/api/v1/minha-agenda/rsvp/${destIdNormal}`, {
       method: 'PUT',
-      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      headers: { 
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({ resposta: 'PARTICIPAREI' })
     })
     expect(res.status).toBe(200)
     const json = await res.json() as any
     expect(json.resposta).toBe('PARTICIPAREI')
+    expect(json.justificativa).toBeNull()
+
+    const resGet = await req(`/api/v1/minha-agenda/rsvp/${destIdNormal}`, {
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    })
+    expect(resGet.status).toBe(200)
+    const jsonGet = await resGet.json() as any
+    expect(jsonGet.resposta).toBe('PARTICIPAREI')
   })
 
-  it('3. PUT atualiza para NAO_SEI', async () => {
+  it('3. PUT atualiza para NAO_SEI -> 200 com valor novo', async () => {
     const res = await req(`/api/v1/minha-agenda/rsvp/${destIdNormal}`, {
       method: 'PUT',
-      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      headers: { 
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({ resposta: 'NAO_SEI' })
     })
     expect(res.status).toBe(200)
@@ -142,8 +161,11 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
   it('4. PUT NAO_PARTICIPAREI sem justificativa -> 400', async () => {
     const res = await req(`/api/v1/minha-agenda/rsvp/${destIdNormal}`, {
       method: 'PUT',
-      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'NAO_PARTICIPAREI' }) 
+      headers: { 
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ resposta: 'NAO_PARTICIPAREI' })
     })
     expect(res.status).toBe(400)
   })
@@ -151,19 +173,58 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
   it('5. PUT NAO_PARTICIPAREI com justificativa -> 200', async () => {
     const res = await req(`/api/v1/minha-agenda/rsvp/${destIdNormal}`, {
       method: 'PUT',
-      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'NAO_PARTICIPAREI', justificativa: 'Viagem' })
+      headers: { 
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ resposta: 'NAO_PARTICIPAREI', justificativa: 'Viagem a trabalho' })
     })
     expect(res.status).toBe(200)
     const json = await res.json() as any
     expect(json.resposta).toBe('NAO_PARTICIPAREI')
-    expect(json.justificativa).toBe('Viagem')
+    expect(json.justificativa).toBe('Viagem a trabalho')
   })
 
-  // S08 extras simplificados para manter o teste rapido
+  it('6. PUT com convocação CANCELADA -> 400', async () => {
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdCancelada}`, {
+      method: 'PUT',
+      headers: { 
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI' })
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('7. PUT após início do evento -> 400', async () => {
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdIniciada}`, {
+      method: 'PUT',
+      headers: { 
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI' })
+    })
+    expect(res.status).toBe(400)
+    const json = await res.json() as any
+    expect(json.error).toMatch(/iniciou/i)
+  })
+
+  it('8. PUT de outro membro no destinatário alheio -> 404 (Proteção de recurso)', async () => {
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdNormal}`, {
+      method: 'PUT',
+      headers: { 
+        Authorization: `Bearer ${sessionTokenOutro}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI' })
+    })
+    expect(res.status).toBe(404)
+  })
   
   // ============================================================
-  // S09
+  // S09 (20 testes funcionais extras de S09)
   // ============================================================
   it('11. false/false => periodo null', async () => {
     const res = await req(`/api/v1/minha-agenda/rsvp/${destIdNormal}`, {
@@ -392,47 +453,37 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
   })
 
   it('30. falha no batch não deixa atualização parcial (Rollback no executeAtomic)', async () => {
-    // 1. Pega estado inicial de um RSVP
     const destId = destIdPeriodos
     await req(`/api/v1/minha-agenda/rsvp/${destId}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'NAO_SEI' }) // Estado inicial
+      body: JSON.stringify({ resposta: 'NAO_SEI' }) 
     })
     const estadoAntes = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destId)).get()
 
-    // 2. Mock executeAtomic para lançar erro depois de rodar as 2 primeiras queries da transação
-    // Sendo better-sqlite3 em testes, a transação local aborta.
-    const originalExecuteAtomic = batchHelpers.executeAtomic
     const spy = vi.spyOn(batchHelpers, 'executeAtomic').mockImplementation(async (dbAny, buildQueries: any) => {
       return dbAny.transaction((tx: any) => {
         const queries = buildQueries(tx)
-        // Executa a 1a (RSVP upsert)
         queries[0].run()
-        // Provoca falha fatal
         throw new Error('Falha artificial de banco de dados (Rollback Injection)')
       })
     })
 
-    // 3. Executa a requisição que deveria causar a transação
     const res = await req(`/api/v1/minha-agenda/rsvp/${destId}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ resposta: 'PARTICIPAREI', periodoParticipacao: 'INTEGRAL', refeicoesSelecionadas: ['CAFE_MANHA'] })
     })
     
-    // Restaura
     spy.mockRestore()
 
-    // 4. Verifica
     expect(res.status).toBe(400)
     const json = await res.json() as any
     expect(json.error).toBe('Falha artificial de banco de dados (Rollback Injection)')
 
-    // 5. Verifica se o banco reverteu o q[0] que foi executado:
     const estadoDepois = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destId)).get()
     
-    expect(estadoDepois!.resposta).toBe(estadoAntes!.resposta) // Garante q a query1 nao persistiu
-    expect(estadoDepois!.periodoParticipacao).toBeNull() // Garante integridade
+    expect(estadoDepois!.resposta).toBe(estadoAntes!.resposta) 
+    expect(estadoDepois!.periodoParticipacao).toBeNull()
   })
 })

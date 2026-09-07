@@ -31,6 +31,7 @@ describe('S09 - Eventos e Refeicoes', () => {
       INSERT INTO administracoes (id, regional_id, nome) VALUES ('adm-1', 'reg-1', 'Adm 1');
       INSERT INTO setores (id, administracao_id, nome) VALUES ('set-1', 'adm-1', 'Set 1');
       INSERT INTO casas (id, setor_id, nome) VALUES ('casa-1', 'set-1', 'Casa 1');
+      INSERT INTO locais (id, nome, endereco, regional_id) VALUES ('loc-1', 'Local 1', 'End 1', 'reg-1');
       
       INSERT INTO membros (id, nome, celular, data_nascimento, casa_id, ativo)
       VALUES 
@@ -65,6 +66,8 @@ describe('S09 - Eventos e Refeicoes', () => {
         modalidade: 'PRESENCIAL',
         inicioEm: '2030-01-01T10:00:00Z',
         fimEm: '2030-01-01T18:00:00Z',
+        regionalId: 'reg-1',
+        localId: 'loc-1',
         possuiManha: true,
         possuiTarde: true
       })
@@ -95,7 +98,9 @@ describe('S09 - Eventos e Refeicoes', () => {
         titulo: 'Evento B',
         modalidade: 'PRESENCIAL',
         inicioEm: '2030-02-01T10:00:00Z',
-        fimEm: '2030-02-01T18:00:00Z'
+        fimEm: '2030-02-01T18:00:00Z',
+        regionalId: 'reg-1',
+        localId: 'loc-1'
       })
     })
     expect(res.status).toBe(201)
