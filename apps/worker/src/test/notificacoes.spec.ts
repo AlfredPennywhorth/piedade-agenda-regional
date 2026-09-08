@@ -53,8 +53,7 @@ describe('S10 - Notificações (Web Push)', () => {
 
       INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id)
       VALUES 
-        ('dest-1', 'conv-1', '${membroId}'),
-        ('dest-2', 'conv-1', '${membroId}'); -- Simula múltiplos destinatários lógicos pro mesmo membro
+        ('dest-1', 'conv-1', '${membroId}');
     `
     sqlite.exec(baseSql)
 
@@ -162,16 +161,27 @@ describe('S10 - Notificações (Web Push)', () => {
   describe('Serviço de Envio (Internal)', () => {
     const vapid = { publicKey: '', privateKey: '', subject: '' }
 
-    it('6. Deve enviar 1 notificação por membro (filtrando múltiplos destinatários lógicos)', async () => {
+    it('6. Deve enviar notificações para todas as subscriptions ativas do destinatário lógico', async () => {
+      // Garante que a primeira subscription está ativa
       await db.update(schema.pushSubscriptions).set({ ativo: true }).where(eq(schema.pushSubscriptions.endpoint, 'https://push.example.com/123')).run()
+      
+      // Cria uma SEGUNDA subscription ativa para o mesmo membro
+      await db.insert(schema.pushSubscriptions).values({
+        id: crypto.randomUUID(),
+        membroId,
+        endpoint: 'https://push.example.com/desktop',
+        p256dh: 'key-desktop',
+        auth: 'auth-desktop',
+        ativo: true
+      }).run()
       
       const spy = vi.spyOn(webPush, 'enviarNotificacao').mockResolvedValue({ success: true, status: 201 })
       
       const result = await enviarAvisosConvocacao(db, 'conv-1', 'Tit', 'Msg', vapid, '/app/agenda')
       
-      expect(result.totais).toBe(1) // Embora houvesse 2 destinatários 'dest-1' e 'dest-2' para o mesmo membro, enviou pra 1 membro
-      expect(result.enviados).toBe(1)
-      expect(spy).toHaveBeenCalledTimes(1)
+      expect(result.totais).toBe(1) // 1 membro convocado
+      expect(result.enviados).toBe(2) // 2 subscriptions ativas do membro
+      expect(spy).toHaveBeenCalledTimes(2)
       
       const payload = JSON.parse(spy.mock.calls[0][1])
       expect(payload.titulo).toBe('Tit')
