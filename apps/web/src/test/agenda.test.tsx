@@ -423,7 +423,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     const dq = within(await screen.findByRole('dialog'))
     fireEvent.click(dq.getByText('✓ Vou participar'))
     
-    expect(dq.getByText('Alimentação (opcional)')).toBeInTheDocument()
+    expect(dq.getByText('Alimentação Oferecida')).toBeInTheDocument()
     expect(dq.getByText('Café da manhã')).toBeInTheDocument()
     expect(dq.getByText('Almoço')).toBeInTheDocument()
   })
@@ -476,14 +476,15 @@ describe('S07 - Minha Agenda e Calendário', () => {
     const dq = within(await screen.findByRole('dialog'))
     fireEvent.click(dq.getByText('✓ Vou participar'))
     
-    // Verifica que está aparecendo
-    expect(dq.getByText('Alimentação (opcional)')).toBeInTheDocument()
+    // Verifica que o período está aparecendo
+    expect(dq.getByText(/período de participação/i)).toBeInTheDocument()
     
     // Clica não sei
     fireEvent.click(dq.getByText('? Não sei ainda'))
     
-    // Some
-    expect(dq.queryByText('Alimentação (opcional)')).not.toBeInTheDocument()
+    // Some o período, mas a alimentação sendo do evento, continua visível
+    expect(dq.queryByText(/período de participação/i)).not.toBeInTheDocument()
+    expect(dq.getByText('Alimentação Oferecida')).toBeInTheDocument()
   })
 
   it('41. NAO_PARTICIPAREI fecha/oculta formulário S09', async () => {
@@ -493,10 +494,12 @@ describe('S07 - Minha Agenda e Calendário', () => {
     fireEvent.click(screen.getByText('Evento S09 Integral'))
     const dq = within(await screen.findByRole('dialog'))
     fireEvent.click(dq.getByText('✓ Vou participar'))
+    expect(dq.getByText(/período de participação/i)).toBeInTheDocument()
     
     fireEvent.click(dq.getByLabelText('✗ Não vou participar'))
     
-    expect(dq.queryByText('Alimentação (opcional)')).not.toBeInTheDocument()
+    expect(dq.queryByText(/período de participação/i)).not.toBeInTheDocument()
+    expect(dq.getByText('Alimentação Oferecida')).toBeInTheDocument()
   })
 
   it('42. salvar + fechar + reabrir preserva: RSVP, período, refeições', async () => {
