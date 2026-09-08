@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@piedade/shared": "workspace:*",
+    "@block65/webcrypto-web-push": "^1.1.0",
     "drizzle-orm": "^0.38.3",
     "hono": "^4.6.17"
   },

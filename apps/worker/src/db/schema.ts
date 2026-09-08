@@ -423,6 +423,22 @@ export const eventoRefeicoes = sqliteTable('evento_refeicoes', {
   ...timestampsS02
 }, table => ({
   checkTipo: check('check_evento_refeicoes_tipo', sql`${table.tipo} IN ('CAFE_MANHA','ALMOCO','LANCHE','JANTAR')`),
-  uniqueEventoTipo: uniqueIndex('idx_evento_refeicoes_unico').on(table.eventoId, table.tipo),
 }))
 
+// ============================================================
+// Notificações e Web Push (S10)
+// ============================================================
+
+export const pushSubscriptions = sqliteTable('push_subscriptions', {
+  id: text('id').primaryKey(),
+  membroId: text('membro_id').notNull().references(() => membros.id),
+  endpoint: text('endpoint').notNull().unique(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  userAgent: text('user_agent'),
+  ativo: ativoDefault,
+  ...timestampsS02
+}, table => ({
+  idxEndpoint: uniqueIndex('idx_push_endpoint').on(table.endpoint),
+  idxPushMembro: index('idx_push_membro').on(table.membroId),
+}))
