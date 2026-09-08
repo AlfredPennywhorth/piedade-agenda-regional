@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
-import { precacheAndRoute } from 'workbox-precaching'
+import { precacheAndRoute, PrecacheEntry } from 'workbox-precaching'
 
-declare let self: ServiceWorkerGlobalScope
+declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: (string | PrecacheEntry)[] }
 
 // Precache resources injected by vite-plugin-pwa
 precacheAndRoute(self.__WB_MANIFEST || [])

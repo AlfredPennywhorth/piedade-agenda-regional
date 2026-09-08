@@ -1,18 +1,19 @@
 import { Hono } from 'hono'
-import { zValidator } from '@hono/zod-validator'
+
 import { eq, and } from 'drizzle-orm'
 import { PushSubscriptionSchema } from '@piedade/shared'
 import { pushSubscriptions } from '../db/schema'
-import { authMiddleware } from './auth/middleware'
+import { authMiddleware } from '../middleware/auth'
+import type { DrizzleD1Database } from 'drizzle-orm/d1'
 
-export const notificacoesRouter = new Hono<{ Variables: { db: any; membroId: string } }>()
+export const notificacoesRouter = new Hono<{ Variables: { db: DrizzleD1Database<Record<string, never>>; membroId: string } }>()
 
 notificacoesRouter.use('*', authMiddleware)
 
-notificacoesRouter.post('/subscribe', zValidator('json', PushSubscriptionSchema), async c => {
+notificacoesRouter.post('/subscribe', async c => {
   const db = c.get('db')
   const membroId = c.get('membroId')
-  const payload = c.req.valid('json')
+  const payload = PushSubscriptionSchema.parse(await c.req.json())
   
   const userAgent = c.req.header('user-agent') || null
   const id = crypto.randomUUID()

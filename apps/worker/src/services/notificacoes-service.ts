@@ -1,9 +1,10 @@
 import { eq, and } from 'drizzle-orm'
 import { convocacaoDestinatarios, pushSubscriptions, membros } from '../db/schema'
 import { enviarNotificacao, VapidDetails } from './web-push'
+import type { DrizzleD1Database } from 'drizzle-orm/d1'
 
 export async function enviarAvisosConvocacao(
-  db: any,
+  db: DrizzleD1Database<Record<string, never>>,
   convocacaoId: string,
   titulo: string,
   mensagem: string,
@@ -26,7 +27,7 @@ export async function enviarAvisosConvocacao(
     .all()
 
   // Filtra IDs únicos
-  const membroIds = Array.from(new Set(destinatarios.map((d: any) => d.membroId)))
+  const membroIds = Array.from(new Set(destinatarios.map((d: { membroId: string }) => d.membroId)))
 
   let enviados = 0
   let inativados = 0

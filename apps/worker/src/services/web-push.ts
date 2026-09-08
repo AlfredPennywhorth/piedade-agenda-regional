@@ -51,7 +51,8 @@ export async function enviarNotificacao(
     }
 
     return { success: true, status: response.status }
-  } catch (error: any) {
-    return { success: false, status: 500, error: error.message }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return { success: false, status: 500, error: message }
   }
 }
