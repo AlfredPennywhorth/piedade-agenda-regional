@@ -64,7 +64,6 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
       convocacaoStatus: convocacoes.status,
       eventoId: eventos.id,
       eventoInicio: eventos.inicioEm,
-      eventoInicio: eventos.inicioEm,
       possuiManha: eventos.possuiManha,
       possuiTarde: eventos.possuiTarde,
       possuiNoite: eventos.possuiNoite
