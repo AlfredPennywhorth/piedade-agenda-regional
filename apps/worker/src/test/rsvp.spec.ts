@@ -312,18 +312,18 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     expect(res.status).toBe(400)
   })
 
-  it('26. PARTICIPAREI -> NAO_SEI limpa período', async () => {
+  it('26. PARTICIPAREI -> NAO_SEI limpa período (mesmo se enviado no payload)', async () => {
     const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'NAO_SEI' })
+      body: JSON.stringify({ resposta: 'NAO_SEI', periodosParticipacao: ['MANHA'] })
     })
     expect(res.status).toBe(200)
     const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdPeriodos)).get()
     expect(dbRecord!.periodosParticipacao).toBeNull()
   })
 
-  it('27. PARTICIPAREI -> NAO_PARTICIPAREI limpa período', async () => {
+  it('27. PARTICIPAREI -> NAO_PARTICIPAREI limpa período (mesmo se enviado no payload)', async () => {
     // Retorna para PARTICIPAREI
     await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
       method: 'PUT',
@@ -334,7 +334,7 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'NAO_PARTICIPAREI', justificativa: 'Viagem' })
+      body: JSON.stringify({ resposta: 'NAO_PARTICIPAREI', justificativa: 'Viagem', periodosParticipacao: ['MANHA'] })
     })
     expect(res.status).toBe(200)
     const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdPeriodos)).get()

@@ -40,21 +40,21 @@ describe('S09 - Shared - Convocacoes', () => {
     expect(res.success).toBe(false)
   })
 
-  it('4. NAO_SEI com periodosParticipacao deve ser rejeitado', () => {
+  it('4. NAO_SEI com periodosParticipacao deve ser aceito e depois limpo no worker', () => {
     const res = RsvpUpsert.safeParse({ 
       resposta: 'NAO_SEI', 
       periodosParticipacao: ['MANHA'] 
     })
-    expect(res.success).toBe(false)
+    expect(res.success).toBe(true)
   })
 
-  it('5. NAO_PARTICIPAREI com periodosParticipacao deve ser rejeitado', () => {
+  it('5. NAO_PARTICIPAREI com periodosParticipacao deve ser aceito e depois limpo no worker', () => {
     const res = RsvpUpsert.safeParse({ 
       resposta: 'NAO_PARTICIPAREI', 
       justificativa: 'ok',
-      periodosParticipacao: ['ALMOCO']
+      periodosParticipacao: ['MANHA']
     })
-    expect(res.success).toBe(false)
+    expect(res.success).toBe(true)
   })
 
   it('6. NAO_PARTICIPAREI sem justificativa deve falhar', () => {

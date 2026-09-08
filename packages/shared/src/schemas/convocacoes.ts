@@ -102,15 +102,5 @@ export const RsvpUpsert = z.object({
       path: ['justificativa'],
     })
   }
-  
-  if (data.resposta !== 'PARTICIPAREI') {
-    if (data.periodosParticipacao && data.periodosParticipacao.length > 0) {
-       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Períodos não devem ser enviados quando resposta não é PARTICIPAREI',
-        path: ['periodosParticipacao'],
-      })
-    }
-  }
 })
 export type RsvpUpsertPayload = z.infer<typeof RsvpUpsert>
