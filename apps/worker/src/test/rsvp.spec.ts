@@ -29,7 +29,6 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
 
   let eventoComPeriodos = ''
   let destIdPeriodos = ''
-  let cafeId = ''
 
   // UUIDs válidos exigidos pelo EventoCreate (z.string().uuid())
   const regionalId = crypto.randomUUID()
