@@ -318,6 +318,12 @@ export const eventos = sqliteTable('eventos', {
   observacoes: text('observacoes'),
   serieRecorrenciaId: text('serie_recorrencia_id').references(() => seriesRecorrencia.id),
   recorrenciaExcecao: integer('recorrencia_excecao', { mode: 'boolean' }).notNull().default(false),
+  
+  // S09
+  possuiManha: integer('possui_manha', { mode: 'boolean' }).notNull().default(false),
+  possuiTarde: integer('possui_tarde', { mode: 'boolean' }).notNull().default(false),
+  possuiNoite: integer('possui_noite', { mode: 'boolean' }).notNull().default(false),
+  
   ativo: ativoDefault,
   ...timestampsS02,
 }, table => ({
@@ -396,6 +402,7 @@ export const rsvp = sqliteTable('rsvp', {
     .references(() => convocacaoDestinatarios.id),
   resposta: text('resposta').notNull(),
   justificativa: text('justificativa'),
+  periodosParticipacao: text('periodos_participacao', { mode: 'json' }).$type<string[]>(), // S09: Array of MANHA, TARDE, NOITE
   respondidoEm: text('respondido_em').notNull(),
   atualizadoEm: text('atualizado_em').notNull(),
   ...timestampsS02
@@ -403,3 +410,19 @@ export const rsvp = sqliteTable('rsvp', {
   checkResposta: check('check_rsvp_resposta', sql`${table.resposta} IN ('PARTICIPAREI','NAO_PARTICIPAREI','NAO_SEI')`),
   idxRsvpDestId: index('idx_rsvp_convocacao_dest_id').on(table.convocacaoDestinatarioId),
 }))
+
+// ============================================================
+// Refeições (S09)
+// ============================================================
+
+export const eventoRefeicoes = sqliteTable('evento_refeicoes', {
+  id: text('id').primaryKey(),
+  eventoId: text('evento_id').notNull().references(() => eventos.id),
+  tipo: text('tipo').notNull(), // CAFE_MANHA, ALMOCO, LANCHE, JANTAR
+  ativo: ativoDefault,
+  ...timestampsS02
+}, table => ({
+  checkTipo: check('check_evento_refeicoes_tipo', sql`${table.tipo} IN ('CAFE_MANHA','ALMOCO','LANCHE','JANTAR')`),
+  uniqueEventoTipo: uniqueIndex('idx_evento_refeicoes_unico').on(table.eventoId, table.tipo),
+}))
+

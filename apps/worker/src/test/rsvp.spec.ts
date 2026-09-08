@@ -1,11 +1,13 @@
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, vi } from 'vitest'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import Database from 'better-sqlite3'
 import { createApp } from '../index'
 import * as schema from '../db/schema'
 import { setupDb } from './setup'
+import { eq } from 'drizzle-orm'
+import * as batchHelpers from '../db/batch'
 
-describe('S08 - RSVP', () => {
+describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
   let sqlite: any
   let db: ReturnType<typeof drizzle>
   let app: any
@@ -25,6 +27,13 @@ describe('S08 - RSVP', () => {
   const destIdIniciada = 'dest-3'
   const destIdOutro = 'dest-4'
 
+  let eventoComPeriodos = ''
+  let destIdPeriodos = ''
+
+  // UUIDs válidos exigidos pelo EventoCreate (z.string().uuid())
+  const regionalId = crypto.randomUUID()
+  const localId = crypto.randomUUID()
+
   beforeAll(async () => {
     sqlite = new Database(':memory:')
     sqlite.pragma('foreign_keys = ON')
@@ -33,22 +42,23 @@ describe('S08 - RSVP', () => {
     setupDb(sqlite)
 
     const baseSql = `
-      INSERT INTO regionais (id, nome) VALUES ('reg-1', 'Reg 1');
-      INSERT INTO administracoes (id, regional_id, nome) VALUES ('adm-1', 'reg-1', 'Adm 1');
+      INSERT INTO regionais (id, nome) VALUES ('${regionalId}', 'Reg 1');
+      INSERT INTO administracoes (id, regional_id, nome) VALUES ('adm-1', '${regionalId}', 'Adm 1');
       INSERT INTO setores (id, administracao_id, nome) VALUES ('set-1', 'adm-1', 'Set 1');
       INSERT INTO casas (id, setor_id, nome) VALUES ('casa-1', 'set-1', 'Casa 1');
+      INSERT INTO locais (id, nome, endereco, numero, cidade, uf) VALUES ('${localId}', 'Local 1', 'Rua de Teste', '100', 'São Paulo', 'SP');
       
       INSERT INTO membros (id, nome, celular, data_nascimento, casa_id, ativo)
       VALUES 
         ('${membroId}', 'João Silva', '11999999999', '1990-01-01', 'casa-1', 1),
         ('${membroIdOutro}', 'Maria Souza', '11888888888', '1990-01-02', 'casa-1', 1);
       
-      -- Eventos: futuro, futuro (cancelado), passado (iniciado)
-      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo)
+      -- Eventos Lote 1/S08 (inserção direta SQL, não passa por Zod)
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo, possui_manha, possui_tarde)
       VALUES 
-        ('ev-futuro', 'Evento Futuro', 'ONLINE', '2030-01-01T10:00:00Z', '2030-01-01T11:00:00Z', 'reg-1', 1),
-        ('ev-cancel', 'Evento Cancelado', 'ONLINE', '2030-02-01T10:00:00Z', '2030-02-01T11:00:00Z', 'reg-1', 1),
-        ('ev-passado', 'Evento Iniciado', 'ONLINE', '2020-01-01T10:00:00Z', '2020-01-01T11:00:00Z', 'reg-1', 1);
+        ('ev-futuro', 'Evento Futuro', 'ONLINE', '2030-01-01T10:00:00Z', '2030-01-01T11:00:00Z', '${regionalId}', 1, 0, 0),
+        ('ev-cancel', 'Evento Cancelado', 'ONLINE', '2030-02-01T10:00:00Z', '2030-02-01T11:00:00Z', '${regionalId}', 1, 0, 0),
+        ('ev-passado', 'Evento Iniciado', 'ONLINE', '2020-01-01T10:00:00Z', '2020-01-01T11:00:00Z', '${regionalId}', 1, 0, 0);
 
       INSERT INTO convocacoes (id, evento_id, status, ativo)
       VALUES 
@@ -65,7 +75,6 @@ describe('S08 - RSVP', () => {
     `
     sqlite.exec(baseSql)
 
-    // Helper para gerar sessão
     const genSession = async (mid: string, cel: string, dataNascimento: string) => {
       const resLink = await req(`/api/v1/admin/membros/${mid}/link-ativacao`, { method: 'POST' })
       const linkJson = await resLink.json() as any
@@ -80,8 +89,36 @@ describe('S08 - RSVP', () => {
 
     sessionToken = await genSession(membroId, '11999999999', '1990-01-01')
     sessionTokenOutro = await genSession(membroIdOutro, '11888888888', '1990-01-02')
+
+    // Prepara evento S09 via API (passa pelo EventoCreate — exige UUIDs válidos)
+    const resEv = await req('/api/v1/eventos', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Evento S09',
+        modalidade: 'PRESENCIAL',
+        inicioEm: '2030-05-01T10:00:00Z',
+        fimEm: '2030-05-01T18:00:00Z',
+        regionalId,
+        localId,
+        possuiManha: true,
+        possuiTarde: true
+      })
+    })
+    expect(resEv.status).toBe(201)
+    const ev = await resEv.json() as any
+    eventoComPeriodos = ev.id
+
+    sqlite.exec(`
+      INSERT INTO convocacoes (id, evento_id, status, ativo) VALUES ('conv-s09', '${eventoComPeriodos}', 'PUBLICADA', 1);
+      INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES ('dest-s09', 'conv-s09', '${membroId}');
+    `)
+    destIdPeriodos = 'dest-s09'
   })
 
+  // ============================================================
+  // S08 - Original Preservado (8 testes)
+  // ============================================================
   it('1. GET sem RSVP -> 404', async () => {
     const res = await req(`/api/v1/minha-agenda/rsvp/${destIdNormal}`, {
       headers: { Authorization: `Bearer ${sessionToken}` }
@@ -132,7 +169,7 @@ describe('S08 - RSVP', () => {
         Authorization: `Bearer ${sessionToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ resposta: 'NAO_PARTICIPAREI' }) // Faltando justificativa
+      body: JSON.stringify({ resposta: 'NAO_PARTICIPAREI' })
     })
     expect(res.status).toBe(400)
   })
@@ -175,11 +212,10 @@ describe('S08 - RSVP', () => {
     })
     expect(res.status).toBe(400)
     const json = await res.json() as any
-    expect(json.error).toMatch(/iniciou/)
+    expect(json.error).toMatch(/iniciou/i)
   })
 
   it('8. PUT de outro membro no destinatário alheio -> 404 (Proteção de recurso)', async () => {
-    // Tentando editar o destIdNormal (que é do mem-1) logado como mem-2 (sessionTokenOutro)
     const res = await req(`/api/v1/minha-agenda/rsvp/${destIdNormal}`, {
       method: 'PUT',
       headers: { 
@@ -189,5 +225,172 @@ describe('S08 - RSVP', () => {
       body: JSON.stringify({ resposta: 'PARTICIPAREI' })
     })
     expect(res.status).toBe(404)
+  })
+  
+  // ============================================================
+  // S09 (20 testes funcionais extras de S09)
+  // ============================================================
+  it('11. false/false => periodo null', async () => {
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdNormal}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI' })
+    })
+    expect(res.status).toBe(200)
+    const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdNormal)).get()
+    expect(dbRecord!.periodosParticipacao).toBeNull()
+  })
+
+  it('12. somente manhã => normaliza MANHA', async () => {
+    await db.update(schema.eventos).set({ possuiManha: true, possuiTarde: false }).where(eq(schema.eventos.id, 'ev-futuro'))
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdNormal}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI' })
+    })
+    expect(res.status).toBe(200)
+    const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdNormal)).get()
+    expect(dbRecord!.periodosParticipacao).toEqual(['MANHA'])
+  })
+
+  it('13. somente tarde => normaliza TARDE', async () => {
+    await db.update(schema.eventos).set({ possuiManha: false, possuiTarde: true }).where(eq(schema.eventos.id, 'ev-futuro'))
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdNormal}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI' })
+    })
+    expect(res.status).toBe(200)
+    const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdNormal)).get()
+    expect(dbRecord!.periodosParticipacao).toEqual(['TARDE'])
+  })
+
+  it('14. manhã+tarde sem período => 400', async () => {
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI' }) // falta periodosParticipacao
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('15. manhã+tarde ["MANHA"]', async () => {
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodosParticipacao: ['MANHA'] })
+    })
+    expect(res.status).toBe(200)
+    const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdPeriodos)).get()
+    expect(dbRecord!.periodosParticipacao).toEqual(['MANHA'])
+  })
+
+  it('16. manhã+tarde ["TARDE"]', async () => {
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodosParticipacao: ['TARDE'] })
+    })
+    expect(res.status).toBe(200)
+  })
+
+  it('17. manhã+tarde ["MANHA", "TARDE"]', async () => {
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodosParticipacao: ['MANHA', 'TARDE'] })
+    })
+    expect(res.status).toBe(200)
+  })
+
+  it('18. enviar período não configurado => 400', async () => {
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodosParticipacao: ['NOITE'] })
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('26. PARTICIPAREI -> NAO_SEI limpa período (mesmo se enviado no payload)', async () => {
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'NAO_SEI', periodosParticipacao: ['MANHA'] })
+    })
+    expect(res.status).toBe(200)
+    const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdPeriodos)).get()
+    expect(dbRecord!.periodosParticipacao).toBeNull()
+  })
+
+  it('27. PARTICIPAREI -> NAO_PARTICIPAREI limpa período (mesmo se enviado no payload)', async () => {
+    // Retorna para PARTICIPAREI
+    await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodosParticipacao: ['MANHA'] })
+    })
+
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'NAO_PARTICIPAREI', justificativa: 'Viagem', periodosParticipacao: ['MANHA'] })
+    })
+    expect(res.status).toBe(200)
+    const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdPeriodos)).get()
+    expect(dbRecord!.periodosParticipacao).toBeNull()
+  })
+
+  it('28. evento iniciado bloqueia alteração', async () => {
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdIniciada}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI' })
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('29. destinatário de outro membro continua retornando 404', async () => {
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdOutro}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI' })
+    })
+    expect(res.status).toBe(404)
+  })
+
+  it('30. falha no batch não deixa atualização parcial (Rollback no executeAtomic)', async () => {
+    const destId = destIdPeriodos
+    await req(`/api/v1/minha-agenda/rsvp/${destId}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'NAO_SEI' }) 
+    })
+    const estadoAntes = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destId)).get()
+
+    const spy = vi.spyOn(batchHelpers, 'executeAtomic').mockImplementation(async (dbAny, buildQueries: any) => {
+      return dbAny.transaction((tx: any) => {
+        const queries = buildQueries(tx)
+        queries[0].run()
+        throw new Error('Falha artificial de banco de dados (Rollback Injection)')
+      })
+    })
+
+    const res = await req(`/api/v1/minha-agenda/rsvp/${destId}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodosParticipacao: ['MANHA'] })
+    })
+    
+    spy.mockRestore()
+
+    expect(res.status).toBe(400)
+    const json = await res.json() as any
+    expect(json.error).toBe('Falha artificial de banco de dados (Rollback Injection)')
+
+    const estadoDepois = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destId)).get()
+    
+    expect(estadoDepois!.resposta).toBe(estadoAntes!.resposta) 
+    expect(estadoDepois!.periodosParticipacao).toBeNull()
   })
 })

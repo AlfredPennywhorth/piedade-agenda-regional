@@ -3,6 +3,7 @@ import { eq, and } from 'drizzle-orm'
 import { rsvp, convocacoes, convocacaoDestinatarios, eventos } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { RsvpUpsert } from '@piedade/shared'
+import { executeAtomic } from '../db/batch'
 
 export const rsvpRouter = new Hono<{ Variables: Variables }>()
 
@@ -61,7 +62,11 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
     const record = await db.select({
       destinatarioId: convocacaoDestinatarios.id,
       convocacaoStatus: convocacoes.status,
+      eventoId: eventos.id,
       eventoInicio: eventos.inicioEm,
+      possuiManha: eventos.possuiManha,
+      possuiTarde: eventos.possuiTarde,
+      possuiNoite: eventos.possuiNoite
     })
     .from(convocacaoDestinatarios)
     .innerJoin(convocacoes, eq(convocacaoDestinatarios.convocacaoId, convocacoes.id))
@@ -86,30 +91,68 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
       return c.json({ error: 'O evento já iniciou. Não é possível alterar a resposta.' }, 400)
     }
 
-    const rsvpId = crypto.randomUUID()
+    // Validações S09 (Worker-side)
+    let finalPeriodos: string[] | null = null
+
+    if (parsed.resposta === 'PARTICIPAREI') {
+      const periodosConfigurados: string[] = []
+      if (record.possuiManha) periodosConfigurados.push('MANHA')
+      if (record.possuiTarde) periodosConfigurados.push('TARDE')
+      if (record.possuiNoite) periodosConfigurados.push('NOITE')
+
+      if (periodosConfigurados.length === 0) {
+        finalPeriodos = null
+      } else if (periodosConfigurados.length === 1) {
+        finalPeriodos = periodosConfigurados
+      } else {
+        if (!parsed.periodosParticipacao || parsed.periodosParticipacao.length === 0) {
+          return c.json({ error: 'É necessário selecionar pelo menos um período de participação.' }, 400)
+        }
+        for (const p of parsed.periodosParticipacao) {
+          if (!periodosConfigurados.includes(p)) {
+             return c.json({ error: `O período ${p} não está configurado para este evento.` }, 400)
+          }
+        }
+        finalPeriodos = parsed.periodosParticipacao
+      }
+    }
+
+    // Precisamos do ID do RSVP. Vamos buscar se existe.
+    const existingRsvp = await db.select().from(rsvp)
+      .where(eq(rsvp.convocacaoDestinatarioId, destinatarioId)).get()
     
-    // Upsert onConflictDoUpdate
-    await db.insert(rsvp)
-      .values({
-        id: rsvpId,
-        convocacaoDestinatarioId: destinatarioId,
-        resposta: parsed.resposta,
-        justificativa: parsed.justificativa,
-        respondidoEm: nowIso,
-        atualizadoEm: nowIso,
-        createdAt: nowIso,
-        updatedAt: nowIso
-      })
-      .onConflictDoUpdate({
-        target: rsvp.convocacaoDestinatarioId,
-        set: {
+    const rsvpId = existingRsvp ? existingRsvp.id : crypto.randomUUID()
+    
+    // Execute de forma atômica (D1 Batch ou Transaction local)
+    await executeAtomic(db, (tx) => {
+      const txQueries = []
+      
+      const txRsvp = tx.insert(rsvp)
+        .values({
+          id: rsvpId,
+          convocacaoDestinatarioId: destinatarioId,
           resposta: parsed.resposta,
           justificativa: parsed.justificativa,
+          periodosParticipacao: finalPeriodos,
+          respondidoEm: existingRsvp ? existingRsvp.respondidoEm : nowIso,
           atualizadoEm: nowIso,
+          createdAt: existingRsvp ? existingRsvp.createdAt : nowIso,
           updatedAt: nowIso
-        }
-      })
-      .execute()
+        })
+        .onConflictDoUpdate({
+          target: rsvp.convocacaoDestinatarioId,
+          set: {
+            resposta: parsed.resposta,
+            justificativa: parsed.justificativa,
+            periodosParticipacao: finalPeriodos,
+            atualizadoEm: nowIso,
+            updatedAt: nowIso
+          }
+        })
+      txQueries.push(txRsvp)
+
+      return txQueries
+    })
 
     const updated = await db.select().from(rsvp)
       .where(eq(rsvp.convocacaoDestinatarioId, destinatarioId))

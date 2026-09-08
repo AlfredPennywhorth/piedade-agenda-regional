@@ -10,6 +10,7 @@ interface EventoDetalheProps {
     rsvp: {
       resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI'
       justificativa?: string | null
+      periodosParticipacao?: string[] | null
     }
   ) => void
 }
@@ -19,7 +20,11 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
   
   const [respostaLocal, setRespostaLocal] = useState<string | null>(item.rsvp?.resposta ?? null)
   const [ausenciaSelecionada, setAusenciaSelecionada] = useState(false)
+  const [isEditingParticipacao, setIsEditingParticipacao] = useState(false)
+  
   const [justificativa, setJustificativa] = useState(item.rsvp?.justificativa ?? '')
+  const [periodosLocal, setPeriodosLocal] = useState<string[]>(item.rsvp?.periodosParticipacao ?? [])
+  
   const [isLoadingRsvp, setIsLoadingRsvp] = useState(false)
   const [rsvpError, setRsvpError] = useState('')
 
@@ -37,24 +42,53 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
     onClose()
   }
 
-  const handleRsvp = async (resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI') => {
+  const handleRsvp = async (resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI', bypassEditCheck = false) => {
     if (resposta === 'NAO_PARTICIPAREI' && !justificativa.trim()) {
       setRsvpError('Justificativa é obrigatória para ausência.')
       return
+    }
+
+    const numPeriodos = [item.evento.possuiManha, item.evento.possuiTarde, item.evento.possuiNoite].filter(Boolean).length
+    const exigePeriodo = numPeriodos > 1
+
+    if (resposta === 'PARTICIPAREI' && !bypassEditCheck) {
+      if (exigePeriodo) {
+        setPeriodosLocal(item.rsvp?.periodosParticipacao ?? [])
+        setIsEditingParticipacao(true)
+        setAusenciaSelecionada(false)
+        return
+      }
+    }
+
+    // Se exige período e está confirmando
+    if (resposta === 'PARTICIPAREI' && bypassEditCheck) {
+      if (exigePeriodo && periodosLocal.length === 0) {
+        setRsvpError('Por favor, selecione pelo menos um período de participação.')
+        return
+      }
     }
 
     setRsvpError('')
     setIsLoadingRsvp(true)
 
     try {
-      await apiClient.putWithAuth(`/minha-agenda/rsvp/${item.destinatarioId}`, {
-        resposta,
-        justificativa: resposta === 'NAO_PARTICIPAREI' ? justificativa : null
-      })
-      const rsvpAtualizado = {
+      const payload: any = {
         resposta,
         justificativa: resposta === 'NAO_PARTICIPAREI' ? justificativa : null
       }
+      
+      if (resposta === 'PARTICIPAREI') {
+        if (periodosLocal.length > 0) payload.periodosParticipacao = periodosLocal
+      }
+
+      await apiClient.putWithAuth(`/minha-agenda/rsvp/${item.destinatarioId}`, payload)
+      
+      const rsvpAtualizado = {
+        resposta,
+        justificativa: resposta === 'NAO_PARTICIPAREI' ? justificativa : null,
+        periodosParticipacao: resposta === 'PARTICIPAREI' ? (periodosLocal.length > 0 ? periodosLocal : null) : null
+      }
+      
       setRespostaLocal(resposta)
       if (onRsvpUpdated) {
         onRsvpUpdated(item.destinatarioId, rsvpAtualizado)
@@ -62,11 +96,32 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
       if (resposta !== 'NAO_PARTICIPAREI') {
         setJustificativa('')
       }
+      if (resposta !== 'PARTICIPAREI') {
+        setPeriodosLocal([])
+      }
+      
       setAusenciaSelecionada(false)
+      setIsEditingParticipacao(false)
     } catch (err: any) {
       setRsvpError(err.message || 'Erro ao registrar resposta.')
     } finally {
       setIsLoadingRsvp(false)
+    }
+  }
+
+  const handlePeriodoToggle = (periodo: string) => {
+    setPeriodosLocal(prev => 
+      prev.includes(periodo) ? prev.filter(p => p !== periodo) : [...prev, periodo]
+    )
+  }
+
+  const getRefeicaoLabel = (tipo: string) => {
+    switch(tipo) {
+      case 'CAFE_MANHA': return 'Café da manhã'
+      case 'ALMOCO': return 'Almoço'
+      case 'LANCHE': return 'Lanche'
+      case 'JANTAR': return 'Jantar'
+      default: return tipo
     }
   }
 
@@ -182,7 +237,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
                   onClick={() => handleRsvp('PARTICIPAREI')}
                   disabled={isLoadingRsvp}
                   className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-colors border ${
-                    respostaLocal === 'PARTICIPAREI' 
+                    (respostaLocal === 'PARTICIPAREI' || isEditingParticipacao)
                       ? 'bg-green-50 border-green-200 text-green-700' 
                       : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
@@ -190,10 +245,10 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
                   ✓ Vou participar
                 </button>
                 <button
-                  onClick={() => handleRsvp('NAO_SEI')}
+                  onClick={() => { setIsEditingParticipacao(false); handleRsvp('NAO_SEI') }}
                   disabled={isLoadingRsvp}
                   className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-colors border ${
-                    respostaLocal === 'NAO_SEI' 
+                    respostaLocal === 'NAO_SEI' && !isEditingParticipacao
                       ? 'bg-slate-100 border-slate-300 text-slate-800' 
                       : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
@@ -202,13 +257,70 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
                 </button>
               </div>
               
+              {isEditingParticipacao && (
+                <div className="p-4 bg-green-50/50 border border-green-100 rounded-lg animate-in slide-in-from-top-2">
+                  <div className="mb-4">
+                    <h4 className="text-sm font-semibold text-slate-700 mb-2">Período de participação *</h4>
+                    <div className="flex flex-col gap-2">
+                      {item.evento.possuiManha && (
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                          <input type="checkbox" value="MANHA" 
+                            checked={periodosLocal.includes('MANHA')}
+                            onChange={() => handlePeriodoToggle('MANHA')}
+                            className="rounded text-green-600 focus:ring-green-500" />
+                          Manhã
+                        </label>
+                      )}
+                      {item.evento.possuiTarde && (
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                          <input type="checkbox" value="TARDE" 
+                            checked={periodosLocal.includes('TARDE')}
+                            onChange={() => handlePeriodoToggle('TARDE')}
+                            className="rounded text-green-600 focus:ring-green-500" />
+                          Tarde
+                        </label>
+                      )}
+                      {item.evento.possuiNoite && (
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                          <input type="checkbox" value="NOITE" 
+                            checked={periodosLocal.includes('NOITE')}
+                            onChange={() => handlePeriodoToggle('NOITE')}
+                            className="rounded text-green-600 focus:ring-green-500" />
+                          Noite
+                        </label>
+                      )}
+                    </div>
+                  </div>
+
+
+
+                  <button
+                    onClick={() => handleRsvp('PARTICIPAREI', true)}
+                    disabled={isLoadingRsvp}
+                    className="w-full py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                  >
+                    {isLoadingRsvp ? 'Salvando...' : 'Confirmar Participação'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsEditingParticipacao(false)
+                      setPeriodosLocal(item.rsvp?.periodosParticipacao ?? [])
+                    }}
+                    disabled={isLoadingRsvp}
+                    className="w-full mt-2 py-2 text-slate-500 rounded-lg text-sm font-medium hover:bg-slate-100 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
+
               <div className="pt-2">
                 <div className="flex items-center gap-2 mb-2">
                   <input 
                     type="radio" 
                     id="radio-nao-vou" 
-                    checked={ausenciaSelecionada || respostaLocal === 'NAO_PARTICIPAREI'}
-                    onChange={() => setAusenciaSelecionada(true)}
+                    checked={ausenciaSelecionada || (respostaLocal === 'NAO_PARTICIPAREI' && !isEditingParticipacao)}
+                    onChange={() => { setAusenciaSelecionada(true); setIsEditingParticipacao(false) }}
                     disabled={isLoadingRsvp}
                     className="w-4 h-4 text-red-600 focus:ring-red-500"
                   />
@@ -217,7 +329,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
                   </label>
                 </div>
 
-                {(ausenciaSelecionada || respostaLocal === 'NAO_PARTICIPAREI') && (
+                {(ausenciaSelecionada || (respostaLocal === 'NAO_PARTICIPAREI' && !isEditingParticipacao)) && (
                   <div className="pl-6 animate-in slide-in-from-top-2">
                     <textarea
                       value={justificativa}
@@ -246,6 +358,19 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
             </div>
           )}
         </div>
+
+        {item.evento.refeicoesOferecidas && item.evento.refeicoesOferecidas.length > 0 && (
+          <div className="border-t border-slate-100 pt-6">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Alimentação Oferecida</h3>
+            <div className="bg-slate-50 text-slate-700 border border-slate-100 rounded-lg p-4 text-sm">
+              <ul className="list-disc pl-5">
+                {item.evento.refeicoesOferecidas.map(tipo => (
+                  <li key={tipo}>{getRefeicaoLabel(tipo)}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
       </div>
     </dialog>
   )

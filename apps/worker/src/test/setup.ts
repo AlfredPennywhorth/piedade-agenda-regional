@@ -176,6 +176,9 @@ export function setupDb(sqlite: any) {
       ativo integer DEFAULT true NOT NULL,
       serie_recorrencia_id text,
       recorrencia_excecao integer DEFAULT false NOT NULL,
+      possui_manha integer DEFAULT false NOT NULL,
+      possui_tarde integer DEFAULT false NOT NULL,
+      possui_noite integer DEFAULT false NOT NULL,
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       FOREIGN KEY (local_id) REFERENCES locais(id),
@@ -257,6 +260,7 @@ export function setupDb(sqlite: any) {
       convocacao_destinatario_id text NOT NULL UNIQUE,
       resposta text NOT NULL,
       justificativa text,
+      periodos_participacao text,
       respondido_em text NOT NULL,
       atualizado_em text NOT NULL,
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -265,6 +269,18 @@ export function setupDb(sqlite: any) {
       CONSTRAINT check_rsvp_resposta CHECK (resposta IN ('PARTICIPAREI','NAO_PARTICIPAREI','NAO_SEI'))
     );
     CREATE INDEX IF NOT EXISTS idx_rsvp_convocacao_dest_id ON rsvp (convocacao_destinatario_id);
+
+    CREATE TABLE IF NOT EXISTS evento_refeicoes (
+      id text PRIMARY KEY NOT NULL,
+      evento_id text NOT NULL,
+      tipo text NOT NULL,
+      ativo integer DEFAULT true NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (evento_id) REFERENCES eventos(id),
+      CONSTRAINT check_evento_refeicoes_tipo CHECK (tipo IN ('CAFE_MANHA','ALMOCO','LANCHE','JANTAR'))
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_evento_refeicoes_unico ON evento_refeicoes (evento_id, tipo);
   `
   sqlite.exec(setupSql)
 }
