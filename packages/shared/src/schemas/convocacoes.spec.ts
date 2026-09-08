@@ -3,75 +3,87 @@ import { RsvpUpsert, TipoRefeicao } from './convocacoes'
 import { EventoRefeicaoCreate } from './eventos'
 
 describe('S09 - Shared - Convocacoes', () => {
-  it('1. PeriodoParticipacao aceita MANHA, TARDE, INTEGRAL e rejeita invalidos', () => {
+  it('1. PeriodosParticipacao aceita MANHA, TARDE, NOITE e rejeita invalidos', () => {
     // Valid values
-    expect(RsvpUpsert.safeParse({ resposta: 'PARTICIPAREI', periodoParticipacao: 'MANHA' }).success).toBe(true)
-    expect(RsvpUpsert.safeParse({ resposta: 'PARTICIPAREI', periodoParticipacao: 'TARDE' }).success).toBe(true)
-    expect(RsvpUpsert.safeParse({ resposta: 'PARTICIPAREI', periodoParticipacao: 'INTEGRAL' }).success).toBe(true)
+    expect(RsvpUpsert.safeParse({ resposta: 'PARTICIPAREI', periodosParticipacao: ['MANHA'] }).success).toBe(true)
+    expect(RsvpUpsert.safeParse({ resposta: 'PARTICIPAREI', periodosParticipacao: ['TARDE'] }).success).toBe(true)
+    expect(RsvpUpsert.safeParse({ resposta: 'PARTICIPAREI', periodosParticipacao: ['NOITE'] }).success).toBe(true)
+    expect(RsvpUpsert.safeParse({ resposta: 'PARTICIPAREI', periodosParticipacao: ['MANHA', 'TARDE'] }).success).toBe(true)
+    expect(RsvpUpsert.safeParse({ resposta: 'PARTICIPAREI', periodosParticipacao: ['MANHA', 'NOITE'] }).success).toBe(true)
+    expect(RsvpUpsert.safeParse({ resposta: 'PARTICIPAREI', periodosParticipacao: ['TARDE', 'NOITE'] }).success).toBe(true)
+    expect(RsvpUpsert.safeParse({ resposta: 'PARTICIPAREI', periodosParticipacao: ['MANHA', 'TARDE', 'NOITE'] }).success).toBe(true)
     
     // Invalid values
-    const resNoite = RsvpUpsert.safeParse({ resposta: 'PARTICIPAREI', periodoParticipacao: 'NOITE' })
-    expect(resNoite.success).toBe(false)
-    const resString = RsvpUpsert.safeParse({ resposta: 'PARTICIPAREI', periodoParticipacao: 'qualquer_coisa' })
+    const resString = RsvpUpsert.safeParse({ resposta: 'PARTICIPAREI', periodosParticipacao: 'MANHA' })
     expect(resString.success).toBe(false)
+    const resIntegral = RsvpUpsert.safeParse({ resposta: 'PARTICIPAREI', periodosParticipacao: ['INTEGRAL'] })
+    expect(resIntegral.success).toBe(false)
+    const resVazio = RsvpUpsert.safeParse({ resposta: 'PARTICIPAREI', periodosParticipacao: ['QUALQUER'] })
+    expect(resVazio.success).toBe(false)
   })
 
-  it('2. TipoRefeicao aceita CAFE_MANHA, ALMOCO, LANCHE_TARDE e rejeita tipo inválido', () => {
+  it('2. TipoRefeicao aceita CAFE_MANHA, ALMOCO, LANCHE, JANTAR e rejeita LANCHE_TARDE/JANTA', () => {
     expect(TipoRefeicao.safeParse('CAFE_MANHA').success).toBe(true)
     expect(TipoRefeicao.safeParse('ALMOCO').success).toBe(true)
-    expect(TipoRefeicao.safeParse('LANCHE_TARDE').success).toBe(true)
+    expect(TipoRefeicao.safeParse('LANCHE').success).toBe(true)
+    expect(TipoRefeicao.safeParse('JANTAR').success).toBe(true)
+    
+    expect(TipoRefeicao.safeParse('LANCHE_TARDE').success).toBe(false)
     expect(TipoRefeicao.safeParse('JANTA').success).toBe(false)
   })
 
-  it('3. RsvpUpsert aceita PARTICIPAREI com periodoParticipacao e refeicoesSelecionadas validas', () => {
+  it('3. RsvpUpsert rejeita período inválido', () => {
     const res = RsvpUpsert.safeParse({ 
       resposta: 'PARTICIPAREI', 
-      periodoParticipacao: 'MANHA',
-      refeicoesSelecionadas: ['ALMOCO']
-    })
-    expect(res.success).toBe(true)
-  })
-
-  it('4. RsvpUpsert rejeita período inválido', () => {
-    const res = RsvpUpsert.safeParse({ 
-      resposta: 'PARTICIPAREI', 
-      periodoParticipacao: 'MADRUGADA',
-      refeicoesSelecionadas: ['ALMOCO']
+      periodosParticipacao: ['MADRUGADA']
     })
     expect(res.success).toBe(false)
   })
 
-  it('5. NAO_SEI com periodoParticipacao deve ser rejeitado', () => {
-    // Depende do superRefine do schema, se nao tiver a gente ajusta dps
-    // Para fins do teste real:
+  it('4. NAO_SEI com periodosParticipacao deve ser rejeitado', () => {
     const res = RsvpUpsert.safeParse({ 
       resposta: 'NAO_SEI', 
-      periodoParticipacao: 'MANHA' 
+      periodosParticipacao: ['MANHA'] 
     })
-    // Se o schema S09 prever falha, isso da false. Se ele normalizar, dá success.
-    // Vamos afirmar false pois a regra é rejeitar:
     expect(res.success).toBe(false)
   })
 
-  it('6. NAO_PARTICIPAREI com refeicoesSelecionadas deve ser rejeitado', () => {
+  it('5. NAO_PARTICIPAREI com periodosParticipacao deve ser rejeitado', () => {
     const res = RsvpUpsert.safeParse({ 
       resposta: 'NAO_PARTICIPAREI', 
       justificativa: 'ok',
-      refeicoesSelecionadas: ['ALMOCO']
+      periodosParticipacao: ['ALMOCO']
     })
     expect(res.success).toBe(false)
+  })
+
+  it('6. NAO_PARTICIPAREI sem justificativa deve falhar', () => {
+    const res = RsvpUpsert.safeParse({ 
+      resposta: 'NAO_PARTICIPAREI'
+    })
+    expect(res.success).toBe(false)
+  })
+
+  it('7. NAO_PARTICIPAREI com justificativa valida deve sucesso', () => {
+    const res = RsvpUpsert.safeParse({ 
+      resposta: 'NAO_PARTICIPAREI',
+      justificativa: 'ok'
+    })
+    expect(res.success).toBe(true)
   })
 })
 
 describe('S09 - Shared - EventoRefeicaoCreate', () => {
-  it('7. aceita tipo de refeição válido', () => {
+  it('8. aceita tipo de refeição válido', () => {
     expect(EventoRefeicaoCreate.safeParse({ tipo: 'CAFE_MANHA' }).success).toBe(true)
     expect(EventoRefeicaoCreate.safeParse({ tipo: 'ALMOCO' }).success).toBe(true)
-    expect(EventoRefeicaoCreate.safeParse({ tipo: 'LANCHE_TARDE' }).success).toBe(true)
+    expect(EventoRefeicaoCreate.safeParse({ tipo: 'LANCHE' }).success).toBe(true)
+    expect(EventoRefeicaoCreate.safeParse({ tipo: 'JANTAR' }).success).toBe(true)
   })
 
-  it('8. rejeita tipo de refeição inválido', () => {
-    expect(EventoRefeicaoCreate.safeParse({ tipo: 'JANTAR' }).success).toBe(false)
+  it('9. rejeita tipo de refeição inválido', () => {
+    expect(EventoRefeicaoCreate.safeParse({ tipo: 'LANCHE_TARDE' }).success).toBe(false)
+    expect(EventoRefeicaoCreate.safeParse({ tipo: 'JANTA' }).success).toBe(false)
     expect(EventoRefeicaoCreate.safeParse({ tipo: '' }).success).toBe(false)
     expect(EventoRefeicaoCreate.safeParse({}).success).toBe(false)
   })
