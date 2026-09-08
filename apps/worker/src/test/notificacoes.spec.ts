@@ -191,6 +191,10 @@ describe('S10 - Notificações (Web Push)', () => {
     })
 
     it('7. Erro 404/410 inativa subscription automaticamente', async () => {
+      // Isola o estado do teste: inativa todas as subscriptions e reativa apenas a alvo
+      await db.update(schema.pushSubscriptions).set({ ativo: false }).run()
+      await db.update(schema.pushSubscriptions).set({ ativo: true }).where(eq(schema.pushSubscriptions.endpoint, 'https://push.example.com/123')).run()
+
       const spy = vi.spyOn(webPush, 'enviarNotificacao').mockResolvedValue({ success: false, status: 410 })
       
       const result = await enviarAvisosConvocacao(db, 'conv-1', 'Tit', 'Msg', vapid, '/app')
@@ -203,7 +207,10 @@ describe('S10 - Notificações (Web Push)', () => {
     })
 
     it('8. Erro 5xx (transiente) não apaga/inativa subscription', async () => {
+      // Isola o estado do teste: inativa todas as subscriptions e reativa apenas a alvo
+      await db.update(schema.pushSubscriptions).set({ ativo: false }).run()
       await db.update(schema.pushSubscriptions).set({ ativo: true }).where(eq(schema.pushSubscriptions.endpoint, 'https://push.example.com/123')).run()
+
       const spy = vi.spyOn(webPush, 'enviarNotificacao').mockResolvedValue({ success: false, status: 502 })
       
       const result = await enviarAvisosConvocacao(db, 'conv-1', 'Tit', 'Msg', vapid, '/app')
