@@ -239,7 +239,7 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     })
     expect(res.status).toBe(200)
     const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdNormal)).get()
-    expect(dbRecord!.periodoParticipacao).toBeNull()
+    expect(dbRecord!.periodosParticipacao).toBeNull()
   })
 
   it('12. somente manhã => normaliza MANHA', async () => {
@@ -251,7 +251,7 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     })
     expect(res.status).toBe(200)
     const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdNormal)).get()
-    expect(dbRecord!.periodoParticipacao).toBe('MANHA')
+    expect(dbRecord!.periodosParticipacao).toEqual(['MANHA'])
   })
 
   it('13. somente tarde => normaliza TARDE', async () => {
@@ -263,154 +263,57 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     })
     expect(res.status).toBe(200)
     const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdNormal)).get()
-    expect(dbRecord!.periodoParticipacao).toBe('TARDE')
+    expect(dbRecord!.periodosParticipacao).toEqual(['TARDE'])
   })
 
   it('14. manhã+tarde sem período => 400', async () => {
     const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'PARTICIPAREI' }) // falta periodo
+      body: JSON.stringify({ resposta: 'PARTICIPAREI' }) // falta periodosParticipacao
     })
     expect(res.status).toBe(400)
   })
 
-  it('15. manhã+tarde MANHA', async () => {
+  it('15. manhã+tarde ["MANHA"]', async () => {
     const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodoParticipacao: 'MANHA' })
+      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodosParticipacao: ['MANHA'] })
     })
     expect(res.status).toBe(200)
     const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdPeriodos)).get()
-    expect(dbRecord!.periodoParticipacao).toBe('MANHA')
+    expect(dbRecord!.periodosParticipacao).toEqual(['MANHA'])
   })
 
-  it('16. manhã+tarde TARDE', async () => {
+  it('16. manhã+tarde ["TARDE"]', async () => {
     const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodoParticipacao: 'TARDE' })
+      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodosParticipacao: ['TARDE'] })
     })
     expect(res.status).toBe(200)
   })
 
-  it('17. manhã+tarde INTEGRAL', async () => {
+  it('17. manhã+tarde ["MANHA", "TARDE"]', async () => {
     const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodoParticipacao: 'INTEGRAL' })
+      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodosParticipacao: ['MANHA', 'TARDE'] })
     })
     expect(res.status).toBe(200)
   })
 
-  it('18. refeição válida', async () => {
-    const resRef = await req(`/api/v1/eventos/${eventoComPeriodos}/refeicoes`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo: 'CAFE_MANHA' })
-    })
-    const refJson = await resRef.json() as any
-    cafeId = refJson.id
-
+  it('18. enviar período não configurado => 400', async () => {
     const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodoParticipacao: 'INTEGRAL', refeicoesSelecionadas: ['CAFE_MANHA'] })
-    })
-    expect(res.status).toBe(200)
-    
-    const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdPeriodos)).get()
-    const rsvpRef = await db.select().from(schema.rsvpRefeicoes).where(eq(schema.rsvpRefeicoes.rsvpId, dbRecord!.id)).all()
-    expect(rsvpRef.length).toBe(1)
-    expect(rsvpRef[0].ativo).toBe(true)
-  })
-
-  it('19. nenhuma refeição => válido', async () => {
-    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodoParticipacao: 'INTEGRAL', refeicoesSelecionadas: [] })
-    })
-    expect(res.status).toBe(200)
-    const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdPeriodos)).get()
-    const rsvpRef = await db.select().from(schema.rsvpRefeicoes).where(eq(schema.rsvpRefeicoes.rsvpId, dbRecord!.id)).all()
-    expect(rsvpRef.every(r => r.ativo === false)).toBe(true)
-  })
-
-  it('20. refeição não oferecida => rejeita', async () => {
-    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodoParticipacao: 'INTEGRAL', refeicoesSelecionadas: ['ALMOCO'] })
+      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodosParticipacao: ['NOITE'] })
     })
     expect(res.status).toBe(400)
   })
 
-  it('21. refeição inativa => rejeita', async () => {
-    await req(`/api/v1/eventos/${eventoComPeriodos}/refeicoes/${cafeId}`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ativo: false })
-    })
-    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodoParticipacao: 'INTEGRAL', refeicoesSelecionadas: ['CAFE_MANHA'] })
-    })
-    expect(res.status).toBe(400)
-    
-    // reativar para os proximos testes
-    await req(`/api/v1/eventos/${eventoComPeriodos}/refeicoes`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo: 'CAFE_MANHA' })
-    })
-  })
-
-  it('22. refeição de outro evento => rejeita', async () => {
-    const res = await req(`/api/v1/minha-agenda/rsvp/${destIdNormal}`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'PARTICIPAREI', refeicoesSelecionadas: ['CAFE_MANHA'] })
-    })
-    expect(res.status).toBe(400)
-  })
-
-  it('23. seleção repetida não duplica', async () => {
-    await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodoParticipacao: 'INTEGRAL', refeicoesSelecionadas: ['CAFE_MANHA'] })
-    })
-    const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdPeriodos)).get()
-    const rsvpRef = await db.select().from(schema.rsvpRefeicoes).where(eq(schema.rsvpRefeicoes.rsvpId, dbRecord!.id)).all()
-    expect(rsvpRef.length).toBe(1)
-  })
-
-  it('24. desmarcar => soft inactive', async () => {
-    await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodoParticipacao: 'INTEGRAL', refeicoesSelecionadas: [] })
-    })
-    const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdPeriodos)).get()
-    const rsvpRef = await db.select().from(schema.rsvpRefeicoes).where(eq(schema.rsvpRefeicoes.rsvpId, dbRecord!.id)).get()
-    expect(rsvpRef!.ativo).toBe(false)
-  })
-
-  it('25. remarcar => reativa mesma linha', async () => {
-    await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodoParticipacao: 'INTEGRAL', refeicoesSelecionadas: ['CAFE_MANHA'] })
-    })
-    const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdPeriodos)).get()
-    const rsvpRef = await db.select().from(schema.rsvpRefeicoes).where(eq(schema.rsvpRefeicoes.rsvpId, dbRecord!.id)).get()
-    expect(rsvpRef!.ativo).toBe(true)
-  })
-
-  it('26. PARTICIPAREI -> NAO_SEI limpa período/refeições', async () => {
+  it('26. PARTICIPAREI -> NAO_SEI limpa período', async () => {
     const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
@@ -418,19 +321,15 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     })
     expect(res.status).toBe(200)
     const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdPeriodos)).get()
-    expect(dbRecord!.periodoParticipacao).toBeNull()
-    const antigas = await db.select().from(schema.rsvpRefeicoes).where(eq(schema.rsvpRefeicoes.rsvpId, dbRecord!.id)).all()
-    for (const antiga of antigas) {
-      expect(antiga.ativo).toBe(false)
-    }
+    expect(dbRecord!.periodosParticipacao).toBeNull()
   })
 
-  it('27. PARTICIPAREI -> NAO_PARTICIPAREI limpa período/refeições', async () => {
+  it('27. PARTICIPAREI -> NAO_PARTICIPAREI limpa período', async () => {
     // Retorna para PARTICIPAREI
     await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodoParticipacao: 'INTEGRAL', refeicoesSelecionadas: ['CAFE_MANHA'] })
+      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodosParticipacao: ['MANHA'] })
     })
 
     const res = await req(`/api/v1/minha-agenda/rsvp/${destIdPeriodos}`, {
@@ -440,11 +339,7 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     })
     expect(res.status).toBe(200)
     const dbRecord = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destIdPeriodos)).get()
-    expect(dbRecord!.periodoParticipacao).toBeNull()
-    const antigas = await db.select().from(schema.rsvpRefeicoes).where(eq(schema.rsvpRefeicoes.rsvpId, dbRecord!.id)).all()
-    for (const antiga of antigas) {
-      expect(antiga.ativo).toBe(false)
-    }
+    expect(dbRecord!.periodosParticipacao).toBeNull()
   })
 
   it('28. evento iniciado bloqueia alteração', async () => {
@@ -485,7 +380,7 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     const res = await req(`/api/v1/minha-agenda/rsvp/${destId}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodoParticipacao: 'INTEGRAL', refeicoesSelecionadas: ['CAFE_MANHA'] })
+      body: JSON.stringify({ resposta: 'PARTICIPAREI', periodosParticipacao: ['MANHA'] })
     })
     
     spy.mockRestore()
@@ -497,6 +392,6 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     const estadoDepois = await db.select().from(schema.rsvp).where(eq(schema.rsvp.convocacaoDestinatarioId, destId)).get()
     
     expect(estadoDepois!.resposta).toBe(estadoAntes!.resposta) 
-    expect(estadoDepois!.periodoParticipacao).toBeNull()
+    expect(estadoDepois!.periodosParticipacao).toBeNull()
   })
 })

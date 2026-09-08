@@ -352,7 +352,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     fireEvent.click(screen.getByText('Reunião de Setor'))
     const dq = within(await screen.findByRole('dialog'))
     fireEvent.click(dq.getByText('✓ Vou participar'))
-    expect(dq.queryByText(/em qual período/i)).not.toBeInTheDocument()
+    expect(dq.queryByText(/período de participação/i)).not.toBeInTheDocument()
   })
 
   it('32. somente manhã não pergunta período', async () => {
@@ -362,7 +362,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     fireEvent.click(screen.getByText('Evento S09 Manhã'))
     const dq = within(await screen.findByRole('dialog'))
     fireEvent.click(dq.getByText('✓ Vou participar'))
-    expect(dq.queryByText(/em qual período/i)).not.toBeInTheDocument()
+    expect(dq.queryByText(/período de participação/i)).not.toBeInTheDocument()
   })
 
   it('33. somente tarde não pergunta período', async () => {
@@ -375,7 +375,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     fireEvent.click(screen.getByText('Evento S09 Manhã'))
     const dq = within(await screen.findByRole('dialog'))
     fireEvent.click(dq.getByText('✓ Vou participar'))
-    expect(dq.queryByText(/em qual período/i)).not.toBeInTheDocument()
+    expect(dq.queryByText(/período de participação/i)).not.toBeInTheDocument()
   })
 
   it('34. manhã+tarde mostra: Manhã, Tarde, Manhã e tarde', async () => {
@@ -385,11 +385,10 @@ describe('S07 - Minha Agenda e Calendário', () => {
     fireEvent.click(screen.getByText('Evento S09 Integral'))
     const dq = within(await screen.findByRole('dialog'))
     fireEvent.click(dq.getByText('✓ Vou participar'))
-    // O componente renderiza "Período de participação *" (não "em qual período")
     expect(dq.getByText(/período de participação/i)).toBeInTheDocument()
     expect(dq.getByText('Manhã')).toBeInTheDocument()
     expect(dq.getByText('Tarde')).toBeInTheDocument()
-    expect(dq.getByText('Manhã e tarde')).toBeInTheDocument()
+    expect(dq.queryByText('Manhã e tarde')).not.toBeInTheDocument()
   })
 
   it('35. clicar Vou participar em manhã+tarde não mostra badge Confirmado antes do PUT', async () => {
@@ -456,13 +455,13 @@ describe('S07 - Minha Agenda e Calendário', () => {
     fireEvent.click(dq.getByText('Confirmar Participação'))
     
     // O componente só inclui refeicoesSelecionadas se length > 0;
-    // com zero refeições o campo é omitido — comportamento válido
+    // (Agora não tem mais refeições no RSVP, então testa só período)
     await waitFor(() => {
       expect(apiClient.putWithAuth).toHaveBeenCalledWith(
         '/minha-agenda/rsvp/dest-s09',
         expect.objectContaining({
           resposta: 'PARTICIPAREI',
-          periodoParticipacao: 'MANHA'
+          periodosParticipacao: ['MANHA']
         })
       )
     })
@@ -510,7 +509,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     // 1. Abre Evento S09 Integral (RSVP inicial = null)
     await waitFor(() => screen.getByText('Evento S09 Integral'))
     fireEvent.click(screen.getByText('Evento S09 Integral'))
-    let dq = within(await screen.findByRole('dialog'))
+    const dq = within(await screen.findByRole('dialog'))
 
     // 2. Clica "Vou participar" para abrir formulário S09
     fireEvent.click(dq.getByText('✓ Vou participar'))
@@ -518,8 +517,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     // 3. Seleciona período TARDE
     fireEvent.click(dq.getByLabelText('Tarde'))
 
-    // 4. Seleciona refeição ALMOCO
-    fireEvent.click(dq.getByLabelText('Almoço'))
+    // (Pulo) Não selecionamos refeição porque não existe no RSVP
 
     // 5. Confirma participação
     fireEvent.click(dq.getByText('Confirmar Participação'))
@@ -530,8 +528,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
         '/minha-agenda/rsvp/dest-s09',
         expect.objectContaining({
           resposta: 'PARTICIPAREI',
-          periodoParticipacao: 'TARDE',
-          refeicoesSelecionadas: ['ALMOCO']
+          periodosParticipacao: ['TARDE']
         })
       )
     })
@@ -544,24 +541,21 @@ describe('S07 - Minha Agenda e Calendário', () => {
     // 8. Reabre o mesmo evento
     fireEvent.click(screen.getByText('Evento S09 Integral'))
     const dialog2 = await screen.findByRole('dialog')
-    dq = within(dialog2)
+    const dq2 = within(dialog2)
 
     // 9. Badge "Confirmado" deve estar visível (estado preservado via handleRsvpUpdated)
-    expect(dq.getByText(/confirmado/i)).toBeInTheDocument()
+    expect(dq2.getByText(/confirmado/i)).toBeInTheDocument()
 
     // 10. Abre formulário de edição para verificar período e refeições salvas
-    fireEvent.click(dq.getByText('✓ Vou participar'))
+    fireEvent.click(dq2.getByText('✓ Vou participar'))
 
     // 11. Verifica que o estado salvo foi restaurado nos inputs
     await waitFor(() => {
-      const rTarde = dq.getByLabelText('Tarde') as HTMLInputElement
+      const rTarde = dq2.getByLabelText('Tarde') as HTMLInputElement
       expect(rTarde.checked).toBe(true)
 
-      const rAlmoco = dq.getByLabelText('Almoço') as HTMLInputElement
-      expect(rAlmoco.checked).toBe(true)
-
-      const rCafe = dq.getByLabelText('Café da manhã') as HTMLInputElement
-      expect(rCafe.checked).toBe(false)
+      const rManha = dq2.getByLabelText('Manhã') as HTMLInputElement
+      expect(rManha.checked).toBe(false)
     })
   })
 
@@ -570,8 +564,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     const mockComRsvp = JSON.parse(JSON.stringify(mockEventos))
     mockComRsvp[2].rsvp = {
       resposta: 'PARTICIPAREI',
-      periodoParticipacao: 'TARDE',
-      refeicoesSelecionadas: ['ALMOCO']
+      periodosParticipacao: ['TARDE']
     }
     
     ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockComRsvp)
@@ -582,14 +575,13 @@ describe('S07 - Minha Agenda e Calendário', () => {
     
     // Abre evento
     fireEvent.click(screen.getByText('Evento S09 Integral'))
-    let dq = within(await screen.findByRole('dialog'))
+    const dq = within(await screen.findByRole('dialog'))
     
     // 2. Abre edição
     fireEvent.click(dq.getByText('✓ Vou participar'))
     
-    // 3. Altera drafts para MANHA e CAFE_MANHA
+    // 3. Altera drafts para MANHA
     fireEvent.click(dq.getByLabelText('Manhã'))
-    fireEvent.click(dq.getByLabelText('Café da manhã'))
     
     // Verifica visualmente que mudou
     const rManha = dq.getByLabelText('Manhã') as HTMLInputElement
@@ -604,14 +596,10 @@ describe('S07 - Minha Agenda e Calendário', () => {
     // 6. Verifica se valores persistidos foram restaurados e draft descartado
     await waitFor(() => {
       const rTardeAfter = dq.getByLabelText('Tarde') as HTMLInputElement
-      const rAlmocoAfter = dq.getByLabelText('Almoço') as HTMLInputElement
       const rManhaAfter = dq.getByLabelText('Manhã') as HTMLInputElement
-      const rCafeAfter = dq.getByLabelText('Café da manhã') as HTMLInputElement
       
       expect(rTardeAfter.checked).toBe(true)
-      expect(rAlmocoAfter.checked).toBe(true)
       expect(rManhaAfter.checked).toBe(false)
-      expect(rCafeAfter.checked).toBe(false)
     })
     
     // 7. Confirma que nenhum PUT foi feito

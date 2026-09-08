@@ -10,8 +10,7 @@ interface EventoDetalheProps {
     rsvp: {
       resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI'
       justificativa?: string | null
-      periodoParticipacao?: string | null
-      refeicoesSelecionadas?: string[]
+      periodosParticipacao?: string[] | null
     }
   ) => void
 }
@@ -24,8 +23,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
   const [isEditingParticipacao, setIsEditingParticipacao] = useState(false)
   
   const [justificativa, setJustificativa] = useState(item.rsvp?.justificativa ?? '')
-  const [periodoLocal, setPeriodoLocal] = useState<string | null>(item.rsvp?.periodoParticipacao ?? null)
-  const [refeicoesLocal, setRefeicoesLocal] = useState<string[]>(item.rsvp?.refeicoesSelecionadas ?? [])
+  const [periodosLocal, setPeriodosLocal] = useState<string[]>(item.rsvp?.periodosParticipacao ?? [])
   
   const [isLoadingRsvp, setIsLoadingRsvp] = useState(false)
   const [rsvpError, setRsvpError] = useState('')
@@ -50,13 +48,12 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
       return
     }
 
+    const numPeriodos = [item.evento.possuiManha, item.evento.possuiTarde, item.evento.possuiNoite].filter(Boolean).length
+    const exigePeriodo = numPeriodos > 1
+
     if (resposta === 'PARTICIPAREI' && !bypassEditCheck) {
-      const exigePeriodo = item.evento.possuiManha && item.evento.possuiTarde
-      const temRefeicoes = item.evento.refeicoesOferecidas && item.evento.refeicoesOferecidas.length > 0
-      
-      if (exigePeriodo || temRefeicoes) {
-        setPeriodoLocal(item.rsvp?.periodoParticipacao ?? null)
-        setRefeicoesLocal(item.rsvp?.refeicoesSelecionadas ?? [])
+      if (exigePeriodo) {
+        setPeriodosLocal(item.rsvp?.periodosParticipacao ?? [])
         setIsEditingParticipacao(true)
         setAusenciaSelecionada(false)
         return
@@ -65,9 +62,8 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
 
     // Se exige período e está confirmando
     if (resposta === 'PARTICIPAREI' && bypassEditCheck) {
-      const exigePeriodo = item.evento.possuiManha && item.evento.possuiTarde
-      if (exigePeriodo && !periodoLocal) {
-        setRsvpError('Por favor, selecione um período de participação.')
+      if (exigePeriodo && periodosLocal.length === 0) {
+        setRsvpError('Por favor, selecione pelo menos um período de participação.')
         return
       }
     }
@@ -82,8 +78,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
       }
       
       if (resposta === 'PARTICIPAREI') {
-        if (periodoLocal) payload.periodoParticipacao = periodoLocal
-        if (refeicoesLocal.length > 0) payload.refeicoesSelecionadas = refeicoesLocal
+        if (periodosLocal.length > 0) payload.periodosParticipacao = periodosLocal
       }
 
       await apiClient.putWithAuth(`/minha-agenda/rsvp/${item.destinatarioId}`, payload)
@@ -91,8 +86,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
       const rsvpAtualizado = {
         resposta,
         justificativa: resposta === 'NAO_PARTICIPAREI' ? justificativa : null,
-        periodoParticipacao: resposta === 'PARTICIPAREI' ? periodoLocal : null,
-        refeicoesSelecionadas: resposta === 'PARTICIPAREI' ? refeicoesLocal : []
+        periodosParticipacao: resposta === 'PARTICIPAREI' ? (periodosLocal.length > 0 ? periodosLocal : null) : null
       }
       
       setRespostaLocal(resposta)
@@ -103,8 +97,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
         setJustificativa('')
       }
       if (resposta !== 'PARTICIPAREI') {
-        setPeriodoLocal(null)
-        setRefeicoesLocal([])
+        setPeriodosLocal([])
       }
       
       setAusenciaSelecionada(false)
@@ -116,9 +109,9 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
     }
   }
 
-  const handleRefeicaoToggle = (tipo: string) => {
-    setRefeicoesLocal(prev => 
-      prev.includes(tipo) ? prev.filter(t => t !== tipo) : [...prev, tipo]
+  const handlePeriodoToggle = (periodo: string) => {
+    setPeriodosLocal(prev => 
+      prev.includes(periodo) ? prev.filter(p => p !== periodo) : [...prev, periodo]
     )
   }
 
@@ -126,7 +119,8 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
     switch(tipo) {
       case 'CAFE_MANHA': return 'Café da manhã'
       case 'ALMOCO': return 'Almoço'
-      case 'LANCHE_TARDE': return 'Lanche da tarde'
+      case 'LANCHE': return 'Lanche'
+      case 'JANTAR': return 'Jantar'
       default: return tipo
     }
   }
@@ -265,53 +259,40 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
               
               {isEditingParticipacao && (
                 <div className="p-4 bg-green-50/50 border border-green-100 rounded-lg animate-in slide-in-from-top-2">
-                  {item.evento.possuiManha && item.evento.possuiTarde && (
-                    <div className="mb-4">
-                      <h4 className="text-sm font-semibold text-slate-700 mb-2">Período de participação *</h4>
-                      <div className="flex flex-col gap-2">
+                  <div className="mb-4">
+                    <h4 className="text-sm font-semibold text-slate-700 mb-2">Período de participação *</h4>
+                    <div className="flex flex-col gap-2">
+                      {item.evento.possuiManha && (
                         <label className="flex items-center gap-2 text-sm text-slate-600">
-                          <input type="radio" name="periodo" value="MANHA" 
-                            checked={periodoLocal === 'MANHA'}
-                            onChange={() => setPeriodoLocal('MANHA')}
-                            className="text-green-600 focus:ring-green-500" />
+                          <input type="checkbox" value="MANHA" 
+                            checked={periodosLocal.includes('MANHA')}
+                            onChange={() => handlePeriodoToggle('MANHA')}
+                            className="rounded text-green-600 focus:ring-green-500" />
                           Manhã
                         </label>
+                      )}
+                      {item.evento.possuiTarde && (
                         <label className="flex items-center gap-2 text-sm text-slate-600">
-                          <input type="radio" name="periodo" value="TARDE" 
-                            checked={periodoLocal === 'TARDE'}
-                            onChange={() => setPeriodoLocal('TARDE')}
-                            className="text-green-600 focus:ring-green-500" />
+                          <input type="checkbox" value="TARDE" 
+                            checked={periodosLocal.includes('TARDE')}
+                            onChange={() => handlePeriodoToggle('TARDE')}
+                            className="rounded text-green-600 focus:ring-green-500" />
                           Tarde
                         </label>
+                      )}
+                      {item.evento.possuiNoite && (
                         <label className="flex items-center gap-2 text-sm text-slate-600">
-                          <input type="radio" name="periodo" value="INTEGRAL" 
-                            checked={periodoLocal === 'INTEGRAL'}
-                            onChange={() => setPeriodoLocal('INTEGRAL')}
-                            className="text-green-600 focus:ring-green-500" />
-                          Manhã e tarde
+                          <input type="checkbox" value="NOITE" 
+                            checked={periodosLocal.includes('NOITE')}
+                            onChange={() => handlePeriodoToggle('NOITE')}
+                            className="rounded text-green-600 focus:ring-green-500" />
+                          Noite
                         </label>
-                      </div>
+                      )}
                     </div>
-                  )}
+                  </div>
 
-                  {item.evento.refeicoesOferecidas && item.evento.refeicoesOferecidas.length > 0 && (
-                    <div className="mb-4">
-                      <h4 className="text-sm font-semibold text-slate-700 mb-2">Alimentação (opcional)</h4>
-                      <p className="text-xs text-slate-500 mb-2">Selecione as refeições que irá necessitar:</p>
-                      <div className="flex flex-col gap-2">
-                        {item.evento.refeicoesOferecidas.map((tipo: string) => (
-                          <label key={tipo} className="flex items-center gap-2 text-sm text-slate-600">
-                            <input 
-                              type="checkbox" 
-                              checked={refeicoesLocal.includes(tipo)}
-                              onChange={() => handleRefeicaoToggle(tipo)}
-                              className="rounded text-green-600 focus:ring-green-500" />
-                            {getRefeicaoLabel(tipo)}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+
 
                   <button
                     onClick={() => handleRsvp('PARTICIPAREI', true)}
@@ -323,8 +304,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
                   <button
                     onClick={() => {
                       setIsEditingParticipacao(false)
-                      setPeriodoLocal(item.rsvp?.periodoParticipacao ?? null)
-                      setRefeicoesLocal(item.rsvp?.refeicoesSelecionadas ?? [])
+                      setPeriodosLocal(item.rsvp?.periodosParticipacao ?? [])
                     }}
                     disabled={isLoadingRsvp}
                     className="w-full mt-2 py-2 text-slate-500 rounded-lg text-sm font-medium hover:bg-slate-100 transition-colors"
@@ -378,6 +358,19 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
             </div>
           )}
         </div>
+
+        {item.evento.refeicoesOferecidas && item.evento.refeicoesOferecidas.length > 0 && (
+          <div className="border-t border-slate-100 pt-6">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Alimentação Oferecida</h3>
+            <div className="bg-slate-50 text-slate-700 border border-slate-100 rounded-lg p-4 text-sm">
+              <ul className="list-disc pl-5">
+                {item.evento.refeicoesOferecidas.map(tipo => (
+                  <li key={tipo}>{getRefeicaoLabel(tipo)}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
       </div>
     </dialog>
   )

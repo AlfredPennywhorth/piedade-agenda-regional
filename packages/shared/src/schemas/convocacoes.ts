@@ -71,10 +71,10 @@ export type ConvocacaoDestinatario = z.infer<typeof ConvocacaoDestinatarioSchema
 export const StatusRsvp = z.enum(['PARTICIPAREI', 'NAO_PARTICIPAREI', 'NAO_SEI'])
 export type StatusRsvpEnum = z.infer<typeof StatusRsvp>
 
-export const PeriodoParticipacao = z.enum(['MANHA', 'TARDE', 'INTEGRAL'])
+export const PeriodoParticipacao = z.enum(['MANHA', 'TARDE', 'NOITE'])
 export type PeriodoParticipacaoEnum = z.infer<typeof PeriodoParticipacao>
 
-export const TipoRefeicao = z.enum(['CAFE_MANHA', 'ALMOCO', 'LANCHE_TARDE'])
+export const TipoRefeicao = z.enum(['CAFE_MANHA', 'ALMOCO', 'LANCHE', 'JANTAR'])
 export type TipoRefeicaoEnum = z.infer<typeof TipoRefeicao>
 
 export const RsvpSchema = z.object({
@@ -82,8 +82,7 @@ export const RsvpSchema = z.object({
   convocacaoDestinatarioId: z.string().uuid(),
   resposta: StatusRsvp,
   justificativa: z.string().nullable().optional(),
-  periodoParticipacao: PeriodoParticipacao.nullable().optional(),
-  refeicoesSelecionadas: z.array(TipoRefeicao).optional(),
+  periodosParticipacao: z.array(PeriodoParticipacao).optional().nullable(),
   respondidoEm: z.string(),
   atualizadoEm: z.string(),
   createdAt: z.string(),
@@ -94,8 +93,7 @@ export type Rsvp = z.infer<typeof RsvpSchema>
 export const RsvpUpsert = z.object({
   resposta: StatusRsvp,
   justificativa: z.string().nullable().optional(),
-  periodoParticipacao: PeriodoParticipacao.nullable().optional(),
-  refeicoesSelecionadas: z.array(TipoRefeicao).optional()
+  periodosParticipacao: z.array(PeriodoParticipacao).optional().nullable(),
 }).superRefine((data, ctx) => {
   if (data.resposta === 'NAO_PARTICIPAREI' && !data.justificativa?.trim()) {
     ctx.addIssue({
@@ -106,11 +104,11 @@ export const RsvpUpsert = z.object({
   }
   
   if (data.resposta !== 'PARTICIPAREI') {
-    if (data.periodoParticipacao || (data.refeicoesSelecionadas && data.refeicoesSelecionadas.length > 0)) {
+    if (data.periodosParticipacao && data.periodosParticipacao.length > 0) {
        ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Período e refeições não devem ser enviados quando resposta não é PARTICIPAREI',
-        path: ['periodoParticipacao'], // Genérico, o Worker filtrará ou recusará.
+        message: 'Períodos não devem ser enviados quando resposta não é PARTICIPAREI',
+        path: ['periodosParticipacao'],
       })
     }
   }

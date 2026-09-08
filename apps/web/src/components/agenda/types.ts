@@ -10,6 +10,7 @@ export interface AgendaItem {
     urlWaze?: string | null
     possuiManha?: boolean
     possuiTarde?: boolean
+    possuiNoite?: boolean
     refeicoesOferecidas?: string[]
   }
   convocacao: {
@@ -24,7 +25,6 @@ export interface AgendaItem {
   rsvp: {
     resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI'
     justificativa?: string | null
-    periodoParticipacao?: string | null
-    refeicoesSelecionadas?: string[]
+    periodosParticipacao?: string[] | null
   } | null
 }

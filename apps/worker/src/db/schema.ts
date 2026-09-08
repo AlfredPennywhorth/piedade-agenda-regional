@@ -322,6 +322,7 @@ export const eventos = sqliteTable('eventos', {
   // S09
   possuiManha: integer('possui_manha', { mode: 'boolean' }).notNull().default(false),
   possuiTarde: integer('possui_tarde', { mode: 'boolean' }).notNull().default(false),
+  possuiNoite: integer('possui_noite', { mode: 'boolean' }).notNull().default(false),
   
   ativo: ativoDefault,
   ...timestampsS02,
@@ -401,13 +402,12 @@ export const rsvp = sqliteTable('rsvp', {
     .references(() => convocacaoDestinatarios.id),
   resposta: text('resposta').notNull(),
   justificativa: text('justificativa'),
-  periodoParticipacao: text('periodo_participacao'), // S09: MANHA, TARDE, INTEGRAL
+  periodosParticipacao: text('periodos_participacao', { mode: 'json' }).$type<string[]>(), // S09: Array of MANHA, TARDE, NOITE
   respondidoEm: text('respondido_em').notNull(),
   atualizadoEm: text('atualizado_em').notNull(),
   ...timestampsS02
 }, table => ({
   checkResposta: check('check_rsvp_resposta', sql`${table.resposta} IN ('PARTICIPAREI','NAO_PARTICIPAREI','NAO_SEI')`),
-  checkPeriodo: check('check_rsvp_periodo', sql`${table.periodoParticipacao} IS NULL OR ${table.periodoParticipacao} IN ('MANHA','TARDE','INTEGRAL')`),
   idxRsvpDestId: index('idx_rsvp_convocacao_dest_id').on(table.convocacaoDestinatarioId),
 }))
 
@@ -418,20 +418,11 @@ export const rsvp = sqliteTable('rsvp', {
 export const eventoRefeicoes = sqliteTable('evento_refeicoes', {
   id: text('id').primaryKey(),
   eventoId: text('evento_id').notNull().references(() => eventos.id),
-  tipo: text('tipo').notNull(), // CAFE_MANHA, ALMOCO, LANCHE_TARDE
+  tipo: text('tipo').notNull(), // CAFE_MANHA, ALMOCO, LANCHE, JANTAR
   ativo: ativoDefault,
   ...timestampsS02
 }, table => ({
-  checkTipo: check('check_evento_refeicoes_tipo', sql`${table.tipo} IN ('CAFE_MANHA','ALMOCO','LANCHE_TARDE')`),
+  checkTipo: check('check_evento_refeicoes_tipo', sql`${table.tipo} IN ('CAFE_MANHA','ALMOCO','LANCHE','JANTAR')`),
   uniqueEventoTipo: uniqueIndex('idx_evento_refeicoes_unico').on(table.eventoId, table.tipo),
 }))
 
-export const rsvpRefeicoes = sqliteTable('rsvp_refeicoes', {
-  id: text('id').primaryKey(),
-  rsvpId: text('rsvp_id').notNull().references(() => rsvp.id),
-  eventoRefeicaoId: text('evento_refeicao_id').notNull().references(() => eventoRefeicoes.id),
-  ativo: ativoDefault,
-  ...timestampsS02
-}, table => ({
-  uniqueRsvpRefeicao: uniqueIndex('idx_rsvp_refeicoes_unico').on(table.rsvpId, table.eventoRefeicaoId),
-}))

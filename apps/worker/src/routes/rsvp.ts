@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
-import { rsvp, convocacoes, convocacaoDestinatarios, eventos, eventoRefeicoes, rsvpRefeicoes } from '../db/schema'
+import { rsvp, convocacoes, convocacaoDestinatarios, eventos, eventoRefeicoes } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { RsvpUpsert } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
@@ -64,8 +64,10 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
       convocacaoStatus: convocacoes.status,
       eventoId: eventos.id,
       eventoInicio: eventos.inicioEm,
+      eventoInicio: eventos.inicioEm,
       possuiManha: eventos.possuiManha,
-      possuiTarde: eventos.possuiTarde
+      possuiTarde: eventos.possuiTarde,
+      possuiNoite: eventos.possuiNoite
     })
     .from(convocacaoDestinatarios)
     .innerJoin(convocacoes, eq(convocacaoDestinatarios.convocacaoId, convocacoes.id))
@@ -91,39 +93,28 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
     }
 
     // Validações S09 (Worker-side)
-    let finalPeriodo = null
-    const refeicoesDesejadas: string[] = []
+    let finalPeriodos: string[] | null = null
 
     if (parsed.resposta === 'PARTICIPAREI') {
-      // 1. Normalizar período
-      if (record.possuiManha && !record.possuiTarde) {
-        finalPeriodo = 'MANHA'
-      } else if (!record.possuiManha && record.possuiTarde) {
-        finalPeriodo = 'TARDE'
-      } else if (record.possuiManha && record.possuiTarde) {
-        if (!parsed.periodoParticipacao) {
-           return c.json({ error: 'Período de participação é obrigatório para este evento.' }, 400)
-        }
-        finalPeriodo = parsed.periodoParticipacao
-      }
+      const periodosConfigurados: string[] = []
+      if (record.possuiManha) periodosConfigurados.push('MANHA')
+      if (record.possuiTarde) periodosConfigurados.push('TARDE')
+      if (record.possuiNoite) periodosConfigurados.push('NOITE')
 
-      // 2. Validar Refeições
-      if (parsed.refeicoesSelecionadas && parsed.refeicoesSelecionadas.length > 0) {
-        const ativasDb = await db.select().from(eventoRefeicoes)
-          .where(and(
-            eq(eventoRefeicoes.eventoId, record.eventoId),
-            eq(eventoRefeicoes.ativo, true)
-          )).all()
-        
-        type EventoRefeicaoRow = { id: string; tipo: string }
-        const tiposAtivos = ativasDb.map((r: EventoRefeicaoRow) => r.tipo)
-        for (const tipo of parsed.refeicoesSelecionadas) {
-          if (!tiposAtivos.includes(tipo)) {
-            return c.json({ error: `Refeição ${tipo} não está disponível ou está inativa neste evento.` }, 400)
-          }
-          const idDaRefeicao = ativasDb.find((r: EventoRefeicaoRow) => r.tipo === tipo)!.id
-          refeicoesDesejadas.push(idDaRefeicao)
+      if (periodosConfigurados.length === 0) {
+        finalPeriodos = null
+      } else if (periodosConfigurados.length === 1) {
+        finalPeriodos = periodosConfigurados
+      } else {
+        if (!parsed.periodosParticipacao || parsed.periodosParticipacao.length === 0) {
+          return c.json({ error: 'É necessário selecionar pelo menos um período de participação.' }, 400)
         }
+        for (const p of parsed.periodosParticipacao) {
+          if (!periodosConfigurados.includes(p)) {
+             return c.json({ error: `O período ${p} não está configurado para este evento.` }, 400)
+          }
+        }
+        finalPeriodos = parsed.periodosParticipacao
       }
     }
 
@@ -133,18 +124,8 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
     
     const rsvpId = existingRsvp ? existingRsvp.id : crypto.randomUUID()
     
-    let escolhasAnteriores: any[] = []
-    if (existingRsvp) {
-      escolhasAnteriores = await db.select().from(rsvpRefeicoes)
-        .where(eq(rsvpRefeicoes.rsvpId, existingRsvp.id)).all()
-    }
-
     // Execute de forma atômica (D1 Batch ou Transaction local)
     await executeAtomic(db, (tx) => {
-      // Como já construímos as queries com `db`, elas não usarão a transação `tx` no SQLite in-memory,
-      // pois drizzle-orm no SQLite (better-sqlite3) exige que a query seja gerada pelo tx.
-      // Vamos reconstruir as queries usando o construtor correto (tx ou db):
-      
       const txQueries = []
       
       const txRsvp = tx.insert(rsvp)
@@ -153,7 +134,7 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
           convocacaoDestinatarioId: destinatarioId,
           resposta: parsed.resposta,
           justificativa: parsed.justificativa,
-          periodoParticipacao: finalPeriodo,
+          periodosParticipacao: finalPeriodos,
           respondidoEm: existingRsvp ? existingRsvp.respondidoEm : nowIso,
           atualizadoEm: nowIso,
           createdAt: existingRsvp ? existingRsvp.createdAt : nowIso,
@@ -164,40 +145,12 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
           set: {
             resposta: parsed.resposta,
             justificativa: parsed.justificativa,
-            periodoParticipacao: finalPeriodo,
+            periodosParticipacao: finalPeriodos,
             atualizadoEm: nowIso,
             updatedAt: nowIso
           }
         })
       txQueries.push(txRsvp)
-
-      if (existingRsvp) {
-        for (const ref of escolhasAnteriores) {
-          const deveEstarAtiva = refeicoesDesejadas.includes(ref.eventoRefeicaoId)
-          if (ref.ativo !== deveEstarAtiva) {
-            txQueries.push(
-              tx.update(rsvpRefeicoes)
-                .set({ ativo: deveEstarAtiva, updatedAt: nowIso })
-                .where(eq(rsvpRefeicoes.id, ref.id))
-            )
-          }
-          const idx = refeicoesDesejadas.indexOf(ref.eventoRefeicaoId)
-          if (idx > -1) refeicoesDesejadas.splice(idx, 1)
-        }
-      }
-
-      for (const refId of refeicoesDesejadas) {
-        txQueries.push(
-          tx.insert(rsvpRefeicoes).values({
-            id: crypto.randomUUID(),
-            rsvpId,
-            eventoRefeicaoId: refId,
-            ativo: true,
-            createdAt: nowIso,
-            updatedAt: nowIso
-          })
-        )
-      }
 
       return txQueries
     })

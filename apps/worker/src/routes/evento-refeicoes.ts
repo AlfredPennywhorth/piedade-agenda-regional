@@ -32,6 +32,23 @@ eventoRefeicoesRouter.post('/:eventoId/refeicoes', async (c) => {
     const evento = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
     if (!evento) return c.json({ error: 'Evento não encontrado' }, 404)
 
+    // Validação de exclusividade (LANCHE x JANTAR)
+    if (parsed.tipo === 'LANCHE' || parsed.tipo === 'JANTAR') {
+      const ativas = await db.select().from(eventoRefeicoes)
+        .where(and(eq(eventoRefeicoes.eventoId, eventoId), eq(eventoRefeicoes.ativo, true)))
+        .all()
+      
+      const hasLanche = ativas.some((r: any) => r.tipo === 'LANCHE')
+      const hasJantar = ativas.some((r: any) => r.tipo === 'JANTAR')
+      
+      if (parsed.tipo === 'LANCHE' && hasJantar) {
+        return c.json({ error: 'Não é permitido ter LANCHE e JANTAR simultaneamente no mesmo evento.' }, 400)
+      }
+      if (parsed.tipo === 'JANTAR' && hasLanche) {
+        return c.json({ error: 'Não é permitido ter LANCHE e JANTAR simultaneamente no mesmo evento.' }, 400)
+      }
+    }
+
     // Soft inactive: Upsert
     const existing = await db.select().from(eventoRefeicoes)
       .where(and(
@@ -84,6 +101,22 @@ eventoRefeicoesRouter.patch('/:eventoId/refeicoes/:refeicaoId', async (c) => {
       )).get()
 
     if (!existing) return c.json({ error: 'Refeição não encontrada' }, 404)
+
+    if (ativo && (existing.tipo === 'LANCHE' || existing.tipo === 'JANTAR')) {
+      const ativas = await db.select().from(eventoRefeicoes)
+        .where(and(eq(eventoRefeicoes.eventoId, eventoId), eq(eventoRefeicoes.ativo, true)))
+        .all()
+      
+      const hasLanche = ativas.some((r: any) => r.tipo === 'LANCHE')
+      const hasJantar = ativas.some((r: any) => r.tipo === 'JANTAR')
+
+      if (existing.tipo === 'LANCHE' && hasJantar) {
+        return c.json({ error: 'Não é permitido ativar LANCHE quando JANTAR já está ativo.' }, 400)
+      }
+      if (existing.tipo === 'JANTAR' && hasLanche) {
+        return c.json({ error: 'Não é permitido ativar JANTAR quando LANCHE já está ativo.' }, 400)
+      }
+    }
 
     const updated = await db.update(eventoRefeicoes)
       .set({ ativo, updatedAt: new Date().toISOString() })

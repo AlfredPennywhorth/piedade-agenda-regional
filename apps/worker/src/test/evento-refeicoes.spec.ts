@@ -140,9 +140,56 @@ describe('S09 - Eventos e Refeicoes', () => {
     const res = await req(`/api/v1/eventos/${eventoA}/refeicoes`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo: 'JANTAR' })
+      body: JSON.stringify({ tipo: 'CHURRASCO' })
     })
     expect(res.status).toBe(400)
+  })
+
+  it('6.1. LANCHE -> JANTAR (rejeitado)', async () => {
+    // Adicionar LANCHE
+    const res1 = await req(`/api/v1/eventos/${eventoA}/refeicoes`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo: 'LANCHE' })
+    })
+    expect(res1.status).toBe(201)
+
+    // Tentar adicionar JANTAR e falhar
+    const res2 = await req(`/api/v1/eventos/${eventoA}/refeicoes`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo: 'JANTAR' })
+    })
+    expect(res2.status).toBe(400)
+  })
+
+  it('6.2. Inativar LANCHE -> JANTAR (permitido)', async () => {
+    const lanche = await db.select().from(schema.eventoRefeicoes).where(
+      and(eq(schema.eventoRefeicoes.eventoId, eventoA), eq(schema.eventoRefeicoes.tipo, 'LANCHE'))
+    ).get()
+
+    // inativar lanche
+    await req(`/api/v1/eventos/${eventoA}/refeicoes/${lanche!.id}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ativo: false })
+    })
+
+    // Agora pode adicionar jantar
+    const res2 = await req(`/api/v1/eventos/${eventoA}/refeicoes`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tipo: 'JANTAR' })
+    })
+    expect(res2.status).toBe(201)
+
+    // Tentar reativar LANCHE e falhar
+    const res3 = await req(`/api/v1/eventos/${eventoA}/refeicoes/${lanche!.id}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ativo: true })
+    })
+    expect(res3.status).toBe(400)
   })
 
   it('7. POST repetido ativo não duplica', async () => {
