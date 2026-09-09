@@ -30,19 +30,31 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
 
-  const urlToOpen = event.notification.data?.url || '/'
+  let urlToOpen = '/'
+  if (event.notification.data && event.notification.data.url) {
+    try {
+      const parsedUrl = new URL(event.notification.data.url, self.location.origin)
+      if (parsedUrl.origin === self.location.origin) {
+        urlToOpen = parsedUrl.pathname + parsedUrl.search + parsedUrl.hash
+      }
+    } catch (e) {
+      // Ignora URL inválida e usa fallback '/'
+    }
+  }
+
+  const finalUrl = new URL(urlToOpen, self.location.origin).href
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       // Verifica se já tem uma janela aberta com a mesma URL (ou a mesma origin)
       for (let i = 0; i < windowClients.length; i++) {
         const client = windowClients[i]
-        if (client.url.includes(new URL(urlToOpen, self.location.origin).href) && 'focus' in client) {
+        if (client.url.includes(finalUrl) && 'focus' in client) {
           return client.focus()
         }
       }
       if (self.clients.openWindow) {
-        return self.clients.openWindow(urlToOpen)
+        return self.clients.openWindow(finalUrl)
       }
     })
   )
