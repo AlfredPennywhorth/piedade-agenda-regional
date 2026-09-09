@@ -147,12 +147,15 @@ APP_ENV=development
 VAPID_PUBLIC_KEY=sua-chave-publica
 VAPID_PRIVATE_KEY=sua-chave-privada
 VAPID_SUBJECT=mailto:admin@localhost
+```
 
 No ambiente frontend (`apps/web/.env.local`), configure:
+
+```ini
 VITE_VAPID_PUBLIC_KEY=sua-chave-publica
+```
 
 > **Aviso de Segurança (Web Push):** A `VAPID_PRIVATE_KEY` nunca deve ser exposta ao frontend e não deve ser commitada. Apenas a chave pública pode ser exposta no client-side.
-```
 
 ---
 
