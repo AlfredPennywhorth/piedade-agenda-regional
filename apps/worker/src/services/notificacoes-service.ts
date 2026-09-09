@@ -1,15 +1,15 @@
 import { eq, and } from 'drizzle-orm'
 import { convocacaoDestinatarios, pushSubscriptions, membros } from '../db/schema'
 import { enviarNotificacao, VapidDetails } from './web-push'
+import type { ExtractTablesWithRelations } from 'drizzle-orm'
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
 
 export async function enviarAvisosConvocacao<
   TMode extends 'sync' | 'async',
   TRunResult,
-  TFullSchema extends Record<string, unknown>,
-  TSchema extends Record<string, unknown>
+  TFullSchema extends Record<string, unknown>
 >(
-  db: BaseSQLiteDatabase<TMode, TRunResult, TFullSchema, TSchema>,
+  db: BaseSQLiteDatabase<TMode, TRunResult, TFullSchema, ExtractTablesWithRelations<TFullSchema>>,
   convocacaoId: string,
   titulo: string,
   mensagem: string,
