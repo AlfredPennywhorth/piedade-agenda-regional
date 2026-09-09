@@ -1,16 +1,20 @@
 import { eq, and } from 'drizzle-orm'
 import { convocacaoDestinatarios, pushSubscriptions, membros } from '../db/schema'
 import { enviarNotificacao, VapidDetails } from './web-push'
-import type { DrizzleD1Database } from 'drizzle-orm/d1'
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
+import type { ExtractTablesWithRelations } from 'drizzle-orm'
+import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
 import * as schema from '../db/schema'
 
-export type NotificacoesDb =
-  | DrizzleD1Database<typeof schema>
-  | BetterSQLite3Database<typeof schema>
-
-export async function enviarAvisosConvocacao(
-  db: NotificacoesDb,
+export async function enviarAvisosConvocacao<
+  TMode extends 'sync' | 'async',
+  TRunResult
+>(
+  db: BaseSQLiteDatabase<
+    TMode,
+    TRunResult,
+    typeof schema,
+    ExtractTablesWithRelations<typeof schema>
+  >,
   convocacaoId: string,
   titulo: string,
   mensagem: string,

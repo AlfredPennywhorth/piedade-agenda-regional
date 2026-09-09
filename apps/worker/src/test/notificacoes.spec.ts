@@ -7,10 +7,10 @@ import { setupDb } from './setup'
 import { eq } from 'drizzle-orm'
 import { enviarAvisosConvocacao } from '../services/notificacoes-service'
 import * as webPush from '../services/web-push'
-
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 describe('S10 - Notificações (Web Push)', () => {
   let sqlite: any
-  let db: ReturnType<typeof drizzle>
+  let db: BetterSQLite3Database<typeof schema>
   let app: any
 
   const req = async (path: string, options?: RequestInit) => {
