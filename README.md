@@ -155,7 +155,7 @@ No ambiente frontend (`apps/web/.env.local`), configure:
 VITE_VAPID_PUBLIC_KEY=sua-chave-publica
 ```
 
-> **Aviso de Segurança (Web Push):** A `VAPID_PRIVATE_KEY` nunca deve ser exposta ao frontend e não deve ser commitada. Apenas a chave pública pode ser exposta no client-side.
+> **Aviso de Segurança (Web Push):** `VAPID_PRIVATE_KEY` é segredo; nunca deve ser commitada; nunca deve ir para o frontend; apenas a chave pública pode ser exposta ao client.
 
 ---
 
