@@ -27,20 +27,33 @@ self.addEventListener('push', (event) => {
   }
 })
 
+export function resolveNotificationUrl(rawUrl: unknown, origin: string): string {
+  if (typeof rawUrl !== 'string' || !rawUrl) {
+    return '/'
+  }
+
+  try {
+    const parsedUrl = new URL(rawUrl, origin)
+    
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return '/'
+    }
+
+    if (parsedUrl.origin === origin) {
+      return parsedUrl.pathname + parsedUrl.search + parsedUrl.hash
+    }
+  } catch (e) {
+    // Ignora URL inválida e usa fallback '/'
+  }
+
+  return '/'
+}
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
 
-  let urlToOpen = '/'
-  if (event.notification.data && event.notification.data.url) {
-    try {
-      const parsedUrl = new URL(event.notification.data.url, self.location.origin)
-      if (parsedUrl.origin === self.location.origin) {
-        urlToOpen = parsedUrl.pathname + parsedUrl.search + parsedUrl.hash
-      }
-    } catch (e) {
-      // Ignora URL inválida e usa fallback '/'
-    }
-  }
+  const rawUrl = event.notification.data?.url
+  const urlToOpen = resolveNotificationUrl(rawUrl, self.location.origin)
 
   const finalUrl = new URL(urlToOpen, self.location.origin).href
 
