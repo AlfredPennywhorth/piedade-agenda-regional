@@ -423,6 +423,7 @@ export const eventoRefeicoes = sqliteTable('evento_refeicoes', {
   ...timestampsS02
 }, table => ({
   checkTipo: check('check_evento_refeicoes_tipo', sql`${table.tipo} IN ('CAFE_MANHA','ALMOCO','LANCHE','JANTAR')`),
+  uniqueEventoTipo: uniqueIndex('idx_evento_refeicoes_unico').on(table.eventoId, table.tipo),
 }))
 
 // ============================================================

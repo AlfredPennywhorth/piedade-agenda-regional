@@ -3,8 +3,13 @@ import { convocacaoDestinatarios, pushSubscriptions, membros } from '../db/schem
 import { enviarNotificacao, VapidDetails } from './web-push'
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
 
-export async function enviarAvisosConvocacao(
-  db: BaseSQLiteDatabase<'async' | 'sync', any, any, any>,
+export async function enviarAvisosConvocacao<
+  TMode extends 'sync' | 'async',
+  TRunResult,
+  TFullSchema extends Record<string, unknown>,
+  TSchema extends Record<string, unknown>
+>(
+  db: BaseSQLiteDatabase<TMode, TRunResult, TFullSchema, TSchema>,
   convocacaoId: string,
   titulo: string,
   mensagem: string,
