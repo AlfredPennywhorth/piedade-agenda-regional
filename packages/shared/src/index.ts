@@ -14,9 +14,10 @@ export * from './schemas/funcoes'
 export * from './schemas/vinculos'
 export * from './schemas/auth'
 export * from './schemas/locais'
-export * from './schemas/eventos'
 export * from './schemas/series'
+export * from './schemas/eventos'
 export * from './schemas/convocacoes'
+export * from './schemas/notificacoes'
 export * from './utils/date-utils'
 export * from './utils/recurrence-engine'
 
@@ -26,8 +27,8 @@ export * from './utils/recurrence-engine'
 // ============================================================
 export const AppInfo = {
   name: 'Agenda Regional São Paulo',
-  version: '0.0.1',
-  sprint: 'S00',
+  version: '0.0.1-s10',
+  sprint: 'S10',
 } as const
 
 // ============================================================

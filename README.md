@@ -142,7 +142,20 @@ Crie o arquivo `apps/worker/.dev.vars` (não commitado):
 # Adicione aqui apenas variáveis de desenvolvimento não-secretas
 # Secrets reais: wrangler secret put <NOME>
 APP_ENV=development
+
+# Web Push (Notificações S10) - CHAVES DE DESENVOLVIMENTO
+VAPID_PUBLIC_KEY=sua-chave-publica
+VAPID_PRIVATE_KEY=sua-chave-privada
+VAPID_SUBJECT=mailto:admin@localhost
 ```
+
+No ambiente frontend (`apps/web/.env.local`), configure:
+
+```ini
+VITE_VAPID_PUBLIC_KEY=sua-chave-publica
+```
+
+> **Aviso de Segurança (Web Push):** `VAPID_PRIVATE_KEY` é segredo; nunca deve ser commitada; nunca deve ir para o frontend; apenas a chave pública pode ser exposta ao client.
 
 ---
 
