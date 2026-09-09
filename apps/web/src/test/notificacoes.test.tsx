@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { NotificacoesControl } from '../components/notificacoes/NotificacoesControl'
 import * as apiClient from '../api/apiClient'
@@ -25,6 +25,7 @@ interface MockPushManager {
 describe('S10 - Notificações Frontend', () => {
   let mockPushManager: MockPushManager
   let mockServiceWorkerReady: Promise<{ pushManager: MockPushManager }>
+  let originalPushManager: unknown
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -47,6 +48,7 @@ describe('S10 - Notificações Frontend', () => {
       configurable: true
     })
 
+    originalPushManager = window.PushManager
     Object.defineProperty(window, 'PushManager', { value: {}, writable: true, configurable: true })
     Object.defineProperty(window, 'Notification', {
       value: {
@@ -58,6 +60,14 @@ describe('S10 - Notificações Frontend', () => {
     })
 
     import.meta.env.VITE_VAPID_PUBLIC_KEY = 'BCqXYZ'
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    if (originalPushManager !== undefined) {
+      Object.defineProperty(window, 'PushManager', { value: originalPushManager, writable: true, configurable: true })
+    }
   })
 
   it('não chama requestPermission no mount', async () => {
@@ -111,7 +121,8 @@ describe('S10 - Notificações Frontend', () => {
   })
 
   it('mostra estado não suportado se PushManager não existir', async () => {
-    Object.defineProperty(window, 'PushManager', { value: undefined, writable: true, configurable: true })
+    Reflect.deleteProperty(window, 'PushManager')
+    expect('PushManager' in window).toBe(false)
     
     render(<NotificacoesControl />)
     expect(await screen.findByText('Não suportado')).toBeInTheDocument()
@@ -119,9 +130,13 @@ describe('S10 - Notificações Frontend', () => {
 })
 
 describe('S10 - Compartilhamento WhatsApp e Segurança SW', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
   it('wa.me possui link com texto codificado e sem dados sensíveis', () => {
-    const mockWindowOpen = vi.fn()
-    vi.stubGlobal('window', { ...window, open: mockWindowOpen })
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
     
     const mockItem: AgendaItem = {
       destinatarioId: '1',
@@ -136,8 +151,8 @@ describe('S10 - Compartilhamento WhatsApp e Segurança SW', () => {
     const shareBtn = screen.getByTitle('Compartilhar no WhatsApp')
     fireEvent.click(shareBtn)
 
-    expect(mockWindowOpen).toHaveBeenCalled()
-    const calledUrl = mockWindowOpen.mock.calls[0][0]
+    expect(openSpy).toHaveBeenCalled()
+    const calledUrl = openSpy.mock.calls[0][0] as string
     expect(calledUrl).toContain('wa.me/?text=')
     expect(calledUrl).not.toContain('undefined')
 
