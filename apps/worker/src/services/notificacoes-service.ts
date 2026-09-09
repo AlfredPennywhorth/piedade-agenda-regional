@@ -1,10 +1,10 @@
 import { eq, and } from 'drizzle-orm'
 import { convocacaoDestinatarios, pushSubscriptions, membros } from '../db/schema'
 import { enviarNotificacao, VapidDetails } from './web-push'
-import type { DrizzleD1Database } from 'drizzle-orm/d1'
+import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
 
 export async function enviarAvisosConvocacao(
-  db: DrizzleD1Database<Record<string, never>>,
+  db: BaseSQLiteDatabase<'async' | 'sync', any, any, any>,
   convocacaoId: string,
   titulo: string,
   mensagem: string,

@@ -195,7 +195,7 @@ describe('S10 - Notificações (Web Push)', () => {
       await db.update(schema.pushSubscriptions).set({ ativo: false }).run()
       await db.update(schema.pushSubscriptions).set({ ativo: true }).where(eq(schema.pushSubscriptions.endpoint, 'https://push.example.com/123')).run()
 
-      const spy = vi.spyOn(webPush, 'enviarNotificacao').mockResolvedValue({ success: false, status: 410 })
+      vi.spyOn(webPush, 'enviarNotificacao').mockResolvedValue({ success: false, status: 410 })
       
       const result = await enviarAvisosConvocacao(db, 'conv-1', 'Tit', 'Msg', vapid, '/app')
       
@@ -211,7 +211,7 @@ describe('S10 - Notificações (Web Push)', () => {
       await db.update(schema.pushSubscriptions).set({ ativo: false }).run()
       await db.update(schema.pushSubscriptions).set({ ativo: true }).where(eq(schema.pushSubscriptions.endpoint, 'https://push.example.com/123')).run()
 
-      const spy = vi.spyOn(webPush, 'enviarNotificacao').mockResolvedValue({ success: false, status: 502 })
+      vi.spyOn(webPush, 'enviarNotificacao').mockResolvedValue({ success: false, status: 502 })
       
       const result = await enviarAvisosConvocacao(db, 'conv-1', 'Tit', 'Msg', vapid, '/app')
       
