@@ -443,3 +443,39 @@ export const pushSubscriptions = sqliteTable('push_subscriptions', {
   idxEndpoint: uniqueIndex('idx_push_endpoint').on(table.endpoint),
   idxPushMembro: index('idx_push_membro').on(table.membroId),
 }))
+
+// ============================================================
+// Portaria e Check-in (S11)
+// ============================================================
+
+export const checkins = sqliteTable('checkins', {
+  id: text('id').primaryKey(),
+  eventoId: text('evento_id').notNull().references(() => eventos.id),
+  membroId: text('membro_id').notNull().references(() => membros.id),
+  convocacaoDestinatarioId: text('convocacao_destinatario_id').references(() => convocacaoDestinatarios.id),
+  modo: text('modo').notNull(), // QR, MANUAL
+  registradoEm: text('registrado_em').notNull(),
+  registradoPorMembroId: text('registrado_por_membro_id').notNull().references(() => membros.id),
+  ativo: ativoDefault,
+  ...timestampsS02
+}, table => ({
+  checkModo: check('check_checkin_modo', sql`${table.modo} IN ('QR','MANUAL')`),
+  uniquePresenca: uniqueIndex('idx_checkin_unico')
+    .on(table.eventoId, table.membroId)
+    .where(sql`${table.ativo} = 1`),
+  idxEventoId: index('idx_checkins_evento_id').on(table.eventoId),
+  idxMembroId: index('idx_checkins_membro_id').on(table.membroId),
+}))
+
+export const checkinTokens = sqliteTable('checkin_tokens', {
+  id: text('id').primaryKey(),
+  eventoId: text('evento_id').notNull().references(() => eventos.id),
+  membroId: text('membro_id').notNull().references(() => membros.id),
+  tokenHash: text('token_hash').notNull(),
+  expiraEm: text('expira_em').notNull(),
+  ativo: ativoDefault,
+  ...timestampsS02
+}, table => ({
+  uniqueTokenHash: uniqueIndex('idx_checkin_token_hash').on(table.tokenHash),
+  idxEventoMembro: index('idx_checkin_token_evento_membro').on(table.eventoId, table.membroId),
+}))

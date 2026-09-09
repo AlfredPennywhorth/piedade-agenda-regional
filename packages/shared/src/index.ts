@@ -18,6 +18,7 @@ export * from './schemas/series'
 export * from './schemas/eventos'
 export * from './schemas/convocacoes'
 export * from './schemas/notificacoes'
+export * from './schemas/checkins'
 export * from './utils/date-utils'
 export * from './utils/recurrence-engine'
 

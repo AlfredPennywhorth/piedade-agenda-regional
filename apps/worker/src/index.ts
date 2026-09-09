@@ -39,6 +39,7 @@ import { convocacoesRouter } from './routes/convocacoes'
 import { agendaRouter } from './routes/agenda'
 import { rsvpRouter } from './routes/rsvp'
 import { notificacoesRouter } from './routes/notificacoes'
+import { checkinsRouter } from './routes/checkins'
 export interface AppOptions {
   enableAdminRoutes?: boolean
 }
@@ -125,6 +126,7 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.route('/api/v1/minha-agenda', agendaRouter)
   app.route('/api/v1/minha-agenda/rsvp', rsvpRouter)
   app.route('/api/v1/minha-agenda/notificacoes', notificacoesRouter)
+  app.route('/api/v1/eventos', checkinsRouter)
 
   // ============================================================
   // Rotas da API (S03 - Autenticação e Permissões)
