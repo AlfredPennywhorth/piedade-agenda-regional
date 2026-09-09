@@ -9,13 +9,25 @@ export const checkinsRouter = new Hono<{ Variables: Variables }>()
 
 checkinsRouter.use('*', authMiddleware)
 
-// Helper para checar autorização de organizador
-async function checkOrganizador(db: any, eventoId: string, membroId: string): Promise<boolean> {
-  const evento = await db.select({ organizador: schema.eventos.organizadorMembroId })
+type DB = Variables['db']
+
+// Helper para checar autorização de organizador e se o evento existe/ativo
+async function verificarEventoOrganizador(db: DB, eventoId: string, membroId: string) {
+  const evento = await db.select({
+    organizador: schema.eventos.organizadorMembroId,
+    ativo: schema.eventos.ativo
+  })
     .from(schema.eventos)
     .where(eq(schema.eventos.id, eventoId))
     .get()
-  return evento?.organizador === membroId
+
+  if (!evento) return { existe: false, ativo: false, autorizado: false }
+  
+  return {
+    existe: true,
+    ativo: evento.ativo,
+    autorizado: evento.organizador === membroId
+  }
 }
 
 checkinsRouter.post('/:eventoId/credencial-checkin', async (c) => {
@@ -25,19 +37,23 @@ checkinsRouter.post('/:eventoId/credencial-checkin', async (c) => {
 
   if (!db || !membroId) return c.json({ error: 'Erro interno' }, 500)
 
-  // Verifica se o membro tem acesso (destinatário da convocação)
-  const evento = await db.select({ id: schema.eventos.id })
+  // Verifica se o evento existe e está ativo
+  const evento = await db.select({ ativo: schema.eventos.ativo })
     .from(schema.eventos)
     .where(eq(schema.eventos.id, eventoId))
     .get()
 
   if (!evento) return c.json({ error: 'Evento não encontrado' }, 404)
+  if (!evento.ativo) return c.json({ error: 'Evento inativo' }, 403)
 
-  const destinatario = await db.select()
+  // Verifica acesso via convocacao publicada e ativa
+  const destinatario = await db.select({ id: schema.convocacaoDestinatarios.id })
     .from(schema.convocacaoDestinatarios)
     .innerJoin(schema.convocacoes, eq(schema.convocacaoDestinatarios.convocacaoId, schema.convocacoes.id))
     .where(and(
       eq(schema.convocacoes.eventoId, eventoId),
+      eq(schema.convocacoes.status, 'PUBLICADA'),
+      eq(schema.convocacoes.ativo, true),
       eq(schema.convocacaoDestinatarios.membroId, membroId)
     ))
     .get()
@@ -58,8 +74,9 @@ checkinsRouter.get('/:eventoId/portaria/membros', async (c) => {
 
   if (!db || !membroId) return c.json({ error: 'Erro interno' }, 500)
 
-  const isOrg = await checkOrganizador(db, eventoId, membroId)
-  if (!isOrg) return c.json({ error: 'Apenas organizador pode acessar a portaria' }, 403)
+  const verificacao = await verificarEventoOrganizador(db, eventoId, membroId)
+  if (!verificacao.existe) return c.json({ error: 'Evento não encontrado' }, 404)
+  if (!verificacao.autorizado) return c.json({ error: 'Apenas organizador pode acessar a portaria' }, 403)
 
   if (!query || query.length < 2) {
     return c.json({ error: 'Termo de busca muito curto' }, 400)
@@ -78,7 +95,7 @@ checkinsRouter.get('/:eventoId/portaria/membros', async (c) => {
 
   if (result.length === 0) return c.json([])
 
-  const ids = result.map((r: any) => r.membroId)
+  const ids = result.map((r: { membroId: string; nome: string }) => r.membroId)
   
   // Verifica checkins e convocações para estes IDs
   const checkinsList = await db.select({ membroId: schema.checkins.membroId })
@@ -97,10 +114,10 @@ checkinsRouter.get('/:eventoId/portaria/membros', async (c) => {
       inArray(schema.convocacaoDestinatarios.membroId, ids)
     ))
 
-  const checkinsSet = new Set(checkinsList.map((c: any) => c.membroId))
-  const convsSet = new Set(convs.map((c: any) => c.membroId))
+  const checkinsSet = new Set<string>(checkinsList.map((ch: { membroId: string }) => ch.membroId))
+  const convsSet = new Set<string>(convs.map((cv: { membroId: string }) => cv.membroId))
 
-  const formatted = result.map((r: any) => ({
+  const formatted = result.map((r: { membroId: string; nome: string }) => ({
     membroId: r.membroId,
     nome: r.nome,
     convocado: convsSet.has(r.membroId),
@@ -111,12 +128,12 @@ checkinsRouter.get('/:eventoId/portaria/membros', async (c) => {
 })
 
 async function registrarCheckin(
-  db: any,
+  db: DB,
   eventoId: string,
   alvoMembroId: string,
   operadorMembroId: string,
   modo: 'QR' | 'MANUAL'
-) {
+): Promise<{ status: 200 | 201; json: { status: 'REGISTRADO' | 'JA_REGISTRADO'; checkinId: string; registradoEm: string } }> {
   const agora = new Date().toISOString()
   
   // Verifica se já tem ativo
@@ -156,7 +173,7 @@ async function registrarCheckin(
       updatedAt: agora
     })
     return { status: 201, json: { status: 'REGISTRADO', checkinId: novoId, registradoEm: agora } }
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Caso de constraint unique caindo no conflito exato (idempotencia hard)
     const concorrente = await db.select().from(schema.checkins)
       .where(and(
@@ -179,22 +196,33 @@ checkinsRouter.post('/:eventoId/checkins/manual', async (c) => {
 
   if (!db || !operadorId) return c.json({ error: 'Erro interno' }, 500)
 
-  const isOrg = await checkOrganizador(db, eventoId, operadorId)
-  if (!isOrg) return c.json({ error: 'Apenas organizador' }, 403)
+  const verificacao = await verificarEventoOrganizador(db, eventoId, operadorId)
+  if (!verificacao.existe) return c.json({ error: 'Evento não encontrado' }, 404)
+  if (!verificacao.autorizado) return c.json({ error: 'Apenas organizador' }, 403)
+
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'JSON inválido' }, 400)
+  }
+
+  const parsed = CheckinManualSchema.safeParse(body)
+  if (!parsed.success) {
+    return c.json({ error: 'Payload inválido' }, 400)
+  }
 
   try {
-    const body = await c.req.json()
-    const parsed = CheckinManualSchema.parse(body)
-
     const membro = await db.select({ id: schema.membros.id }).from(schema.membros)
-      .where(and(eq(schema.membros.id, parsed.membroId), eq(schema.membros.ativo, true))).get()
+      .where(and(eq(schema.membros.id, parsed.data.membroId), eq(schema.membros.ativo, true))).get()
     
     if (!membro) return c.json({ error: 'Membro inválido ou inativo' }, 404)
 
-    const result = await registrarCheckin(db, eventoId, parsed.membroId, operadorId, 'MANUAL')
-    return c.json(result.json, result.status as any)
-  } catch (err: any) {
-    return c.json({ error: 'Payload inválido' }, 400)
+    const result = await registrarCheckin(db, eventoId, parsed.data.membroId, operadorId, 'MANUAL')
+    return c.json(result.json, result.status)
+  } catch (err: unknown) {
+    console.error(err)
+    return c.json({ error: 'Erro interno do servidor' }, 500)
   }
 })
 
@@ -205,14 +233,24 @@ checkinsRouter.post('/:eventoId/checkins/qr', async (c) => {
 
   if (!db || !operadorId) return c.json({ error: 'Erro interno' }, 500)
 
-  const isOrg = await checkOrganizador(db, eventoId, operadorId)
-  if (!isOrg) return c.json({ error: 'Apenas organizador' }, 403)
+  const verificacao = await verificarEventoOrganizador(db, eventoId, operadorId)
+  if (!verificacao.existe) return c.json({ error: 'Evento não encontrado' }, 404)
+  if (!verificacao.autorizado) return c.json({ error: 'Apenas organizador' }, 403)
+
+  let body: unknown
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'JSON inválido' }, 400)
+  }
+
+  const parsed = CheckinQrSchema.safeParse(body)
+  if (!parsed.success) {
+    return c.json({ error: 'Payload inválido' }, 400)
+  }
 
   try {
-    const body = await c.req.json()
-    const parsed = CheckinQrSchema.parse(body)
-
-    const hashed = await hashToken(parsed.token)
+    const hashed = await hashToken(parsed.data.token)
     const agora = new Date().toISOString()
 
     const tokenRecord = await db.select().from(schema.checkinTokens)
@@ -233,9 +271,10 @@ checkinsRouter.post('/:eventoId/checkins/qr', async (c) => {
     if (!membro) return c.json({ error: 'Membro inválido ou inativo' }, 404)
 
     const result = await registrarCheckin(db, eventoId, tokenRecord.membroId, operadorId, 'QR')
-    return c.json(result.json, result.status as any)
-  } catch (err: any) {
-    return c.json({ error: 'Payload inválido' }, 400)
+    return c.json(result.json, result.status)
+  } catch (err: unknown) {
+    console.error(err)
+    return c.json({ error: 'Erro interno do servidor' }, 500)
   }
 })
 
@@ -247,8 +286,9 @@ checkinsRouter.patch('/:eventoId/checkins/:checkinId/inativar', async (c) => {
 
   if (!db || !operadorId) return c.json({ error: 'Erro interno' }, 500)
 
-  const isOrg = await checkOrganizador(db, eventoId, operadorId)
-  if (!isOrg) return c.json({ error: 'Apenas organizador' }, 403)
+  const verificacao = await verificarEventoOrganizador(db, eventoId, operadorId)
+  if (!verificacao.existe) return c.json({ error: 'Evento não encontrado' }, 404)
+  if (!verificacao.autorizado) return c.json({ error: 'Apenas organizador' }, 403)
 
   const agora = new Date().toISOString()
 
@@ -256,6 +296,10 @@ checkinsRouter.patch('/:eventoId/checkins/:checkinId/inativar', async (c) => {
     .where(and(eq(schema.checkins.id, checkinId), eq(schema.checkins.eventoId, eventoId))).get()
 
   if (!record) return c.json({ error: 'Registro não encontrado no evento' }, 404)
+
+  if (!record.ativo) {
+    return c.json({ success: true, checkinId, status: 'JA_INATIVO' }, 200)
+  }
 
   await db.update(schema.checkins)
     .set({ ativo: false, updatedAt: agora })
