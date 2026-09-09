@@ -42,7 +42,7 @@ export function resolveNotificationUrl(rawUrl: unknown, origin: string): string 
     if (parsedUrl.origin === origin) {
       return parsedUrl.pathname + parsedUrl.search + parsedUrl.hash
     }
-  } catch (e) {
+  } catch {
     // Ignora URL inválida e usa fallback '/'
   }
 
