@@ -1,20 +1,8 @@
-import { eq, and } from 'drizzle-orm'
-import { convocacaoDestinatarios, pushSubscriptions, membros } from '../db/schema'
 import { enviarNotificacao, VapidDetails } from './web-push'
-import type { ExtractTablesWithRelations } from 'drizzle-orm'
-import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
-import * as schema from '../db/schema'
+import type { NotificacoesRepository } from './notificacoes-repository'
 
-export async function enviarAvisosConvocacao<
-  TMode extends 'sync' | 'async',
-  TRunResult
->(
-  db: BaseSQLiteDatabase<
-    TMode,
-    TRunResult,
-    typeof schema,
-    ExtractTablesWithRelations<typeof schema>
-  >,
+export async function enviarAvisosConvocacao(
+  repo: NotificacoesRepository,
   convocacaoId: string,
   titulo: string,
   mensagem: string,
@@ -22,22 +10,10 @@ export async function enviarAvisosConvocacao<
   url: string
 ): Promise<{ totais: number; enviados: number; inativados: number; falhas: number }> {
   // Busca todos os destinatários ativos vinculados à convocação
-  const destinatarios = await db
-    .select({
-      membroId: convocacaoDestinatarios.membroId
-    })
-    .from(convocacaoDestinatarios)
-    .innerJoin(membros, eq(convocacaoDestinatarios.membroId, membros.id))
-    .where(
-      and(
-        eq(convocacaoDestinatarios.convocacaoId, convocacaoId),
-        eq(membros.ativo, true)
-      )
-    )
-    .all()
+  const destinatarios = await repo.listarMembrosDaConvocacao(convocacaoId)
 
   // Filtra IDs únicos
-  const membroIds = Array.from(new Set(destinatarios.map((d: { membroId: string }) => d.membroId)))
+  const membroIds = Array.from(new Set(destinatarios))
 
   let enviados = 0
   let inativados = 0
@@ -45,16 +21,7 @@ export async function enviarAvisosConvocacao<
 
   for (const membroId of membroIds) {
     // Busca subscriptions ativas do membro
-    const subs = await db
-      .select()
-      .from(pushSubscriptions)
-      .where(
-        and(
-          eq(pushSubscriptions.membroId, membroId),
-          eq(pushSubscriptions.ativo, true)
-        )
-      )
-      .all()
+    const subs = await repo.listarSubscriptionsAtivas(membroId)
 
     for (const sub of subs) {
       const payload = JSON.stringify({ titulo, mensagem, url })
@@ -72,11 +39,7 @@ export async function enviarAvisosConvocacao<
       } else {
         // Se retornar 410 (Gone) ou 404 (Not Found), inativamos a subscription
         if (result.status === 410 || result.status === 404) {
-          await db
-            .update(pushSubscriptions)
-            .set({ ativo: false, updatedAt: new Date().toISOString() })
-            .where(eq(pushSubscriptions.id, sub.id))
-            .run()
+          await repo.inativarSubscription(sub.id)
           inativados++
         } else {
           // Erro transiente (5xx) ou outros não devem apagar/inativar

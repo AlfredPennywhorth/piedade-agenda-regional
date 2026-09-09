@@ -8,9 +8,12 @@ import { eq } from 'drizzle-orm'
 import { enviarAvisosConvocacao } from '../services/notificacoes-service'
 import * as webPush from '../services/web-push'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
+import { criarNotificacoesRepositoryBetterSQLite } from '../services/notificacoes-repository-drizzle'
+
 describe('S10 - Notificações (Web Push)', () => {
   let sqlite: any
   let db: BetterSQLite3Database<typeof schema>
+  let repo: any
   let app: any
 
   const req = async (path: string, options?: RequestInit) => {
@@ -29,6 +32,7 @@ describe('S10 - Notificações (Web Push)', () => {
     sqlite = new Database(':memory:')
     sqlite.pragma('foreign_keys = ON')
     db = drizzle(sqlite, { schema })
+    repo = criarNotificacoesRepositoryBetterSQLite(db)
     app = createApp(db, { enableAdminRoutes: true })
     setupDb(sqlite)
 
@@ -177,7 +181,7 @@ describe('S10 - Notificações (Web Push)', () => {
       
       const spy = vi.spyOn(webPush, 'enviarNotificacao').mockResolvedValue({ success: true, status: 201 })
       
-      const result = await enviarAvisosConvocacao(db, 'conv-1', 'Tit', 'Msg', vapid, '/app/agenda')
+      const result = await enviarAvisosConvocacao(repo, 'conv-1', 'Tit', 'Msg', vapid, '/app/agenda')
       
       expect(result.totais).toBe(1) // 1 membro convocado
       expect(result.enviados).toBe(2) // 2 subscriptions ativas do membro
@@ -197,7 +201,7 @@ describe('S10 - Notificações (Web Push)', () => {
 
       vi.spyOn(webPush, 'enviarNotificacao').mockResolvedValue({ success: false, status: 410 })
       
-      const result = await enviarAvisosConvocacao(db, 'conv-1', 'Tit', 'Msg', vapid, '/app')
+      const result = await enviarAvisosConvocacao(repo, 'conv-1', 'Tit', 'Msg', vapid, '/app')
       
       expect(result.enviados).toBe(0)
       expect(result.inativados).toBe(1)
@@ -213,7 +217,7 @@ describe('S10 - Notificações (Web Push)', () => {
 
       vi.spyOn(webPush, 'enviarNotificacao').mockResolvedValue({ success: false, status: 502 })
       
-      const result = await enviarAvisosConvocacao(db, 'conv-1', 'Tit', 'Msg', vapid, '/app')
+      const result = await enviarAvisosConvocacao(repo, 'conv-1', 'Tit', 'Msg', vapid, '/app')
       
       expect(result.inativados).toBe(0)
       expect(result.falhas).toBe(1)
