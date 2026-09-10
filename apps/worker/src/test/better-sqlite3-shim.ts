@@ -91,6 +91,7 @@ export default class Database {
   }
 
   transaction<T extends (...args: any[]) => any>(fn: T): T & { deferred: T; immediate: T; exclusive: T } {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this
     const createTxFn = (mode: string) => {
       return (...args: any[]) => {
