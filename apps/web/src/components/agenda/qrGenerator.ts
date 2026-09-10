@@ -125,11 +125,6 @@ export function generateQrMatrix(text: string): boolean[][] {
   const grid: boolean[][] = Array.from({ length: size }, () => Array(size).fill(false))
   const reserved: boolean[][] = Array.from({ length: size }, () => Array(size).fill(false))
 
-  function setModule(r: number, c: number, val: boolean) {
-    grid[r][c] = val
-    reserved[r][c] = true
-  }
-
   // Desenhar Finder Pattern (7x7)
   function drawFinder(r: number, c: number) {
     for (let dr = -1; dr <= 7; dr++) {
