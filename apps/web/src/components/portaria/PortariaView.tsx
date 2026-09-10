@@ -16,6 +16,11 @@ interface Participante {
   } | null
 }
 
+interface CheckinResponse {
+  jaRegistrado?: boolean
+  message?: string
+}
+
 export function PortariaView() {
   const [eventoIdInput, setEventoIdInput] = useState('')
   const [eventoIdAtual, setEventoIdAtual] = useState('')
@@ -30,7 +35,7 @@ export function PortariaView() {
     setLoading(true)
     setMensagem(null)
     try {
-      const data = await apiClient.fetchWithAuth(`/portaria/eventos/${evId}/participantes`)
+      const data = await apiClient.fetchWithAuth<{ participantes: Participante[] }>(`/portaria/eventos/${evId}/participantes`)
       setParticipantes(data.participantes || [])
       setEventoIdAtual(evId)
     } catch (err: any) {
@@ -46,7 +51,7 @@ export function PortariaView() {
     setLoading(true)
     setMensagem(null)
     try {
-      const res = await apiClient.postWithAuth<any>('/checkin/qr', { qrToken: qrTokenInput.trim() })
+      const res = await apiClient.postWithAuth<CheckinResponse>('/checkin/qr', { qrToken: qrTokenInput.trim() })
       if (res.jaRegistrado) {
         setMensagem({ tipo: 'aviso', texto: 'Atenção: Presença JÁ REGISTRADA previamente!' })
       } else {
@@ -65,7 +70,7 @@ export function PortariaView() {
     setLoading(true)
     setMensagem(null)
     try {
-      const res = await apiClient.postWithAuth<any>('/checkin/manual', { convocacaoDestinatarioId: destinatarioId })
+      const res = await apiClient.postWithAuth<CheckinResponse>('/checkin/manual', { convocacaoDestinatarioId: destinatarioId })
       if (res.jaRegistrado) {
         setMensagem({ tipo: 'aviso', texto: `Atenção: Presença de ${nomeMembro} JÁ REGISTRADA previamente!` })
       } else {
