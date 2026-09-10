@@ -234,7 +234,7 @@ convocacoesRouter.post('/:id/publicar', async (c) => {
 
   try {
     const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
-    const atorMembroId = c.get('membroId') || c.req.header('x-membro-id') || evento.organizadorMembroId || null
+    const atorMembroId = c.get('membroId') || null
 
     await executeAtomic(db, (qdb) => {
       const queries = []
@@ -306,7 +306,7 @@ convocacoesRouter.post('/:id/cancelar', async (c) => {
   
   const evento = await db.select().from(eventos).where(eq(eventos.id, convocacao.eventoId)).get()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
-  const atorMembroId = c.get('membroId') || c.req.header('x-membro-id') || (evento ? evento.organizadorMembroId : null) || null
+  const atorMembroId = c.get('membroId') || null
 
   const nowIso = new Date().toISOString()
   await executarOperacaoComAudit(

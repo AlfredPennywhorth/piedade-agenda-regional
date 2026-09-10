@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm'
+import { eq, and, inArray, or } from 'drizzle-orm'
 import * as schema from '../db/schema'
 
 export interface ContextoPermissoes {
@@ -219,4 +219,135 @@ export async function eAuditorSistemaAutorizado(db: any, membroId: string): Prom
   // Válido apenas em escopo REGIONAL ou ADMINISTRACAO
   return vinculosAuditor.some(({ v }: any) => v.regionalId !== null || v.administracaoId !== null)
 }
+
+export interface CapacidadesMembro {
+  podeVisualizarRelatorios: boolean
+  podeVisualizarAuditoria: boolean
+  podeOperarPortaria: boolean
+}
+
+export async function obterCapacidadesMembro(db: any, membroId: string): Promise<CapacidadesMembro> {
+  if (!db || !membroId) {
+    return {
+      podeVisualizarRelatorios: false,
+      podeVisualizarAuditoria: false,
+      podeOperarPortaria: false
+    }
+  }
+
+  const vinculos = await db
+    .select({
+      codigo: schema.funcoes.codigo
+    })
+    .from(schema.vinculosFuncionais)
+    .innerJoin(schema.funcoes, eq(schema.vinculosFuncionais.funcaoId, schema.funcoes.id))
+    .where(
+      and(
+        eq(schema.vinculosFuncionais.membroId, membroId),
+        eq(schema.vinculosFuncionais.ativo, true),
+        eq(schema.funcoes.ativo, true)
+      )
+    )
+    .all()
+
+  const codigos = new Set(vinculos.map((v: any) => v.codigo))
+
+  const eventoOrganizado = await db
+    .select({ id: schema.eventos.id })
+    .from(schema.eventos)
+    .where(and(eq(schema.eventos.organizadorMembroId, membroId), eq(schema.eventos.ativo, true)))
+    .get()
+
+  const podeVisualizarRelatorios = codigos.has('GESTOR_RELATORIOS') || !!eventoOrganizado
+  const podeVisualizarAuditoria = await eAuditorSistemaAutorizado(db, membroId)
+  const podeOperarPortaria = codigos.has('OPERADOR_PORTARIA')
+
+  return {
+    podeVisualizarRelatorios,
+    podeVisualizarAuditoria,
+    podeOperarPortaria
+  }
+}
+
+export interface EscoposAutorizadosAuditor {
+  regionaisIds: string[]
+  administracoesIds: string[]
+  setoresIds: string[]
+  casasIds: string[]
+  gtsIds: string[]
+}
+
+export async function obterEscoposAutorizadosDoAuditor(db: any, membroId: string): Promise<EscoposAutorizadosAuditor | null> {
+  if (!db || !membroId) return null
+
+  const vinculosAuditor = await db
+    .select({
+      v: schema.vinculosFuncionais,
+      f: schema.funcoes
+    })
+    .from(schema.vinculosFuncionais)
+    .innerJoin(schema.funcoes, eq(schema.vinculosFuncionais.funcaoId, schema.funcoes.id))
+    .where(
+      and(
+        eq(schema.vinculosFuncionais.membroId, membroId),
+        eq(schema.vinculosFuncionais.ativo, true),
+        eq(schema.funcoes.ativo, true),
+        eq(schema.funcoes.codigo, 'AUDITOR_SISTEMA')
+      )
+    )
+    .all()
+
+  if (!vinculosAuditor || vinculosAuditor.length === 0) return null
+
+  const vinculosValidos = vinculosAuditor.filter(({ v }: any) => v.regionalId !== null || v.administracaoId !== null)
+  if (vinculosValidos.length === 0) return null
+
+  const regionaisIds = new Set<string>()
+  const administracoesIds = new Set<string>()
+  const setoresIds = new Set<string>()
+  const casasIds = new Set<string>()
+  const gtsIds = new Set<string>()
+
+  for (const { v } of vinculosValidos) {
+    if (v.regionalId) {
+      regionaisIds.add(v.regionalId)
+      const adms = await db.select({ id: schema.administracoes.id }).from(schema.administracoes).where(eq(schema.administracoes.regionalId, v.regionalId)).all()
+      adms.forEach((a: any) => administracoesIds.add(a.id))
+    } else if (v.administracaoId) {
+      administracoesIds.add(v.administracaoId)
+    }
+  }
+
+  const arrAdms = Array.from(administracoesIds)
+  if (arrAdms.length > 0) {
+    const setList = await db.select({ id: schema.setores.id }).from(schema.setores).where(inArray(schema.setores.administracaoId, arrAdms)).all()
+    setList.forEach((s: any) => setoresIds.add(s.id))
+  }
+
+  const arrSetores = Array.from(setoresIds)
+  if (arrSetores.length > 0) {
+    const casList = await db.select({ id: schema.casas.id }).from(schema.casas).where(inArray(schema.casas.setorId, arrSetores)).all()
+    casList.forEach((c: any) => casasIds.add(c.id))
+  }
+
+  const arrRegionais = Array.from(regionaisIds)
+  const gtConditions = []
+  if (arrRegionais.length > 0) gtConditions.push(inArray(schema.gruposTrabalho.regionalId, arrRegionais))
+  if (arrAdms.length > 0) gtConditions.push(inArray(schema.gruposTrabalho.administracaoId, arrAdms))
+  if (arrSetores.length > 0) gtConditions.push(inArray(schema.gruposTrabalho.setorId, arrSetores))
+
+  if (gtConditions.length > 0) {
+    const gtList = await db.select({ id: schema.gruposTrabalho.id }).from(schema.gruposTrabalho).where(or(...gtConditions)).all()
+    gtList.forEach((g: any) => gtsIds.add(g.id))
+  }
+
+  return {
+    regionaisIds: Array.from(regionaisIds),
+    administracoesIds: Array.from(administracoesIds),
+    setoresIds: Array.from(setoresIds),
+    casasIds: Array.from(casasIds),
+    gtsIds: Array.from(gtsIds)
+  }
+}
+
 

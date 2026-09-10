@@ -3,8 +3,11 @@ import { eq, and } from 'drizzle-orm'
 import { eventos } from '../db/schema'
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
+import { authMiddleware } from '../middleware/auth'
 
 export const eventosRouter = new Hono<any>()
+
+eventosRouter.use('*', authMiddleware)
 
 eventosRouter.get('/', async (c) => {
   const db = c.get('db')
@@ -46,7 +49,7 @@ eventosRouter.post('/', async (c) => {
     const id = crypto.randomUUID()
 
     const { escopoTipo, escopoId } = extrairEscopoDoEvento(parsed)
-    const atorMembroId = c.get('membroId') || parsed.organizadorMembroId || c.req.header('x-membro-id') || null
+    const atorMembroId = c.get('membroId') || null
 
     const auditData: AuditLogData = {
       acao: 'EVENTO_CRIADO',
@@ -103,7 +106,7 @@ eventosRouter.patch('/:id', async (c) => {
     const nowIso = new Date().toISOString()
 
     const { escopoTipo, escopoId } = extrairEscopoDoEvento(existing)
-    const atorMembroId = c.get('membroId') || existing.organizadorMembroId || c.req.header('x-membro-id') || null
+    const atorMembroId = c.get('membroId') || null
 
     const auditData: AuditLogData = {
       acao: 'EVENTO_ATUALIZADO',

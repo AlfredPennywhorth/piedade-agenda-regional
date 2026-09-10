@@ -3,6 +3,8 @@ import { eq } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { authMiddleware, Variables } from '../../middleware/auth'
 
+import { obterCapacidadesMembro } from '../../security/permissoes'
+
 export const meApp = new Hono<{ Variables: Variables }>()
 
 meApp.use('*', authMiddleware)
@@ -24,6 +26,8 @@ meApp.get('/', async (c) => {
     return c.json({ error: 'Membro não encontrado' }, 404)
   }
 
+  const capacidades = await obterCapacidadesMembro(db, membroId)
+
   // Não retornamos pinHash, pinSalt nem dataNascimento
   return c.json({
     id: membro.id,
@@ -31,7 +35,8 @@ meApp.get('/', async (c) => {
     casaId: membro.casaId,
     ativo: membro.ativo,
     autenticacaoAtiva: membro.autenticacaoAtiva,
-    ativadoEm: membro.ativadoEm
+    ativadoEm: membro.ativadoEm,
+    capacidades,
   }, 200)
 })
 
