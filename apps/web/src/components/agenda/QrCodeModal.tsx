@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useMemo } from 'react'
+import { generateQrMatrix } from './qrGenerator'
 
 interface QrCodeModalProps {
   destinatarioId: string
@@ -21,6 +22,13 @@ export function QrCodeModal({ destinatarioId, tituloEvento, onClose }: QrCodeMod
     }
     onClose()
   }
+
+  // Gera a matriz QR codificando exatamente o destinatarioId
+  const matrix = useMemo(() => {
+    return generateQrMatrix(destinatarioId)
+  }, [destinatarioId])
+
+  const size = matrix.length
 
   return (
     <dialog
@@ -49,13 +57,36 @@ export function QrCodeModal({ destinatarioId, tituloEvento, onClose }: QrCodeMod
       <div className="p-6 flex flex-col items-center text-center space-y-4">
         <p className="text-sm font-medium text-slate-700">{tituloEvento}</p>
 
-        {/* Representação legível do QR Code opaco */}
-        <div className="bg-slate-100 p-6 rounded-2xl border-2 border-slate-200 flex flex-col items-center justify-center w-56 h-56 shadow-inner">
-          <svg className="w-36 h-36 text-slate-900" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M2 2h8v8H2V2zm2 2v4h4V4H4zm-2 12h8v8H2v-8zm2 2v4h4v-4H4zm12-16h8v8h-8V2zm2 2v4h4V4h-4zM4 11h2v2H4v-2zm4 0h2v2H8v-2zm-4 4h2v2H4v-2zm8-4h2v2h-2v-2zm4 0h2v2h-2v-2zm0 4h2v2h-2v-2zm-4 0h2v2h-2v-2zm4 4h2v2h-2v-2zm-4 0h2v2h-2v-2zm8-4h2v2h-2v-2zm0 4h2v2h-2v-2z" />
+        {/* QR Code SVG dinâmico codificando destinatarioId */}
+        <div
+          className="bg-white p-4 rounded-2xl border-2 border-slate-200 flex flex-col items-center justify-center shadow-inner"
+          data-testid="qrcode-canvas"
+          data-qr-payload={destinatarioId}
+        >
+          <svg
+            viewBox={`0 0 ${size} ${size}`}
+            className="w-48 h-48 bg-white"
+            shapeRendering="crispEdges"
+            role="img"
+            aria-label={`QR Code para o destinatário ${destinatarioId}`}
+          >
+            {matrix.map((row, r) =>
+              row.map((cell, c) =>
+                cell ? (
+                  <rect
+                    key={`${r}-${c}`}
+                    x={c}
+                    y={r}
+                    width={1}
+                    height={1}
+                    fill="#000000"
+                  />
+                ) : null
+              )
+            )}
           </svg>
           <span className="mt-2 text-[10px] font-mono text-slate-500 tracking-tight break-all uppercase">
-            {destinatarioId.substring(0, 18)}...
+            {destinatarioId}
           </span>
         </div>
 

@@ -82,15 +82,33 @@ describe('S11 - Portaria e Check-in', () => {
     await db.insert(membros).values({ id: memOrganizadorId, nome: 'Lucas Organizador', casaId: casId, ativo: true, autenticacaoAtiva: true })
     const tokenOrganizador = await criarSessao(memOrganizadorId)
 
-    // Função OPERADOR_PORTARIA
+    // Membro 7: Função com NOME "Operador de Portaria", mas CÓDIGO diferente de OPERADOR_PORTARIA
+    const memNomePortariaCodigoDiferenteId = crypto.randomUUID()
+    await db.insert(membros).values({ id: memNomePortariaCodigoDiferenteId, nome: 'Marcos NomePortaria', casaId: casId, ativo: true, autenticacaoAtiva: true })
+    const tokenNomePortariaCodigoDiferente = await criarSessao(memNomePortariaCodigoDiferenteId)
+
+    // Função OPERADOR_PORTARIA (canônica)
     const funcaoPortariaId = crypto.randomUUID()
     await db.insert(funcoes).values({ id: funcaoPortariaId, nome: 'Operador de Portaria', codigo: 'OPERADOR_PORTARIA', ativo: true })
+
+    // Função com mesmo nome mas CÓDIGO diferente
+    const funcaoNomeIgualCodigoDiferenteId = crypto.randomUUID()
+    await db.insert(funcoes).values({ id: funcaoNomeIgualCodigoDiferenteId, nome: 'Operador de Portaria', codigo: 'OUTRA_FUNCAO_SEM_PERMISSAO', ativo: true })
 
     // Vínculo do operador autorizado no Setor
     await db.insert(vinculosFuncionais).values({
       id: crypto.randomUUID(),
       membroId: memOperadorId,
       funcaoId: funcaoPortariaId,
+      setorId: setId,
+      ativo: true
+    })
+
+    // Vínculo do membro 7 no mesmo Setor mas com a função de código diferente
+    await db.insert(vinculosFuncionais).values({
+      id: crypto.randomUUID(),
+      membroId: memNomePortariaCodigoDiferenteId,
+      funcaoId: funcaoNomeIgualCodigoDiferenteId,
       setorId: setId,
       ativo: true
     })
@@ -181,6 +199,7 @@ describe('S11 - Portaria e Check-in', () => {
       memComumId, tokenComum,
       tokenOperadorOutro,
       tokenOrganizador,
+      tokenNomePortariaCodigoDiferente,
       destRascunhoId
     }
   }
@@ -406,5 +425,20 @@ describe('S11 - Portaria e Check-in', () => {
     const json = await res.json()
     expect(json.totalParticipantes).toBe(2)
     expect(json.participantes.length).toBe(2)
+  })
+
+  it('15. Função com NOME Operador de Portaria mas CÓDIGO diferente de OPERADOR_PORTARIA NÃO autoriza (403 Forbidden)', async () => {
+    const ctx = await setupBaseData()
+    const res = await app.request('/api/v1/checkin/qr', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${ctx.tokenNomePortariaCodigoDiferente}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ qrToken: ctx.dest1Id })
+    })
+    expect(res.status).toBe(403)
+    const json = await res.json()
+    expect(json.code).toBe('FORBIDDEN')
   })
 })

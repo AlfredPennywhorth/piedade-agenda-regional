@@ -1,4 +1,4 @@
-import { eq, and, or } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import * as schema from '../db/schema'
 
 export interface ContextoPermissoes {
@@ -63,7 +63,7 @@ export function temVinculoEmTipoEscopo(contexto: ContextoPermissoes, tipo: 'regi
 }
 
 /**
- * Valida se o membro possui vínculo ativo com a função OPERADOR_PORTARIA no mesmo escopo do evento.
+ * Valida se o membro possui vínculo ativo estritamente com a função de código OPERADOR_PORTARIA no mesmo escopo do evento.
  */
 export async function eOperadorPortariaAutorizado(db: any, membroId: string, evento: any): Promise<boolean> {
   if (!db || !membroId || !evento) return false
@@ -80,10 +80,7 @@ export async function eOperadorPortariaAutorizado(db: any, membroId: string, eve
         eq(schema.vinculosFuncionais.membroId, membroId),
         eq(schema.vinculosFuncionais.ativo, true),
         eq(schema.funcoes.ativo, true),
-        or(
-          eq(schema.funcoes.codigo, 'OPERADOR_PORTARIA'),
-          eq(schema.funcoes.nome, 'Operador de Portaria')
-        )
+        eq(schema.funcoes.codigo, 'OPERADOR_PORTARIA')
       )
     )
     .all()
