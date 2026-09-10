@@ -3,7 +3,7 @@ import { createApp } from '../index'
 import { setupDb } from './setup'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import Database from 'better-sqlite3'
-import { regionais, administracoes, setores, casas, membros, funcoes, vinculosFuncionais, locais, eventos, convocacoes, convocacaoDestinatarios, sessoes, rsvp, checkins } from '../db/schema'
+import { regionais, administracoes, setores, casas, membros, funcoes, vinculosFuncionais, locais, eventos, convocacoes, convocacaoDestinatarios, sessoes, rsvp } from '../db/schema'
 import { hashToken } from '../security/tokens'
 
 describe('S11 - Portaria e Check-in', () => {

@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
-import { checkins, convocacaoDestinatarios, convocacoes, eventos, membros } from '../db/schema'
+import { checkins, convocacaoDestinatarios, convocacoes, eventos } from '../db/schema'
 import { CheckinQrSchema, CheckinManualSchema } from '@piedade/shared'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eOperadorPortariaAutorizado } from '../security/permissoes'
