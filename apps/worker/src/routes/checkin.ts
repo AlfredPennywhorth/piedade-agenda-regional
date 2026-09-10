@@ -101,8 +101,6 @@ checkinRouter.post('/qr', async (c) => {
           eventoId,
           forma: 'QR'
         },
-        ip: c.req.header('x-forwarded-for') || null,
-        userAgent: c.req.header('user-agent') || null,
       }
     )
 
@@ -201,8 +199,6 @@ checkinRouter.post('/manual', async (c) => {
           eventoId,
           forma: 'MANUAL'
         },
-        ip: c.req.header('x-forwarded-for') || null,
-        userAgent: c.req.header('user-agent') || null,
       }
     )
 

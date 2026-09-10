@@ -3,7 +3,10 @@ const require = createRequire(import.meta.url)
 
 let RealDatabase: any
 try {
-  RealDatabase = require('better-sqlite3')
+  const RealDb = require('better-sqlite3')
+  const testDb = new RealDb(':memory:')
+  testDb.close()
+  RealDatabase = RealDb
 } catch {
   // fallback to node:sqlite when better-sqlite3 native bindings are not available
 }

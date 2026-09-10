@@ -171,8 +171,6 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
           resposta: parsed.resposta,
           periodosParticipacao: finalPeriodos || []
         },
-        ip: c.req.header('x-forwarded-for') || null,
-        userAgent: c.req.header('user-agent') || null,
       })
       txQueries.push(auditQuery)
 

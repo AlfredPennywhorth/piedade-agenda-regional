@@ -100,8 +100,6 @@ auditoriaRouter.get('/', async (c) => {
     escopoTipo: auditoriaLogs.escopoTipo,
     escopoId: auditoriaLogs.escopoId,
     contexto: auditoriaLogs.contexto,
-    ip: auditoriaLogs.ip,
-    userAgent: auditoriaLogs.userAgent,
     criadoEm: auditoriaLogs.criadoEm,
   })
   .from(auditoriaLogs)

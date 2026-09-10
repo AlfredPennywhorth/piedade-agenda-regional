@@ -7,8 +7,6 @@ CREATE TABLE `auditoria_logs` (
   `escopo_tipo` text,
   `escopo_id` text,
   `contexto` text,
-  `ip` text,
-  `user_agent` text,
   `criado_em` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
   FOREIGN KEY (`ator_membro_id`) REFERENCES `membros`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION
 );

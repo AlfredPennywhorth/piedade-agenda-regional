@@ -271,8 +271,6 @@ convocacoesRouter.post('/:id/publicar', async (c) => {
           eventoId: convocacao.eventoId,
           totalDestinatarios: destinatariosToInsert.length
         },
-        ip: c.req.header('x-forwarded-for') || null,
-        userAgent: c.req.header('user-agent') || null,
       }))
 
       // 4. ABORTO CONDICIONAL VIA CONSTRAINT
@@ -326,8 +324,6 @@ convocacoesRouter.post('/:id/cancelar', async (c) => {
       contexto: {
         eventoId: convocacao.eventoId
       },
-      ip: c.req.header('x-forwarded-for') || null,
-      userAgent: c.req.header('user-agent') || null,
     }
   )
   

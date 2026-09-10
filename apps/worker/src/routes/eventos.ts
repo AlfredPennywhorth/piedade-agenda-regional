@@ -64,8 +64,6 @@ eventosRouter.post('/', async (c) => {
         escopoTipo: escopoTipo || '',
         escopoId: escopoId || '',
       },
-      ip: c.req.header('x-forwarded-for') || null,
-      userAgent: c.req.header('user-agent') || null,
     }
 
     await executarOperacaoComAudit(
@@ -120,8 +118,6 @@ eventosRouter.patch('/:id', async (c) => {
         modalidade: existing.modalidade,
         camposAlterados: Object.keys(parsed),
       },
-      ip: c.req.header('x-forwarded-for') || null,
-      userAgent: c.req.header('user-agent') || null,
     }
 
     await executarOperacaoComAudit(

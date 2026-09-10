@@ -9,8 +9,6 @@ export interface AuditLogData {
   escopoTipo?: string | null
   escopoId?: string | null
   contexto?: Record<string, unknown> | null
-  ip?: string | null
-  userAgent?: string | null
 }
 
 export function extrairEscopoDoEvento(evento: any): { escopoTipo: string | null; escopoId: string | null } {
@@ -36,8 +34,6 @@ export function criarAuditQuery(dbOrTx: any, data: AuditLogData) {
     escopoTipo: data.escopoTipo || null,
     escopoId: data.escopoId || null,
     contexto: data.contexto || null,
-    ip: data.ip || null,
-    userAgent: data.userAgent || null,
   })
 }
 

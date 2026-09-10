@@ -3,12 +3,12 @@ import { render, screen } from '@testing-library/react'
 import { MainLayout } from '../components/layout/MainLayout'
 
 describe('Navegação e Visibilidade de Permissões — S12 Frontend', () => {
-  it('1. Usuário comum (sem permissões) não vê Relatórios nem Auditoria, mas vê navegação baseline (Agenda, Calendário, Portaria, Avisos, Meu Cadastro)', () => {
+  it('1. Usuário comum (sem capacidades) NÃO vê Portaria, Relatórios nem Auditoria', () => {
     render(
       <MainLayout
         currentTab="agenda"
         onTabChange={() => {}}
-        capacidades={{ podeVisualizarRelatorios: false, podeVisualizarAuditoria: false, podeOperarPortaria: false }}
+        capacidades={{ podeOperarPortaria: false, podeVisualizarRelatorios: false, podeVisualizarAuditoria: false }}
       >
         <div>Conteúdo Principal</div>
       </MainLayout>
@@ -16,10 +16,10 @@ describe('Navegação e Visibilidade de Permissões — S12 Frontend', () => {
 
     expect(screen.getByRole('button', { name: /Minha Agenda/i })).toBeDefined()
     expect(screen.getByRole('button', { name: /Calendário/i })).toBeDefined()
-    expect(screen.getByRole('button', { name: /Portaria/i })).toBeDefined()
     expect(screen.getByRole('button', { name: /Avisos/i })).toBeDefined()
     expect(screen.getByRole('button', { name: /Meu Cadastro/i })).toBeDefined()
 
+    expect(screen.queryByRole('button', { name: /Portaria/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /Relatórios/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /Auditoria/i })).toBeNull()
   })
@@ -40,33 +40,51 @@ describe('Navegação e Visibilidade de Permissões — S12 Frontend', () => {
     expect(screen.queryByRole('button', { name: /Auditoria/i })).toBeNull()
   })
 
-  it('3. Gestor autorizado vê Relatórios, mas NÃO vê Auditoria', () => {
+  it('3. GESTOR_RELATORIOS isolado vê Relatórios, mas NÃO vê Portaria nem Auditoria', () => {
     render(
       <MainLayout
         currentTab="relatorios"
         onTabChange={() => {}}
-        capacidades={{ podeVisualizarRelatorios: true, podeVisualizarAuditoria: false }}
+        capacidades={{ podeOperarPortaria: false, podeVisualizarRelatorios: true, podeVisualizarAuditoria: false }}
       >
         <div>Conteúdo Principal</div>
       </MainLayout>
     )
 
     expect(screen.getByRole('button', { name: /Relatórios/i })).toBeDefined()
+    expect(screen.queryByRole('button', { name: /Portaria/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /Auditoria/i })).toBeNull()
   })
 
-  it('4. Auditor autorizado vê Auditoria, mas NÃO vê Relatórios se não for gestor', () => {
+  it('4. AUDITOR_SISTEMA isolado vê Auditoria, mas NÃO vê Portaria nem Relatórios', () => {
     render(
       <MainLayout
         currentTab="auditoria"
         onTabChange={() => {}}
-        capacidades={{ podeVisualizarAuditoria: true, podeVisualizarRelatorios: false }}
+        capacidades={{ podeOperarPortaria: false, podeVisualizarAuditoria: true, podeVisualizarRelatorios: false }}
       >
         <div>Conteúdo Principal</div>
       </MainLayout>
     )
 
     expect(screen.getByRole('button', { name: /Auditoria/i })).toBeDefined()
+    expect(screen.queryByRole('button', { name: /Portaria/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /Relatórios/i })).toBeNull()
+  })
+
+  it('5. Membro com múltiplas funções (Portaria + Relatórios) vê Portaria e Relatórios, mas NÃO vê Auditoria', () => {
+    render(
+      <MainLayout
+        currentTab="agenda"
+        onTabChange={() => {}}
+        capacidades={{ podeOperarPortaria: true, podeVisualizarRelatorios: true, podeVisualizarAuditoria: false }}
+      >
+        <div>Conteúdo Principal</div>
+      </MainLayout>
+    )
+
+    expect(screen.getByRole('button', { name: /Portaria/i })).toBeDefined()
+    expect(screen.getByRole('button', { name: /Relatórios/i })).toBeDefined()
+    expect(screen.queryByRole('button', { name: /Auditoria/i })).toBeNull()
   })
 })

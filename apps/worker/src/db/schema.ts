@@ -485,8 +485,6 @@ export const auditoriaLogs = sqliteTable('auditoria_logs', {
   escopoTipo: text('escopo_tipo'),
   escopoId: text('escopo_id'),
   contexto: text('contexto', { mode: 'json' }).$type<Record<string, unknown>>(),
-  ip: text('ip'),
-  userAgent: text('user_agent'),
   criadoEm: text('criado_em').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 }, table => ({
   idxAcao: index('idx_auditoria_acao').on(table.acao),
