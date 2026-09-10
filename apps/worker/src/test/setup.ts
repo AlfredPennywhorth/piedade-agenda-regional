@@ -320,7 +320,7 @@ export function setupDb(sqlite: any) {
     CREATE TABLE IF NOT EXISTS auditoria_logs (
       id text PRIMARY KEY NOT NULL,
       acao text NOT NULL,
-      ator_membro_id text NOT NULL,
+      ator_membro_id text,
       recurso_tipo text NOT NULL,
       recurso_id text NOT NULL,
       escopo_tipo text,
