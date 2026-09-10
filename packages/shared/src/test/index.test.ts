@@ -6,8 +6,9 @@ describe('Shared — AppInfo', () => {
     expect(AppInfo.name).toBe('Agenda Regional São Paulo')
   })
 
-  it('identifica sprint S10', () => {
-    expect(AppInfo.sprint).toBe('S10')
+  it('identifica sprint S11', () => {
+    expect(AppInfo.sprint).toBe('S11')
+    expect(AppInfo.version).toBe('0.0.1-s11')
   })
 })
 
