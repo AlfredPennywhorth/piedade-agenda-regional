@@ -98,6 +98,7 @@ describe('S12 - Auditoria e Atomicidade Fail-Closed', () => {
       modalidade: 'ONLINE',
       inicioEm: '2026-11-01T10:00:00Z',
       fimEm: '2026-11-01T12:00:00Z',
+      urlOnline: 'https://meet.google.com/audit',
       regionalId: regId,
       organizadorMembroId: memAuditorId
     }
