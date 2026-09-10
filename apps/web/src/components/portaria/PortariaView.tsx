@@ -30,7 +30,7 @@ export function PortariaView() {
     setLoading(true)
     setMensagem(null)
     try {
-      const data = await apiClient.getWithAuth<{ participantes: Participante[] }>(`/portaria/eventos/${evId}/participantes`)
+      const data = await apiClient.fetchWithAuth(`/portaria/eventos/${evId}/participantes`)
       setParticipantes(data.participantes || [])
       setEventoIdAtual(evId)
     } catch (err: any) {

@@ -237,7 +237,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
         )}
 
         {/* QR Code do Destinatário de Convocação Publicada */}
-        {item.convocacao.status === 'PUBLICADA' && (
+        {!!item.destinatarioId && (
           <div className="border-t border-slate-100 pt-6">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Check-in na Portaria</h3>
             <button
