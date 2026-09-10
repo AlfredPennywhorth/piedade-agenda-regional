@@ -3,7 +3,7 @@ import { executeAtomic } from '../db/batch'
 
 export interface AuditLogData {
   acao: string
-  atorMembroId: string
+  atorMembroId?: string | null
   recursoTipo: string
   recursoId: string
   escopoTipo?: string | null
@@ -30,7 +30,7 @@ export function criarAuditQuery(dbOrTx: any, data: AuditLogData) {
   return dbOrTx.insert(schema.auditoriaLogs).values({
     id: crypto.randomUUID(),
     acao: data.acao,
-    atorMembroId: data.atorMembroId,
+    atorMembroId: data.atorMembroId ?? null,
     recursoTipo: data.recursoTipo,
     recursoId: data.recursoId,
     escopoTipo: data.escopoTipo || null,

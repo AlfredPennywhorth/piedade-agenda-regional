@@ -46,7 +46,7 @@ eventosRouter.post('/', async (c) => {
     const id = crypto.randomUUID()
 
     const { escopoTipo, escopoId } = extrairEscopoDoEvento(parsed)
-    const atorMembroId = c.get('membroId') || parsed.organizadorMembroId || c.req.header('x-membro-id') || '00000000-0000-0000-0000-000000000000'
+    const atorMembroId = c.get('membroId') || parsed.organizadorMembroId || c.req.header('x-membro-id') || null
 
     const auditData: AuditLogData = {
       acao: 'EVENTO_CRIADO',
@@ -103,7 +103,7 @@ eventosRouter.patch('/:id', async (c) => {
     const nowIso = new Date().toISOString()
 
     const { escopoTipo, escopoId } = extrairEscopoDoEvento(existing)
-    const atorMembroId = c.get('membroId') || existing.organizadorMembroId || c.req.header('x-membro-id') || '00000000-0000-0000-0000-000000000000'
+    const atorMembroId = c.get('membroId') || existing.organizadorMembroId || c.req.header('x-membro-id') || null
 
     const auditData: AuditLogData = {
       acao: 'EVENTO_ATUALIZADO',

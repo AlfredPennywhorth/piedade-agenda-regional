@@ -479,7 +479,7 @@ export const checkins = sqliteTable('checkins', {
 export const auditoriaLogs = sqliteTable('auditoria_logs', {
   id: text('id').primaryKey(),
   acao: text('acao').notNull(),
-  atorMembroId: text('ator_membro_id').notNull().references(() => membros.id),
+  atorMembroId: text('ator_membro_id').references(() => membros.id),
   recursoTipo: text('recurso_tipo').notNull(),
   recursoId: text('recurso_id').notNull(),
   escopoTipo: text('escopo_tipo'),
