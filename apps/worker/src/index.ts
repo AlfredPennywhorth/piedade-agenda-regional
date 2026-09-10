@@ -58,7 +58,7 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
         const allowed = ['http://localhost:5173']
         const customOrigin = c.env?.CORS_ORIGIN
         if (customOrigin) {
-          const origins = customOrigin.split(',').map(o => o.trim()).filter(Boolean)
+          const origins = customOrigin.split(',').map((o: string) => o.trim()).filter(Boolean)
           allowed.push(...origins)
         }
         if (origin && allowed.includes(origin)) {
