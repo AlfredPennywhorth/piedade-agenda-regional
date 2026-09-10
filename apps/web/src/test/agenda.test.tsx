@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import App from '../App'
+import { QrCodeModal } from '../components/agenda/QrCodeModal'
 import * as apiClient from '../api/apiClient'
 
 vi.mock('../api/apiClient', () => ({
@@ -607,5 +608,23 @@ describe('S07 - Minha Agenda e Calendário', () => {
     
     // 7. Confirma que nenhum PUT foi feito
     expect(apiClient.putWithAuth).not.toHaveBeenCalled()
+  })
+})
+
+describe('S11 - QR Code Modal', () => {
+  it('gerador de QR Code codifica exatamente o destinatarioId no payload', () => {
+    const uuidTest = '550e8400-e29b-41d4-a716-446655440000'
+    render(
+      <QrCodeModal
+        destinatarioId={uuidTest}
+        tituloEvento="Evento Teste S11"
+        onClose={() => {}}
+      />
+    )
+
+    const canvas = screen.getByTestId('qrcode-canvas')
+    expect(canvas).toBeInTheDocument()
+    expect(canvas.getAttribute('data-qr-payload')).toBe(uuidTest)
+    expect(screen.getByText(uuidTest)).toBeInTheDocument()
   })
 })

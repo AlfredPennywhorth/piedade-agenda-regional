@@ -1,6 +1,18 @@
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787/api/v1'
 
-export async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+export class ApiError<T = any> extends Error {
+  status: number
+  body: T
+
+  constructor(status: number, message: string, body: T) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.body = body
+  }
+}
+
+export async function fetchWithAuth<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('session_token')
   const headers = new Headers(options.headers || {})
   
@@ -15,15 +27,26 @@ export async function fetchWithAuth(endpoint: string, options: RequestInit = {})
   
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}))
-    throw new Error(errorBody.error || `HTTP error! status: ${response.status}`)
+    const message = errorBody.error || errorBody.message || `HTTP error! status: ${response.status}`
+    throw new ApiError(response.status, message, errorBody)
   }
   
   return response.json()
 }
 
-export async function putWithAuth(endpoint: string, body: any) {
-  return fetchWithAuth(endpoint, {
+export async function putWithAuth<T = any>(endpoint: string, body: any): Promise<T> {
+  return fetchWithAuth<T>(endpoint, {
     method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  })
+}
+
+export async function postWithAuth<T = any>(endpoint: string, body: any): Promise<T> {
+  return fetchWithAuth<T>(endpoint, {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },

@@ -96,4 +96,22 @@ Este diretório contém a documentação da API do projeto **Agenda Regional Sã
 - **Escopo Herdado e Rigoroso**: O escopo da convocação é exclusivamente derivado de seu evento. Não há inferência de hierarquia descendente; um evento de Setor convocará estritamente quem tiver um vínculo com a função naquele Setor, ignorando vínculos de Casas sob ele.
 - **Limites de Ciclo de Vida**: Convocação PUBLICADA e CANCELADA não permite alterações em suas funções ou regras.
 
-> **Status:** Rotas de suporte (S00) operacionais. Rotas institucionais e de vínculos (S01, S02), autenticação (S03), eventos/locais base (S04), séries de recorrência (S05) e Convocações Snapshot (S06) implementadas.
+## Rotas de Portaria e Check-in (S11)
+
+| Método | Rota | Descrição | Permissão Exigida |
+|---|---|---|---|
+| POST | `/api/v1/checkin/qr` | Registra presença por QR Code opaco (`qrToken`) | Autenticado + `OPERADOR_PORTARIA` no escopo do evento |
+| POST | `/api/v1/checkin/manual` | Registra presença manual pelo `convocacaoDestinatarioId` | Autenticado + `OPERADOR_PORTARIA` no escopo do evento |
+| GET | `/api/v1/checkin/destinatarios/:id/presenca` | Consulta situação de presença de um destinatário | Próprio membro OU `OPERADOR_PORTARIA` no escopo |
+| GET | `/api/v1/portaria/eventos/:eventoId/participantes` | Lista participantes convocados desduplicados para a portaria | Autenticado + `OPERADOR_PORTARIA` no escopo do evento |
+
+### Regras Essenciais da S11
+- **Autorização por Função de Portaria**: Exige vínculo funcional ativo com a função `OPERADOR_PORTARIA` no mesmo escopo institucional do evento. Membros autenticados comuns ou organizadores do evento sem essa função recebem 403 Forbidden.
+- **Unicidade de Presença**: Restrição `UNIQUE(evento_id, membro_id)` no banco de dados. Uma segunda tentativa para o mesmo membro no mesmo evento retorna 409 Conflict.
+- **Derivação de IDs**: `membro_id` e `evento_id` são derivados pelo backend a partir do `convocacaoDestinatarioId` validado e da convocação correspondente.
+- **QR Code Opaco**: Transporta unicamente o `convocacaoDestinatarioId` (UUID opaco), sem dados pessoais (PIN, celular, etc.).
+- **Convocação PUBLICADA**: Somente destinatários de convocações com status `PUBLICADA` aceitam check-in.
+- **Check-in Independe de RSVP**: Resposta de RSVP (`PARTICIPAREI`, `NAO_SEI`, `NAO_PARTICIPAREI` ou ausente) não condiciona o check-in físico.
+- **Consulta Desduplicada**: A listagem de portaria agrupa por participante (`membro_id`), exibindo cada pessoa uma única vez por evento.
+
+> **Status:** Rotas de suporte (S00), institucionais (S01, S02), autenticação (S03), eventos (S04), séries (S05), convocações (S06), agenda/RSVP (S07/S08), alimentação (S09), notificações Push (S10) e Portaria/Check-in (S11) operacionais.

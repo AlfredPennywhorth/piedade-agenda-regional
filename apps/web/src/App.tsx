@@ -3,14 +3,16 @@ import { MainLayout } from './components/layout/MainLayout'
 import { AgendaView } from './components/agenda/AgendaView'
 import { CalendarioView } from './components/calendario/CalendarioView'
 import { NotificacoesControl } from './components/notificacoes/NotificacoesControl'
+import { PortariaView } from './components/portaria/PortariaView'
 
 function App() {
-  const [currentTab, setCurrentTab] = useState<'agenda' | 'calendario' | 'avisos' | 'cadastro'>('agenda')
+  const [currentTab, setCurrentTab] = useState<'agenda' | 'calendario' | 'avisos' | 'cadastro' | 'portaria'>('agenda')
 
   return (
     <MainLayout currentTab={currentTab} onTabChange={setCurrentTab}>
       {currentTab === 'agenda' && <AgendaView />}
       {currentTab === 'calendario' && <CalendarioView />}
+      {currentTab === 'portaria' && <PortariaView />}
       
       {currentTab === 'avisos' && (
         <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">

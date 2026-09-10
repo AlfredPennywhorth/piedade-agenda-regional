@@ -15,6 +15,7 @@ export interface Env {
   APP_VERSION: string
   PIN_PEPPER: string
   DB: D1Database
+  CORS_ORIGIN?: string
 }
 
 import { drizzle } from 'drizzle-orm/d1'
@@ -39,6 +40,8 @@ import { convocacoesRouter } from './routes/convocacoes'
 import { agendaRouter } from './routes/agenda'
 import { rsvpRouter } from './routes/rsvp'
 import { notificacoesRouter } from './routes/notificacoes'
+import { checkinRouter } from './routes/checkin'
+import { portariaRouter } from './routes/portaria'
 export interface AppOptions {
   enableAdminRoutes?: boolean
 }
@@ -51,7 +54,18 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.use(
     '/api/*',
     cors({
-      origin: ['http://localhost:5173'], // Dev local — produção: configurar via variável
+      origin: (origin, c) => {
+        const allowed = ['http://localhost:5173']
+        const customOrigin = c.env?.CORS_ORIGIN
+        if (customOrigin) {
+          const origins = customOrigin.split(',').map((o: string) => o.trim()).filter(Boolean)
+          allowed.push(...origins)
+        }
+        if (origin && allowed.includes(origin)) {
+          return origin
+        }
+        return allowed[0]
+      },
       allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
     })
   )
@@ -63,9 +77,9 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.get('/', c => {
     return c.json({
       app: 'Agenda Regional São Paulo',
-      version: c.env?.APP_VERSION ?? '0.0.1-s00',
-      sprint: 'S02',
-      status: 'scaffolding',
+      version: c.env?.APP_VERSION ?? '0.0.1-s11',
+      sprint: 'S11',
+      status: 'operational',
     })
   })
 
@@ -125,6 +139,12 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.route('/api/v1/minha-agenda', agendaRouter)
   app.route('/api/v1/minha-agenda/rsvp', rsvpRouter)
   app.route('/api/v1/minha-agenda/notificacoes', notificacoesRouter)
+
+  // ============================================================
+  // Rotas da API (S11 - Portaria e Check-in)
+  // ============================================================
+  app.route('/api/v1/checkin', checkinRouter)
+  app.route('/api/v1/portaria', portariaRouter)
 
   // ============================================================
   // Rotas da API (S03 - Autenticação e Permissões)

@@ -15,8 +15,8 @@ describe('Worker — Rotas de infraestrutura', () => {
     const json = (await res.json()) as Record<string, unknown>
 
     expect(json.app).toBe('Agenda Regional São Paulo')
-    expect(json.sprint).toBe('S02')
-    expect(json.status).toBe('scaffolding')
+    expect(json.sprint).toBe('S11')
+    expect(json.status).toBe('operational')
   })
 
   it('GET /health retorna healthy: true', async () => {
@@ -48,5 +48,45 @@ describe('Worker — Rotas de infraestrutura', () => {
     const json = (await res.json()) as Record<string, unknown>
 
     expect(json.error).toBeDefined()
+  })
+
+  describe('CORS — Configuração de origens', () => {
+    it('aceita origem padrão localhost:5173', async () => {
+      const res = await app.request(
+        '/api/v1/health',
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: 'http://localhost:5173',
+            'Access-Control-Request-Method': 'GET',
+          },
+        },
+        env
+      )
+
+      expect(res.headers.get('access-control-allow-origin')).toBe('http://localhost:5173')
+    })
+
+    it('aceita origem adicional configurada via CORS_ORIGIN (ex: Codespaces)', async () => {
+      const codespaceEnv = {
+        ...env,
+        CORS_ORIGIN: 'https://codespace-5173.app.github.dev',
+      }
+      const res = await app.request(
+        '/api/v1/health',
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: 'https://codespace-5173.app.github.dev',
+            'Access-Control-Request-Method': 'GET',
+          },
+        },
+        codespaceEnv
+      )
+
+      expect(res.headers.get('access-control-allow-origin')).toBe(
+        'https://codespace-5173.app.github.dev'
+      )
+    })
   })
 })

@@ -443,3 +443,31 @@ export const pushSubscriptions = sqliteTable('push_subscriptions', {
   idxEndpoint: uniqueIndex('idx_push_endpoint').on(table.endpoint),
   idxPushMembro: index('idx_push_membro').on(table.membroId),
 }))
+
+// ============================================================
+// Portaria e Check-in (S11)
+// ============================================================
+
+export const checkins = sqliteTable('checkins', {
+  id: text('id').primaryKey(),
+  convocacaoDestinatarioId: text('convocacao_destinatario_id')
+    .notNull()
+    .references(() => convocacaoDestinatarios.id),
+  eventoId: text('evento_id')
+    .notNull()
+    .references(() => eventos.id),
+  membroId: text('membro_id')
+    .notNull()
+    .references(() => membros.id),
+  dataHoraCheckin: text('data_hora_checkin')
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  forma: text('forma').notNull(), // QR, MANUAL
+  operadorMembroId: text('operador_membro_id').references(() => membros.id),
+  ...timestampsS02
+}, table => ({
+  checkForma: check('check_checkin_forma', sql`${table.forma} IN ('QR', 'MANUAL')`),
+  uniqueEventoMembro: uniqueIndex('idx_checkin_evento_membro_unico').on(table.eventoId, table.membroId),
+  idxDestinatario: index('idx_checkin_destinatario').on(table.convocacaoDestinatarioId),
+  idxMembro: index('idx_checkin_membro').on(table.membroId),
+}))
