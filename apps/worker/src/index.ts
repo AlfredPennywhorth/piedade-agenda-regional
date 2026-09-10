@@ -15,6 +15,7 @@ export interface Env {
   APP_VERSION: string
   PIN_PEPPER: string
   DB: D1Database
+  CORS_ORIGIN?: string
 }
 
 import { drizzle } from 'drizzle-orm/d1'
@@ -53,7 +54,18 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.use(
     '/api/*',
     cors({
-      origin: ['http://localhost:5173'], // Dev local — produção: configurar via variável
+      origin: (origin, c) => {
+        const allowed = ['http://localhost:5173']
+        const customOrigin = c.env?.CORS_ORIGIN
+        if (customOrigin) {
+          const origins = customOrigin.split(',').map(o => o.trim()).filter(Boolean)
+          allowed.push(...origins)
+        }
+        if (origin && allowed.includes(origin)) {
+          return origin
+        }
+        return allowed[0]
+      },
       allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
     })
   )
