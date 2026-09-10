@@ -39,6 +39,8 @@ import { convocacoesRouter } from './routes/convocacoes'
 import { agendaRouter } from './routes/agenda'
 import { rsvpRouter } from './routes/rsvp'
 import { notificacoesRouter } from './routes/notificacoes'
+import { checkinRouter } from './routes/checkin'
+import { portariaRouter } from './routes/portaria'
 export interface AppOptions {
   enableAdminRoutes?: boolean
 }
@@ -63,9 +65,9 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.get('/', c => {
     return c.json({
       app: 'Agenda Regional São Paulo',
-      version: c.env?.APP_VERSION ?? '0.0.1-s00',
-      sprint: 'S02',
-      status: 'scaffolding',
+      version: c.env?.APP_VERSION ?? '0.0.1-s11',
+      sprint: 'S11',
+      status: 'operational',
     })
   })
 
@@ -125,6 +127,12 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.route('/api/v1/minha-agenda', agendaRouter)
   app.route('/api/v1/minha-agenda/rsvp', rsvpRouter)
   app.route('/api/v1/minha-agenda/notificacoes', notificacoesRouter)
+
+  // ============================================================
+  // Rotas da API (S11 - Portaria e Check-in)
+  // ============================================================
+  app.route('/api/v1/checkin', checkinRouter)
+  app.route('/api/v1/portaria', portariaRouter)
 
   // ============================================================
   // Rotas da API (S03 - Autenticação e Permissões)

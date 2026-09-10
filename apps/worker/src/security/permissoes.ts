@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm'
+import { eq, and, or } from 'drizzle-orm'
 import * as schema from '../db/schema'
 
 export interface ContextoPermissoes {
@@ -58,6 +58,46 @@ export function temVinculoEmTipoEscopo(contexto: ContextoPermissoes, tipo: 'regi
       case 'casa': return v.casaId !== null
       case 'gt': return v.grupoTrabalhoId !== null
     }
+    return false
+  })
+}
+
+/**
+ * Valida se o membro possui vínculo ativo com a função OPERADOR_PORTARIA no mesmo escopo do evento.
+ */
+export async function eOperadorPortariaAutorizado(db: any, membroId: string, evento: any): Promise<boolean> {
+  if (!db || !membroId || !evento) return false
+
+  const vinculosPortaria = await db
+    .select({
+      v: schema.vinculosFuncionais,
+      f: schema.funcoes
+    })
+    .from(schema.vinculosFuncionais)
+    .innerJoin(schema.funcoes, eq(schema.vinculosFuncionais.funcaoId, schema.funcoes.id))
+    .where(
+      and(
+        eq(schema.vinculosFuncionais.membroId, membroId),
+        eq(schema.vinculosFuncionais.ativo, true),
+        eq(schema.funcoes.ativo, true),
+        or(
+          eq(schema.funcoes.codigo, 'OPERADOR_PORTARIA'),
+          eq(schema.funcoes.nome, 'Operador de Portaria')
+        )
+      )
+    )
+    .all()
+
+  if (!vinculosPortaria || vinculosPortaria.length === 0) {
+    return false
+  }
+
+  return vinculosPortaria.some(({ v }: any) => {
+    if (evento.regionalId && v.regionalId === evento.regionalId) return true
+    if (evento.administracaoId && v.administracaoId === evento.administracaoId) return true
+    if (evento.setorId && v.setorId === evento.setorId) return true
+    if (evento.casaId && v.casaId === evento.casaId) return true
+    if (evento.grupoTrabalhoId && v.grupoTrabalhoId === evento.grupoTrabalhoId) return true
     return false
   })
 }
