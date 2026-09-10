@@ -61,8 +61,7 @@ portariaRouter.get('/eventos/:eventoId/participantes', async (c) => {
       and(
         eq(convocacoes.eventoId, eventoId),
         eq(convocacoes.status, 'PUBLICADA'),
-        eq(convocacoes.ativo, true),
-        eq(membros.ativo, true)
+        eq(convocacoes.ativo, true)
       )
     )
     .all()

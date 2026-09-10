@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { createApp } from '../index'
 import { setupDb } from './setup'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
+import { eq } from 'drizzle-orm'
 import Database from 'better-sqlite3'
 import { regionais, administracoes, setores, casas, membros, funcoes, vinculosFuncionais, locais, eventos, convocacoes, convocacaoDestinatarios, sessoes, rsvp } from '../db/schema'
 import { hashToken } from '../security/tokens'
@@ -440,5 +441,24 @@ describe('S11 - Portaria e Check-in', () => {
     expect(res.status).toBe(403)
     const json = await res.json()
     expect(json.code).toBe('FORBIDDEN')
+  })
+
+  it('16. Portaria lista destinatários de convocações PUBLICADAS mesmo se membro.ativo for alterado para false após a publicação (Snapshot)', async () => {
+    const ctx = await setupBaseData()
+
+    // Inativa o membro 1 (membro.ativo = false) APÓS o snapshot já ter sido gerado na convocação PUBLICADA
+    await db.update(membros).set({ ativo: false }).where(eq(membros.id, ctx.mem1Id))
+
+    // Consulta os participantes na portaria
+    const res = await app.request(`/api/v1/portaria/eventos/${ctx.evId}/participantes`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${ctx.tokenOperador}` }
+    })
+
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.totalParticipantes).toBe(2)
+    const mem1Presente = json.participantes.some((p: any) => p.membro.id === ctx.mem1Id)
+    expect(mem1Presente).toBe(true)
   })
 })
