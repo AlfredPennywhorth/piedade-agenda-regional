@@ -30,10 +30,10 @@ export function PortariaView() {
   const [loading, setLoading] = useState(false)
   const [mensagem, setMensagem] = useState<{ tipo: 'sucesso' | 'aviso' | 'erro'; texto: string } | null>(null)
 
-  const carregarParticipantes = async (evId: string) => {
+  const carregarParticipantes = async (evId: string, limparMensagem = true) => {
     if (!evId.trim()) return
     setLoading(true)
-    setMensagem(null)
+    if (limparMensagem) setMensagem(null)
     try {
       const data = await apiClient.fetchWithAuth<{ participantes: Participante[] }>(`/portaria/eventos/${evId}/participantes`)
       setParticipantes(data.participantes || [])
@@ -58,9 +58,15 @@ export function PortariaView() {
         setMensagem({ tipo: 'sucesso', texto: `Check-in por QR Code realizado com sucesso!` })
       }
       setQrTokenInput('')
-      if (eventoIdAtual) carregarParticipantes(eventoIdAtual)
+      if (eventoIdAtual) carregarParticipantes(eventoIdAtual, false)
     } catch (err: any) {
-      setMensagem({ tipo: 'erro', texto: err.message || 'Falha ao validar QR Code.' })
+      if (err?.status === 409 && err?.body?.jaRegistrado === true) {
+        setMensagem({ tipo: 'aviso', texto: 'Atenção: Presença JÁ REGISTRADA previamente!' })
+        setQrTokenInput('')
+        if (eventoIdAtual) carregarParticipantes(eventoIdAtual, false)
+      } else {
+        setMensagem({ tipo: 'erro', texto: err.message || 'Falha ao validar QR Code.' })
+      }
     } finally {
       setLoading(false)
     }
@@ -76,9 +82,14 @@ export function PortariaView() {
       } else {
         setMensagem({ tipo: 'sucesso', texto: `Check-in manual de ${nomeMembro} realizado com sucesso!` })
       }
-      if (eventoIdAtual) carregarParticipantes(eventoIdAtual)
+      if (eventoIdAtual) carregarParticipantes(eventoIdAtual, false)
     } catch (err: any) {
-      setMensagem({ tipo: 'erro', texto: err.message || 'Falha ao registrar check-in manual.' })
+      if (err?.status === 409 && err?.body?.jaRegistrado === true) {
+        setMensagem({ tipo: 'aviso', texto: `Atenção: Presença de ${nomeMembro} JÁ REGISTRADA previamente!` })
+        if (eventoIdAtual) carregarParticipantes(eventoIdAtual, false)
+      } else {
+        setMensagem({ tipo: 'erro', texto: err.message || 'Falha ao registrar check-in manual.' })
+      }
     } finally {
       setLoading(false)
     }

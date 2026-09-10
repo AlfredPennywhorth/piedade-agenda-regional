@@ -1,5 +1,17 @@
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787/api/v1'
 
+export class ApiError<T = any> extends Error {
+  status: number
+  body: T
+
+  constructor(status: number, message: string, body: T) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.body = body
+  }
+}
+
 export async function fetchWithAuth<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('session_token')
   const headers = new Headers(options.headers || {})
@@ -15,7 +27,8 @@ export async function fetchWithAuth<T = any>(endpoint: string, options: RequestI
   
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}))
-    throw new Error(errorBody.error || `HTTP error! status: ${response.status}`)
+    const message = errorBody.error || errorBody.message || `HTTP error! status: ${response.status}`
+    throw new ApiError(response.status, message, errorBody)
   }
   
   return response.json()
