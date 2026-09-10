@@ -4,6 +4,7 @@ import { checkins, convocacaoDestinatarios, convocacoes, eventos } from '../db/s
 import { CheckinQrSchema, CheckinManualSchema } from '@piedade/shared'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eOperadorPortariaAutorizado } from '../security/permissoes'
+import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
 
 export const checkinRouter = new Hono<{ Variables: Variables }>()
 
@@ -69,7 +70,7 @@ checkinRouter.post('/qr', async (c) => {
       }, 409)
     }
 
-    // 5. Registra o check-in
+    // 5. Registra o check-in com auditoria atômica
     const nowIso = new Date().toISOString()
     const newCheckin = {
       id: crypto.randomUUID(),
@@ -83,7 +84,27 @@ checkinRouter.post('/qr', async (c) => {
       updatedAt: nowIso
     }
 
-    await db.insert(checkins).values(newCheckin)
+    const { escopoTipo, escopoId } = extrairEscopoDoEvento(dest.evento)
+
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [qdb.insert(checkins).values(newCheckin)],
+      {
+        acao: 'CHECKIN_QR',
+        atorMembroId: operadorMembroId,
+        recursoTipo: 'CHECKIN',
+        recursoId: newCheckin.id,
+        escopoTipo,
+        escopoId,
+        contexto: {
+          convocacaoDestinatarioId: dest.destinatario.id,
+          eventoId,
+          forma: 'QR'
+        },
+        ip: c.req.header('x-forwarded-for') || null,
+        userAgent: c.req.header('user-agent') || null,
+      }
+    )
 
     return c.json(newCheckin, 201)
   } catch (err: any) {
@@ -163,7 +184,27 @@ checkinRouter.post('/manual', async (c) => {
       updatedAt: nowIso
     }
 
-    await db.insert(checkins).values(newCheckin)
+    const { escopoTipo, escopoId } = extrairEscopoDoEvento(dest.evento)
+
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [qdb.insert(checkins).values(newCheckin)],
+      {
+        acao: 'CHECKIN_MANUAL',
+        atorMembroId: operadorMembroId,
+        recursoTipo: 'CHECKIN',
+        recursoId: newCheckin.id,
+        escopoTipo,
+        escopoId,
+        contexto: {
+          convocacaoDestinatarioId: dest.destinatario.id,
+          eventoId,
+          forma: 'MANUAL'
+        },
+        ip: c.req.header('x-forwarded-for') || null,
+        userAgent: c.req.header('user-agent') || null,
+      }
+    )
 
     return c.json(newCheckin, 201)
   } catch (err: any) {
@@ -173,6 +214,7 @@ checkinRouter.post('/manual', async (c) => {
     return c.json({ error: err.message || 'Erro ao registrar check-in manual' }, 400)
   }
 })
+
 
 // GET /api/v1/checkin/destinatarios/:destinatarioId/presenca
 checkinRouter.get('/destinatarios/:destinatarioId/presenca', async (c) => {

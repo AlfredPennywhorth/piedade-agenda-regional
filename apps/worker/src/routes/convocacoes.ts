@@ -3,6 +3,7 @@ import { eq, and, inArray, sql } from 'drizzle-orm'
 import { convocacoes, convocacaoFuncoes, convocacaoDestinatarios, convocacaoDestinatarioEvidencias, eventos, vinculosFuncionais, membros, funcoes } from '../db/schema'
 import { ConvocacaoCreate, ConvocacaoUpdate, ConvocacaoFuncaoCreate } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
+import { criarAuditQuery, extrairEscopoDoEvento, executarOperacaoComAudit } from '../services/auditoria'
 
 export const convocacoesRouter = new Hono<any>()
 
@@ -232,6 +233,9 @@ convocacoesRouter.post('/:id/publicar', async (c) => {
   }
 
   try {
+    const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+    const atorMembroId = c.get('membroId') || c.req.header('x-membro-id') || evento.organizadorMembroId || '00000000-0000-0000-0000-000000000000'
+
     await executeAtomic(db, (qdb) => {
       const queries = []
       
@@ -255,7 +259,23 @@ convocacoesRouter.post('/:id/publicar', async (c) => {
         queries.push(qdb.insert(convocacaoDestinatarioEvidencias).values(evidenciasToInsert))
       }
       
-      // 3. ABORTO CONDICIONAL VIA CONSTRAINT
+      // 3. AUDITORIA
+      queries.push(criarAuditQuery(qdb, {
+        acao: 'CONVOCACAO_PUBLICADA',
+        atorMembroId,
+        recursoTipo: 'CONVOCACAO',
+        recursoId: id,
+        escopoTipo,
+        escopoId,
+        contexto: {
+          eventoId: convocacao.eventoId,
+          totalDestinatarios: destinatariosToInsert.length
+        },
+        ip: c.req.header('x-forwarded-for') || null,
+        userAgent: c.req.header('user-agent') || null,
+      }))
+
+      // 4. ABORTO CONDICIONAL VIA CONSTRAINT
       // Se a row não foi atualizada no passo 1 (concorrência), o updatedAt ainda é antigo.
       // Nesse caso, injetamos 'ABORT_OCC' no status, forçando o D1 a lançar CHECK constraint failed e abortar tudo.
       queries.push(
@@ -284,14 +304,32 @@ convocacoesRouter.post('/:id/cancelar', async (c) => {
   if (!convocacao) return c.json({ error: 'Convocação não encontrada' }, 404)
   if (convocacao.status === 'CANCELADA') return c.json({ error: 'Convocação já está cancelada' }, 400)
   
+  const evento = await db.select().from(eventos).where(eq(eventos.id, convocacao.eventoId)).get()
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+  const atorMembroId = c.get('membroId') || c.req.header('x-membro-id') || (evento ? evento.organizadorMembroId : null) || '00000000-0000-0000-0000-000000000000'
+
   const nowIso = new Date().toISOString()
-  await executeAtomic(db, (qdb) => {
-    return [
+  await executarOperacaoComAudit(
+    db,
+    (qdb) => [
       qdb.update(convocacoes)
         .set({ status: 'CANCELADA', canceladaEm: nowIso, ativo: false, updatedAt: nowIso })
         .where(eq(convocacoes.id, id))
-    ]
-  })
+    ],
+    {
+      acao: 'CONVOCACAO_CANCELADA',
+      atorMembroId,
+      recursoTipo: 'CONVOCACAO',
+      recursoId: id,
+      escopoTipo,
+      escopoId,
+      contexto: {
+        eventoId: convocacao.eventoId
+      },
+      ip: c.req.header('x-forwarded-for') || null,
+      userAgent: c.req.header('user-agent') || null,
+    }
+  )
   
   return c.json({ success: true })
 })

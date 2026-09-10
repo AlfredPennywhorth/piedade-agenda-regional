@@ -28,8 +28,8 @@ export * from './utils/recurrence-engine'
 // ============================================================
 export const AppInfo = {
   name: 'Agenda Regional São Paulo',
-  version: '0.0.1-s11',
-  sprint: 'S11',
+  version: '0.0.1-s12',
+  sprint: 'S12',
 } as const
 
 // ============================================================

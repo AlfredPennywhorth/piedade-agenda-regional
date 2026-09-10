@@ -42,6 +42,8 @@ import { rsvpRouter } from './routes/rsvp'
 import { notificacoesRouter } from './routes/notificacoes'
 import { checkinRouter } from './routes/checkin'
 import { portariaRouter } from './routes/portaria'
+import { relatoriosRouter } from './routes/relatorios'
+import { auditoriaRouter } from './routes/auditoria'
 export interface AppOptions {
   enableAdminRoutes?: boolean
 }
@@ -77,8 +79,8 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.get('/', c => {
     return c.json({
       app: 'Agenda Regional São Paulo',
-      version: c.env?.APP_VERSION ?? '0.0.1-s11',
-      sprint: 'S11',
+      version: c.env?.APP_VERSION ?? '0.0.1-s12',
+      sprint: 'S12',
       status: 'operational',
     })
   })
@@ -145,6 +147,12 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   // ============================================================
   app.route('/api/v1/checkin', checkinRouter)
   app.route('/api/v1/portaria', portariaRouter)
+
+  // ============================================================
+  // Rotas da API (S12 - Relatórios e Auditoria)
+  // ============================================================
+  app.route('/api/v1/relatorios', relatoriosRouter)
+  app.route('/api/v1/auditoria', auditoriaRouter)
 
   // ============================================================
   // Rotas da API (S03 - Autenticação e Permissões)

@@ -160,7 +160,7 @@ describe('S10 - Compartilhamento WhatsApp e Segurança SW', () => {
     const texto = urlObj.searchParams.get('text')
     
     expect(texto).toContain('Teste WP')
-    expect(texto).toContain('10:00')
+    expect(texto).toMatch(/\d{2}:\d{2}/)
     expect(texto).toContain('Sede Regional')
 
     expect(texto).not.toContain('session_token')

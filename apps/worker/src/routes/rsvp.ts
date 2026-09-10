@@ -4,6 +4,7 @@ import { rsvp, convocacoes, convocacaoDestinatarios, eventos } from '../db/schem
 import { authMiddleware, Variables } from '../middleware/auth'
 import { RsvpUpsert } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
+import { criarAuditQuery, extrairEscopoDoEvento } from '../services/auditoria'
 
 export const rsvpRouter = new Hono<{ Variables: Variables }>()
 
@@ -66,7 +67,12 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
       eventoInicio: eventos.inicioEm,
       possuiManha: eventos.possuiManha,
       possuiTarde: eventos.possuiTarde,
-      possuiNoite: eventos.possuiNoite
+      possuiNoite: eventos.possuiNoite,
+      regionalId: eventos.regionalId,
+      administracaoId: eventos.administracaoId,
+      setorId: eventos.setorId,
+      casaId: eventos.casaId,
+      grupoTrabalhoId: eventos.grupoTrabalhoId,
     })
     .from(convocacaoDestinatarios)
     .innerJoin(convocacoes, eq(convocacaoDestinatarios.convocacaoId, convocacoes.id))
@@ -122,6 +128,8 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
       .where(eq(rsvp.convocacaoDestinatarioId, destinatarioId)).get()
     
     const rsvpId = existingRsvp ? existingRsvp.id : crypto.randomUUID()
+
+    const { escopoTipo, escopoId } = extrairEscopoDoEvento(record)
     
     // Execute de forma atômica (D1 Batch ou Transaction local)
     await executeAtomic(db, (tx) => {
@@ -150,6 +158,23 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
           }
         })
       txQueries.push(txRsvp)
+
+      const auditQuery = criarAuditQuery(tx, {
+        acao: 'RSVP_REGISTRADO',
+        atorMembroId: membroId,
+        recursoTipo: 'RSVP',
+        recursoId: rsvpId,
+        escopoTipo,
+        escopoId,
+        contexto: {
+          convocacaoDestinatarioId: destinatarioId,
+          resposta: parsed.resposta,
+          periodosParticipacao: finalPeriodos || []
+        },
+        ip: c.req.header('x-forwarded-for') || null,
+        userAgent: c.req.header('user-agent') || null,
+      })
+      txQueries.push(auditQuery)
 
       return txQueries
     })

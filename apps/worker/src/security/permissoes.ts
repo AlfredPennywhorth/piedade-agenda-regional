@@ -98,3 +98,125 @@ export async function eOperadorPortariaAutorizado(db: any, membroId: string, eve
     return false
   })
 }
+
+/**
+ * Valida se o membro possui permissão de relatórios para um evento específico.
+ * Autorizado se:
+ * 1. É o organizador do evento (evento.organizadorMembroId === membroId); OU
+ * 2. Possui vínculo ativo com a função GESTOR_RELATORIOS no exato escopo do evento.
+ */
+export async function eGestorRelatoriosAutorizadoParaEvento(db: any, membroId: string, evento: any): Promise<boolean> {
+  if (!db || !membroId || !evento) return false
+
+  // 1. Organizador do evento
+  if (evento.organizadorMembroId === membroId) {
+    return true
+  }
+
+  // 2. Vínculo GESTOR_RELATORIOS no mesmo escopo
+  const vinculosGestor = await db
+    .select({
+      v: schema.vinculosFuncionais,
+      f: schema.funcoes
+    })
+    .from(schema.vinculosFuncionais)
+    .innerJoin(schema.funcoes, eq(schema.vinculosFuncionais.funcaoId, schema.funcoes.id))
+    .where(
+      and(
+        eq(schema.vinculosFuncionais.membroId, membroId),
+        eq(schema.vinculosFuncionais.ativo, true),
+        eq(schema.funcoes.ativo, true),
+        eq(schema.funcoes.codigo, 'GESTOR_RELATORIOS')
+      )
+    )
+    .all()
+
+  if (!vinculosGestor || vinculosGestor.length === 0) {
+    return false
+  }
+
+  return vinculosGestor.some(({ v }: any) => {
+    if (evento.regionalId && v.regionalId === evento.regionalId) return true
+    if (evento.administracaoId && v.administracaoId === evento.administracaoId) return true
+    if (evento.setorId && v.setorId === evento.setorId) return true
+    if (evento.casaId && v.casaId === evento.casaId) return true
+    if (evento.grupoTrabalhoId && v.grupoTrabalhoId === evento.grupoTrabalhoId) return true
+    return false
+  })
+}
+
+/**
+ * Valida se o membro possui permissão GESTOR_RELATORIOS em um escopo específico (tipo + id).
+ */
+export async function eGestorRelatoriosAutorizadoParaEscopo(
+  db: any,
+  membroId: string,
+  escopoTipo: 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+  escopoId: string
+): Promise<boolean> {
+  if (!db || !membroId || !escopoTipo || !escopoId) return false
+
+  const vinculosGestor = await db
+    .select({
+      v: schema.vinculosFuncionais,
+      f: schema.funcoes
+    })
+    .from(schema.vinculosFuncionais)
+    .innerJoin(schema.funcoes, eq(schema.vinculosFuncionais.funcaoId, schema.funcoes.id))
+    .where(
+      and(
+        eq(schema.vinculosFuncionais.membroId, membroId),
+        eq(schema.vinculosFuncionais.ativo, true),
+        eq(schema.funcoes.ativo, true),
+        eq(schema.funcoes.codigo, 'GESTOR_RELATORIOS')
+      )
+    )
+    .all()
+
+  if (!vinculosGestor || vinculosGestor.length === 0) {
+    return false
+  }
+
+  return vinculosGestor.some(({ v }: any) => {
+    switch (escopoTipo) {
+      case 'REGIONAL': return v.regionalId === escopoId
+      case 'ADMINISTRACAO': return v.administracaoId === escopoId
+      case 'SETOR': return v.setorId === escopoId
+      case 'CASA': return v.casaId === escopoId
+      case 'GRUPO_TRABALHO': return v.grupoTrabalhoId === escopoId
+      default: return false
+    }
+  })
+}
+
+/**
+ * Valida se o membro possui vínculo ativo estritamente com a função AUDITOR_SISTEMA em escopo REGIONAL ou ADMINISTRACAO.
+ */
+export async function eAuditorSistemaAutorizado(db: any, membroId: string): Promise<boolean> {
+  if (!db || !membroId) return false
+
+  const vinculosAuditor = await db
+    .select({
+      v: schema.vinculosFuncionais,
+      f: schema.funcoes
+    })
+    .from(schema.vinculosFuncionais)
+    .innerJoin(schema.funcoes, eq(schema.vinculosFuncionais.funcaoId, schema.funcoes.id))
+    .where(
+      and(
+        eq(schema.vinculosFuncionais.membroId, membroId),
+        eq(schema.vinculosFuncionais.ativo, true),
+        eq(schema.funcoes.ativo, true),
+        eq(schema.funcoes.codigo, 'AUDITOR_SISTEMA')
+      )
+    )
+    .all()
+
+  if (!vinculosAuditor || vinculosAuditor.length === 0) {
+    return false
+  }
+
+  // Válido apenas em escopo REGIONAL ou ADMINISTRACAO
+  return vinculosAuditor.some(({ v }: any) => v.regionalId !== null || v.administracaoId !== null)
+}
+
