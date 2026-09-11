@@ -47,7 +47,7 @@ Este diretório contém a documentação da API do projeto **Agenda Regional Sã
 - **Materialização no Banco**: A recorrência não é resolvida sob demanda; ao criar uma série, a engine gera *física e independentemente* todos os eventos na tabela `eventos` com o campo `serie_recorrencia_id` associado.
 - **Data Final Obrigatória**: A série possui horizonte de materialização delimitado (usualmente 1 ano).
 - **Timezone Estrito**: O fuso da série é amarrado a `America/Sao_Paulo`. A materialização dos eventos injeta na base as datas UTC perfeitamente alinhadas (ex: 09:00 BRT -> 12:00 UTC).
-- **Modos de Atualização (`updateMode`)**: 
+- **Modos de Atualização (`updateMode`)**:
   - `THIS`: Preserva a série, edita o evento único em questão e o marca como `recorrencia_excecao = true`.
   - `THIS_AND_FUTURE`: Encerra a série A no evento escolhido e cria a série B daquele ponto em diante.
   - `ALL`: Edita as especificações da série original. Mantém os eventos do passado intocados, inativa os eventos futuros não excepcionados substituídos e materializa novas ocorrências com base nas novas especificações da série.

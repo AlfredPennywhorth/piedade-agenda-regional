@@ -1,7 +1,7 @@
 # ADR-003 — Modelo de Membros, Funções e Vínculos Funcionais
 
-**Status:** DECIDIDO  
-**Data:** 2026-09-01  
+**Status:** DECIDIDO
+**Data:** 2026-09-01
 **Sprint:** S02
 
 ## Contexto
