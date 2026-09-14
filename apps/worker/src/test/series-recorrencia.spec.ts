@@ -4,8 +4,9 @@ import { setupDb } from './setup'
 import { createApp } from '../index'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import BetterSqlite3 from 'better-sqlite3'
-import { regionais, locais, eventos, seriesRecorrencia, administracoes } from '../db/schema'
+import { regionais, locais, eventos, seriesRecorrencia, administracoes, setores, casas, membros, sessoes } from '../db/schema'
 import { eq } from 'drizzle-orm'
+import { hashToken } from '../security/tokens'
 
 import { createUtcDateFromSaoPaulo, getLocalDateFromUtc } from '@piedade/shared'
 
@@ -13,14 +14,44 @@ describe('Series Recorrencia API (S05)', () => {
   let sqlite: Database
   let db: any
   let app: any
+  let token: string
 
-  beforeEach(() => {
+  beforeEach(async () => {
     sqlite = new BetterSqlite3(':memory:')
     sqlite.pragma('foreign_keys = ON')
     setupDb(sqlite)
     db = drizzle(sqlite)
     app = createApp(db)
+
+    const regId = crypto.randomUUID()
+    const admId = crypto.randomUUID()
+    const setId = crypto.randomUUID()
+    const casId = crypto.randomUUID()
+    const memId = crypto.randomUUID()
+    await db.insert(regionais).values({ id: regId, nome: 'Reg' })
+    await db.insert(administracoes).values({ id: admId, nome: 'Adm', regionalId: regId })
+    await db.insert(setores).values({ id: setId, nome: 'Set', administracaoId: admId })
+    await db.insert(casas).values({ id: casId, nome: 'Cas', setorId: setId })
+    await db.insert(membros).values({ id: memId, nome: 'Mem Test', casaId: casId, ativo: true, autenticacaoAtiva: true })
+    const rawToken = crypto.randomUUID()
+    const tokenHash = await hashToken(rawToken)
+    await db.insert(sessoes).values({
+      id: crypto.randomUUID(),
+      membroId: memId,
+      tokenHash,
+      expiraEm: new Date(Date.now() + 86400000).toISOString(),
+      createdAt: new Date().toISOString()
+    })
+    token = rawToken
   })
+
+  function req(path: string, options: any = {}) {
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      ...(options.headers || {})
+    }
+    return app.request(path, { ...options, headers })
+  }
 
   async function createRegional() {
     const id = crypto.randomUUID()
@@ -42,7 +73,7 @@ describe('Series Recorrencia API (S05)', () => {
 
   it('1. criar série diária', async () => {
     const regionalId = await createRegional()
-    const res = await app.request('/api/v1/series-recorrencia', {
+    const res = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...basePayload, regionalId })
@@ -54,7 +85,7 @@ describe('Series Recorrencia API (S05)', () => {
 
   it('2. criar série semanal', async () => {
     const regionalId = await createRegional()
-    const res = await app.request('/api/v1/series-recorrencia', {
+    const res = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -72,7 +103,7 @@ describe('Series Recorrencia API (S05)', () => {
 
   it('3. criar série quinzenal', async () => {
     const regionalId = await createRegional()
-    const res = await app.request('/api/v1/series-recorrencia', {
+    const res = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -90,7 +121,7 @@ describe('Series Recorrencia API (S05)', () => {
 
   it('4. criar mensal por dia fixo', async () => {
     const regionalId = await createRegional()
-    const res = await app.request('/api/v1/series-recorrencia', {
+    const res = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -108,7 +139,7 @@ describe('Series Recorrencia API (S05)', () => {
 
   it('5. criar mensal por posição na semana', async () => {
     const regionalId = await createRegional()
-    const res = await app.request('/api/v1/series-recorrencia', {
+    const res = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -127,7 +158,7 @@ describe('Series Recorrencia API (S05)', () => {
 
   it('5.1 rejeitar intervalo diferente de 1', async () => {
     const regionalId = await createRegional()
-    const res = await app.request('/api/v1/series-recorrencia', {
+    const res = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...basePayload, regionalId, intervalo: 2 })
@@ -140,7 +171,7 @@ describe('Series Recorrencia API (S05)', () => {
     const oldCountSeries = db.select().from(seriesRecorrencia).all().length
     const oldCountEvents = db.select().from(eventos).all().length
 
-    const res = await app.request('/api/v1/series-recorrencia', {
+    const res = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
@@ -166,7 +197,7 @@ describe('Series Recorrencia API (S05)', () => {
     const regionalId = await createRegional()
     const payload = { ...basePayload, regionalId }
     delete (payload as any).dataFim
-    const res = await app.request('/api/v1/series-recorrencia', {
+    const res = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -176,7 +207,7 @@ describe('Series Recorrencia API (S05)', () => {
 
   it('7. rejeitar data final anterior à inicial', async () => {
     const regionalId = await createRegional()
-    const res = await app.request('/api/v1/series-recorrencia', {
+    const res = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -191,7 +222,7 @@ describe('Series Recorrencia API (S05)', () => {
 
   it('8. materializar número correto de ocorrências', async () => {
     const regionalId = await createRegional()
-    const res = await app.request('/api/v1/series-recorrencia', {
+    const res = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...basePayload, regionalId, dataFim: '2026-09-10' }) // 1 to 10
@@ -204,7 +235,7 @@ describe('Series Recorrencia API (S05)', () => {
 
   it('9. ocorrências com IDs próprios', async () => {
     const regionalId = await createRegional()
-    await app.request('/api/v1/series-recorrencia', {
+    await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...basePayload, regionalId }) // 5 
@@ -216,7 +247,7 @@ describe('Series Recorrencia API (S05)', () => {
 
   it('10. ocorrências vinculadas à série', async () => {
     const regionalId = await createRegional()
-    const res = await app.request('/api/v1/series-recorrencia', {
+    const res = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...basePayload, regionalId })
@@ -239,7 +270,7 @@ describe('Series Recorrencia API (S05)', () => {
 
   it('13. cada ocorrência mantém exatamente um escopo', async () => {
     const regionalId = await createRegional()
-    await app.request('/api/v1/series-recorrencia', {
+    await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...basePayload, regionalId })
@@ -252,7 +283,7 @@ describe('Series Recorrencia API (S05)', () => {
 
   it('14. evento não recorrente continua válido com serie_recorrencia_id null', async () => {
     const regionalId = await createRegional()
-    const res = await app.request('/api/v1/eventos', {
+    const res = await req('/api/v1/eventos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -271,7 +302,7 @@ describe('Series Recorrencia API (S05)', () => {
 
   it('15. inativar uma ocorrência não inativa as demais', async () => {
     const regionalId = await createRegional()
-    await app.request('/api/v1/series-recorrencia', {
+    await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...basePayload, regionalId }) // 5
@@ -280,7 +311,7 @@ describe('Series Recorrencia API (S05)', () => {
     const firstEvId = evs[0].id
 
     // Rota de evento normal atualizando pra ativo = false (SOMENTE ESTA)
-    await app.request(`/api/v1/eventos/${firstEvId}`, {
+    await req(`/api/v1/eventos/${firstEvId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ativo: false })
@@ -297,7 +328,7 @@ describe('Series Recorrencia API (S05)', () => {
 
   it('16, 17, 18. alterar ALL (não apaga, preserva exceção, evita duplicação)', async () => {
     const regionalId = await createRegional()
-    const postRes = await app.request('/api/v1/series-recorrencia', {
+    const postRes = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2099-09-01', dataFim: '2099-09-05' })
@@ -307,14 +338,14 @@ describe('Series Recorrencia API (S05)', () => {
     
     // SOMENTE ESTA -> via eventos PATCH, o que torna ela uma exceção
     const targetEv = evs[2] // dia 3
-    await app.request(`/api/v1/eventos/${targetEv.id}`, {
+    await req(`/api/v1/eventos/${targetEv.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ titulo: 'Exceção' })
     })
 
     // TODA A SERIE -> via series PATCH, altera a série inteira (menos a exceção)
-    const patchRes = await app.request(`/api/v1/series-recorrencia/${serieId}`, {
+    const patchRes = await req(`/api/v1/series-recorrencia/${serieId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -351,7 +382,7 @@ describe('Series Recorrencia API (S05)', () => {
 
   it('19. ESTA E AS PRÓXIMAS divide a série corretamente e não apaga fisicamente', async () => {
     const regionalId = await createRegional()
-    const postRes = await app.request('/api/v1/series-recorrencia', {
+    const postRes = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2026-09-01', dataFim: '2026-09-10' })
@@ -361,7 +392,7 @@ describe('Series Recorrencia API (S05)', () => {
     const evs = db.select().from(eventos).all()
     const evTarget = evs.find((e: any) => e.inicioEm.includes('2026-09-06')) // Ocorrência do dia 06
     
-    const patchRes = await app.request(`/api/v1/series-recorrencia/${serieId}`, {
+    const patchRes = await req(`/api/v1/series-recorrencia/${serieId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -399,7 +430,7 @@ describe('Series Recorrencia API (S05)', () => {
 
     beforeEach(async () => {
       regionalId = await createRegional()
-      const postRes = await app.request('/api/v1/series-recorrencia', {
+      const postRes = await req('/api/v1/series-recorrencia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2026-09-01', dataFim: '2026-09-01' })
@@ -411,7 +442,7 @@ describe('Series Recorrencia API (S05)', () => {
     })
 
     it('20. THIS: alteração válida', async () => {
-      const res = await app.request(`/api/v1/series-recorrencia/${serieId}`, {
+      const res = await req(`/api/v1/series-recorrencia/${serieId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { titulo: 'Novo Titulo Unico' } })
@@ -420,7 +451,7 @@ describe('Series Recorrencia API (S05)', () => {
     })
 
     it('21. THIS: fim <= início falha', async () => {
-      const res = await app.request(`/api/v1/series-recorrencia/${serieId}`, {
+      const res = await req(`/api/v1/series-recorrencia/${serieId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { fimEm: '2026-09-01T08:00:00Z' } })
@@ -432,7 +463,7 @@ describe('Series Recorrencia API (S05)', () => {
       const adminId = crypto.randomUUID()
       await db.insert(administracoes).values({ id: adminId, nome: 'Adm', regionalId }).run()
 
-      const res = await app.request(`/api/v1/series-recorrencia/${serieId}`, {
+      const res = await req(`/api/v1/series-recorrencia/${serieId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { administracaoId: adminId } })
@@ -444,7 +475,7 @@ describe('Series Recorrencia API (S05)', () => {
       const localId = crypto.randomUUID()
       await db.insert(locais).values({ id: localId, nome: 'L', endereco: 'E', numero: '1', cidade: 'SP', uf: 'SP' }).run()
 
-      const res = await app.request(`/api/v1/series-recorrencia/${serieId}`, {
+      const res = await req(`/api/v1/series-recorrencia/${serieId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { localId } })
@@ -473,7 +504,7 @@ describe('Series Recorrencia API (S05)', () => {
   it('25. ALL com ativo=false inativa série e eventos futuros sem apagar ou regenerar', async () => {
     // 1. Criar série futura distante para isolar do relógio (2099)
     const regionalId = await createRegional()
-    const createRes = await app.request('/api/v1/series-recorrencia', {
+    const createRes = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -499,7 +530,7 @@ describe('Series Recorrencia API (S05)', () => {
 
     // 3. Escolher uma ocorrência e transformá-la em exceção via PATCH THIS
     const evParaExcecao = ocorrencias[2]
-    const patchThisRes = await app.request(`/api/v1/series-recorrencia/${serieId}`, {
+    const patchThisRes = await req(`/api/v1/series-recorrencia/${serieId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -521,7 +552,7 @@ describe('Series Recorrencia API (S05)', () => {
     expect(excecaoCriada.ativo).toBe(true)
 
     // 5. Executar PATCH ALL com ativo = false
-    const patchAllRes = await app.request(`/api/v1/series-recorrencia/${serieId}`, {
+    const patchAllRes = await req(`/api/v1/series-recorrencia/${serieId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

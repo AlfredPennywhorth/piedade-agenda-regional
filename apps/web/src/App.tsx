@@ -1,18 +1,34 @@
-import { useState } from 'react'
-import { MainLayout } from './components/layout/MainLayout'
+import { useState, useEffect } from 'react'
+import { MainLayout, CapacidadesFrontend } from './components/layout/MainLayout'
 import { AgendaView } from './components/agenda/AgendaView'
 import { CalendarioView } from './components/calendario/CalendarioView'
 import { NotificacoesControl } from './components/notificacoes/NotificacoesControl'
 import { PortariaView } from './components/portaria/PortariaView'
+import { RelatoriosView } from './components/relatorios/RelatoriosView'
+import { AuditoriaView } from './components/auditoria/AuditoriaView'
+import { fetchWithAuth } from './api/apiClient'
 
 function App() {
-  const [currentTab, setCurrentTab] = useState<'agenda' | 'calendario' | 'avisos' | 'cadastro' | 'portaria'>('agenda')
+  const [currentTab, setCurrentTab] = useState<'agenda' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria'>('agenda')
+  const [capacidades, setCapacidades] = useState<CapacidadesFrontend>({})
+
+  useEffect(() => {
+    fetchWithAuth<{ capacidades?: CapacidadesFrontend }>('/auth/me')
+      .then((data) => {
+        if (data && data.capacidades) {
+          setCapacidades(data.capacidades)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   return (
-    <MainLayout currentTab={currentTab} onTabChange={setCurrentTab}>
+    <MainLayout currentTab={currentTab} onTabChange={setCurrentTab} capacidades={capacidades}>
       {currentTab === 'agenda' && <AgendaView />}
       {currentTab === 'calendario' && <CalendarioView />}
       {currentTab === 'portaria' && <PortariaView />}
+      {currentTab === 'relatorios' && <RelatoriosView />}
+      {currentTab === 'auditoria' && <AuditoriaView />}
       
       {currentTab === 'avisos' && (
         <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">

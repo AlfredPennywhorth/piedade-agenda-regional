@@ -1,6 +1,6 @@
 # ADR-002 — Modelagem de Escopo para Grupos de Trabalho
 
-**Data:** 2026-08-31  
+**Data:** 2026-08-31
 **Status:** APROVADO (Sprint S01)
 
 ## Contexto

@@ -471,3 +471,26 @@ export const checkins = sqliteTable('checkins', {
   idxDestinatario: index('idx_checkin_destinatario').on(table.convocacaoDestinatarioId),
   idxMembro: index('idx_checkin_membro').on(table.membroId),
 }))
+
+// ============================================================
+// Auditoria (S12)
+// ============================================================
+
+export const auditoriaLogs = sqliteTable('auditoria_logs', {
+  id: text('id').primaryKey(),
+  acao: text('acao').notNull(),
+  atorMembroId: text('ator_membro_id').references(() => membros.id),
+  recursoTipo: text('recurso_tipo').notNull(),
+  recursoId: text('recurso_id').notNull(),
+  escopoTipo: text('escopo_tipo'),
+  escopoId: text('escopo_id'),
+  contexto: text('contexto', { mode: 'json' }).$type<Record<string, unknown>>(),
+  criadoEm: text('criado_em').notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+}, table => ({
+  idxAcao: index('idx_auditoria_acao').on(table.acao),
+  idxAtor: index('idx_auditoria_ator').on(table.atorMembroId),
+  idxRecurso: index('idx_auditoria_recurso').on(table.recursoTipo, table.recursoId),
+  idxEscopo: index('idx_auditoria_escopo').on(table.escopoTipo, table.escopoId),
+  idxCriadoEm: index('idx_auditoria_criado_em').on(table.criadoEm),
+}))
+

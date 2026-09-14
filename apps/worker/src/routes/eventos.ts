@@ -2,8 +2,12 @@ import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
 import { eventos } from '../db/schema'
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
+import { executarOperacaoComAudit, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
+import { authMiddleware } from '../middleware/auth'
 
 export const eventosRouter = new Hono<any>()
+
+eventosRouter.use('*', authMiddleware)
 
 eventosRouter.get('/', async (c) => {
   const db = c.get('db')
@@ -43,7 +47,32 @@ eventosRouter.post('/', async (c) => {
     const parsed = EventoCreate.parse(body)
     
     const id = crypto.randomUUID()
-    const result = await db.insert(eventos).values({ id, ...parsed }).returning().get()
+
+    const { escopoTipo, escopoId } = extrairEscopoDoEvento(parsed)
+    const atorMembroId = c.get('membroId') || null
+
+    const auditData: AuditLogData = {
+      acao: 'EVENTO_CRIADO',
+      atorMembroId,
+      recursoTipo: 'EVENTO',
+      recursoId: id,
+      escopoTipo,
+      escopoId,
+      contexto: {
+        titulo: parsed.titulo,
+        modalidade: parsed.modalidade,
+        escopoTipo: escopoTipo || '',
+        escopoId: escopoId || '',
+      },
+    }
+
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [qdb.insert(eventos).values({ id, ...parsed })],
+      auditData
+    )
+
+    const result = await db.select().from(eventos).where(eq(eventos.id, id)).get()
     return c.json(result, 201)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
@@ -72,12 +101,36 @@ eventosRouter.patch('/:id', async (c) => {
 
     // PMO Rule: Ao alterar uma ocorrência individual, preservar serie_recorrencia_id e marcar recorrencia_excecao = true.
     const isExcecao = existing.serieRecorrenciaId !== null ? true : existing.recorrenciaExcecao
+    const nowIso = new Date().toISOString()
 
-    const updated = await db.update(eventos)
-      .set({ ...parsed, recorrenciaExcecao: isExcecao, updatedAt: new Date().toISOString() })
-      .where(eq(eventos.id, id))
-      .returning().get()
-      
+    const { escopoTipo, escopoId } = extrairEscopoDoEvento(existing)
+    const atorMembroId = c.get('membroId') || null
+
+    const auditData: AuditLogData = {
+      acao: 'EVENTO_ATUALIZADO',
+      atorMembroId,
+      recursoTipo: 'EVENTO',
+      recursoId: id,
+      escopoTipo,
+      escopoId,
+      contexto: {
+        titulo: existing.titulo,
+        modalidade: existing.modalidade,
+        camposAlterados: Object.keys(parsed),
+      },
+    }
+
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [
+        qdb.update(eventos)
+          .set({ ...parsed, recorrenciaExcecao: isExcecao, updatedAt: nowIso })
+          .where(eq(eventos.id, id))
+      ],
+      auditData
+    )
+
+    const updated = await db.select().from(eventos).where(eq(eventos.id, id)).get()
     return c.json(updated)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
@@ -89,3 +142,4 @@ eventosRouter.patch('/:id', async (c) => {
     return c.json({ error: err.issues || err.message }, 400)
   }
 })
+
