@@ -68,7 +68,7 @@ INSERT OR IGNORE INTO locais (id, nome, endereco, numero, cidade, uf, ativo, cre
 -- 6. EVENTOS
 INSERT OR IGNORE INTO eventos (id, titulo, modalidade, inicio_em, fim_em, local_id, organizador_membro_id, regional_id, administracao_id, ativo, created_at, updated_at) VALUES
 ('evento-sintetico-gestor-s12', 'Evento Teste Reg-1', 'PRESENCIAL', '2026-10-01T10:00:00Z', '2026-10-01T12:00:00Z', 'loc-1', 'm-5', 'reg-1', NULL, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('evento-sintetico-fora-s12', 'Evento Teste Adm-2', 'PRESENCIAL', '2026-10-02T10:00:00Z', '2026-10-02T12:00:00Z', 'loc-1', 'm-5', NULL, 'adm-2', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+('evento-sintetico-fora-s12', 'Evento Teste Adm-2', 'PRESENCIAL', '2026-10-02T10:00:00Z', '2026-10-02T12:00:00Z', 'loc-1', 'm-1', NULL, 'adm-2', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- 7. CONVOCAÇÕES, DESTINATÁRIOS, RSVP E CHECK-IN PARA O EVENTO GESTOR
 INSERT OR IGNORE INTO convocacoes (id, evento_id, status, ativo, created_at, updated_at) VALUES
@@ -85,14 +85,14 @@ INSERT OR IGNORE INTO checkins (id, convocacao_destinatario_id, evento_id, membr
 
 -- 8. AUDITORIA_LOGS (Ações Canônicas para C10-A)
 INSERT OR IGNORE INTO auditoria_logs (id, acao, ator_membro_id, recurso_tipo, recurso_id, escopo_tipo, escopo_id, contexto, criado_em) VALUES
-('log-1', 'EVENTO_CRIADO', 'm-5', 'evento', 'evento-sintetico-gestor-s12', 'regional', 'reg-1', '{"teste":"C10-A"}', CURRENT_TIMESTAMP),
-('log-2', 'EVENTO_ATUALIZADO', 'm-5', 'evento', 'evento-sintetico-gestor-s12', 'regional', 'reg-1', '{"teste":"C10-A"}', CURRENT_TIMESTAMP),
-('log-3', 'CONVOCACAO_PUBLICADA', 'm-5', 'convocacao', 'conv-101', 'regional', 'reg-1', '{"teste":"C10-A"}', CURRENT_TIMESTAMP),
-('log-4', 'CONVOCACAO_CANCELADA', 'm-5', 'convocacao', 'conv-101', 'regional', 'reg-1', '{"teste":"C10-A"}', CURRENT_TIMESTAMP),
-('log-5', 'RSVP_REGISTRADO', 'm-1', 'rsvp', 'rsvp-1', 'regional', 'reg-1', '{"teste":"C10-A"}', CURRENT_TIMESTAMP),
-('log-6', 'CHECKIN_MANUAL', 'm-2', 'checkin', 'chk-1', 'regional', 'reg-1', '{"teste":"C10-A"}', CURRENT_TIMESTAMP),
-('log-7', 'CHECKIN_QR', 'm-2', 'checkin', 'chk-1', 'regional', 'reg-1', '{"teste":"C10-A"}', CURRENT_TIMESTAMP),
-('log-8', 'EVENTO_CRIADO', 'm-5', 'evento', 'evento-sintetico-fora-s12', 'administracao', 'adm-2', '{"teste":"C7"}', CURRENT_TIMESTAMP);
+('log-1', 'EVENTO_CRIADO', 'm-5', 'EVENTO', 'evento-sintetico-gestor-s12', 'REGIONAL', 'reg-1', '{"teste":"C10-A"}', CURRENT_TIMESTAMP),
+('log-2', 'EVENTO_ATUALIZADO', 'm-5', 'EVENTO', 'evento-sintetico-gestor-s12', 'REGIONAL', 'reg-1', '{"teste":"C10-A"}', CURRENT_TIMESTAMP),
+('log-3', 'CONVOCACAO_PUBLICADA', 'm-5', 'CONVOCACAO', 'conv-101', 'REGIONAL', 'reg-1', '{"teste":"C10-A"}', CURRENT_TIMESTAMP),
+('log-4', 'CONVOCACAO_CANCELADA', 'm-5', 'CONVOCACAO', 'conv-101', 'REGIONAL', 'reg-1', '{"teste":"C10-A"}', CURRENT_TIMESTAMP),
+('log-5', 'RSVP_REGISTRADO', 'm-1', 'RSVP', 'rsvp-1', 'REGIONAL', 'reg-1', '{"teste":"C10-A"}', CURRENT_TIMESTAMP),
+('log-6', 'CHECKIN_MANUAL', 'm-2', 'CHECKIN', 'chk-1', 'REGIONAL', 'reg-1', '{"teste":"C10-A"}', CURRENT_TIMESTAMP),
+('log-7', 'CHECKIN_QR', 'm-2', 'CHECKIN', 'chk-1', 'REGIONAL', 'reg-1', '{"teste":"C10-A"}', CURRENT_TIMESTAMP),
+('log-8', 'EVENTO_CRIADO', 'm-5', 'EVENTO', 'evento-sintetico-fora-s12', 'ADMINISTRACAO', 'adm-2', '{"teste":"C7"}', CURRENT_TIMESTAMP);
 
 -- 9. SESSÕES E TOKENS SINTÉTICOS (Para uso direto via localStorage)
 -- ATENÇÃO: As chaves na tabela sessoes requerem o hash SHA-256 do token bruto correspondente.
