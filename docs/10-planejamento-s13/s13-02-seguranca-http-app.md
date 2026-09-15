@@ -4,7 +4,7 @@
 
 - S13: EM EXECUCAO.
 - S13.01: CONCLUIDA.
-- S13.02: EM EXECUCAO, pendente de validacao, PR e homologacao.
+- S13.02: EM HOMOLOGACAO, pendente de revisao tecnica e homologacao do PO.
 - S13.03 a S13.07: PLANEJADAS / NAO INICIADAS.
 
 ## Inventario inicial
