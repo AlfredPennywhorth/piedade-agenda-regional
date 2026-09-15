@@ -3,8 +3,9 @@
 ## Status
 
 - S13: EM EXECUCAO.
-- S13.01: EM HOMOLOGACAO, pendente de revisao tecnica e homologacao do PO.
-- S13.02 a S13.07: PLANEJADAS / NAO INICIADAS.
+- S13.01: HOMOLOGADA.
+- S13.02: PLANEJADA / NAO INICIADA.
+- S13.03 a S13.07: PLANEJADAS / NAO INICIADAS.
 
 ## Decisoes mantidas
 
@@ -39,10 +40,8 @@ Login, ativacao e respostas de credencial usam mensagens neutras. PIN, data de n
 
 ## Testes e homologacao
 
-Os testes de autenticacao cobrem sessao valida, inexistente, revogada, inatividade, idade absoluta, logout isolado, reset administrativo e bloqueio por identificador inexistente sem persistencia em claro. A matriz manual do PO deve validar:
+CI #94: SUCCESS.
 
-1. Fazer cinco logins invalidos e conferir 429 e `Retry-After` de aproximadamente 30 segundos; repetir apos cada vencimento ate a faixa de 15 minutos.
-2. Durante bloqueio, enviar novamente e conferir que o tempo restante diminui sem aumentar o contador.
-3. Fazer login valido apos o vencimento e confirmar que uma nova falha reinicia na primeira faixa.
-4. Simular sessao com mais de 12 horas sem atividade e outra com mais de 30 dias, confirmando 401 em ambas.
-5. Abrir duas sessoes, encerrar uma e confirmar que apenas seu Bearer deixa de acessar; em seguida, executar reset administrativo e confirmar que ambas sao revogadas.
+Os testes automatizados e a execucao real local H1-H10 foram aprovados: sessao valida, sessao inexistente ou revogada, inatividade, idade absoluta, logout isolado, reset administrativo, nova sessao apos ativacao, rate limiting progressivo, `429`, `Retry-After`, limpeza do estado apos sucesso, identificador inexistente e anti-enumeracao.
+
+A homologacao visual manual nao e aplicavel neste momento. O frontend atual nao possui tela de login, tela de ativacao/reset de PIN, botao ou fluxo visual de logout, nem tratamento visual especifico para HTTP 429. Esses elementos devem entrar em trabalho futuro de frontend/UX e nao representam deficiencia funcional pendente do backend da S13.01.
