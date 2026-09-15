@@ -1,34 +1,36 @@
 # CHECKPOINT FINAL - HOMOLOGAÇÃO S12 (Trabalho na Empresa)
 
-**Branch:** `feature/s12-relatorios-auditoria`
-**HEAD:** `8d4ffa1ff5435fbe0b2054d3e6fd4fe3bcfd35dd`
-**APP_VERSION Atualizada:** `0.0.1-s12`
-**PR:** `#16` (Aberta)
-**CI do novo HEAD:** `in_progress` (Run ID: 34644452289)
-**Merges:** Nenhum realizado.
+**Branch:** `feature/s12-relatorios-auditoria` (permanece remota, não apagada)
+**HEAD homologado:** `8fc829caf05c7bd634cf61787e9f1367ffd78f3b`
+**APP_VERSION:** `0.0.1-s12`
+**PR:** `#16` — **MERGED** em `develop`
+**Merge commit:** `1f611b6e85f7bc02f71ac4d805aec6b1c4677027`
+**CI:** Run #89 — `CI — Agenda Regional São Paulo` — **SUCCESS**
+**Merges em `main`:** Nenhum realizado.
 
 ---
 
 ## Status dos Cenários de Homologação
 
-- **Cenário 1:** PASS (Mantido, não reaberto)
-- **Cenário 2:** PASS (Mantido, não reaberto)
-- **Cenário 3:** PREPARADO
-- **Cenários 4 a 9:** AGUARDANDO
-- **Cenário 10-A:** AGUARDANDO
-- **Cenário 10-B:** AGUARDANDO
+- **Cenário 1:** PASS
+- **Cenário 2:** PASS
+- **Cenário 3:** PASS
+- **Cenários 4 a 9:** PASS
+- **Cenário 10-A:** PASS
+- **Cenário 10-B:** PASS
 
-**Status Geral S12:** EM HOMOLOGAÇÃO
+**Status Geral S12:** **CONCLUÍDA**
 
 ---
 
-## Status do Seed (Local/Residencial)
+## Encerramento
 
-O arquivo `scratch/s12_seed_homologacao_completo.sql` está:
-**VALIDADO ESTATICAMENTE MAS AINDA NÃO VALIDADO POR EXECUÇÃO NO D1.**
+- Objetivo entregue: relatórios (consolidado/nominal/agregado) e auditoria com controle de acesso por escopo e função.
+- Correção final encontrada durante o C10: exigência de autenticação obrigatória no router de Convocações.
+- Normalização dos tipos de recurso da Auditoria.
+- Fechamento com 317/317 testes passando.
+- PR #16 mergeada em `develop` sem conflitos; nenhum merge realizado em `main`.
 
-**Ação Pendente (Computador Residencial):**
-1. Gerar os hashes SHA-256 (substituir os placeholders `PENDENTE_GERAR_HASH_*`).
-2. Executar o seed contra o D1 local.
-3. Validar constraints e tabelas na execução real.
-4. Proceder com testes via UI para consumar os Cenários C3 a C10-B.
+## Dívida técnica conhecida
+
+- Wrangler `3.114.17` → `4.x`: atualização controlada, planejada para execução futura (fora do escopo da S12/S13).

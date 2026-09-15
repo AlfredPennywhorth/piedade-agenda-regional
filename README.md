@@ -12,6 +12,7 @@ e ambiente de execução.
 ### Antigravity — Lead Developer
 
 Responsável por:
+
 - edição de código;
 - criação e alteração de arquivos;
 - inspeção estática;
@@ -20,6 +21,7 @@ Responsável por:
 - push de branches.
 
 No ambiente local do Antigravity é PROIBIDO executar ou instalar:
+
 - node
 - npm
 - npx
@@ -34,6 +36,7 @@ Não instalar Node.js ou pnpm para contornar essa restrição.
 
 Comandos permitidos localmente incluem apenas operações sem runtime
 da aplicação, como:
+
 - git status
 - git diff
 - git diff --check
@@ -47,6 +50,7 @@ da aplicação, como:
 ### GitHub Codespaces — ambiente executável de homologação
 
 É o ambiente autorizado para:
+
 - pnpm install;
 - testes;
 - typecheck;
@@ -70,16 +74,50 @@ ao Codespaces ou a ambientes explicitamente autorizados para execução.
 Elas NÃO autorizam o Antigravity a instalar ou executar Node.js,
 npm, npx ou pnpm localmente.
 
-> **Sprints Consolidadas** — Fundação técnica, modelo institucional, membros e convocações já estabelecidos (S00 a S06).
+> **Sprints Consolidadas** — Fundação técnica, modelo institucional, membros, convocações, RSVP, notificações, portaria/check-in e relatórios/auditoria já estabelecidos (S00 a S12).
+
+---
+
+## Status das Sprints
+
+### S12 — Relatórios e Auditoria: **CONCLUÍDA**
+
+- Objetivo entregue: relatórios (consolidado, nominal e agregados) e auditoria com controle de acesso por escopo e função.
+- PR [#16](https://github.com/AlfredPennywhorth/piedade-agenda-regional/pull/16) — **MERGED** em `develop`.
+- Merge commit: `1f611b6e85f7bc02f71ac4d805aec6b1c4677027`.
+- CI (Run #89 — `CI — Agenda Regional São Paulo`): **SUCCESS**.
+- Cenários de homologação C1–C10 (incluindo C10-A e C10-B): **PASS**.
+- Correção final encontrada durante o C10: autenticação obrigatória no router de Convocações.
+- Normalização dos tipos de recurso da Auditoria.
+- Fechamento com 317/317 testes passando.
+- Nenhum merge realizado em `main`.
+
+Ver detalhes em [docs/09-homologacao/s12-checkpoint-homologacao.md](./docs/09-homologacao/s12-checkpoint-homologacao.md) e [docs/09-homologacao/s12-checklist-encerramento.md](./docs/09-homologacao/s12-checklist-encerramento.md).
+
+### Dívida técnica conhecida
+
+- Wrangler `3.114.17` → `4.x`: atualização controlada, planejada para execução futura.
+
+### S13 — Acessibilidade / LGPD / Segurança: **PLANEJADA / NÃO INICIADA**
+
+Sub-sprints planejadas (ver [docs/10-planejamento-s13/s13-plano-execucao.md](./docs/10-planejamento-s13/s13-plano-execucao.md)):
+
+- S13.01 — Autenticação e Sessão
+- S13.02 — Segurança HTTP/App
+- S13.03 — Acessibilidade estrutural
+- S13.04 — Acessibilidade dos fluxos críticos
+- S13.05 — Minimização de dados
+- S13.06 — LGPD / Comissão, condicionada às decisões institucionais
+- S13.07 — Hardening
 
 ---
 
 ## Pré-requisitos do ambiente executável
 
-| Ferramenta | Versão mínima |
-|---|---|
-| Node.js | 20.x |
-| pnpm | 9.x |
+| Ferramenta   | Versão mínima                     |
+| ------------ | --------------------------------- |
+| Node.js      | 20.x                              |
+| pnpm         | 9.x                               |
 | Wrangler CLI | 3.x (incluído como devDependency) |
 
 ```bash
@@ -265,6 +303,7 @@ pnpm --filter @piedade/worker db:migrate:local
 ## Segurança — Regras obrigatórias
 
 **Nunca inserir no Git:**
+
 - Senhas ou tokens de qualquer natureza
 - Secrets de API (Cloudflare, GitHub, etc.)
 - Dados reais de membros
@@ -290,25 +329,25 @@ O pipeline roda automaticamente em push e pull_request para `main` e `develop`:
 
 ## Documentação
 
-| Pasta | Conteúdo |
-|---|---|
-| [/docs/00-governanca](./docs/00-governanca/README.md) | Governança e processos |
-| [/docs/01-requisitos](./docs/01-requisitos/README.md) | Requisitos funcionais e não-funcionais |
-| [/docs/02-arquitetura](./docs/02-arquitetura/README.md) | Arquitetura e decisões técnicas |
-| [/docs/03-modelo-dados](./docs/03-modelo-dados/README.md) | Schema e modelo de dados |
-| [/docs/04-seguranca-lgpd](./docs/04-seguranca-lgpd/README.md) | Segurança e conformidade LGPD |
-| [/docs/05-api](./docs/05-api/README.md) | Documentação da API |
-| [/docs/06-ux](./docs/06-ux/README.md) | UX e design |
-| [/docs/07-testes](./docs/07-testes/README.md) | Estratégia de testes |
-| [/docs/08-operacao](./docs/08-operacao/README.md) | Operação e deploy |
-| [/docs/09-decisoes-adr](./docs/09-decisoes-adr/README.md) | Architecture Decision Records |
+| Pasta                                                         | Conteúdo                               |
+| ------------------------------------------------------------- | -------------------------------------- |
+| [/docs/00-governanca](./docs/00-governanca/README.md)         | Governança e processos                 |
+| [/docs/01-requisitos](./docs/01-requisitos/README.md)         | Requisitos funcionais e não-funcionais |
+| [/docs/02-arquitetura](./docs/02-arquitetura/README.md)       | Arquitetura e decisões técnicas        |
+| [/docs/03-modelo-dados](./docs/03-modelo-dados/README.md)     | Schema e modelo de dados               |
+| [/docs/04-seguranca-lgpd](./docs/04-seguranca-lgpd/README.md) | Segurança e conformidade LGPD          |
+| [/docs/05-api](./docs/05-api/README.md)                       | Documentação da API                    |
+| [/docs/06-ux](./docs/06-ux/README.md)                         | UX e design                            |
+| [/docs/07-testes](./docs/07-testes/README.md)                 | Estratégia de testes                   |
+| [/docs/08-operacao](./docs/08-operacao/README.md)             | Operação e deploy                      |
+| [/docs/09-decisoes-adr](./docs/09-decisoes-adr/README.md)     | Architecture Decision Records          |
 
 ---
 
 ## Decisões arquiteturais registradas
 
-| ADR | Status |
-|---|---|
+| ADR                                                                      | Status             |
+| ------------------------------------------------------------------------ | ------------------ |
 | [ADR-001 — Autenticação](./docs/09-decisoes-adr/ADR-001-autenticacao.md) | DECIDIDO (PMO-001) |
 
 ---
