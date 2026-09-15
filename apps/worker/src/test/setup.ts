@@ -89,6 +89,16 @@ export function setupDb(sqlite: any) {
       FOREIGN KEY (membro_id) REFERENCES membros(id)
     );
 
+    CREATE TABLE IF NOT EXISTS rate_limits_autenticacao (
+      chave_hash text PRIMARY KEY NOT NULL,
+      falhas_consecutivas integer DEFAULT 0 NOT NULL,
+      bloqueado_ate text,
+      expira_em text NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_rate_limits_autenticacao_expira_em ON rate_limits_autenticacao (expira_em);
+
     CREATE TABLE IF NOT EXISTS locais (
       id text PRIMARY KEY NOT NULL,
       nome text NOT NULL,

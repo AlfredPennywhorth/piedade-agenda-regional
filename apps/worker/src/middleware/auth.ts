@@ -1,5 +1,5 @@
 import { Context, Next } from 'hono'
-import { eq, and, isNull, gt } from 'drizzle-orm'
+import { eq, and, isNull } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { hashToken } from '../security/tokens'
 import { carregarContextoPermissoes, ContextoPermissoes } from '../security/permissoes'
@@ -10,15 +10,19 @@ export type Variables = {
   contextoPermissoes: ContextoPermissoes
 }
 
+const INATIVIDADE_MAXIMA_MS = 12 * 60 * 60 * 1000
+const VALIDADE_ABSOLUTA_MS = 30 * 24 * 60 * 60 * 1000
+const INTERVALO_ATUALIZACAO_ATIVIDADE_MS = 5 * 60 * 1000
+
 export async function authMiddleware(c: Context<{ Variables: Variables }>, next: Next) {
   const authHeader = c.req.header('Authorization')
-  
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return c.json({ error: 'Não autorizado', code: 'UNAUTHORIZED' }, 401)
   }
 
   const token = authHeader.substring(7)
-  
+
   if (!token) {
     return c.json({ error: 'Token inválido', code: 'UNAUTHORIZED' }, 401)
   }
@@ -32,21 +36,15 @@ export async function authMiddleware(c: Context<{ Variables: Variables }>, next:
 
   // Busca a sessão e o membro manualmente com JOIN
   const agora = new Date().toISOString()
-  
+
   const [result] = await db
     .select({
       sessao: schema.sessoes,
-      membro: schema.membros
+      membro: schema.membros,
     })
     .from(schema.sessoes)
     .innerJoin(schema.membros, eq(schema.sessoes.membroId, schema.membros.id))
-    .where(
-      and(
-        eq(schema.sessoes.tokenHash, hashedToken),
-        isNull(schema.sessoes.revogadoEm),
-        gt(schema.sessoes.expiraEm, agora)
-      )
-    )
+    .where(and(eq(schema.sessoes.tokenHash, hashedToken), isNull(schema.sessoes.revogadoEm)))
     .limit(1)
 
   if (!result || !result.membro) {
@@ -55,16 +53,29 @@ export async function authMiddleware(c: Context<{ Variables: Variables }>, next:
 
   const { sessao, membro } = result
 
+  const instanteAtual = Date.now()
+  const criadaEm = new Date(sessao.createdAt).getTime()
+  const ultimoAcessoEm = new Date(sessao.ultimoAcessoEm ?? sessao.createdAt).getTime()
+  const expiradaPorInatividade = instanteAtual - ultimoAcessoEm >= INATIVIDADE_MAXIMA_MS
+  const expiradaPorIdade = instanteAtual - criadaEm >= VALIDADE_ABSOLUTA_MS
+  const expiradaPorPrazo = new Date(sessao.expiraEm).getTime() <= instanteAtual
+
+  if (expiradaPorInatividade || expiradaPorIdade || expiradaPorPrazo) {
+    return c.json({ error: 'Sessão inválida ou expirada', code: 'UNAUTHORIZED' }, 401)
+  }
+
   // Verifica se membro está ativo e tem autenticação ativa
   if (!membro.ativo || !membro.autenticacaoAtiva) {
     return c.json({ error: 'Acesso bloqueado', code: 'FORBIDDEN' }, 403)
   }
 
-  // Atualizar último acesso (síncrono para garantir compatibilidade nos testes)
-  await db.update(schema.sessoes)
-    .set({ ultimoAcessoEm: agora })
-    .where(eq(schema.sessoes.id, sessao.id))
-    .execute()
+  if (instanteAtual - ultimoAcessoEm >= INTERVALO_ATUALIZACAO_ATIVIDADE_MS) {
+    await db
+      .update(schema.sessoes)
+      .set({ ultimoAcessoEm: agora })
+      .where(eq(schema.sessoes.id, sessao.id))
+      .execute()
+  }
 
   // Carrega permissões
   const contextoPermissoes = await carregarContextoPermissoes(db, sessao.membroId)

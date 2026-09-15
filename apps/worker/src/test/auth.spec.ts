@@ -63,7 +63,7 @@ describe('Autenticação e Sessões S03', () => {
   // 1-5: Geração de Link (Admin)
   it('1. Admin pode gerar link de ativação para membro válido', async () => {
     const res = await req(`/api/v1/admin/membros/${membroId}/link-ativacao`, { method: 'POST' })
-    const json = await res.json() as any
+    const json = (await res.json()) as any
     expect(res.status).toBe(201)
     expect(json.token).toBeDefined()
     tokenAtivacaoPuro = json.token
@@ -74,13 +74,17 @@ describe('Autenticação e Sessões S03', () => {
   })
 
   it('3. Link gerado é salvo no banco com token_hash (nunca token puro)', async () => {
-    const link = sqlite.prepare('SELECT * FROM links_ativacao WHERE membro_id = ?').get(membroId) as any
+    const link = sqlite
+      .prepare('SELECT * FROM links_ativacao WHERE membro_id = ?')
+      .get(membroId) as any
     expect(link.token_hash).toBeDefined()
     expect(link.token_hash).not.toBe(tokenAtivacaoPuro)
   })
 
   it('4. Admin não pode gerar link para membro inativo', async () => {
-    const res = await req(`/api/v1/admin/membros/${membroInativoId}/link-ativacao`, { method: 'POST' })
+    const res = await req(`/api/v1/admin/membros/${membroInativoId}/link-ativacao`, {
+      method: 'POST',
+    })
     expect(res.status).toBe(404)
   })
 
@@ -94,7 +98,12 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ celular: '11999999999', dataNascimento: '1990-01-01', pin: '123456', confirmacaoPin: '123456' })
+      body: JSON.stringify({
+        celular: '11999999999',
+        dataNascimento: '1990-01-01',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
     })
     expect(res.status).toBe(400)
   })
@@ -103,7 +112,13 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: '', celular: '11999999999', dataNascimento: '1990-01-01', pin: '123456', confirmacaoPin: '123456' })
+      body: JSON.stringify({
+        token: '',
+        celular: '11999999999',
+        dataNascimento: '1990-01-01',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
     })
     expect(res.status).toBe(400)
   })
@@ -112,7 +127,13 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: 'inexistente12345678', celular: '11999999999', dataNascimento: '1990-01-01', pin: '123456', confirmacaoPin: '123456' })
+      body: JSON.stringify({
+        token: 'inexistente12345678',
+        celular: '11999999999',
+        dataNascimento: '1990-01-01',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
     })
     expect(res.status).toBe(400)
   })
@@ -121,7 +142,12 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: tokenAtivacaoPuro, dataNascimento: '1990-01-01', pin: '123456', confirmacaoPin: '123456' })
+      body: JSON.stringify({
+        token: tokenAtivacaoPuro,
+        dataNascimento: '1990-01-01',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
     })
     expect(res.status).toBe(400)
   })
@@ -130,7 +156,13 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: tokenAtivacaoPuro, celular: '11000000000', dataNascimento: '1990-01-01', pin: '123456', confirmacaoPin: '123456' })
+      body: JSON.stringify({
+        token: tokenAtivacaoPuro,
+        celular: '11000000000',
+        dataNascimento: '1990-01-01',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
     })
     expect(res.status).toBe(400)
   })
@@ -139,7 +171,12 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: tokenAtivacaoPuro, celular: '11999999999', pin: '123456', confirmacaoPin: '123456' })
+      body: JSON.stringify({
+        token: tokenAtivacaoPuro,
+        celular: '11999999999',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
     })
     expect(res.status).toBe(400)
   })
@@ -148,7 +185,13 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: tokenAtivacaoPuro, celular: '11999999999', dataNascimento: '2000-01-01', pin: '123456', confirmacaoPin: '123456' })
+      body: JSON.stringify({
+        token: tokenAtivacaoPuro,
+        celular: '11999999999',
+        dataNascimento: '2000-01-01',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
     })
     expect(res.status).toBe(400)
   })
@@ -157,7 +200,12 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: tokenAtivacaoPuro, celular: '11999999999', dataNascimento: '1990-01-01', confirmacaoPin: '123456' })
+      body: JSON.stringify({
+        token: tokenAtivacaoPuro,
+        celular: '11999999999',
+        dataNascimento: '1990-01-01',
+        confirmacaoPin: '123456',
+      }),
     })
     expect(res.status).toBe(400)
   })
@@ -166,7 +214,13 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: tokenAtivacaoPuro, celular: '11999999999', dataNascimento: '1990-01-01', pin: '12345', confirmacaoPin: '12345' })
+      body: JSON.stringify({
+        token: tokenAtivacaoPuro,
+        celular: '11999999999',
+        dataNascimento: '1990-01-01',
+        pin: '12345',
+        confirmacaoPin: '12345',
+      }),
     })
     expect(res.status).toBe(400)
   })
@@ -175,7 +229,12 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: tokenAtivacaoPuro, celular: '11999999999', dataNascimento: '1990-01-01', pin: '123456' })
+      body: JSON.stringify({
+        token: tokenAtivacaoPuro,
+        celular: '11999999999',
+        dataNascimento: '1990-01-01',
+        pin: '123456',
+      }),
     })
     expect(res.status).toBe(400)
   })
@@ -184,7 +243,13 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: tokenAtivacaoPuro, celular: '11999999999', dataNascimento: '1990-01-01', pin: '123456', confirmacaoPin: '654321' })
+      body: JSON.stringify({
+        token: tokenAtivacaoPuro,
+        celular: '11999999999',
+        dataNascimento: '1990-01-01',
+        pin: '123456',
+        confirmacaoPin: '654321',
+      }),
     })
     expect(res.status).toBe(400)
   })
@@ -194,29 +259,53 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: tokenAtivacaoPuro, celular: '11999999999', dataNascimento: '1990-01-01', pin: '123456', confirmacaoPin: '123456' })
+      body: JSON.stringify({
+        token: tokenAtivacaoPuro,
+        celular: '11999999999',
+        dataNascimento: '1990-01-01',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
     })
     expect(res.status).toBe(400)
     sqlite.exec(`UPDATE membros SET ativo = 1 WHERE id = '${membroId}'`)
   })
 
   it('18. Ativação falha se token já expirou', async () => {
-    sqlite.exec(`UPDATE links_ativacao SET expira_em = '2000-01-01T00:00:00Z' WHERE membro_id = '${membroId}'`)
+    sqlite.exec(
+      `UPDATE links_ativacao SET expira_em = '2000-01-01T00:00:00Z' WHERE membro_id = '${membroId}'`
+    )
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: tokenAtivacaoPuro, celular: '11999999999', dataNascimento: '1990-01-01', pin: '123456', confirmacaoPin: '123456' })
+      body: JSON.stringify({
+        token: tokenAtivacaoPuro,
+        celular: '11999999999',
+        dataNascimento: '1990-01-01',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
     })
     expect(res.status).toBe(400)
-    sqlite.exec(`UPDATE links_ativacao SET expira_em = '2099-01-01T00:00:00Z' WHERE membro_id = '${membroId}'`)
+    sqlite.exec(
+      `UPDATE links_ativacao SET expira_em = '2099-01-01T00:00:00Z' WHERE membro_id = '${membroId}'`
+    )
   })
 
   it('19. Ativação falha se token já foi revogado', async () => {
-    sqlite.exec(`UPDATE links_ativacao SET revogado_em = CURRENT_TIMESTAMP WHERE membro_id = '${membroId}'`)
+    sqlite.exec(
+      `UPDATE links_ativacao SET revogado_em = CURRENT_TIMESTAMP WHERE membro_id = '${membroId}'`
+    )
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: tokenAtivacaoPuro, celular: '11999999999', dataNascimento: '1990-01-01', pin: '123456', confirmacaoPin: '123456' })
+      body: JSON.stringify({
+        token: tokenAtivacaoPuro,
+        celular: '11999999999',
+        dataNascimento: '1990-01-01',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
     })
     expect(res.status).toBe(400)
     sqlite.exec(`UPDATE links_ativacao SET revogado_em = NULL WHERE membro_id = '${membroId}'`)
@@ -227,37 +316,53 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: tokenAtivacaoPuro, celular: '11999999999', dataNascimento: '1990-01-01', pin: '123456', confirmacaoPin: '123456' })
+      body: JSON.stringify({
+        token: tokenAtivacaoPuro,
+        celular: '11999999999',
+        dataNascimento: '1990-01-01',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
     })
     expect(res.status).toBe(200)
-    const json = await res.json() as any
+    const json = (await res.json()) as any
     expect(json.sessionToken).toBeDefined()
     sessionTokenPuro = json.sessionToken
   })
 
   it('21. Ativação bem-sucedida gera pin_hash e pin_salt para o membro', async () => {
-    const membro = sqlite.prepare('SELECT pin_hash, pin_salt FROM membros WHERE id = ?').get(membroId) as any
+    const membro = sqlite
+      .prepare('SELECT pin_hash, pin_salt FROM membros WHERE id = ?')
+      .get(membroId) as any
     expect(membro.pin_hash).not.toBeNull()
     expect(membro.pin_salt).not.toBeNull()
   })
 
   it('22. Ativação bem-sucedida marca autenticacao_ativa como true', async () => {
-    const membro = sqlite.prepare('SELECT autenticacao_ativa FROM membros WHERE id = ?').get(membroId) as any
+    const membro = sqlite
+      .prepare('SELECT autenticacao_ativa FROM membros WHERE id = ?')
+      .get(membroId) as any
     expect(membro.autenticacao_ativa).toBe(1)
   })
 
   it('23. Ativação bem-sucedida zera as tentativas_pin', async () => {
-    const membro = sqlite.prepare('SELECT tentativas_pin FROM membros WHERE id = ?').get(membroId) as any
+    const membro = sqlite
+      .prepare('SELECT tentativas_pin FROM membros WHERE id = ?')
+      .get(membroId) as any
     expect(membro.tentativas_pin).toBe(0)
   })
 
   it('24. Ativação bem-sucedida remove bloqueado_ate se existisse', async () => {
-    const membro = sqlite.prepare('SELECT bloqueado_ate FROM membros WHERE id = ?').get(membroId) as any
+    const membro = sqlite
+      .prepare('SELECT bloqueado_ate FROM membros WHERE id = ?')
+      .get(membroId) as any
     expect(membro.bloqueado_ate).toBeNull()
   })
 
   it('25. Ativação bem-sucedida preenche ativado_em', async () => {
-    const membro = sqlite.prepare('SELECT ativado_em FROM membros WHERE id = ?').get(membroId) as any
+    const membro = sqlite
+      .prepare('SELECT ativado_em FROM membros WHERE id = ?')
+      .get(membroId) as any
     expect(membro.ativado_em).not.toBeNull()
   })
 
@@ -271,7 +376,13 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: tokenAtivacaoPuro, celular: '11999999999', dataNascimento: '1990-01-01', pin: '123456', confirmacaoPin: '123456' })
+      body: JSON.stringify({
+        token: tokenAtivacaoPuro,
+        celular: '11999999999',
+        dataNascimento: '1990-01-01',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
     })
     expect(res.status).toBe(400)
   })
@@ -281,7 +392,7 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin: '123456' })
+      body: JSON.stringify({ pin: '123456' }),
     })
     expect(res.status).toBe(400)
   })
@@ -290,7 +401,7 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identificador: '11999999999' })
+      body: JSON.stringify({ identificador: '11999999999' }),
     })
     expect(res.status).toBe(400)
   })
@@ -299,7 +410,7 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identificador: '11000000000', pin: '123456' })
+      body: JSON.stringify({ identificador: '11000000000', pin: '123456' }),
     })
     expect(res.status).toBe(401)
   })
@@ -309,7 +420,7 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identificador: '11999999999', pin: '123456' })
+      body: JSON.stringify({ identificador: '11999999999', pin: '123456' }),
     })
     expect(res.status).toBe(401)
     sqlite.exec(`UPDATE membros SET ativo = 1 WHERE id = '${membroId}'`)
@@ -320,23 +431,26 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identificador: '11999999999', pin: '123456' })
+      body: JSON.stringify({ identificador: '11999999999', pin: '123456' }),
     })
     expect(res.status).toBe(401)
     sqlite.exec(`UPDATE membros SET autenticacao_ativa = 1 WHERE id = '${membroId}'`)
   })
 
   it('33. Login falha com PIN incorreto', async () => {
+    sqlite.exec('DELETE FROM rate_limits_autenticacao')
     const res = await req('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identificador: '11999999999', pin: '654321' })
+      body: JSON.stringify({ identificador: '11999999999', pin: '654321' }),
     })
     expect(res.status).toBe(401)
   })
 
   it('34. Login com PIN incorreto incrementa tentativas_pin no banco', async () => {
-    const membro = sqlite.prepare('SELECT tentativas_pin FROM membros WHERE id = ?').get(membroId) as any
+    const membro = sqlite
+      .prepare('SELECT tentativas_pin FROM membros WHERE id = ?')
+      .get(membroId) as any
     expect(membro.tentativas_pin).toBe(1)
   })
 
@@ -345,10 +459,12 @@ describe('Autenticação e Sessões S03', () => {
       await req('/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identificador: '11999999999', pin: '000000' })
+        body: JSON.stringify({ identificador: '11999999999', pin: '000000' }),
       })
     }
-    const membro = sqlite.prepare('SELECT tentativas_pin, bloqueado_ate FROM membros WHERE id = ?').get(membroId) as any
+    const membro = sqlite
+      .prepare('SELECT tentativas_pin, bloqueado_ate FROM membros WHERE id = ?')
+      .get(membroId) as any
     expect(membro.tentativas_pin).toBe(5)
     expect(membro.bloqueado_ate).not.toBeNull()
   })
@@ -357,25 +473,30 @@ describe('Autenticação e Sessões S03', () => {
     const res = await req('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identificador: '11999999999', pin: '123456' })
+      body: JSON.stringify({ identificador: '11999999999', pin: '123456' }),
     })
     expect(res.status).toBe(429)
   })
 
   it('37. Login bem-sucedido (após bloqueio expirado) zera contadores e gera token de sessão', async () => {
-    sqlite.exec(`UPDATE membros SET bloqueado_ate = '2000-01-01T00:00:00Z' WHERE id = '${membroId}'`)
-    
+    sqlite.exec(
+      `UPDATE membros SET bloqueado_ate = '2000-01-01T00:00:00Z' WHERE id = '${membroId}'`
+    )
+    sqlite.exec(`UPDATE rate_limits_autenticacao SET bloqueado_ate = '2000-01-01T00:00:00Z'`)
+
     const res = await req('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identificador: '11999999999', pin: '123456' })
+      body: JSON.stringify({ identificador: '11999999999', pin: '123456' }),
     })
-    
+
     expect(res.status).toBe(200)
-    const json = await res.json() as any
+    const json = (await res.json()) as any
     sessionTokenPuro = json.sessionToken
-    
-    const membro = sqlite.prepare('SELECT tentativas_pin, bloqueado_ate FROM membros WHERE id = ?').get(membroId) as any
+
+    const membro = sqlite
+      .prepare('SELECT tentativas_pin, bloqueado_ate FROM membros WHERE id = ?')
+      .get(membroId) as any
     expect(membro.tentativas_pin).toBe(0)
     expect(membro.bloqueado_ate).toBeNull()
   })
@@ -383,35 +504,123 @@ describe('Autenticação e Sessões S03', () => {
   // 38-40: Sessão, Logout e Recuperação
   it('38. Endpoint protegido /auth/me/vinculos retorna 200 com os dados corretos', async () => {
     const res = await req('/api/v1/auth/me/vinculos', {
-      headers: { 'Authorization': `Bearer ${sessionTokenPuro}` }
+      headers: { Authorization: `Bearer ${sessionTokenPuro}` },
     })
     expect(res.status).toBe(200)
-    const json = await res.json() as any
+    const json = (await res.json()) as any
     expect(json.vinculosAtivos).toHaveLength(1)
+  })
+
+  it('38.1 Sessão expira por inatividade após 12 horas', async () => {
+    sqlite.exec(
+      `UPDATE sessoes SET ultimo_acesso_em = '2000-01-01T00:00:00.000Z' WHERE token_hash = (SELECT token_hash FROM sessoes WHERE membro_id = '${membroId}' AND revogado_em IS NULL ORDER BY created_at DESC LIMIT 1)`
+    )
+
+    const res = await req('/api/v1/auth/me', {
+      headers: { Authorization: `Bearer ${sessionTokenPuro}` },
+    })
+
+    expect(res.status).toBe(401)
+    sqlite.exec(
+      `UPDATE sessoes SET ultimo_acesso_em = CURRENT_TIMESTAMP WHERE membro_id = '${membroId}' AND revogado_em IS NULL`
+    )
+  })
+
+  it('38.2 Sessão expira após 30 dias mesmo com atividade recente', async () => {
+    sqlite.exec(
+      `UPDATE sessoes SET created_at = '2000-01-01T00:00:00.000Z', ultimo_acesso_em = CURRENT_TIMESTAMP, expira_em = '2099-01-01T00:00:00.000Z' WHERE membro_id = '${membroId}' AND revogado_em IS NULL`
+    )
+
+    const res = await req('/api/v1/auth/me', {
+      headers: { Authorization: `Bearer ${sessionTokenPuro}` },
+    })
+
+    expect(res.status).toBe(401)
+    sqlite.exec(
+      `UPDATE sessoes SET created_at = CURRENT_TIMESTAMP, ultimo_acesso_em = CURRENT_TIMESTAMP WHERE membro_id = '${membroId}' AND revogado_em IS NULL`
+    )
   })
 
   it('39. Logout revoga a sessão e bloqueia acessos subsequentes', async () => {
     const resLogout = await req('/api/v1/auth/logout', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${sessionTokenPuro}` }
+      headers: { Authorization: `Bearer ${sessionTokenPuro}` },
     })
     expect(resLogout.status).toBe(200)
 
     const resMe = await req('/api/v1/auth/me', {
-      headers: { 'Authorization': `Bearer ${sessionTokenPuro}` }
+      headers: { Authorization: `Bearer ${sessionTokenPuro}` },
     })
     expect(resMe.status).toBe(401)
   })
 
+  it('39.1 Logout revoga somente a sessão atual', async () => {
+    const primeiroLogin = await req('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identificador: '11999999999', pin: '123456' }),
+    })
+    const primeiroToken = ((await primeiroLogin.json()) as any).sessionToken
+    const segundoLogin = await req('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identificador: '11999999999', pin: '123456' }),
+    })
+    const segundoToken = ((await segundoLogin.json()) as any).sessionToken
+
+    await req('/api/v1/auth/logout', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${primeiroToken}` },
+    })
+    const outraSessao = await req('/api/v1/auth/me', {
+      headers: { Authorization: `Bearer ${segundoToken}` },
+    })
+    expect(outraSessao.status).toBe(200)
+  })
+
+  it('39.2 Rate limit protege identificador inexistente sem persistir seu valor', async () => {
+    for (let tentativa = 0; tentativa < 5; tentativa++) {
+      await req('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identificador: '11966666666', pin: '123456' }),
+      })
+    }
+
+    const limite = sqlite
+      .prepare('SELECT * FROM rate_limits_autenticacao WHERE falhas_consecutivas = 5')
+      .get() as any
+    expect(limite).toBeDefined()
+    expect(limite.chave_hash).not.toContain('11966666666')
+
+    const bloqueada = await req('/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identificador: '11966666666', pin: '123456' }),
+    })
+    expect(bloqueada.status).toBe(429)
+    expect(Number(bloqueada.headers.get('Retry-After'))).toBeGreaterThan(0)
+    const aposBloqueio = sqlite
+      .prepare('SELECT falhas_consecutivas FROM rate_limits_autenticacao WHERE chave_hash = ?')
+      .get(limite.chave_hash) as any
+    expect(aposBloqueio.falhas_consecutivas).toBe(5)
+  })
+
   it('40. Reset administrativo limpa PIN e revoga todas as sessões e links', async () => {
-    const resReset = await req(`/api/v1/admin/membros/${membroId}/reset-autenticacao`, { method: 'POST' })
+    const resReset = await req(`/api/v1/admin/membros/${membroId}/reset-autenticacao`, {
+      method: 'POST',
+    })
     expect(resReset.status).toBe(200)
 
-    const membro = sqlite.prepare('SELECT pin_hash, autenticacao_ativa FROM membros WHERE id = ?').get(membroId) as any
+    const membro = sqlite
+      .prepare('SELECT pin_hash, autenticacao_ativa FROM membros WHERE id = ?')
+      .get(membroId) as any
     expect(membro.pin_hash).toBeNull()
     expect(membro.autenticacao_ativa).toBe(0)
 
-    const sessoesCount = sqlite.prepare('SELECT COUNT(*) as count FROM sessoes WHERE membro_id = ? AND revogado_em IS NULL').get(membroId) as any
+    const sessoesCount = sqlite
+      .prepare('SELECT COUNT(*) as count FROM sessoes WHERE membro_id = ? AND revogado_em IS NULL')
+      .get(membroId) as any
     expect(sessoesCount.count).toBe(0)
   })
 
@@ -419,7 +628,7 @@ describe('Autenticação e Sessões S03', () => {
     // Membro 1 acabou de ser resetado no teste 40.
     // Vamos gerar um novo link de ativação
     const resLink = await req(`/api/v1/admin/membros/${membroId}/link-ativacao`, { method: 'POST' })
-    const { token } = await resLink.json() as any
+    const { token } = (await resLink.json()) as any
 
     // Criamos um gatilho temporário no SQLite para forçar um erro na tabela sessoes
     // Como a sessão é inserida no final do executeAtomic de ativação, as tabelas links_ativacao e membros
@@ -435,7 +644,13 @@ describe('Autenticação e Sessões S03', () => {
     const resAtivar = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, celular: '11999999999', dataNascimento: '1990-01-01', pin: '654321', confirmacaoPin: '654321' })
+      body: JSON.stringify({
+        token,
+        celular: '11999999999',
+        dataNascimento: '1990-01-01',
+        pin: '654321',
+        confirmacaoPin: '654321',
+      }),
     })
 
     // Deve falhar pois o banco rejeitou o insert
@@ -446,11 +661,17 @@ describe('Autenticação e Sessões S03', () => {
 
     // VERIFICAÇÃO DO ROLLBACK
     // 1. O link gerado NÃO deve ter sido marcado como utilizado
-    const linkBanco = sqlite.prepare('SELECT utilizado_em FROM links_ativacao WHERE membro_id = ? ORDER BY created_at DESC LIMIT 1').get(membroId) as any
+    const linkBanco = sqlite
+      .prepare(
+        'SELECT utilizado_em FROM links_ativacao WHERE membro_id = ? ORDER BY created_at DESC LIMIT 1'
+      )
+      .get(membroId) as any
     expect(linkBanco.utilizado_em).toBeNull()
 
     // 2. O membro NÃO deve ter recebido a autenticacao_ativa (pois deu erro no final)
-    const membro = sqlite.prepare('SELECT autenticacao_ativa, pin_hash FROM membros WHERE id = ?').get(membroId) as any
+    const membro = sqlite
+      .prepare('SELECT autenticacao_ativa, pin_hash FROM membros WHERE id = ?')
+      .get(membroId) as any
     expect(membro.autenticacao_ativa).toBe(0)
     expect(membro.pin_hash).toBeNull()
   })
@@ -460,7 +681,7 @@ describe('Autenticação e Sessões S03', () => {
     const salt = gerarSalt()
     const pepper = 'meu-pepper'
     const phc = await hashPin('123456', salt, pepper)
-    
+
     // $v1$pbkdf2-sha256$i=100000$salt$hash
     const parts = phc.split('$')
     expect(parts.length).toBe(6)
@@ -473,13 +694,13 @@ describe('Autenticação e Sessões S03', () => {
   it('43. Pepper correto e incorreto funcionam conforme esperado', async () => {
     const { hashPin, verifyPin, gerarSalt } = await import('../security/pin')
     const salt = gerarSalt()
-    
+
     const pin = '123456'
     const pepperCerto = 'chave-secreta'
     const pepperErrado = 'outra-chave'
-    
+
     const phc = await hashPin(pin, salt, pepperCerto)
-    
+
     // Testa pepper correto
     const valido = await verifyPin(pin, pepperCerto, phc)
     expect(valido).toBe(true)
@@ -491,25 +712,33 @@ describe('Autenticação e Sessões S03', () => {
 
   it('44. Versão desconhecida de Hash deve ser rejeitada', async () => {
     const { verifyPin } = await import('../security/pin')
-    
+
     // $v2 não é suportado, deve retornar falso e não quebrar a aplicação
     const pin = '123456'
     const fakePhc = '$v2$pbkdf2-sha256$i=100000$salt$hash'
-    
+
     const valido = await verifyPin(pin, 'pepper', fakePhc)
     expect(valido).toBe(false)
   })
 
   it('45. Login com celular normalizado', async () => {
     // a) gerar link para esse membro ativo
-    const resLink = await req(`/api/v1/admin/membros/${membroAtivoNormalizadoId}/link-ativacao`, { method: 'POST' })
-    const { token } = await resLink.json() as any
+    const resLink = await req(`/api/v1/admin/membros/${membroAtivoNormalizadoId}/link-ativacao`, {
+      method: 'POST',
+    })
+    const { token } = (await resLink.json()) as any
 
     // b) ativar usando celular nacional normalizado (o backend espera string numérica ou transformará no schema)
     const resAtivar = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, celular: '11977777777', dataNascimento: '1990-01-01', pin: '654321', confirmacaoPin: '654321' })
+      body: JSON.stringify({
+        token,
+        celular: '11977777777',
+        dataNascimento: '1990-01-01',
+        pin: '654321',
+        confirmacaoPin: '654321',
+      }),
     })
     expect(resAtivar.status).toBe(200)
 
@@ -517,12 +746,12 @@ describe('Autenticação e Sessões S03', () => {
     const resLogin = await req('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identificador: '+55 11 97777-7777', pin: '654321' })
+      body: JSON.stringify({ identificador: '+55 11 97777-7777', pin: '654321' }),
     })
-    
+
     // d) esperar 200
     expect(resLogin.status).toBe(200)
-    const json = await resLogin.json() as any
+    const json = (await resLogin.json()) as any
     expect(json.sessionToken).toBeDefined()
   })
 })
