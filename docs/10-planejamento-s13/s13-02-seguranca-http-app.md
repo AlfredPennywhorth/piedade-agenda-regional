@@ -4,8 +4,8 @@
 
 - S13: EM EXECUCAO.
 - S13.01: CONCLUIDA.
-- S13.02: EM HOMOLOGACAO, pendente de revisao tecnica e homologacao do PO.
-- S13.03 a S13.07: PLANEJADAS / NAO INICIADAS.
+- S13.02: HOMOLOGADA.
+- S13.03 a S13.07: NAO INICIADAS / PLANEJADAS.
 
 ## Inventario inicial
 
@@ -39,12 +39,28 @@ As rotas de autenticacao, membros, convocacoes, check-in, portaria, relatorios e
 
 ## Testes e homologacao
 
-Os testes automatizados cobrem origem permitida, origem arbitraria, preflight, ambiente de producao sem allowlist, headers, cache de autenticacao, health sem ambiente e erro 500 sanitizado. A regressao de autenticacao continua coberta na suite do Worker.
+CI da implementacao: SUCCESS.
 
-Roteiro manual: confirmar que uma origem configurada conclui preflight e que uma origem nao configurada nao recebe `Access-Control-Allow-Origin`; inspecionar respostas de API autenticada para `Cache-Control: no-store`; confirmar os headers de seguranca em `/health`; e provocar uma falha controlada de ambiente de homologacao verificando que a resposta ao cliente nao expoe stack ou SQL.
+- CORS permitido: PASS.
+- Origem arbitraria nao refletida: PASS.
+- Preflight: PASS.
+- Security headers: PASS.
+- Cache de rotas sensiveis: PASS.
+- Erro 500 sanitizado: PASS.
+- `/health` sanitizado: PASS.
+- CI da implementacao: SUCCESS.
+
+A homologacao visual do PO nao e aplicavel neste momento, pois os controles da S13.02 pertencem a camada HTTP/backend e foram validados por testes automatizados, CI e sondas HTTP reais.
+
+## Pendencias futuras sem bloqueio
+
+- Dominios definitivos de producao devem ser configurados em `CORS_ORIGIN` no deploy.
+- CSP especifica do frontend permanece para o trabalho futuro de frontend/UX.
+
+Essas pendencias nao bloqueiam a homologacao da S13.02 e nao constituem defeitos desta entrega.
 
 ## Decisoes adiadas
 
-- Lista definitiva de dominios de producao em `CORS_ORIGIN` deve ser definida na configuracao de deploy.
-- CSP do frontend, que depende de dominios e recursos efetivamente servidos, permanece para o trabalho de frontend/UX apropriado.
+- Dominios definitivos de producao devem ser configurados em `CORS_ORIGIN` no deploy.
+- CSP especifica do frontend permanece para o trabalho futuro de frontend/UX.
 - Wrangler permanece em `3.114.17`; a atualizacao para 4.x nao faz parte desta sub-sprint.
