@@ -3,7 +3,7 @@
 ## Status
 
 - S13: EM EXECUCAO.
-- S13.01: EM EXECUCAO, pendente de PR, revisao tecnica e homologacao do PO.
+- S13.01: EM HOMOLOGACAO, pendente de revisao tecnica e homologacao do PO.
 - S13.02 a S13.07: PLANEJADAS / NAO INICIADAS.
 
 ## Decisoes mantidas

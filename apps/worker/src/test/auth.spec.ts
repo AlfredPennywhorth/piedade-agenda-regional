@@ -606,6 +606,39 @@ describe('Autenticação e Sessões S03', () => {
     expect(aposBloqueio.falhas_consecutivas).toBe(5)
   })
 
+  it('39.3 Rate limit aplica todas as faixas progressivas e conserva 15 minutos após a décima falha', async () => {
+    sqlite.exec('DELETE FROM rate_limits_autenticacao')
+    const identificador = '11955555555'
+    const bloqueiosEsperados = [30, 60, 120, 300, 600, 900, 900]
+
+    for (let falha = 1; falha <= 11; falha++) {
+      const resposta = await req('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identificador, pin: '123456' }),
+      })
+
+      if (falha < 5) {
+        expect(resposta.status).toBe(401)
+        continue
+      }
+
+      expect(resposta.status).toBe(429)
+      const bloqueioEsperado = bloqueiosEsperados[falha - 5]
+      expect(Number(resposta.headers.get('Retry-After'))).toBeGreaterThanOrEqual(
+        bloqueioEsperado - 1
+      )
+
+      const limite = sqlite
+        .prepare('SELECT chave_hash, falhas_consecutivas FROM rate_limits_autenticacao')
+        .get() as any
+      expect(limite.falhas_consecutivas).toBe(falha)
+      sqlite
+        .prepare('UPDATE rate_limits_autenticacao SET bloqueado_ate = ? WHERE chave_hash = ?')
+        .run('2000-01-01T00:00:00.000Z', limite.chave_hash)
+    }
+  })
+
   it('40. Reset administrativo limpa PIN e revoga todas as sessões e links', async () => {
     const resReset = await req(`/api/v1/admin/membros/${membroId}/reset-autenticacao`, {
       method: 'POST',
