@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Context, Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { loginSchema } from '@piedade/shared'
 import * as schema from '../../db/schema'
@@ -9,10 +9,95 @@ import { executeAtomic } from '../../db/batch'
 import { Env } from '../../index'
 export const loginApp = new Hono<{ Bindings: Env; Variables: { db: any } }>()
 
-const LIMITE_TENTATIVAS = 5
-const TEMPO_BLOQUEIO_MS = 15 * 60 * 1000 // 15 minutos
+const RETENCAO_RATE_LIMIT_MS = 24 * 60 * 60 * 1000
+const BLOQUEIOS_PROGRESSIVOS_MS: Record<number, number> = {
+  5: 30 * 1000,
+  6: 60 * 1000,
+  7: 2 * 60 * 1000,
+  8: 5 * 60 * 1000,
+  9: 10 * 60 * 1000,
+}
+const BLOQUEIO_MAXIMO_MS = 15 * 60 * 1000
 
-loginApp.post('/', async (c) => {
+function obterDuracaoBloqueio(falhas: number) {
+  return BLOQUEIOS_PROGRESSIVOS_MS[falhas] ?? (falhas >= 10 ? BLOQUEIO_MAXIMO_MS : 0)
+}
+
+function respostaBloqueada(c: Context, bloqueadoAte: Date, agora: Date) {
+  const retryAfter = Math.max(1, Math.ceil((bloqueadoAte.getTime() - agora.getTime()) / 1000))
+  c.header('Retry-After', String(retryAfter))
+  return c.json({ error: 'Credenciais inválidas' }, 429)
+}
+
+async function registrarFalha(
+  db: any,
+  rateLimit: typeof schema.rateLimitsAutenticacao.$inferSelect | undefined,
+  chaveHash: string,
+  membroId: string | undefined,
+  agora: Date
+) {
+  const falhasAnteriores =
+    rateLimit && new Date(rateLimit.expiraEm) > agora ? rateLimit.falhasConsecutivas : 0
+  const falhasConsecutivas = falhasAnteriores + 1
+  const duracaoBloqueio = obterDuracaoBloqueio(falhasConsecutivas)
+  const bloqueadoAte = duracaoBloqueio
+    ? new Date(agora.getTime() + duracaoBloqueio).toISOString()
+    : null
+  const expiraEm = new Date(agora.getTime() + RETENCAO_RATE_LIMIT_MS).toISOString()
+
+  await executeAtomic(db, tx => {
+    const queries = [
+      tx.insert(schema.tentativasAcesso).values({
+        id: crypto.randomUUID(),
+        membroId: membroId ?? null,
+        tipo: 'LOGIN_PIN',
+        sucesso: false,
+        motivo: 'Credenciais inválidas',
+      }),
+    ]
+    if (membroId) {
+      queries.push(
+        tx
+          .update(schema.membros)
+          .set({
+            tentativasPin: falhasConsecutivas,
+            bloqueadoAte,
+            updatedAt: agora.toISOString(),
+          })
+          .where(eq(schema.membros.id, membroId))
+      )
+    }
+    if (rateLimit && new Date(rateLimit.expiraEm) > agora) {
+      queries.push(
+        tx
+          .update(schema.rateLimitsAutenticacao)
+          .set({
+            falhasConsecutivas,
+            bloqueadoAte,
+            expiraEm,
+            updatedAt: agora.toISOString(),
+          })
+          .where(eq(schema.rateLimitsAutenticacao.chaveHash, chaveHash))
+      )
+    } else {
+      queries.push(
+        tx.insert(schema.rateLimitsAutenticacao).values({
+          chaveHash,
+          falhasConsecutivas,
+          bloqueadoAte,
+          expiraEm,
+          createdAt: agora.toISOString(),
+          updatedAt: agora.toISOString(),
+        })
+      )
+    }
+    return queries
+  })
+
+  return { bloqueadoAte, falhasConsecutivas }
+}
+
+loginApp.post('/', async c => {
   const body = await c.req.json()
   const result = loginSchema.safeParse(body)
 
@@ -21,13 +106,32 @@ loginApp.post('/', async (c) => {
   }
 
   const { identificador, pin } = result.data
-  
+
   const db = c.get('db')
   if (!db) {
     return c.json({ error: 'Banco de dados indisponível', code: 'INTERNAL_ERROR' }, 500)
   }
 
   const agora = new Date()
+  const chaveHash = await hashToken(identificador)
+
+  const [rateLimit] = await db
+    .select()
+    .from(schema.rateLimitsAutenticacao)
+    .where(eq(schema.rateLimitsAutenticacao.chaveHash, chaveHash))
+    .limit(1)
+
+  if (rateLimit && new Date(rateLimit.expiraEm) <= agora) {
+    await db
+      .delete(schema.rateLimitsAutenticacao)
+      .where(eq(schema.rateLimitsAutenticacao.chaveHash, chaveHash))
+      .execute()
+  } else if (rateLimit?.bloqueadoAte) {
+    const bloqueadoAte = new Date(rateLimit.bloqueadoAte)
+    if (agora < bloqueadoAte) {
+      return respostaBloqueada(c, bloqueadoAte, agora)
+    }
+  }
 
   const [membro] = await db
     .select()
@@ -39,28 +143,11 @@ loginApp.post('/', async (c) => {
   const errorMsg = 'Credenciais inválidas'
 
   if (!membro || !membro.ativo || !membro.autenticacaoAtiva) {
-    await db.insert(schema.tentativasAcesso).values({
-      id: crypto.randomUUID(),
-      membroId: membro?.id || null,
-      tipo: 'LOGIN_PIN',
-      sucesso: false,
-      motivo: !membro ? 'Membro não encontrado' : 'Membro inativo ou não ativado'
-    })
-    return c.json({ error: errorMsg }, 401)
-  }
-
-  if (membro.bloqueadoAte) {
-    const bloqueadoAte = new Date(membro.bloqueadoAte)
-    if (agora < bloqueadoAte) {
-      await db.insert(schema.tentativasAcesso).values({
-        id: crypto.randomUUID(),
-        membroId: membro.id,
-        tipo: 'LOGIN_PIN',
-        sucesso: false,
-        motivo: 'Conta temporariamente bloqueada'
-      })
-      return c.json({ error: 'Muitas tentativas inválidas. Tente novamente mais tarde.' }, 429)
+    const falha = await registrarFalha(db, rateLimit, chaveHash, membro?.id, agora)
+    if (falha.bloqueadoAte) {
+      return respostaBloqueada(c, new Date(falha.bloqueadoAte), agora)
     }
+    return c.json({ error: errorMsg }, 401)
   }
 
   // Verificar PIN
@@ -68,60 +155,38 @@ loginApp.post('/', async (c) => {
   const pinValido = await verifyPin(pin, pepper, membro.pinHash!)
 
   if (!pinValido) {
-    const tentativas = membro.tentativasPin + 1
-    const bloqueadoAteStr = tentativas >= LIMITE_TENTATIVAS 
-      ? new Date(agora.getTime() + TEMPO_BLOQUEIO_MS).toISOString() 
-      : null
-
-    await executeAtomic(db, (tx) => [
-      tx.update(schema.membros)
-        .set({
-          tentativasPin: tentativas,
-          bloqueadoAte: bloqueadoAteStr,
-          updatedAt: agora.toISOString()
-        })
-        .where(eq(schema.membros.id, membro.id)),
-      tx.insert(schema.tentativasAcesso).values({
-        id: crypto.randomUUID(),
-        membroId: membro.id,
-        tipo: 'LOGIN_PIN',
-        sucesso: false,
-        motivo: 'PIN inválido'
-      })
-    ])
-
+    const falha = await registrarFalha(db, rateLimit, chaveHash, membro.id, agora)
+    if (falha.bloqueadoAte) {
+      return respostaBloqueada(c, new Date(falha.bloqueadoAte), agora)
+    }
     return c.json({ error: errorMsg }, 401)
   }
 
-  // Sucesso no PIN
   const sessionToken = gerarTokenAleatorio()
   const hashedSessionToken = await hashToken(sessionToken)
-  const expiraEm = new Date(agora.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 dias
+  const expiraEm = new Date(agora.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
-  await executeAtomic(db, (tx) => [
-    // Zera contadores
-    tx.update(schema.membros)
-      .set({
-        tentativasPin: 0,
-        bloqueadoAte: null,
-        updatedAt: agora.toISOString()
-      })
+  await executeAtomic(db, tx => [
+    tx
+      .update(schema.membros)
+      .set({ tentativasPin: 0, bloqueadoAte: null, updatedAt: agora.toISOString() })
       .where(eq(schema.membros.id, membro.id)),
-    // Cria sessão
+    tx
+      .delete(schema.rateLimitsAutenticacao)
+      .where(eq(schema.rateLimitsAutenticacao.chaveHash, chaveHash)),
     tx.insert(schema.sessoes).values({
       id: crypto.randomUUID(),
       membroId: membro.id,
       tokenHash: hashedSessionToken,
       expiraEm,
-      userAgent: c.req.header('User-Agent') || null
+      userAgent: c.req.header('User-Agent') || null,
     }),
-    // Registra tentativa
     tx.insert(schema.tentativasAcesso).values({
       id: crypto.randomUUID(),
       membroId: membro.id,
       tipo: 'LOGIN_PIN',
-      sucesso: true
-    })
+      sucesso: true,
+    }),
   ])
 
   return c.json({ sessionToken }, 200)

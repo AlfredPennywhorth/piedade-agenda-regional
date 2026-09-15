@@ -9,7 +9,7 @@ import { executeAtomic } from '../../db/batch'
 import { Env } from '../../index'
 export const ativacaoApp = new Hono<{ Bindings: Env; Variables: { db: any } }>()
 
-ativacaoApp.post('/', async (c) => {
+ativacaoApp.post('/', async c => {
   const body = await c.req.json()
   const result = ativacaoSchema.safeParse(body)
 
@@ -31,7 +31,7 @@ ativacaoApp.post('/', async (c) => {
   const [queryResult] = await db
     .select({
       link: schema.linksAtivacao,
-      membro: schema.membros
+      membro: schema.membros,
     })
     .from(schema.linksAtivacao)
     .innerJoin(schema.membros, eq(schema.linksAtivacao.membroId, schema.membros.id))
@@ -52,7 +52,7 @@ ativacaoApp.post('/', async (c) => {
       membroId: queryResult?.link?.membroId || null,
       tipo: 'ATIVACAO',
       sucesso: false,
-      motivo: 'Token inválido, expirado ou revogado'
+      motivo: 'Token inválido, expirado ou revogado',
     })
     return c.json({ error: 'Link de ativação inválido ou expirado' }, 400)
   }
@@ -65,7 +65,7 @@ ativacaoApp.post('/', async (c) => {
       membroId: membro.id,
       tipo: 'ATIVACAO',
       sucesso: false,
-      motivo: 'Membro inativo'
+      motivo: 'Membro inativo',
     })
     return c.json({ error: 'Link de ativação inválido ou expirado' }, 400)
   }
@@ -76,7 +76,7 @@ ativacaoApp.post('/', async (c) => {
       membroId: membro.id,
       tipo: 'ATIVACAO',
       sucesso: false,
-      motivo: 'Dados cadastrais não conferem'
+      motivo: 'Dados cadastrais não conferem',
     })
     return c.json({ error: 'Dados informados não conferem com o cadastro' }, 400)
   }
@@ -92,19 +92,21 @@ ativacaoApp.post('/', async (c) => {
   const expiraEmSessao = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 dias
 
   // Executa as operações
-  await executeAtomic(db, (tx) => {
+  await executeAtomic(db, tx => {
     const dbBatch = []
 
     // 1. Marcar link como utilizado
     dbBatch.push(
-      tx.update(schema.linksAtivacao)
+      tx
+        .update(schema.linksAtivacao)
         .set({ utilizadoEm: agora, updatedAt: agora })
         .where(eq(schema.linksAtivacao.id, link.id))
     )
 
     // 2. Atualizar membro
     dbBatch.push(
-      tx.update(schema.membros)
+      tx
+        .update(schema.membros)
         .set({
           autenticacaoAtiva: true,
           pinHash: hashedPin,
@@ -112,9 +114,16 @@ ativacaoApp.post('/', async (c) => {
           tentativasPin: 0,
           bloqueadoAte: null,
           ativadoEm: agora,
-          updatedAt: agora
+          updatedAt: agora,
         })
         .where(eq(schema.membros.id, membro.id))
+    )
+
+    dbBatch.push(
+      tx
+        .update(schema.sessoes)
+        .set({ revogadoEm: agora })
+        .where(and(eq(schema.sessoes.membroId, membro.id), isNull(schema.sessoes.revogadoEm)))
     )
 
     // 3. Registrar tentativa de sucesso
@@ -123,7 +132,7 @@ ativacaoApp.post('/', async (c) => {
         id: crypto.randomUUID(),
         membroId: membro.id,
         tipo: 'ATIVACAO',
-        sucesso: true
+        sucesso: true,
       })
     )
 
@@ -134,15 +143,18 @@ ativacaoApp.post('/', async (c) => {
         membroId: membro.id,
         tokenHash: hashedSessionToken,
         expiraEm: expiraEmSessao,
-        userAgent: c.req.header('User-Agent') || null
+        userAgent: c.req.header('User-Agent') || null,
       })
     )
 
     return dbBatch
   })
 
-  return c.json({
-    message: 'Ativação concluída com sucesso',
-    sessionToken // Token puro retornado 1 única vez
-  }, 200)
+  return c.json(
+    {
+      message: 'Ativação concluída com sucesso',
+      sessionToken, // Token puro retornado 1 única vez
+    },
+    200
+  )
 })
