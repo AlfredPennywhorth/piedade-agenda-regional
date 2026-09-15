@@ -53,24 +53,49 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
 
   // Middlewares globais
   app.use('*', logger())
+  app.use('*', async (c, next) => {
+    c.header(
+      'Content-Security-Policy',
+      "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
+    )
+    c.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+    c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
+    c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    c.header('X-Content-Type-Options', 'nosniff')
+    c.header('X-Frame-Options', 'DENY')
+    await next()
+  })
   app.use(
     '/api/*',
     cors({
       origin: (origin, c) => {
-        const allowed = ['http://localhost:5173']
+        const allowed = c.env?.APP_ENV === 'production' ? [] : ['http://localhost:5173']
         const customOrigin = c.env?.CORS_ORIGIN
         if (customOrigin) {
-          const origins = customOrigin.split(',').map((o: string) => o.trim()).filter(Boolean)
+          const origins = customOrigin
+            .split(',')
+            .map((o: string) => o.trim())
+            .filter(Boolean)
           allowed.push(...origins)
         }
-        if (origin && allowed.includes(origin)) {
-          return origin
-        }
-        return allowed[0]
+        return origin && allowed.includes(origin) ? origin : ''
       },
-      allowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+      allowMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     })
   )
+
+  const noStore = async (c: any, next: any) => {
+    c.header('Cache-Control', 'no-store')
+    c.header('Pragma', 'no-cache')
+    await next()
+  }
+  app.use('/api/v1/auth/*', noStore)
+  app.use('/api/v1/membros/*', noStore)
+  app.use('/api/v1/convocacoes/*', noStore)
+  app.use('/api/v1/checkin/*', noStore)
+  app.use('/api/v1/portaria/*', noStore)
+  app.use('/api/v1/relatorios/*', noStore)
+  app.use('/api/v1/auditoria/*', noStore)
 
   // ============================================================
   // Rotas de infraestrutura — S00
@@ -88,7 +113,6 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.get('/health', c => {
     return c.json({
       healthy: true,
-      env: c.env?.APP_ENV ?? 'unknown',
       ts: new Date().toISOString(),
     })
   })
@@ -169,6 +193,11 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   // 404 padrão
   app.notFound(c => {
     return c.json({ error: 'Rota não encontrada' }, 404)
+  })
+
+  app.onError((_error, c) => {
+    console.error('Erro interno da aplicação')
+    return c.json({ error: 'Erro interno do servidor', code: 'INTERNAL_ERROR' }, 500)
   })
 
   return app
