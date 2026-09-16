@@ -53,3 +53,13 @@ export async function postWithAuth<T = any>(endpoint: string, body: any): Promis
     body: JSON.stringify(body)
   })
 }
+
+export async function patchWithAuth<T = any>(endpoint: string, body: any): Promise<T> {
+  return fetchWithAuth<T>(endpoint, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  })
+}

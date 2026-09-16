@@ -6,10 +6,11 @@ import { NotificacoesControl } from './components/notificacoes/NotificacoesContr
 import { PortariaView } from './components/portaria/PortariaView'
 import { RelatoriosView } from './components/relatorios/RelatoriosView'
 import { AuditoriaView } from './components/auditoria/AuditoriaView'
+import { RegionaisView } from './components/regionais/RegionaisView'
 import { fetchWithAuth } from './api/apiClient'
 
 function App() {
-  const [currentTab, setCurrentTab] = useState<'agenda' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria'>('agenda')
+  const [currentTab, setCurrentTab] = useState<'agenda' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais'>('agenda')
   const [capacidades, setCapacidades] = useState<CapacidadesFrontend>({})
 
   useEffect(() => {
@@ -29,6 +30,7 @@ function App() {
       {currentTab === 'portaria' && <PortariaView />}
       {currentTab === 'relatorios' && <RelatoriosView />}
       {currentTab === 'auditoria' && <AuditoriaView />}
+      {currentTab === 'regionais' && <RegionaisView />}
       
       {currentTab === 'avisos' && (
         <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
