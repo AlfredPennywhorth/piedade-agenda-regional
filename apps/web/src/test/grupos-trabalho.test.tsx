@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { GruposTrabalhoView } from '../components/grupos-trabalho/GruposTrabalhoView'
 import * as apiClient from '../api/apiClient'
 
@@ -67,8 +67,10 @@ describe('S01 — GruposTrabalhoView (Gestão de Grupos de Trabalho)', () => {
     const btnDetalhes = await screen.findByText('Detalhes')
     fireEvent.click(btnDetalhes)
 
-    expect(await screen.findByText('Detalhes do Grupo de Trabalho')).toBeInTheDocument()
-    expect(screen.getByText('Coral')).toBeInTheDocument()
+    const dialog = await screen.findByRole('dialog')
+    
+    expect(within(dialog).getByText('Detalhes do Grupo de Trabalho')).toBeInTheDocument()
+    expect(within(dialog).getByText('Coral')).toBeInTheDocument()
   })
 
   it('4. Criar: deve validar envio e chamar post com sucesso', async () => {
@@ -87,7 +89,7 @@ describe('S01 — GruposTrabalhoView (Gestão de Grupos de Trabalho)', () => {
     fireEvent.change(screen.getByLabelText(/Nome do Grupo/i), { target: { value: 'Novo Grupo' } })
     
     // regional radio is selected by default, so we pick the regional
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'reg-1' } })
+    fireEvent.change(screen.getByLabelText(/Regional/i), { target: { value: 'reg-1' } })
 
     fireEvent.click(screen.getByText('Salvar Grupo'))
 

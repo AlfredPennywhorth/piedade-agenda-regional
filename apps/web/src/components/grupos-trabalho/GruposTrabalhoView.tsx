@@ -293,8 +293,9 @@ export function GruposTrabalhoView() {
 
       {/* Filtro */}
       <div className="flex items-center space-x-2 mb-4">
-        <label className="text-sm font-medium text-slate-700">Filtrar por Escopo:</label>
+        <label htmlFor="filtro-escopo" className="text-sm font-medium text-slate-700">Filtrar por Escopo:</label>
         <select
+          id="filtro-escopo"
           value={filtroEscopo}
           onChange={(e) => setFiltroEscopo(e.target.value as any)}
           className="px-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
@@ -382,8 +383,8 @@ export function GruposTrabalhoView() {
 
               {tipoEscopo === 'regional' && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Regional <span className="text-red-500">*</span></label>
-                  <select value={regionalId} onChange={(e) => setRegionalId(e.target.value)} disabled={salvando} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
+                  <label htmlFor="select-regional" className="block text-xs font-semibold text-slate-700 mb-1">Regional <span className="text-red-500">*</span></label>
+                  <select id="select-regional" value={regionalId} onChange={(e) => setRegionalId(e.target.value)} disabled={salvando} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
                     <option value="">Selecione...</option>
                     {regionais.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
                   </select>
@@ -391,8 +392,8 @@ export function GruposTrabalhoView() {
               )}
               {tipoEscopo === 'administracao' && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Administração <span className="text-red-500">*</span></label>
-                  <select value={administracaoId} onChange={(e) => setAdministracaoId(e.target.value)} disabled={salvando} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
+                  <label htmlFor="select-administracao" className="block text-xs font-semibold text-slate-700 mb-1">Administração <span className="text-red-500">*</span></label>
+                  <select id="select-administracao" value={administracaoId} onChange={(e) => setAdministracaoId(e.target.value)} disabled={salvando} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
                     <option value="">Selecione...</option>
                     {administracoes.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
                   </select>
@@ -400,8 +401,8 @@ export function GruposTrabalhoView() {
               )}
               {tipoEscopo === 'setor' && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Setor <span className="text-red-500">*</span></label>
-                  <select value={setorId} onChange={(e) => setSetorId(e.target.value)} disabled={salvando} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
+                  <label htmlFor="select-setor" className="block text-xs font-semibold text-slate-700 mb-1">Setor <span className="text-red-500">*</span></label>
+                  <select id="select-setor" value={setorId} onChange={(e) => setSetorId(e.target.value)} disabled={salvando} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
                     <option value="">Selecione...</option>
                     {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
                   </select>
@@ -513,9 +514,14 @@ export function GruposTrabalhoView() {
       {/* Modal de Detalhes */}
       {grupoDetalhe && (
         <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200">
+          <div 
+            className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-detalhes-titulo"
+          >
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-              <h3 className="font-bold text-slate-800 text-base">Detalhes do Grupo de Trabalho</h3>
+              <h3 id="modal-detalhes-titulo" className="font-bold text-slate-800 text-base">Detalhes do Grupo de Trabalho</h3>
               <button
                 onClick={() => setGrupoDetalhe(null)}
                 className="text-slate-400 hover:text-slate-600 text-sm font-semibold"
