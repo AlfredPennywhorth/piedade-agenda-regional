@@ -35,6 +35,15 @@ const mockEventos = [
   }
 ]
 
+const SERIE_ID = '44444444-4444-4444-4444-444444444444'
+const mockEventoRecorrente = {
+  ...mockEventos[0],
+  id: '55555555-5555-5555-5555-555555555555',
+  titulo: 'Reunião Recorrente',
+  serieRecorrenciaId: SERIE_ID,
+  recorrenciaExcecao: false
+}
+
 describe('EventosView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -189,6 +198,124 @@ describe('EventosView', () => {
         administracaoId: null,
       }))
     })
+  })
+
+  it('deve abrir escolha ao editar evento recorrente, cancelar não envia PATCH', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return [mockEventoRecorrente]
+      return []
+    })
+
+    render(<EventosView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Recorrente')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
+
+    const dialogEscolha = await screen.findByRole('dialog', { name: /editar evento recorrente/i })
+    expect(dialogEscolha).toBeInTheDocument()
+
+    // Clicar em cancelar
+    fireEvent.click(within(dialogEscolha).getByRole('button', { name: /cancelar/i }))
+    expect(dialogEscolha).not.toBeInTheDocument()
+    expect(apiClient.patchWithAuth).not.toHaveBeenCalled()
+  })
+
+  it('deve enviar updateMode THIS e fromEventId ao editar apenas a ocorrência', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url.startsWith(`/eventos/${mockEventoRecorrente.id}`)) return mockEventoRecorrente
+      if (url === '/eventos') return [mockEventoRecorrente]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({})
+
+    render(<EventosView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Recorrente')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
+
+    const dialogEscolha = await screen.findByRole('dialog', { name: /editar evento recorrente/i })
+    fireEvent.click(within(dialogEscolha).getByRole('button', { name: /apenas este evento/i }))
+
+    const formDialog = await screen.findByRole('dialog', { name: /editar evento/i })
+    const { getByLabelText, getByRole } = within(formDialog)
+
+    await waitFor(() => {
+      expect(getByLabelText(/título/i)).toHaveValue('Reunião Recorrente')
+    })
+
+    fireEvent.change(getByLabelText(/título/i), { target: { value: 'Reunião Recorrente Editada' } })
+    fireEvent.click(getByRole('button', { name: /salvar/i }))
+
+    // Confirmação de THIS
+    const confirmDialog = await screen.findByRole('dialog', { name: /confirmar exceção/i })
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: /confirmar e salvar/i }))
+
+    await waitFor(() => {
+      expect(apiClient.patchWithAuth).toHaveBeenCalledWith(`/series-recorrencia/${SERIE_ID}`, expect.objectContaining({
+        updateMode: 'THIS',
+        fromEventId: mockEventoRecorrente.id,
+        changes: expect.objectContaining({
+          titulo: 'Reunião Recorrente Editada'
+        })
+      }))
+    })
+    
+    // Assegurar que os campos de série NÃO estão presentes em changes (verificado por ser o objeto vindo do form)
+    const patchCall = vi.mocked(apiClient.patchWithAuth).mock.calls[0][1] as any
+    expect(patchCall.changes).not.toHaveProperty('frequencia')
+    expect(patchCall.changes).not.toHaveProperty('intervalo')
+  })
+
+  it('deve exibir erro da API se falhar no PATCH THIS', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url.startsWith(`/eventos/${mockEventoRecorrente.id}`)) return mockEventoRecorrente
+      if (url === '/eventos') return [mockEventoRecorrente]
+      return []
+    })
+    
+    // Import ApiError or mock the class matching the expected structure
+    const ApiError = vi.fn().mockImplementation((status, message) => {
+      const err = new Error(message)
+      ;(err as any).status = status
+      ;(err as any).body = { error: message }
+      Object.setPrototypeOf(err, ApiError.prototype)
+      return err
+    })
+    vi.mocked(apiClient.patchWithAuth).mockRejectedValueOnce(new ApiError(400, 'Conflito de horários'))
+
+    render(<EventosView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Recorrente')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
+    
+    const dialogEscolha = await screen.findByRole('dialog', { name: /editar evento recorrente/i })
+    fireEvent.click(within(dialogEscolha).getByRole('button', { name: /apenas este evento/i }))
+
+    const formDialog = await screen.findByRole('dialog', { name: /editar evento/i })
+    const { getByRole } = within(formDialog)
+
+    await waitFor(() => {
+      expect(within(formDialog).getByLabelText(/título/i)).toHaveValue('Reunião Recorrente')
+    })
+
+    fireEvent.click(getByRole('button', { name: /salvar/i }))
+
+    const confirmDialog = await screen.findByRole('dialog', { name: /confirmar exceção/i })
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: /confirmar e salvar/i }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Conflito de horários')
   })
 })
 
