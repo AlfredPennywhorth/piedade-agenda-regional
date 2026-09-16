@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { SeriesView } from '../components/series/SeriesView'
 import * as apiClient from '../api/apiClient'
 import { SerieCreate } from '@piedade/shared'
@@ -88,8 +88,9 @@ describe('SeriesView', () => {
     // Verifica acessibilidade do diálogo de detalhe
     const dialog = screen.getByRole('dialog', { name: 'Detalhes da Série' })
     expect(dialog).toBeInTheDocument()
-    expect(screen.getByText('Semanal')).toBeInTheDocument()
-    expect(screen.getByText('2025-01-01 20:00')).toBeInTheDocument()
+    const view = within(dialog)
+    expect(view.getByText('Semanal')).toBeInTheDocument()
+    expect(view.getByText(/2025-01-01\s*20:00/)).toBeInTheDocument()
 
     // Fecha o modal
     fireEvent.click(screen.getByText('✕'))
