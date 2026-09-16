@@ -181,15 +181,15 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
     fireEvent.change(selectCasa, { target: { value: CASA_1_ID } })
 
     const inputNome = screen.getByLabelText(/Nome Completo \*/i)
-    fireEvent.change(inputNome, { target: { value: 'Oi' } }) // < 3 chars
+    fireEvent.change(inputNome, { target: { value: 'A' } }) // < 3 chars
 
     const inputCelular = screen.getByLabelText(/Celular/i)
     fireEvent.change(inputCelular, { target: { value: '119' } }) // celular inválido
 
     fireEvent.click(screen.getByText('Salvar Membro'))
 
-    expect(await screen.findByText('Nome deve ter no mínimo 3 caracteres')).toBeInTheDocument()
-    expect(screen.getByText('Formato de celular inválido (ex: 11999999999)')).toBeInTheDocument()
+    expect(await screen.findByText('Nome deve ter no mínimo 2 caracteres')).toBeInTheDocument()
+    expect(screen.getByText('Formato de celular inválido')).toBeInTheDocument()
     expect(apiClient.postWithAuth).not.toHaveBeenCalled()
   })
 
