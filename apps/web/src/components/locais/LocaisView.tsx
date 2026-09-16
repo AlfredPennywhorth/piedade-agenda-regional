@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { z } from 'zod'
 import { LocalCreate } from '@piedade/shared'
 import * as apiClient from '../../api/apiClient'
 
@@ -21,7 +20,22 @@ interface Local {
   ativo: boolean
 }
 
-type LocalFormData = z.infer<typeof LocalCreate>
+type LocalFormData = {
+  nome: string
+  endereco: string
+  numero: string
+  complemento?: string | null
+  bairro?: string | null
+  cidade: string
+  uf: string
+  cep?: string | null
+  referencia?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  urlMaps?: string | null
+  urlWaze?: string | null
+  ativo: boolean
+}
 
 export function LocaisView() {
   const [locais, setLocais] = useState<Local[]>([])
@@ -151,27 +165,33 @@ export function LocaisView() {
     }
 
     try {
-      const validatedData = LocalCreate.parse(payloadToValidate)
-      setFormErrors({})
-      setSaving(true)
-
-      if (editingId) {
-        await apiClient.patchWithAuth(`/locais/${editingId}`, validatedData)
-      } else {
-        await apiClient.postWithAuth('/locais', validatedData)
-      }
-
-      setFormOpen(false)
-      fetchLocais()
-    } catch (err: any) {
-      if (err instanceof z.ZodError) {
+      const parsed = LocalCreate.safeParse(payloadToValidate)
+      
+      if (!parsed.success) {
         const errors: any = {}
-        err.errors.forEach(e => {
+        parsed.error.issues.forEach((e: any) => {
           if (e.path[0]) {
             errors[e.path[0].toString()] = e.message
           }
         })
         setFormErrors(errors)
+        return
+      }
+
+      setFormErrors({})
+      setSaving(true)
+
+      if (editingId) {
+        await apiClient.patchWithAuth(`/locais/${editingId}`, parsed.data)
+      } else {
+        await apiClient.postWithAuth('/locais', parsed.data)
+      }
+
+      setFormOpen(false)
+      fetchLocais()
+    } catch (err: any) {
+      if (err instanceof apiClient.ApiError && err.body?.error) {
+        setError(typeof err.body.error === 'string' ? err.body.error : 'Dados inválidos')
       } else {
         setError(err.message || 'Erro ao salvar local')
       }

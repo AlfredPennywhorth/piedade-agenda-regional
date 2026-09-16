@@ -2,7 +2,6 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { LocaisView } from '../components/locais/LocaisView'
 import * as apiClient from '../api/apiClient'
-import { z } from 'zod'
 
 vi.mock('../api/apiClient', () => ({
   fetchWithAuth: vi.fn(),
