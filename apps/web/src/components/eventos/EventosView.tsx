@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { EventoCreate, EventoUpdate, EventoCreateInput } from '@piedade/shared'
+import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import type { Casa } from '../casas/CasasView'
 import type { Setor } from '../setores/SetoresView'
@@ -33,6 +33,8 @@ export interface Evento {
   ativo: boolean
   createdAt?: string
   updatedAt?: string
+  serieRecorrenciaId?: string | null
+  recorrenciaExcecao?: boolean
 }
 
 export function EventosView() {
@@ -53,8 +55,11 @@ export function EventosView() {
   // Form State
   const [formOpen, setFormOpen] = useState(false)
   const [eventoEditandoId, setEventoEditandoId] = useState<string | null>(null)
+  const [eventoEditandoSerieId, setEventoEditandoSerieId] = useState<string | null>(null)
   const [carregandoDetalhes, setCarregandoDetalhes] = useState<boolean>(false)
   const [salvando, setSalvando] = useState<boolean>(false)
+  const [escolhaSerieAberto, setEscolhaSerieAberto] = useState<Evento | null>(null)
+  const [confirmacaoThisAberto, setConfirmacaoThisAberto] = useState<EventoUpdateInput | null>(null)
 
   // Modal Details
   const [eventoDetalhe, setEventoDetalhe] = useState<Evento | null>(null)
@@ -161,6 +166,7 @@ export function EventosView() {
 
   const abrirFormCriar = () => {
     setEventoEditandoId(null)
+    setEventoEditandoSerieId(null)
     setFormData({
       titulo: '',
       descricao: '',
@@ -185,12 +191,22 @@ export function EventosView() {
     setFormOpen(true)
   }
 
-  const abrirFormEditar = async (id: string) => {
+  const handleClickEditar = (item: Evento) => {
+    if (item.serieRecorrenciaId) {
+      setEscolhaSerieAberto(item)
+    } else {
+      abrirFormEditar(item.id, null)
+    }
+  }
+
+  const abrirFormEditar = async (id: string, serieId: string | null) => {
     setEventoEditandoId(id)
+    setEventoEditandoSerieId(serieId)
     setCarregandoDetalhes(true)
     setErrosForm({})
     setErro(null)
     setFormOpen(true)
+    setEscolhaSerieAberto(null)
 
     try {
       const item = await fetchWithAuth<Evento>(`/eventos/${id}`)
@@ -269,6 +285,15 @@ export function EventosView() {
       setSalvando(true)
 
       // Ensure that for PATCH, fields that are not relevant (like localId for ONLINE) are explicitly null
+      if (eventoEditandoSerieId) {
+        setConfirmacaoThisAberto({
+          ...parsed.data,
+          localId: parsed.data.modalidade === 'ONLINE' ? null : parsed.data.localId,
+          urlOnline: parsed.data.modalidade === 'PRESENCIAL' ? null : parsed.data.urlOnline,
+        })
+        return
+      }
+
       if (eventoEditandoId) {
         const updatePayload = {
           ...parsed.data,
@@ -288,6 +313,34 @@ export function EventosView() {
       } else {
         setErro(err.message || 'Erro ao salvar evento.')
       }
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const confirmarEditarThis = async () => {
+    if (!eventoEditandoId || !eventoEditandoSerieId || !confirmacaoThisAberto) return
+    setSalvando(true)
+    setErro(null)
+    try {
+      const updatePayload = {
+        updateMode: 'THIS',
+        fromEventId: eventoEditandoId,
+        changes: confirmacaoThisAberto
+      }
+      await patchWithAuth(`/series-recorrencia/${eventoEditandoSerieId}`, updatePayload)
+      setConfirmacaoThisAberto(null)
+      setFormOpen(false)
+      carregarDados()
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.body?.error) {
+        setErro(typeof err.body.error === 'string' ? err.body.error : 'Dados inválidos')
+      } else if (err instanceof Error) {
+        setErro(err.message || 'Erro ao salvar evento.')
+      } else {
+        setErro('Erro ao salvar evento.')
+      }
+      setConfirmacaoThisAberto(null)
     } finally {
       setSalvando(false)
     }
@@ -357,7 +410,7 @@ export function EventosView() {
                       <button onClick={() => setEventoDetalhe(item)} className="text-brand-600 hover:text-brand-900 font-medium">
                         Ver
                       </button>
-                      <button onClick={() => abrirFormEditar(item.id)} className="text-amber-600 hover:text-amber-900 font-medium">
+                      <button onClick={() => handleClickEditar(item)} className="text-amber-600 hover:text-amber-900 font-medium">
                         Editar
                       </button>
                     </td>
@@ -697,6 +750,76 @@ export function EventosView() {
                   <p className="text-slate-900">{eventoDetalhe.descricao}</p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal Escolha Edição Série */}
+      {escolhaSerieAberto && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+          <div role="dialog" aria-modal="true" aria-labelledby="modal-escolha-title" className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 id="modal-escolha-title" className="text-lg font-semibold text-slate-900">
+                Editar Evento Recorrente
+              </h3>
+              <button onClick={() => setEscolhaSerieAberto(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <div className="p-6">
+              <p className="text-slate-700 mb-6">
+                Este evento pertence a uma série recorrente. O que você deseja editar?
+              </p>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => {
+                    const item = escolhaSerieAberto
+                    setEscolhaSerieAberto(null)
+                    abrirFormEditar(item.id, item.serieRecorrenciaId || null)
+                  }}
+                  className="w-full px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700"
+                >
+                  Apenas este evento
+                </button>
+                <button
+                  onClick={() => setEscolhaSerieAberto(null)}
+                  className="w-full px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmação THIS */}
+      {confirmacaoThisAberto && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+          <div role="dialog" aria-modal="true" aria-labelledby="modal-confirm-this-title" className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 id="modal-confirm-this-title" className="text-lg font-semibold text-slate-900">
+                Confirmar Exceção
+              </h3>
+              <button onClick={() => setConfirmacaoThisAberto(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <div className="p-6">
+              <p className="text-slate-700 mb-6">
+                Você está editando apenas esta ocorrência. Ao salvar, ela se tornará uma exceção e não será afetada por alterações globais futuras na série original. Deseja prosseguir?
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setConfirmacaoThisAberto(null)}
+                  className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarEditarThis}
+                  disabled={salvando}
+                  className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {salvando ? 'Salvando...' : 'Confirmar e Salvar'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
