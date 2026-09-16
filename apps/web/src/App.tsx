@@ -11,10 +11,11 @@ import { AdministracoesView } from './components/administracoes/AdministracoesVi
 import { SetoresView } from './components/setores/SetoresView'
 import { CasasView } from './components/casas/CasasView'
 import { GruposTrabalhoView } from './components/grupos-trabalho/GruposTrabalhoView'
+import { MembrosView } from './components/membros/MembrosView'
 import { fetchWithAuth } from './api/apiClient'
 
 function App() {
-  const [currentTab, setCurrentTab] = useState<'agenda' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho'>('agenda')
+  const [currentTab, setCurrentTab] = useState<'agenda' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros'>('agenda')
   const [capacidades, setCapacidades] = useState<CapacidadesFrontend>({})
 
   useEffect(() => {
@@ -39,6 +40,7 @@ function App() {
       {currentTab === 'setores' && <SetoresView />}
       {currentTab === 'casas' && <CasasView />}
       {currentTab === 'grupos-trabalho' && <GruposTrabalhoView />}
+      {currentTab === 'membros' && <MembrosView />}
       
       {currentTab === 'avisos' && (
         <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
