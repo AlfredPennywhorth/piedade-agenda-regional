@@ -302,7 +302,7 @@ export function LocaisView() {
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6">
+            <form onSubmit={handleSubmit} noValidate className="p-6 overflow-y-auto space-y-6">
               <div className="space-y-4">
                 <h4 className="font-medium text-slate-900 border-b pb-2">Informações Básicas</h4>
                 <div>
