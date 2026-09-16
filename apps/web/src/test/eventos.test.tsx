@@ -1,0 +1,189 @@
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { EventosView } from '../components/eventos/EventosView'
+import * as apiClient from '../api/apiClient'
+
+vi.mock('../api/apiClient', () => ({
+  fetchWithAuth: vi.fn(),
+  postWithAuth: vi.fn(),
+  patchWithAuth: vi.fn()
+}))
+
+const mockEventos = [
+  {
+    id: '1',
+    titulo: 'Reunião Presencial',
+    descricao: 'Descrição do evento',
+    pauta: 'Pauta do evento',
+    modalidade: 'PRESENCIAL',
+    inicioEm: '2026-10-10T10:00:00.000Z',
+    fimEm: '2026-10-10T12:00:00.000Z',
+    localId: 'local-1',
+    urlOnline: null,
+    organizadorMembroId: null,
+    regionalId: 'reg-1',
+    administracaoId: null,
+    setorId: null,
+    casaId: null,
+    grupoTrabalhoId: null,
+    observacoes: null,
+    ativo: true,
+  }
+]
+
+describe('EventosView', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === '/locais') return [{ id: 'local-1', nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: 'reg-1', nome: 'Reg 1' }]
+      return []
+    })
+  })
+
+  it('deve listar eventos corretamente', async () => {
+    render(<EventosView />)
+    expect(screen.getByText('Gestão de Eventos')).toBeInTheDocument()
+    
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Presencial')).toBeInTheDocument()
+      expect(screen.getByText('PRESENCIAL')).toBeInTheDocument()
+    })
+  })
+
+  it('deve exibir empty state quando não houver eventos', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return []
+      return []
+    })
+
+    render(<EventosView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Nenhum evento cadastrado.')).toBeInTheDocument()
+    })
+  })
+
+  it('deve exibir detalhes de um evento em diálogo acessível', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url.startsWith('/eventos/1')) return mockEventos[0]
+      if (url === '/eventos') return mockEventos
+      return []
+    })
+
+    render(<EventosView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Presencial')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /ver/i }))
+
+    await waitFor(() => {
+      const dialog = screen.getByRole('dialog', { name: /detalhes do evento/i })
+      expect(dialog).toHaveAttribute('aria-modal', 'true')
+      
+      const { getByText } = within(dialog)
+      expect(getByText('Descrição do evento')).toBeInTheDocument()
+    })
+  })
+
+  it('deve validar regra temporal: fim anterior ao início', async () => {
+    vi.mocked(apiClient.postWithAuth).mockResolvedValueOnce({})
+    render(<EventosView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Presencial')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+    const { getByLabelText, getByRole, findByRole } = within(dialog)
+
+    fireEvent.change(getByLabelText(/título/i), { target: { value: 'Novo Evento' } })
+    // Fim anterior ao início
+    fireEvent.change(getByLabelText(/início/i), { target: { value: '2026-10-10T12:00' } })
+    fireEvent.change(getByLabelText(/fim/i), { target: { value: '2026-10-10T10:00' } })
+    
+    // modalidade presencial
+    fireEvent.change(getByLabelText(/modalidade/i), { target: { value: 'PRESENCIAL' } })
+    fireEvent.change(getByLabelText(/local/i), { target: { value: 'local-1' } })
+
+    // escopo
+    fireEvent.change(getByLabelText(/tipo de escopo/i), { target: { value: 'regional' } })
+    fireEvent.change(getByLabelText(/regional \*/i), { target: { value: 'reg-1' } })
+
+    fireEvent.click(getByRole('button', { name: /salvar/i }))
+
+    const alert = await findByRole('alert')
+    expect(alert).toBeInTheDocument()
+    expect(apiClient.postWithAuth).not.toHaveBeenCalled()
+  })
+
+  it('deve limpar urlOnline ao trocar para PRESENCIAL e vice-versa', async () => {
+    render(<EventosView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Presencial')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+    const { getByLabelText, queryByLabelText } = within(dialog)
+
+    // Online
+    fireEvent.change(getByLabelText(/modalidade/i), { target: { value: 'ONLINE' } })
+    expect(getByLabelText(/url online/i)).toBeInTheDocument()
+    expect(queryByLabelText(/local \*/i)).not.toBeInTheDocument()
+
+    // Hibrido
+    fireEvent.change(getByLabelText(/modalidade/i), { target: { value: 'HIBRIDO' } })
+    expect(getByLabelText(/url online/i)).toBeInTheDocument()
+    expect(getByLabelText(/local \*/i)).toBeInTheDocument()
+
+    // Presencial
+    fireEvent.change(getByLabelText(/modalidade/i), { target: { value: 'PRESENCIAL' } })
+    expect(queryByLabelText(/url online/i)).not.toBeInTheDocument()
+    expect(getByLabelText(/local \*/i)).toBeInTheDocument()
+  })
+
+  it('deve editar um evento existente via PATCH e limpar scopes cruzados', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url.startsWith('/eventos/1')) return mockEventos[0]
+      if (url === '/eventos') return mockEventos
+      if (url === '/locais') return [{ id: 'local-1', nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: 'reg-1', nome: 'Reg 1' }]
+      return []
+    })
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({})
+
+    render(<EventosView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Presencial')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
+
+    const dialog = await screen.findByRole('dialog', { name: /editar evento/i })
+    const { getByLabelText, getByRole } = within(dialog)
+
+    await waitFor(() => {
+      expect(getByLabelText(/título/i)).toHaveValue('Reunião Presencial')
+    })
+
+    fireEvent.change(getByLabelText(/título/i), { target: { value: 'Reunião Presencial Editada' } })
+    fireEvent.click(getByRole('button', { name: /salvar/i }))
+
+    await waitFor(() => {
+      expect(apiClient.patchWithAuth).toHaveBeenCalledWith('/eventos/1', expect.objectContaining({
+        titulo: 'Reunião Presencial Editada',
+        regionalId: 'reg-1',
+        administracaoId: null,
+      }))
+    })
+  })
+})
