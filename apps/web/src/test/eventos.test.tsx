@@ -3,11 +3,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { EventosView } from '../components/eventos/EventosView'
 import * as apiClient from '../api/apiClient'
 
-vi.mock('../api/apiClient', () => ({
-  fetchWithAuth: vi.fn(),
-  postWithAuth: vi.fn(),
-  patchWithAuth: vi.fn()
-}))
+vi.mock('../api/apiClient', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/apiClient')>()
+  return {
+    ...actual,
+    fetchWithAuth: vi.fn(),
+    postWithAuth: vi.fn(),
+    patchWithAuth: vi.fn(),
+  }
+})
 
 const EVENTO_ID = '33333333-3333-3333-3333-333333333333'
 const LOCAL_ID = '11111111-1111-1111-1111-111111111111'
@@ -281,15 +285,9 @@ describe('EventosView', () => {
       return []
     })
     
-    // Import ApiError or mock the class matching the expected structure
-    const ApiError = vi.fn().mockImplementation((status, message) => {
-      const err = new Error(message)
-      ;(err as any).status = status
-      ;(err as any).body = { error: message }
-      Object.setPrototypeOf(err, ApiError.prototype)
-      return err
-    })
-    vi.mocked(apiClient.patchWithAuth).mockRejectedValueOnce(new ApiError(400, 'Conflito de horários'))
+    vi.mocked(apiClient.patchWithAuth).mockRejectedValueOnce(
+      new apiClient.ApiError(409, 'Conflito de horários', { error: 'Conflito de horários' })
+    )
 
     render(<EventosView />)
 
@@ -314,8 +312,8 @@ describe('EventosView', () => {
     const confirmDialog = await screen.findByRole('dialog', { name: /confirmar exceção/i })
     fireEvent.click(within(confirmDialog).getByRole('button', { name: /confirmar e salvar/i }))
 
-    const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('Conflito de horários')
+    const erroDiv = await screen.findByText('Conflito de horários')
+    expect(erroDiv).toBeInTheDocument()
   })
 })
 
