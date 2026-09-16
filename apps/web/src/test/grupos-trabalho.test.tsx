@@ -89,7 +89,7 @@ describe('S01 — GruposTrabalhoView (Gestão de Grupos de Trabalho)', () => {
     fireEvent.change(screen.getByLabelText(/Nome do Grupo/i), { target: { value: 'Novo Grupo' } })
     
     // regional radio is selected by default, so we pick the regional
-    fireEvent.change(screen.getByLabelText(/Regional/i), { target: { value: 'reg-1' } })
+    fireEvent.change(screen.getByLabelText('Regional vinculada ao Grupo'), { target: { value: 'reg-1' } })
 
     fireEvent.click(screen.getByText('Salvar Grupo'))
 

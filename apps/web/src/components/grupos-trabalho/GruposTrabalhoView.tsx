@@ -383,7 +383,7 @@ export function GruposTrabalhoView() {
 
               {tipoEscopo === 'regional' && (
                 <div>
-                  <label htmlFor="select-regional" className="block text-xs font-semibold text-slate-700 mb-1">Regional <span className="text-red-500">*</span></label>
+                  <label htmlFor="select-regional" className="block text-xs font-semibold text-slate-700 mb-1">Regional vinculada ao Grupo <span className="text-red-500">*</span></label>
                   <select id="select-regional" value={regionalId} onChange={(e) => setRegionalId(e.target.value)} disabled={salvando} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
                     <option value="">Selecione...</option>
                     {regionais.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
@@ -392,7 +392,7 @@ export function GruposTrabalhoView() {
               )}
               {tipoEscopo === 'administracao' && (
                 <div>
-                  <label htmlFor="select-administracao" className="block text-xs font-semibold text-slate-700 mb-1">Administração <span className="text-red-500">*</span></label>
+                  <label htmlFor="select-administracao" className="block text-xs font-semibold text-slate-700 mb-1">Administração vinculada ao Grupo <span className="text-red-500">*</span></label>
                   <select id="select-administracao" value={administracaoId} onChange={(e) => setAdministracaoId(e.target.value)} disabled={salvando} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
                     <option value="">Selecione...</option>
                     {administracoes.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
@@ -401,7 +401,7 @@ export function GruposTrabalhoView() {
               )}
               {tipoEscopo === 'setor' && (
                 <div>
-                  <label htmlFor="select-setor" className="block text-xs font-semibold text-slate-700 mb-1">Setor <span className="text-red-500">*</span></label>
+                  <label htmlFor="select-setor" className="block text-xs font-semibold text-slate-700 mb-1">Setor vinculado ao Grupo <span className="text-red-500">*</span></label>
                   <select id="select-setor" value={setorId} onChange={(e) => setSetorId(e.target.value)} disabled={salvando} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
                     <option value="">Selecione...</option>
                     {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
