@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { SeriesView } from '../components/series/SeriesView'
 import * as apiClient from '../api/apiClient'
-import { SerieCreate } from '@piedade/shared'
 
 vi.mock('../api/apiClient', () => ({
   fetchWithAuth: vi.fn(),

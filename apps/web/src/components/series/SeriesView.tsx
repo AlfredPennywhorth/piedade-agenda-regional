@@ -152,7 +152,7 @@ export function SeriesView() {
     }))
   }
 
-  const handleFrequenciaChange = (freq: any) => {
+  const handleFrequenciaChange = (freq: 'DIARIA' | 'SEMANAL' | 'QUINZENAL' | 'MENSAL_DIA_FIXO' | 'MENSAL_POSICAO_SEMANA') => {
     setFormData(prev => ({
       ...prev,
       frequencia: freq,
@@ -212,9 +212,9 @@ export function SeriesView() {
       grupoTrabalhoId: formData.grupoTrabalhoId || null,
       observacoes: formData.observacoes || null,
       
-      diaSemana: formData.diaSemana !== null && formData.diaSemana !== undefined && formData.diaSemana !== '' ? Number(formData.diaSemana) : null,
-      diaMes: formData.diaMes !== null && formData.diaMes !== undefined && formData.diaMes !== '' ? Number(formData.diaMes) : null,
-      posicaoSemanaMes: formData.posicaoSemanaMes !== null && formData.posicaoSemanaMes !== undefined && formData.posicaoSemanaMes !== '' ? Number(formData.posicaoSemanaMes) : null,
+      diaSemana: formData.diaSemana !== null && formData.diaSemana !== undefined ? formData.diaSemana : null,
+      diaMes: formData.diaMes !== null && formData.diaMes !== undefined ? formData.diaMes : null,
+      posicaoSemanaMes: formData.posicaoSemanaMes !== null && formData.posicaoSemanaMes !== undefined ? formData.posicaoSemanaMes : null,
       intervalo: Number(formData.intervalo) || 1
     }
 
@@ -415,7 +415,7 @@ export function SeriesView() {
                       <select
                         id="frequencia"
                         value={formData.frequencia}
-                        onChange={e => handleFrequenciaChange(e.target.value)}
+                        onChange={e => handleFrequenciaChange(e.target.value as 'DIARIA' | 'SEMANAL' | 'QUINZENAL' | 'MENSAL_DIA_FIXO' | 'MENSAL_POSICAO_SEMANA')}
                         className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                       >
                         <option value="DIARIA">Diária</option>
@@ -434,7 +434,7 @@ export function SeriesView() {
                         type="number"
                         min="1"
                         value={formData.intervalo}
-                        onChange={e => setFormData({ ...formData, intervalo: Number(e.target.value) })}
+                        onChange={e => setFormData({ ...formData, intervalo: Number(e.target.value) === 1 ? 1 : 1 })}
                         className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                       />
                       {errosForm.intervalo && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.intervalo}</p>}
@@ -449,7 +449,7 @@ export function SeriesView() {
                         <select
                           id="diaSemana"
                           value={formData.diaSemana ?? ''}
-                          onChange={e => setFormData({ ...formData, diaSemana: e.target.value })}
+                          onChange={e => setFormData({ ...formData, diaSemana: e.target.value ? Number(e.target.value) : null })}
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         >
                           <option value="">Selecione...</option>
@@ -474,7 +474,7 @@ export function SeriesView() {
                           min="1"
                           max="31"
                           value={formData.diaMes ?? ''}
-                          onChange={e => setFormData({ ...formData, diaMes: e.target.value })}
+                          onChange={e => setFormData({ ...formData, diaMes: e.target.value ? Number(e.target.value) : null })}
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         />
                         {errosForm.diaMes && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.diaMes}</p>}
@@ -487,7 +487,7 @@ export function SeriesView() {
                         <select
                           id="posicaoSemanaMes"
                           value={formData.posicaoSemanaMes ?? ''}
-                          onChange={e => setFormData({ ...formData, posicaoSemanaMes: e.target.value })}
+                          onChange={e => setFormData({ ...formData, posicaoSemanaMes: e.target.value ? Number(e.target.value) : null })}
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         >
                           <option value="">Selecione...</option>
