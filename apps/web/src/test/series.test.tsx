@@ -1,0 +1,227 @@
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { SeriesView } from '../components/series/SeriesView'
+import * as apiClient from '../api/apiClient'
+import userEvent from '@testing-library/user-event'
+import { SerieCreate } from '@piedade/shared'
+
+vi.mock('../api/apiClient', () => ({
+  fetchWithAuth: vi.fn(),
+  postWithAuth: vi.fn(),
+  patchWithAuth: vi.fn(),
+  deleteWithAuth: vi.fn(),
+  ApiError: class ApiError extends Error {
+    body: any
+    constructor(message: string, body: any) {
+      super(message)
+      this.body = body
+    }
+  }
+}))
+
+const MOCK_SERIES = [
+  {
+    id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+    titulo: 'Reunião Semanal',
+    modalidade: 'ONLINE',
+    frequencia: 'SEMANAL',
+    intervalo: 1,
+    dataInicio: '2025-01-01',
+    dataFim: '2025-12-31',
+    horarioInicio: '20:00',
+    horarioFim: '21:00',
+    diaSemana: 1, // Segunda
+    diaMes: null,
+    posicaoSemanaMes: null,
+    localId: null,
+    urlOnline: 'https://meet.google.com/abc',
+    organizadorMembroId: '2b4c13a0-7f2e-4b9d-a8e5-3d5f9c8b7a6d',
+    regionalId: 'd290f1ee-6c54-4b01-90e6-d701748f0851',
+    administracaoId: null,
+    setorId: null,
+    casaId: null,
+    grupoTrabalhoId: null,
+    ativo: true,
+  }
+]
+
+const MOCK_LOOKUPS = {
+  locais: [{ id: '9f8b7c6d-5e4f-3a2b-1c0d-e9f8a7b6c5d4', nome: 'Sede Regional' }],
+  membros: [{ id: '2b4c13a0-7f2e-4b9d-a8e5-3d5f9c8b7a6d', nome: 'João' }],
+  regionais: [{ id: 'd290f1ee-6c54-4b01-90e6-d701748f0851', nome: 'SP' }],
+  administracoes: [],
+  setores: [],
+  casas: [],
+  gruposTrabalho: []
+}
+
+describe('SeriesView', () => {
+  beforeEach(() => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/series-recorrencia') return MOCK_SERIES
+      if (url === '/locais') return MOCK_LOOKUPS.locais
+      if (url === '/membros') return MOCK_LOOKUPS.membros
+      if (url === '/regionais') return MOCK_LOOKUPS.regionais
+      if (url === '/administracoes') return MOCK_LOOKUPS.administracoes
+      if (url === '/setores') return MOCK_LOOKUPS.setores
+      if (url === '/casas') return MOCK_LOOKUPS.casas
+      if (url === '/grupos-trabalho') return MOCK_LOOKUPS.gruposTrabalho
+      return []
+    })
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('deve listar as séries e permitir visualizar os detalhes num diálogo acessível', async () => {
+    render(<SeriesView />)
+
+    // Aguarda carregamento
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Semanal')).toBeInTheDocument()
+    })
+
+    // Abre detalhes
+    const btns = screen.getAllByText('Ver')
+    fireEvent.click(btns[0])
+
+    // Verifica acessibilidade do diálogo de detalhe
+    const dialog = screen.getByRole('dialog', { name: 'Detalhes da Série' })
+    expect(dialog).toBeInTheDocument()
+    expect(screen.getByText('Semanal')).toBeInTheDocument()
+    expect(screen.getByText('2025-01-01 20:00')).toBeInTheDocument()
+
+    // Fecha o modal
+    fireEvent.click(screen.getByText('✕'))
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Detalhes da Série' })).not.toBeInTheDocument()
+    })
+  })
+
+  it('deve alternar campos condicionais de modalidade e limpar incompatíveis', async () => {
+    render(<SeriesView />)
+    const user = userEvent.setup()
+
+    await waitFor(() => screen.getByText('+ Nova Série'))
+    await user.click(screen.getByText('+ Nova Série'))
+
+    // Seleciona modalidade HIBRIDO
+    const modalidadeSelect = screen.getByLabelText(/Modalidade \*/i)
+    await user.selectOptions(modalidadeSelect, 'HIBRIDO')
+
+    expect(screen.getByLabelText(/Local \*/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/URL Online \*/i)).toBeInTheDocument()
+
+    // Preenche ambos
+    await user.selectOptions(screen.getByLabelText(/Local \*/i), '9f8b7c6d-5e4f-3a2b-1c0d-e9f8a7b6c5d4')
+    await user.type(screen.getByLabelText(/URL Online \*/i), 'https://zoom.us')
+
+    // Altera para PRESENCIAL (deve esconder URL Online)
+    await user.selectOptions(modalidadeSelect, 'PRESENCIAL')
+    expect(screen.queryByLabelText(/URL Online \*/i)).not.toBeInTheDocument()
+
+    // Submete e verifica o payload para confirmar que urlOnline foi limpo
+    await user.type(screen.getByLabelText(/Título \*/i), 'Teste')
+    await user.type(screen.getByLabelText(/Data Início \*/i), '2025-01-01')
+    await user.type(screen.getByLabelText(/Data Fim \*/i), '2025-01-31')
+    await user.type(screen.getByLabelText(/Horário Início \*/i), '10:00')
+    await user.type(screen.getByLabelText(/Horário Fim \*/i), '11:00')
+    
+    // Escopo
+    await user.selectOptions(screen.getByLabelText(/Tipo de Escopo/i), 'regional')
+    await user.selectOptions(screen.getByLabelText(/Regional \*/i), 'd290f1ee-6c54-4b01-90e6-d701748f0851')
+
+    vi.mocked(apiClient.postWithAuth).mockResolvedValueOnce({})
+    await user.click(screen.getByText('Salvar Série'))
+
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalled()
+    })
+    
+    const payload = vi.mocked(apiClient.postWithAuth).mock.calls[0][1] as any
+    expect(payload.modalidade).toBe('PRESENCIAL')
+    expect(payload.urlOnline).toBeNull()
+    expect(payload.localId).toBe('9f8b7c6d-5e4f-3a2b-1c0d-e9f8a7b6c5d4')
+  })
+
+  it('deve apresentar os campos condicionais corretos para as frequências e validar o formulário (role="alert")', async () => {
+    render(<SeriesView />)
+    const user = userEvent.setup()
+
+    await waitFor(() => screen.getByText('+ Nova Série'))
+    await user.click(screen.getByText('+ Nova Série'))
+
+    const form = screen.getByRole('dialog', { name: 'Nova Série de Recorrência' }).querySelector('form')
+    expect(form).toHaveAttribute('noValidate')
+
+    // SEMANAL: exibe diaSemana
+    const frequenciaSelect = screen.getByLabelText(/Frequência \*/i)
+    await user.selectOptions(frequenciaSelect, 'SEMANAL')
+    expect(screen.getByLabelText(/Dia da Semana \*/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Dia do Mês \*/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Posição na Semana \*/i)).not.toBeInTheDocument()
+
+    // MENSAL_DIA_FIXO: exibe diaMes
+    await user.selectOptions(frequenciaSelect, 'MENSAL_DIA_FIXO')
+    expect(screen.queryByLabelText(/Dia da Semana \*/i)).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/Dia do Mês \*/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Posição na Semana \*/i)).not.toBeInTheDocument()
+
+    // MENSAL_POSICAO_SEMANA: exibe diaSemana e posicaoSemanaMes
+    await user.selectOptions(frequenciaSelect, 'MENSAL_POSICAO_SEMANA')
+    expect(screen.getByLabelText(/Dia da Semana \*/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Posição na Semana \*/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Dia do Mês \*/i)).not.toBeInTheDocument()
+
+    // Testa as mensagens de erro acessíveis disparando o submit vazio
+    await user.click(screen.getByText('Salvar Série'))
+
+    // Deve aparecer role="alert" do zod
+    await waitFor(() => {
+      const alerts = screen.getAllByRole('alert')
+      expect(alerts.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('deve permitir criar uma série com strings nativas de data/hora, validando o envio', async () => {
+    render(<SeriesView />)
+    const user = userEvent.setup()
+
+    await waitFor(() => screen.getByText('+ Nova Série'))
+    await user.click(screen.getByText('+ Nova Série'))
+
+    await user.type(screen.getByLabelText(/Título \*/i), 'Série Integrada')
+    await user.type(screen.getByLabelText(/Data Início \*/i), '2026-03-01')
+    await user.type(screen.getByLabelText(/Data Fim \*/i), '2026-04-01')
+    await user.type(screen.getByLabelText(/Horário Início \*/i), '08:30')
+    await user.type(screen.getByLabelText(/Horário Fim \*/i), '12:00')
+
+    await user.selectOptions(screen.getByLabelText(/Frequência \*/i), 'DIARIA')
+    // Diaria nao precisa de dias especificos
+
+    await user.selectOptions(screen.getByLabelText(/Modalidade \*/i), 'ONLINE')
+    await user.type(screen.getByLabelText(/URL Online \*/i), 'https://teams.microsoft.com/xyz')
+
+    await user.selectOptions(screen.getByLabelText(/Tipo de Escopo/i), 'regional')
+    await user.selectOptions(screen.getByLabelText(/Regional \*/i), 'd290f1ee-6c54-4b01-90e6-d701748f0851')
+
+    vi.mocked(apiClient.postWithAuth).mockResolvedValueOnce({})
+    await user.click(screen.getByText('Salvar Série'))
+
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith('/series-recorrencia', expect.objectContaining({
+        titulo: 'Série Integrada',
+        dataInicio: '2026-03-01',
+        dataFim: '2026-04-01',
+        horarioInicio: '08:30',
+        horarioFim: '12:00',
+        frequencia: 'DIARIA',
+        intervalo: 1,
+        modalidade: 'ONLINE',
+        urlOnline: 'https://teams.microsoft.com/xyz',
+        regionalId: 'd290f1ee-6c54-4b01-90e6-d701748f0851'
+      }))
+    })
+  })
+})
