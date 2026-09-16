@@ -309,7 +309,7 @@ describe('SeriesView', () => {
     await screen.findByRole('dialog', { name: 'Editar Série de Recorrência' })
 
     fireEvent.click(screen.getByText('Salvar Série'))
-    const confirmModal = await screen.findByRole('dialog', { name: 'Confirmar Edição de Série' })
+    await screen.findByRole('dialog', { name: 'Confirmar Edição de Série' })
 
     vi.mocked(apiClient.patchWithAuth).mockRejectedValueOnce(new apiClient.ApiError(400, 'Erro teste', { error: 'Mensagem de erro de API' }))
     fireEvent.click(screen.getByText('Confirmar e Reconstruir'))

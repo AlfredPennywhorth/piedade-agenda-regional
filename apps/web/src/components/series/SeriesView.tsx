@@ -207,7 +207,7 @@ export function SeriesView() {
       pauta: serie.pauta || '',
       modalidade: serie.modalidade,
       frequencia: serie.frequencia,
-      intervalo: serie.intervalo,
+      intervalo: 1,
       dataInicio: serie.dataInicio,
       dataFim: serie.dataFim,
       horarioInicio: serie.horarioInicio,
@@ -260,7 +260,7 @@ export function SeriesView() {
       diaSemana: formData.diaSemana !== null && formData.diaSemana !== undefined ? formData.diaSemana : null,
       diaMes: formData.diaMes !== null && formData.diaMes !== undefined ? formData.diaMes : null,
       posicaoSemanaMes: formData.posicaoSemanaMes !== null && formData.posicaoSemanaMes !== undefined ? formData.posicaoSemanaMes : null,
-      intervalo: Number(formData.intervalo) || 1
+      intervalo: 1
     }
 
     try {
