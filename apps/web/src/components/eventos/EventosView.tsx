@@ -7,7 +7,11 @@ import type { Administracao } from '../administracoes/AdministracoesView'
 import type { Regional } from '../regionais/RegionaisView'
 import type { GrupoTrabalho } from '../grupos-trabalho/GruposTrabalhoView'
 import type { Membro } from '../membros/MembrosView'
-import type { Local } from '../locais/LocaisView'
+
+interface Local {
+  id: string
+  nome: string
+}
 
 export interface Evento {
   id: string
