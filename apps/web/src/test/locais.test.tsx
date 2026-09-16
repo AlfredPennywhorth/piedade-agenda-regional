@@ -124,7 +124,7 @@ describe('LocaisView', () => {
     fireEvent.click(screen.getByText('Cadastrar primeiro local'))
 
     const dialog = screen.getByRole('dialog')
-    const { getByLabelText, getByRole, findByText } = within(dialog)
+    const { getByLabelText, getByRole } = within(dialog)
 
     fireEvent.change(getByLabelText(/nome/i), { target: { value: 'Novo Local' } })
     fireEvent.change(getByLabelText(/endereço/i), { target: { value: 'Av B' } })
