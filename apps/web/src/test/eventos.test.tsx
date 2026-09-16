@@ -9,19 +9,23 @@ vi.mock('../api/apiClient', () => ({
   patchWithAuth: vi.fn()
 }))
 
+const EVENTO_ID = '33333333-3333-3333-3333-333333333333'
+const LOCAL_ID = '11111111-1111-1111-1111-111111111111'
+const REGIONAL_ID = '22222222-2222-2222-2222-222222222222'
+
 const mockEventos = [
   {
-    id: '1',
+    id: EVENTO_ID,
     titulo: 'Reunião Presencial',
     descricao: 'Descrição do evento',
     pauta: 'Pauta do evento',
     modalidade: 'PRESENCIAL',
     inicioEm: '2026-10-10T10:00:00.000Z',
     fimEm: '2026-10-10T12:00:00.000Z',
-    localId: 'local-1',
+    localId: LOCAL_ID,
     urlOnline: null,
     organizadorMembroId: null,
-    regionalId: 'reg-1',
+    regionalId: REGIONAL_ID,
     administracaoId: null,
     setorId: null,
     casaId: null,
@@ -36,8 +40,8 @@ describe('EventosView', () => {
     vi.clearAllMocks()
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/eventos') return mockEventos
-      if (url === '/locais') return [{ id: 'local-1', nome: 'Sede' }]
-      if (url === '/regionais') return [{ id: 'reg-1', nome: 'Reg 1' }]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
       return []
     })
   })
@@ -67,7 +71,7 @@ describe('EventosView', () => {
 
   it('deve exibir detalhes de um evento em diálogo acessível', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
-      if (url.startsWith('/eventos/1')) return mockEventos[0]
+      if (url.startsWith(`/eventos/${EVENTO_ID}`)) return mockEventos[0]
       if (url === '/eventos') return mockEventos
       return []
     })
@@ -109,11 +113,11 @@ describe('EventosView', () => {
     
     // modalidade presencial
     fireEvent.change(getByLabelText(/modalidade/i), { target: { value: 'PRESENCIAL' } })
-    fireEvent.change(getByLabelText(/local/i), { target: { value: 'local-1' } })
+    fireEvent.change(getByLabelText(/local/i), { target: { value: LOCAL_ID } })
 
     // escopo
     fireEvent.change(getByLabelText(/tipo de escopo/i), { target: { value: 'regional' } })
-    fireEvent.change(getByLabelText(/regional \*/i), { target: { value: 'reg-1' } })
+    fireEvent.change(getByLabelText(/regional \*/i), { target: { value: REGIONAL_ID } })
 
     fireEvent.click(getByRole('button', { name: /salvar/i }))
 
@@ -152,10 +156,10 @@ describe('EventosView', () => {
 
   it('deve editar um evento existente via PATCH e limpar scopes cruzados', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
-      if (url.startsWith('/eventos/1')) return mockEventos[0]
+      if (url.startsWith(`/eventos/${EVENTO_ID}`)) return mockEventos[0]
       if (url === '/eventos') return mockEventos
-      if (url === '/locais') return [{ id: 'local-1', nome: 'Sede' }]
-      if (url === '/regionais') return [{ id: 'reg-1', nome: 'Reg 1' }]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
       return []
     })
     vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({})
@@ -179,11 +183,12 @@ describe('EventosView', () => {
     fireEvent.click(getByRole('button', { name: /salvar/i }))
 
     await waitFor(() => {
-      expect(apiClient.patchWithAuth).toHaveBeenCalledWith('/eventos/1', expect.objectContaining({
+      expect(apiClient.patchWithAuth).toHaveBeenCalledWith(`/eventos/${EVENTO_ID}`, expect.objectContaining({
         titulo: 'Reunião Presencial Editada',
-        regionalId: 'reg-1',
+        regionalId: REGIONAL_ID,
         administracaoId: null,
       }))
     })
   })
 })
+
