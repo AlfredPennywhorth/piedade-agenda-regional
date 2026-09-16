@@ -273,7 +273,7 @@ describe('EventosView', () => {
     })
     
     // Assegurar que os campos de série NÃO estão presentes em changes (verificado por ser o objeto vindo do form)
-    const patchCall = vi.mocked(apiClient.patchWithAuth).mock.calls[0][1] as any
+    const patchCall = vi.mocked(apiClient.patchWithAuth).mock.calls[0][1]
     expect(patchCall.changes).not.toHaveProperty('frequencia')
     expect(patchCall.changes).not.toHaveProperty('intervalo')
   })

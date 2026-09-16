@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { EventoCreate, EventoUpdate, EventoCreateInput } from '@piedade/shared'
+import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import type { Casa } from '../casas/CasasView'
 import type { Setor } from '../setores/SetoresView'
@@ -59,7 +59,7 @@ export function EventosView() {
   const [carregandoDetalhes, setCarregandoDetalhes] = useState<boolean>(false)
   const [salvando, setSalvando] = useState<boolean>(false)
   const [escolhaSerieAberto, setEscolhaSerieAberto] = useState<Evento | null>(null)
-  const [confirmacaoThisAberto, setConfirmacaoThisAberto] = useState<any | null>(null)
+  const [confirmacaoThisAberto, setConfirmacaoThisAberto] = useState<EventoUpdateInput | null>(null)
 
   // Modal Details
   const [eventoDetalhe, setEventoDetalhe] = useState<Evento | null>(null)
@@ -332,11 +332,13 @@ export function EventosView() {
       setConfirmacaoThisAberto(null)
       setFormOpen(false)
       carregarDados()
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof ApiError && err.body?.error) {
         setErro(typeof err.body.error === 'string' ? err.body.error : 'Dados inválidos')
-      } else {
+      } else if (err instanceof Error) {
         setErro(err.message || 'Erro ao salvar evento.')
+      } else {
+        setErro('Erro ao salvar evento.')
       }
       setConfirmacaoThisAberto(null)
     } finally {
