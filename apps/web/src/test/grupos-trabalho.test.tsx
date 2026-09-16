@@ -20,13 +20,13 @@ describe('S01 — GruposTrabalhoView (Gestão de Grupos de Trabalho)', () => {
 
   it('1. Listar: deve carregar e exibir lista de grupos de trabalho', async () => {
     const mockGrupos = [
-      { id: 'gt-1', nome: 'Jovens - Regional', ativo: true, regionalId: 'reg-1', administracaoId: null, setorId: null },
+      { id: 'gt-1', nome: 'Jovens - Regional', ativo: true, regionalId: '11111111-1111-4111-8111-111111111111', administracaoId: null, setorId: null },
       { id: 'gt-2', nome: 'Casais - Setor', ativo: false, regionalId: null, administracaoId: null, setorId: 'set-1' }
     ]
 
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url: string) => {
       if (url === '/grupos-trabalho') return mockGrupos
-      if (url === '/regionais') return [{ id: 'reg-1', nome: 'Regional Sul' }]
+      if (url === '/regionais') return [{ id: '11111111-1111-4111-8111-111111111111', nome: 'Regional Sul' }]
       if (url === '/administracoes') return []
       if (url === '/setores') return [{ id: 'set-1', nome: 'Setor A' }]
       return []
@@ -52,11 +52,11 @@ describe('S01 — GruposTrabalhoView (Gestão de Grupos de Trabalho)', () => {
   })
 
   it('3. Detalhar: deve exibir detalhes do grupo', async () => {
-    const mockGrupo = { id: 'gt-1', nome: 'Coral', ativo: true, regionalId: 'reg-1', administracaoId: null, setorId: null }
+    const mockGrupo = { id: 'gt-1', nome: 'Coral', ativo: true, regionalId: '11111111-1111-4111-8111-111111111111', administracaoId: null, setorId: null }
 
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url: string) => {
       if (url === '/grupos-trabalho') return [mockGrupo]
-      if (url === '/regionais') return [{ id: 'reg-1', nome: 'Reg 1' }]
+      if (url === '/regionais') return [{ id: '11111111-1111-4111-8111-111111111111', nome: 'Reg 1' }]
       if (url === '/administracoes' || url === '/setores') return []
       if (url === '/grupos-trabalho/gt-1') return mockGrupo
       return []
@@ -75,11 +75,11 @@ describe('S01 — GruposTrabalhoView (Gestão de Grupos de Trabalho)', () => {
 
   it('4. Criar: deve validar envio e chamar post com sucesso', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url: string) => {
-      if (url === '/regionais') return [{ id: 'reg-1', nome: 'Regional SP' }]
+      if (url === '/regionais') return [{ id: '11111111-1111-4111-8111-111111111111', nome: 'Regional SP' }]
       return []
     })
     
-    vi.mocked(apiClient.postWithAuth).mockResolvedValue({ id: 'novo', nome: 'Novo', ativo: true, regionalId: 'reg-1' })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({ id: 'novo', nome: 'Novo', ativo: true, regionalId: '11111111-1111-4111-8111-111111111111' })
 
     render(<GruposTrabalhoView />)
     await screen.findByText('Nenhum grupo de trabalho encontrado.')
@@ -89,7 +89,7 @@ describe('S01 — GruposTrabalhoView (Gestão de Grupos de Trabalho)', () => {
     fireEvent.change(screen.getByLabelText(/Nome do Grupo/i), { target: { value: 'Novo Grupo' } })
     
     // regional radio is selected by default, so we pick the regional
-    fireEvent.change(screen.getByLabelText('Regional vinculada ao Grupo'), { target: { value: 'reg-1' } })
+    fireEvent.change(screen.getByLabelText(/Regional vinculada ao Grupo/i), { target: { value: '11111111-1111-4111-8111-111111111111' } })
 
     fireEvent.click(screen.getByText('Salvar Grupo'))
 
@@ -97,7 +97,7 @@ describe('S01 — GruposTrabalhoView (Gestão de Grupos de Trabalho)', () => {
       expect(apiClient.postWithAuth).toHaveBeenCalledWith('/grupos-trabalho', {
         nome: 'Novo Grupo',
         ativo: true,
-        regionalId: 'reg-1',
+        regionalId: '11111111-1111-4111-8111-111111111111',
         administracaoId: null,
         setorId: null
       })
