@@ -9,9 +9,11 @@ vi.mock('../api/apiClient', () => ({
   patchWithAuth: vi.fn(),
   deleteWithAuth: vi.fn(),
   ApiError: class ApiError extends Error {
+    status: number
     body: any
-    constructor(message: string, body: any) {
+    constructor(status: number, message: string, body: any) {
       super(message)
+      this.status = status
       this.body = body
     }
   }
