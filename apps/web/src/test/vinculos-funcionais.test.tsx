@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { VinculosFuncionaisView } from '../components/vinculos-funcionais/VinculosFuncionaisView'
 import * as apiClient from '../api/apiClient'
 import { ApiError } from '../api/apiClient'
