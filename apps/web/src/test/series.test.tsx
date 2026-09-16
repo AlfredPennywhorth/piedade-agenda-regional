@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { SeriesView } from '../components/series/SeriesView'
 import * as apiClient from '../api/apiClient'
-import userEvent from '@testing-library/user-event'
 import { SerieCreate } from '@piedade/shared'
 
 vi.mock('../api/apiClient', () => ({
@@ -101,39 +100,38 @@ describe('SeriesView', () => {
 
   it('deve alternar campos condicionais de modalidade e limpar incompatíveis', async () => {
     render(<SeriesView />)
-    const user = userEvent.setup()
 
     await waitFor(() => screen.getByText('+ Nova Série'))
-    await user.click(screen.getByText('+ Nova Série'))
+    fireEvent.click(screen.getByText('+ Nova Série'))
 
     // Seleciona modalidade HIBRIDO
     const modalidadeSelect = screen.getByLabelText(/Modalidade \*/i)
-    await user.selectOptions(modalidadeSelect, 'HIBRIDO')
+    fireEvent.change(modalidadeSelect, { target: { value: 'HIBRIDO' } })
 
     expect(screen.getByLabelText(/Local \*/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/URL Online \*/i)).toBeInTheDocument()
 
     // Preenche ambos
-    await user.selectOptions(screen.getByLabelText(/Local \*/i), '9f8b7c6d-5e4f-3a2b-1c0d-e9f8a7b6c5d4')
-    await user.type(screen.getByLabelText(/URL Online \*/i), 'https://zoom.us')
+    fireEvent.change(screen.getByLabelText(/Local \*/i), { target: { value: '9f8b7c6d-5e4f-3a2b-1c0d-e9f8a7b6c5d4' } })
+    fireEvent.change(screen.getByLabelText(/URL Online \*/i), { target: { value: 'https://zoom.us' } })
 
     // Altera para PRESENCIAL (deve esconder URL Online)
-    await user.selectOptions(modalidadeSelect, 'PRESENCIAL')
+    fireEvent.change(modalidadeSelect, { target: { value: 'PRESENCIAL' } })
     expect(screen.queryByLabelText(/URL Online \*/i)).not.toBeInTheDocument()
 
     // Submete e verifica o payload para confirmar que urlOnline foi limpo
-    await user.type(screen.getByLabelText(/Título \*/i), 'Teste')
-    await user.type(screen.getByLabelText(/Data Início \*/i), '2025-01-01')
-    await user.type(screen.getByLabelText(/Data Fim \*/i), '2025-01-31')
-    await user.type(screen.getByLabelText(/Horário Início \*/i), '10:00')
-    await user.type(screen.getByLabelText(/Horário Fim \*/i), '11:00')
+    fireEvent.change(screen.getByLabelText(/Título \*/i), { target: { value: 'Teste' } })
+    fireEvent.change(screen.getByLabelText(/Data Início \*/i), { target: { value: '2025-01-01' } })
+    fireEvent.change(screen.getByLabelText(/Data Fim \*/i), { target: { value: '2025-01-31' } })
+    fireEvent.change(screen.getByLabelText(/Horário Início \*/i), { target: { value: '10:00' } })
+    fireEvent.change(screen.getByLabelText(/Horário Fim \*/i), { target: { value: '11:00' } })
     
     // Escopo
-    await user.selectOptions(screen.getByLabelText(/Tipo de Escopo/i), 'regional')
-    await user.selectOptions(screen.getByLabelText(/Regional \*/i), 'd290f1ee-6c54-4b01-90e6-d701748f0851')
+    fireEvent.change(screen.getByLabelText(/Tipo de Escopo/i), { target: { value: 'regional' } })
+    fireEvent.change(screen.getByLabelText(/Regional \*/i), { target: { value: 'd290f1ee-6c54-4b01-90e6-d701748f0851' } })
 
     vi.mocked(apiClient.postWithAuth).mockResolvedValueOnce({})
-    await user.click(screen.getByText('Salvar Série'))
+    fireEvent.click(screen.getByText('Salvar Série'))
 
     await waitFor(() => {
       expect(apiClient.postWithAuth).toHaveBeenCalled()
@@ -147,35 +145,34 @@ describe('SeriesView', () => {
 
   it('deve apresentar os campos condicionais corretos para as frequências e validar o formulário (role="alert")', async () => {
     render(<SeriesView />)
-    const user = userEvent.setup()
 
     await waitFor(() => screen.getByText('+ Nova Série'))
-    await user.click(screen.getByText('+ Nova Série'))
+    fireEvent.click(screen.getByText('+ Nova Série'))
 
     const form = screen.getByRole('dialog', { name: 'Nova Série de Recorrência' }).querySelector('form')
     expect(form).toHaveAttribute('noValidate')
 
     // SEMANAL: exibe diaSemana
     const frequenciaSelect = screen.getByLabelText(/Frequência \*/i)
-    await user.selectOptions(frequenciaSelect, 'SEMANAL')
+    fireEvent.change(frequenciaSelect, { target: { value: 'SEMANAL' } })
     expect(screen.getByLabelText(/Dia da Semana \*/i)).toBeInTheDocument()
     expect(screen.queryByLabelText(/Dia do Mês \*/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/Posição na Semana \*/i)).not.toBeInTheDocument()
 
     // MENSAL_DIA_FIXO: exibe diaMes
-    await user.selectOptions(frequenciaSelect, 'MENSAL_DIA_FIXO')
+    fireEvent.change(frequenciaSelect, { target: { value: 'MENSAL_DIA_FIXO' } })
     expect(screen.queryByLabelText(/Dia da Semana \*/i)).not.toBeInTheDocument()
     expect(screen.getByLabelText(/Dia do Mês \*/i)).toBeInTheDocument()
     expect(screen.queryByLabelText(/Posição na Semana \*/i)).not.toBeInTheDocument()
 
     // MENSAL_POSICAO_SEMANA: exibe diaSemana e posicaoSemanaMes
-    await user.selectOptions(frequenciaSelect, 'MENSAL_POSICAO_SEMANA')
+    fireEvent.change(frequenciaSelect, { target: { value: 'MENSAL_POSICAO_SEMANA' } })
     expect(screen.getByLabelText(/Dia da Semana \*/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/Posição na Semana \*/i)).toBeInTheDocument()
     expect(screen.queryByLabelText(/Dia do Mês \*/i)).not.toBeInTheDocument()
 
     // Testa as mensagens de erro acessíveis disparando o submit vazio
-    await user.click(screen.getByText('Salvar Série'))
+    fireEvent.click(screen.getByText('Salvar Série'))
 
     // Deve aparecer role="alert" do zod
     await waitFor(() => {
@@ -186,28 +183,27 @@ describe('SeriesView', () => {
 
   it('deve permitir criar uma série com strings nativas de data/hora, validando o envio', async () => {
     render(<SeriesView />)
-    const user = userEvent.setup()
 
     await waitFor(() => screen.getByText('+ Nova Série'))
-    await user.click(screen.getByText('+ Nova Série'))
+    fireEvent.click(screen.getByText('+ Nova Série'))
 
-    await user.type(screen.getByLabelText(/Título \*/i), 'Série Integrada')
-    await user.type(screen.getByLabelText(/Data Início \*/i), '2026-03-01')
-    await user.type(screen.getByLabelText(/Data Fim \*/i), '2026-04-01')
-    await user.type(screen.getByLabelText(/Horário Início \*/i), '08:30')
-    await user.type(screen.getByLabelText(/Horário Fim \*/i), '12:00')
+    fireEvent.change(screen.getByLabelText(/Título \*/i), { target: { value: 'Série Integrada' } })
+    fireEvent.change(screen.getByLabelText(/Data Início \*/i), { target: { value: '2026-03-01' } })
+    fireEvent.change(screen.getByLabelText(/Data Fim \*/i), { target: { value: '2026-04-01' } })
+    fireEvent.change(screen.getByLabelText(/Horário Início \*/i), { target: { value: '08:30' } })
+    fireEvent.change(screen.getByLabelText(/Horário Fim \*/i), { target: { value: '12:00' } })
 
-    await user.selectOptions(screen.getByLabelText(/Frequência \*/i), 'DIARIA')
+    fireEvent.change(screen.getByLabelText(/Frequência \*/i), { target: { value: 'DIARIA' } })
     // Diaria nao precisa de dias especificos
 
-    await user.selectOptions(screen.getByLabelText(/Modalidade \*/i), 'ONLINE')
-    await user.type(screen.getByLabelText(/URL Online \*/i), 'https://teams.microsoft.com/xyz')
+    fireEvent.change(screen.getByLabelText(/Modalidade \*/i), { target: { value: 'ONLINE' } })
+    fireEvent.change(screen.getByLabelText(/URL Online \*/i), { target: { value: 'https://teams.microsoft.com/xyz' } })
 
-    await user.selectOptions(screen.getByLabelText(/Tipo de Escopo/i), 'regional')
-    await user.selectOptions(screen.getByLabelText(/Regional \*/i), 'd290f1ee-6c54-4b01-90e6-d701748f0851')
+    fireEvent.change(screen.getByLabelText(/Tipo de Escopo/i), { target: { value: 'regional' } })
+    fireEvent.change(screen.getByLabelText(/Regional \*/i), { target: { value: 'd290f1ee-6c54-4b01-90e6-d701748f0851' } })
 
     vi.mocked(apiClient.postWithAuth).mockResolvedValueOnce({})
-    await user.click(screen.getByText('Salvar Série'))
+    fireEvent.click(screen.getByText('Salvar Série'))
 
     await waitFor(() => {
       expect(apiClient.postWithAuth).toHaveBeenCalledWith('/series-recorrencia', expect.objectContaining({
