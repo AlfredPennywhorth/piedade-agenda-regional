@@ -71,7 +71,7 @@ export function LocaisView() {
       setLoading(true)
       setError(null)
       const data = await apiClient.fetchWithAuth<Local[]>('/locais')
-      setLocais(data)
+      setLocais(data || [])
     } catch (err: any) {
       setError(err.message || 'Erro ao carregar locais')
     } finally {
@@ -225,7 +225,7 @@ export function LocaisView() {
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
         </div>
-      ) : locais.length === 0 ? (
+      ) : (locais || []).length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-slate-200 shadow-sm">
           <p className="text-slate-500 mb-4">Nenhum local cadastrado.</p>
           <button

@@ -137,7 +137,7 @@ describe('LocaisView', () => {
 
     fireEvent.click(getByRole('button', { name: /salvar local/i }))
 
-    expect(await findByText(/URL inválida/i)).toBeInTheDocument()
+    expect(await findByText(/invalid url/i)).toBeInTheDocument()
     expect(apiClient.postWithAuth).not.toHaveBeenCalled()
   })
 
