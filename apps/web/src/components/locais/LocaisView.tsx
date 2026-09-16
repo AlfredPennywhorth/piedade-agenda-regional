@@ -315,7 +315,7 @@ export function LocaisView() {
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     placeholder="Ex: Templo Central"
                   />
-                  {formErrors.nome && <p className="text-red-500 text-xs mt-1">{formErrors.nome}</p>}
+                  {formErrors.nome && <p role="alert" className="text-red-500 text-xs mt-1">{formErrors.nome}</p>}
                 </div>
               </div>
 
@@ -356,7 +356,7 @@ export function LocaisView() {
                       onChange={e => setFormData({ ...formData, endereco: e.target.value })}
                       className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     />
-                    {formErrors.endereco && <p className="text-red-500 text-xs mt-1">{formErrors.endereco}</p>}
+                    {formErrors.endereco && <p role="alert" className="text-red-500 text-xs mt-1">{formErrors.endereco}</p>}
                   </div>
                   <div>
                     <label htmlFor="numero" className="block text-sm font-medium text-slate-700 mb-1">Número *</label>
@@ -367,7 +367,7 @@ export function LocaisView() {
                       onChange={e => setFormData({ ...formData, numero: e.target.value })}
                       className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     />
-                    {formErrors.numero && <p className="text-red-500 text-xs mt-1">{formErrors.numero}</p>}
+                    {formErrors.numero && <p role="alert" className="text-red-500 text-xs mt-1">{formErrors.numero}</p>}
                   </div>
                 </div>
 
@@ -404,7 +404,7 @@ export function LocaisView() {
                       onChange={e => setFormData({ ...formData, cidade: e.target.value })}
                       className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     />
-                    {formErrors.cidade && <p className="text-red-500 text-xs mt-1">{formErrors.cidade}</p>}
+                    {formErrors.cidade && <p role="alert" className="text-red-500 text-xs mt-1">{formErrors.cidade}</p>}
                   </div>
                   <div>
                     <label htmlFor="uf" className="block text-sm font-medium text-slate-700 mb-1">UF *</label>
@@ -417,7 +417,7 @@ export function LocaisView() {
                       className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 uppercase"
                       placeholder="SP"
                     />
-                    {formErrors.uf && <p className="text-red-500 text-xs mt-1">{formErrors.uf}</p>}
+                    {formErrors.uf && <p role="alert" className="text-red-500 text-xs mt-1">{formErrors.uf}</p>}
                   </div>
                 </div>
               </div>
@@ -462,7 +462,7 @@ export function LocaisView() {
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     placeholder="https://maps.google.com/..."
                   />
-                  {formErrors.urlMaps && <p className="text-red-500 text-xs mt-1">{formErrors.urlMaps}</p>}
+                  {formErrors.urlMaps && <p role="alert" className="text-red-500 text-xs mt-1">{formErrors.urlMaps}</p>}
                 </div>
                 <div>
                   <label htmlFor="urlWaze" className="block text-sm font-medium text-slate-700 mb-1">URL Waze</label>
@@ -474,7 +474,7 @@ export function LocaisView() {
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     placeholder="https://waze.com/ul?..."
                   />
-                  {formErrors.urlWaze && <p className="text-red-500 text-xs mt-1">{formErrors.urlWaze}</p>}
+                  {formErrors.urlWaze && <p role="alert" className="text-red-500 text-xs mt-1">{formErrors.urlWaze}</p>}
                 </div>
               </div>
 
