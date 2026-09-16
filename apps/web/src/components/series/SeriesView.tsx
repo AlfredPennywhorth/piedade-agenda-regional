@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { SerieCreate, SerieCreateInput } from '@piedade/shared'
-import { fetchWithAuth, postWithAuth, ApiError } from '../../api/apiClient'
+import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import type { Casa } from '../casas/CasasView'
 import type { Setor } from '../setores/SetoresView'
 import type { Administracao } from '../administracoes/AdministracoesView'
@@ -60,6 +60,10 @@ export function SeriesView() {
   // Form State
   const [formOpen, setFormOpen] = useState(false)
   const [salvando, setSalvando] = useState<boolean>(false)
+  
+  const [serieEditandoId, setSerieEditandoId] = useState<string | null>(null)
+  const [confirmacaoEditar, setConfirmacaoEditar] = useState<Partial<SerieCreateInput> | null>(null)
+  const [confirmacaoInativar, setConfirmacaoInativar] = useState<SerieRecorrencia | null>(null)
 
   // Modal Details
   const [serieDetalhe, setSerieDetalhe] = useState<SerieRecorrencia | null>(null)
@@ -163,6 +167,7 @@ export function SeriesView() {
   }
 
   const abrirFormCriar = () => {
+    setSerieEditandoId(null)
     setFormData({
       titulo: '',
       descricao: '',
@@ -189,6 +194,46 @@ export function SeriesView() {
       ativo: true,
     })
     setTipoEscopo('')
+    setErrosForm({})
+    setErro(null)
+    setFormOpen(true)
+  }
+
+  const abrirFormEditar = (serie: SerieRecorrencia) => {
+    setSerieEditandoId(serie.id)
+    setFormData({
+      titulo: serie.titulo,
+      descricao: serie.descricao || '',
+      pauta: serie.pauta || '',
+      modalidade: serie.modalidade,
+      frequencia: serie.frequencia,
+      intervalo: serie.intervalo,
+      dataInicio: serie.dataInicio,
+      dataFim: serie.dataFim,
+      horarioInicio: serie.horarioInicio,
+      horarioFim: serie.horarioFim,
+      diaSemana: serie.diaSemana,
+      diaMes: serie.diaMes,
+      posicaoSemanaMes: serie.posicaoSemanaMes,
+      localId: serie.localId || '',
+      urlOnline: serie.urlOnline || '',
+      organizadorMembroId: serie.organizadorMembroId || '',
+      regionalId: serie.regionalId || '',
+      administracaoId: serie.administracaoId || '',
+      setorId: serie.setorId || '',
+      casaId: serie.casaId || '',
+      grupoTrabalhoId: serie.grupoTrabalhoId || '',
+      observacoes: serie.observacoes || '',
+      ativo: serie.ativo,
+    })
+    
+    if (serie.regionalId) setTipoEscopo('regional')
+    else if (serie.administracaoId) setTipoEscopo('administracao')
+    else if (serie.setorId) setTipoEscopo('setor')
+    else if (serie.casaId) setTipoEscopo('casa')
+    else if (serie.grupoTrabalhoId) setTipoEscopo('grupoTrabalho')
+    else setTipoEscopo('')
+    
     setErrosForm({})
     setErro(null)
     setFormOpen(true)
@@ -232,6 +277,11 @@ export function SeriesView() {
         return
       }
 
+      if (serieEditandoId) {
+        setConfirmacaoEditar(parsed.data)
+        return
+      }
+
       setSalvando(true)
 
       await postWithAuth('/series-recorrencia', parsed.data)
@@ -244,6 +294,51 @@ export function SeriesView() {
       } else {
         setErro(err.message || 'Erro ao salvar série.')
       }
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const confirmarEdicao = async () => {
+    if (!serieEditandoId || !confirmacaoEditar) return
+    setSalvando(true)
+    setErro(null)
+    try {
+      const payload = {
+        updateMode: 'ALL',
+        changes: confirmacaoEditar
+      }
+      await patchWithAuth(`/series-recorrencia/${serieEditandoId}`, payload)
+      setConfirmacaoEditar(null)
+      setFormOpen(false)
+      carregarDados()
+    } catch (err: any) {
+      if (err instanceof ApiError && err.body?.error) {
+        setErro(typeof err.body.error === 'string' ? err.body.error : 'Dados inválidos')
+      } else {
+        setErro(err.message || 'Erro ao atualizar série.')
+      }
+      setConfirmacaoEditar(null)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const confirmarInativacaoSubmit = async () => {
+    if (!confirmacaoInativar) return
+    setSalvando(true)
+    setErro(null)
+    try {
+      const payload = {
+        updateMode: 'ALL',
+        changes: { ativo: false }
+      }
+      await patchWithAuth(`/series-recorrencia/${confirmacaoInativar.id}`, payload)
+      setConfirmacaoInativar(null)
+      carregarDados()
+    } catch (err: any) {
+      setErro(err.message || 'Erro ao inativar série.')
+      setConfirmacaoInativar(null)
     } finally {
       setSalvando(false)
     }
@@ -322,6 +417,14 @@ export function SeriesView() {
                       <button onClick={() => setSerieDetalhe(item)} className="text-brand-600 hover:text-brand-900 font-medium">
                         Ver
                       </button>
+                      <button onClick={() => abrirFormEditar(item)} className="text-blue-600 hover:text-blue-900 font-medium">
+                        Editar
+                      </button>
+                      {item.ativo && (
+                        <button onClick={() => setConfirmacaoInativar(item)} className="text-red-600 hover:text-red-900 font-medium">
+                          Inativar
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -337,7 +440,7 @@ export function SeriesView() {
           <div role="dialog" aria-modal="true" aria-labelledby="modal-form-title" className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden my-8">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-form-title" className="text-lg font-semibold text-slate-900">
-                Nova Série de Recorrência
+                {serieEditandoId ? 'Editar Série de Recorrência' : 'Nova Série de Recorrência'}
               </h3>
               <button onClick={() => setFormOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
@@ -785,6 +888,72 @@ export function SeriesView() {
                   <p className="text-slate-900">{serieDetalhe.descricao}</p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmação Edição */}
+      {confirmacaoEditar && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+          <div role="dialog" aria-modal="true" aria-labelledby="modal-confirm-edit-title" className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden p-6 space-y-4">
+            <h3 id="modal-confirm-edit-title" className="text-lg font-semibold text-slate-900">Confirmar Edição de Série</h3>
+            <p className="text-sm text-slate-600">
+              Atenção: Ao confirmar esta edição, todas as ocorrências futuras não excepcionais desta série serão <strong>reconstruídas</strong> com base nestas novas regras.
+            </p>
+            <p className="text-sm text-slate-600">
+              Ocorrências passadas e exceções individuais não serão afetadas.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmacaoEditar(null)}
+                className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                disabled={salvando}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarEdicao}
+                disabled={salvando}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {salvando ? 'Salvando...' : 'Confirmar e Reconstruir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmação Inativação */}
+      {confirmacaoInativar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+          <div role="dialog" aria-modal="true" aria-labelledby="modal-confirm-inactivate-title" className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden p-6 space-y-4">
+            <h3 id="modal-confirm-inactivate-title" className="text-lg font-semibold text-red-600">Inativar Série</h3>
+            <p className="text-sm text-slate-600">
+              Você está prestes a inativar a série <strong>{confirmacaoInativar.titulo}</strong>.
+            </p>
+            <p className="text-sm text-slate-600">
+              Isso fará com que <strong>todos os eventos futuros</strong> desta série sejam inativados. Os eventos passados serão preservados.
+            </p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmacaoInativar(null)}
+                className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                disabled={salvando}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarInativacaoSubmit}
+                disabled={salvando}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {salvando ? 'Inativando...' : 'Sim, Inativar Futuros'}
+              </button>
             </div>
           </div>
         </div>

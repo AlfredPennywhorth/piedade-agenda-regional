@@ -220,4 +220,102 @@ describe('SeriesView', () => {
       }))
     })
   })
+  it('deve abrir edição, exigir confirmação e enviar PATCH com updateMode ALL', async () => {
+    render(<SeriesView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Semanal')).toBeInTheDocument()
+    })
+
+    const btnEditar = screen.getByText('Editar')
+    fireEvent.click(btnEditar)
+
+    // Formulario de edição aberto
+    const form = screen.getByRole('dialog', { name: 'Editar Série de Recorrência' })
+    expect(form).toBeInTheDocument()
+
+    // Altera titulo
+    fireEvent.change(screen.getByLabelText(/Título \*/i), { target: { value: 'Reunião Semanal Editada' } })
+    
+    // Tenta salvar, deve abrir confirmacao
+    fireEvent.click(screen.getByText('Salvar Série'))
+
+    const confirmModal = await screen.findByRole('dialog', { name: 'Confirmar Edição de Série' })
+    expect(confirmModal).toBeInTheDocument()
+
+    // Confirmar
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({})
+    fireEvent.click(screen.getByText('Confirmar e Reconstruir'))
+
+    await waitFor(() => {
+      expect(apiClient.patchWithAuth).toHaveBeenCalledWith('/series-recorrencia/f47ac10b-58cc-4372-a567-0e02b2c3d479', expect.objectContaining({
+        updateMode: 'ALL',
+        changes: expect.objectContaining({
+          titulo: 'Reunião Semanal Editada'
+        })
+      }))
+    })
+  })
+
+  it('deve abrir inativação, exigir confirmação e enviar PATCH com updateMode ALL e ativo falso', async () => {
+    render(<SeriesView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Semanal')).toBeInTheDocument()
+    })
+
+    const btnInativar = screen.getByText('Inativar')
+    fireEvent.click(btnInativar)
+
+    const confirmModal = await screen.findByRole('dialog', { name: 'Inativar Série' })
+    expect(confirmModal).toBeInTheDocument()
+
+    // Confirmar
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({})
+    fireEvent.click(screen.getByText('Sim, Inativar Futuros'))
+
+    await waitFor(() => {
+      expect(apiClient.patchWithAuth).toHaveBeenCalledWith('/series-recorrencia/f47ac10b-58cc-4372-a567-0e02b2c3d479', {
+        updateMode: 'ALL',
+        changes: { ativo: false }
+      })
+    })
+  })
+
+  it('deve cancelar confirmação de edição e inativação sem enviar PATCH', async () => {
+    render(<SeriesView />)
+    await waitFor(() => screen.getByText('Reunião Semanal'))
+
+    // Inativação
+    fireEvent.click(screen.getByText('Inativar'))
+    const confirmInativar = await screen.findByRole('dialog', { name: 'Inativar Série' })
+    
+    // Cancela
+    fireEvent.click(within(confirmInativar).getByText('Cancelar'))
+    
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Inativar Série' })).not.toBeInTheDocument()
+    })
+    expect(apiClient.patchWithAuth).not.toHaveBeenCalled()
+  })
+
+  it('deve tratar erro de API no PATCH de edição', async () => {
+    render(<SeriesView />)
+    await waitFor(() => screen.getByText('Reunião Semanal'))
+
+    fireEvent.click(screen.getByText('Editar'))
+    await screen.findByRole('dialog', { name: 'Editar Série de Recorrência' })
+
+    fireEvent.click(screen.getByText('Salvar Série'))
+    const confirmModal = await screen.findByRole('dialog', { name: 'Confirmar Edição de Série' })
+
+    vi.mocked(apiClient.patchWithAuth).mockRejectedValueOnce(new apiClient.ApiError(400, 'Erro teste', { error: 'Mensagem de erro de API' }))
+    fireEvent.click(screen.getByText('Confirmar e Reconstruir'))
+
+    // Dialog fecha e mostra erro na tela principal ou volta pro form
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Confirmar Edição de Série' })).not.toBeInTheDocument()
+      expect(screen.getByText('Mensagem de erro de API')).toBeInTheDocument()
+    })
+  })
 })
