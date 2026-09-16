@@ -14,10 +14,11 @@ import { GruposTrabalhoView } from './components/grupos-trabalho/GruposTrabalhoV
 import { MembrosView } from './components/membros/MembrosView'
 import { FuncoesView } from './components/funcoes/FuncoesView'
 import { VinculosFuncionaisView } from './components/vinculos-funcionais/VinculosFuncionaisView'
+import { LocaisView } from './components/locais/LocaisView'
 import { fetchWithAuth } from './api/apiClient'
 
 function App() {
-  const [currentTab, setCurrentTab] = useState<'agenda' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais'>('agenda')
+  const [currentTab, setCurrentTab] = useState<'agenda' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais'>('agenda')
   const [capacidades, setCapacidades] = useState<CapacidadesFrontend>({})
 
   useEffect(() => {
@@ -45,6 +46,7 @@ function App() {
       {currentTab === 'membros' && <MembrosView />}
       {currentTab === 'funcoes' && <FuncoesView />}
       {currentTab === 'vinculos-funcionais' && <VinculosFuncionaisView />}
+      {currentTab === 'locais' && <LocaisView />}
       
       {currentTab === 'avisos' && (
         <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
