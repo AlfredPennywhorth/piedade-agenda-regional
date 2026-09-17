@@ -307,7 +307,7 @@ export function EventosView() {
         horarioInicio: serie.horarioInicio || '',
         horarioFim: serie.horarioFim || '',
         frequencia: serie.frequencia,
-        intervalo: serie.intervalo || 1,
+        intervalo: 1,
         diaSemana: serie.diaSemana,
         diaMes: serie.diaMes,
         posicaoSemanaMes: serie.posicaoSemanaMes,
