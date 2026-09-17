@@ -3,11 +3,6 @@ import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput, Serie
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import { SerieFormModal, TipoEscopo } from '../series/SerieFormModal'
 import type { Casa } from '../casas/CasasView'
-import { useState, useEffect } from 'react'
-import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput, SerieCreateInput } from '@piedade/shared'
-import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
-import { SerieFormModal, TipoEscopo } from '../series/SerieFormModal'
-import type { Casa } from '../casas/CasasView'
 import type { Setor } from '../setores/SetoresView'
 import type { Administracao } from '../administracoes/AdministracoesView'
 import type { Regional } from '../regionais/RegionaisView'
@@ -452,14 +447,14 @@ export function EventosView() {
     setErro(null)
     try {
       const {
-        titulo, descricao, pauta, modalidade, frequencia, intervalo, dataInicio,
+        titulo, descricao, pauta, modalidade, frequencia, dataInicio,
         dataFim, horarioInicio, horarioFim, diaSemana, diaMes,
         posicaoSemanaMes, localId, urlOnline, organizadorMembroId, regionalId,
         administracaoId, setorId, casaId, grupoTrabalhoId, observacoes, ativo
       } = confirmacaoFutureAberto
 
       const changes = {
-        titulo, descricao, pauta, modalidade, frequencia, intervalo, dataInicio,
+        titulo, descricao, pauta, modalidade, frequencia, intervalo: 1, dataInicio,
         dataFim, horarioInicio, horarioFim, diaSemana, diaMes,
         posicaoSemanaMes, localId, urlOnline, organizadorMembroId, regionalId,
         administracaoId, setorId, casaId, grupoTrabalhoId, observacoes, ativo
