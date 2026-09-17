@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react'
-import { ConvocacaoCreate, ConvocacaoUpdate, ConvocacaoCreatePayload, ConvocacaoUpdatePayload, Convocacao, Evento } from '@piedade/shared'
-import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
+import { ConvocacaoCreate, ConvocacaoUpdate, ConvocacaoCreatePayload, ConvocacaoUpdatePayload, Convocacao } from '@piedade/shared'
+import { fetchWithAuth, postWithAuth, patchWithAuth } from '../../api/apiClient'
+
+interface EventoLookup {
+  id: string
+  titulo: string
+  ativo?: boolean
+}
 
 export function ConvocacoesView() {
   const [convocacoes, setConvocacoes] = useState<Convocacao[]>([])
-  const [eventosLookup, setEventosLookup] = useState<Evento[]>([])
+  const [eventosLookup, setEventosLookup] = useState<EventoLookup[]>([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -24,7 +30,7 @@ export function ConvocacoesView() {
     try {
       const [convData, eventosData] = await Promise.all([
         fetchWithAuth<Convocacao[]>('/convocacoes'),
-        fetchWithAuth<Evento[]>('/eventos')
+        fetchWithAuth<EventoLookup[]>('/eventos')
       ])
       setConvocacoes(convData || [])
       setEventosLookup(eventosData || [])
