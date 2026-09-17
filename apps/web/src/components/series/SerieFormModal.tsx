@@ -21,6 +21,7 @@ export interface SerieFormModalProps {
   initialData: Partial<SerieCreateInput>
   initialTipoEscopo: TipoEscopo
   lookups: Lookups
+  externalError?: string | null
   onSubmit: (data: SerieCreateInput) => Promise<void>
 }
 
@@ -31,6 +32,7 @@ export function SerieFormModal({
   initialData,
   initialTipoEscopo,
   lookups,
+  externalError,
   onSubmit
 }: SerieFormModalProps) {
   const [formData, setFormData] = useState<Partial<SerieCreateInput>>(initialData)
@@ -148,8 +150,13 @@ export function SerieFormModal({
               <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
             {erro && (
-              <div className="p-4 bg-red-50 border-b border-red-200 text-red-700 text-sm">
+              <div role="alert" className="p-4 bg-red-50 border-b border-red-200 text-red-700 text-sm">
                 {erro}
+              </div>
+            )}
+            {externalError && (
+              <div role="alert" className="p-4 bg-red-50 border-b border-red-200 text-red-700 text-sm">
+                {externalError}
               </div>
             )}
             <form onSubmit={handleSubmit} noValidate className="p-6 overflow-y-auto space-y-6">

@@ -315,5 +315,94 @@ describe('EventosView', () => {
     const erroDiv = await screen.findByText('Conflito de horários')
     expect(erroDiv).toBeInTheDocument()
   })
-})
+  it('deve enviar updateMode THIS_AND_FUTURE e fromEventId ao editar este e os próximos', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url.startsWith(`/series-recorrencia/${SERIE_ID}`)) return { ...mockEventoRecorrente, frequencia: 'DIARIA', intervalo: 1, dataInicio: '2026-10-10', dataFim: '2026-10-20', horarioInicio: '10:00', horarioFim: '12:00' }
+      if (url === '/eventos') return [mockEventoRecorrente]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({})
 
+    render(<EventosView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Recorrente')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
+
+    const dialogEscolha = await screen.findByRole('dialog', { name: /editar evento recorrente/i })
+    fireEvent.click(within(dialogEscolha).getByRole('button', { name: /este e os próximos eventos/i }))
+
+    const formDialog = await screen.findByRole('dialog', { name: /editar evento recorrente/i })
+    const { getByLabelText, getByRole } = within(formDialog)
+
+    await waitFor(() => {
+      expect(getByLabelText(/título/i)).toHaveValue('Reunião Recorrente')
+    })
+
+    fireEvent.change(getByLabelText(/título/i), { target: { value: 'Série Editada' } })
+    fireEvent.click(getByRole('button', { name: /salvar série/i }))
+
+    // Confirmação de THIS_AND_FUTURE
+    const confirmDialog = await screen.findByRole('dialog', { name: /confirmar edição/i })
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: /confirmar e salvar/i }))
+
+    await waitFor(() => {
+      expect(apiClient.patchWithAuth).toHaveBeenCalledWith(`/series-recorrencia/${SERIE_ID}`, expect.objectContaining({
+        updateMode: 'THIS_AND_FUTURE',
+        fromEventId: mockEventoRecorrente.id,
+        changes: expect.objectContaining({
+          titulo: 'Série Editada',
+          frequencia: 'DIARIA'
+        })
+      }))
+    })
+  })
+
+  it('deve exibir erro da API se falhar no PATCH THIS_AND_FUTURE', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url.startsWith(`/series-recorrencia/${SERIE_ID}`)) return { ...mockEventoRecorrente, frequencia: 'DIARIA', intervalo: 1, dataInicio: '2026-10-10', dataFim: '2026-10-20', horarioInicio: '10:00', horarioFim: '12:00' }
+      if (url === '/eventos') return [mockEventoRecorrente]
+      return []
+    })
+    
+    vi.mocked(apiClient.patchWithAuth).mockRejectedValueOnce(
+      new apiClient.ApiError(409, 'Erro na série futura', { error: 'Erro na série futura' })
+    )
+
+    render(<EventosView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Recorrente')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
+    
+    const dialogEscolha = await screen.findByRole('dialog', { name: /editar evento recorrente/i })
+    fireEvent.click(within(dialogEscolha).getByRole('button', { name: /este e os próximos eventos/i }))
+
+    const formDialog = await screen.findByRole('dialog', { name: /editar evento recorrente/i })
+    const { getByRole } = within(formDialog)
+
+    await waitFor(() => {
+      expect(within(formDialog).getByLabelText(/título/i)).toHaveValue('Reunião Recorrente')
+    })
+
+    fireEvent.click(getByRole('button', { name: /salvar série/i }))
+
+    const confirmDialog = await screen.findByRole('dialog', { name: /confirmar edição/i })
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: /confirmar e salvar/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /confirmar edição/i })).not.toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('dialog', { name: /editar evento recorrente/i })).toBeInTheDocument()
+
+    const alerts = await screen.findAllByRole('alert')
+    expect(alerts.some(alert => alert.textContent === 'Erro na série futura')).toBe(true)
+  })
+})

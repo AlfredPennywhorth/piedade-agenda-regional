@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput } from '@piedade/shared'
+import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput, SerieCreateInput } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
+import { SerieFormModal, TipoEscopo } from '../series/SerieFormModal'
 import type { Casa } from '../casas/CasasView'
 import type { Setor } from '../setores/SetoresView'
 import type { Administracao } from '../administracoes/AdministracoesView'
@@ -11,6 +12,33 @@ import type { Membro } from '../membros/MembrosView'
 interface Local {
   id: string
   nome: string
+}
+
+interface SerieResponse {
+  id: string
+  titulo: string
+  descricao: string | null
+  pauta: string | null
+  modalidade: 'PRESENCIAL' | 'ONLINE' | 'HIBRIDO'
+  dataInicio: string
+  dataFim: string
+  horarioInicio: string
+  horarioFim: string
+  frequencia: 'DIARIA' | 'SEMANAL' | 'QUINZENAL' | 'MENSAL_DIA_FIXO' | 'MENSAL_POSICAO_SEMANA'
+  intervalo: number
+  diaSemana: number | null
+  diaMes: number | null
+  posicaoSemanaMes: number | null
+  localId: string | null
+  urlOnline: string | null
+  organizadorMembroId: string | null
+  regionalId: string | null
+  administracaoId: string | null
+  setorId: string | null
+  casaId: string | null
+  grupoTrabalhoId: string | null
+  observacoes: string | null
+  ativo: boolean
 }
 
 export interface Evento {
@@ -60,6 +88,12 @@ export function EventosView() {
   const [salvando, setSalvando] = useState<boolean>(false)
   const [escolhaSerieAberto, setEscolhaSerieAberto] = useState<Evento | null>(null)
   const [confirmacaoThisAberto, setConfirmacaoThisAberto] = useState<EventoUpdateInput | null>(null)
+  const [confirmacaoFutureAberto, setConfirmacaoFutureAberto] = useState<SerieCreateInput | null>(null)
+  
+  // Serie Form State
+  const [serieFormOpen, setSerieFormOpen] = useState(false)
+  const [serieInitialData, setSerieInitialData] = useState<Partial<SerieCreateInput>>({})
+  const [serieInitialTipoEscopo, setSerieInitialTipoEscopo] = useState<TipoEscopo>('')
 
   // Modal Details
   const [eventoDetalhe, setEventoDetalhe] = useState<Evento | null>(null)
@@ -245,6 +279,67 @@ export function EventosView() {
     }
   }
 
+  const abrirFormEditarThisAndFuture = async (evento: Evento) => {
+    if (!evento.serieRecorrenciaId) return;
+    setEventoEditandoId(evento.id)
+    setEventoEditandoSerieId(evento.serieRecorrenciaId)
+    setCarregandoDetalhes(true)
+    setErro(null)
+    
+    try {
+      const serie = await fetchWithAuth<SerieResponse>(`/series-recorrencia/${evento.serieRecorrenciaId}`)
+      
+      let tipo: TipoEscopo = ''
+      if (serie.regionalId) tipo = 'regional'
+      else if (serie.administracaoId) tipo = 'administracao'
+      else if (serie.setorId) tipo = 'setor'
+      else if (serie.casaId) tipo = 'casa'
+      else if (serie.grupoTrabalhoId) tipo = 'grupoTrabalho'
+      
+      setSerieInitialTipoEscopo(tipo)
+      setSerieInitialData({
+        titulo: serie.titulo || '',
+        descricao: serie.descricao || '',
+        pauta: serie.pauta || '',
+        modalidade: serie.modalidade,
+        dataInicio: serie.dataInicio || '',
+        dataFim: serie.dataFim || '',
+        horarioInicio: serie.horarioInicio || '',
+        horarioFim: serie.horarioFim || '',
+        frequencia: serie.frequencia,
+        intervalo: 1,
+        diaSemana: serie.diaSemana,
+        diaMes: serie.diaMes,
+        posicaoSemanaMes: serie.posicaoSemanaMes,
+        localId: serie.localId || '',
+        urlOnline: serie.urlOnline || '',
+        organizadorMembroId: serie.organizadorMembroId || '',
+        regionalId: serie.regionalId || '',
+        administracaoId: serie.administracaoId || '',
+        setorId: serie.setorId || '',
+        casaId: serie.casaId || '',
+        grupoTrabalhoId: serie.grupoTrabalhoId || '',
+        observacoes: serie.observacoes || '',
+        ativo: serie.ativo ?? true,
+      })
+      setSerieFormOpen(true)
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.body?.error) {
+        setErro(typeof err.body.error === 'string' ? err.body.error : 'Dados inválidos')
+      } else if (err instanceof Error) {
+        setErro(err.message || 'Erro ao carregar série.')
+      } else {
+        setErro('Erro ao carregar série.')
+      }
+    } finally {
+      setCarregandoDetalhes(false)
+    }
+  }
+
+  const handleSerieSubmit = async (data: SerieCreateInput) => {
+    setConfirmacaoFutureAberto(data)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrosForm({})
@@ -341,6 +436,48 @@ export function EventosView() {
         setErro('Erro ao salvar evento.')
       }
       setConfirmacaoThisAberto(null)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const confirmarEditarThisAndFuture = async () => {
+    if (!eventoEditandoId || !eventoEditandoSerieId || !confirmacaoFutureAberto) return
+    setSalvando(true)
+    setErro(null)
+    try {
+      const {
+        titulo, descricao, pauta, modalidade, frequencia, dataInicio,
+        dataFim, horarioInicio, horarioFim, diaSemana, diaMes,
+        posicaoSemanaMes, localId, urlOnline, organizadorMembroId, regionalId,
+        administracaoId, setorId, casaId, grupoTrabalhoId, observacoes, ativo
+      } = confirmacaoFutureAberto
+
+      const changes = {
+        titulo, descricao, pauta, modalidade, frequencia, intervalo: 1, dataInicio,
+        dataFim, horarioInicio, horarioFim, diaSemana, diaMes,
+        posicaoSemanaMes, localId, urlOnline, organizadorMembroId, regionalId,
+        administracaoId, setorId, casaId, grupoTrabalhoId, observacoes, ativo
+      }
+
+      const updatePayload = {
+        updateMode: 'THIS_AND_FUTURE',
+        fromEventId: eventoEditandoId,
+        changes
+      }
+      await patchWithAuth(`/series-recorrencia/${eventoEditandoSerieId}`, updatePayload)
+      setConfirmacaoFutureAberto(null)
+      setSerieFormOpen(false)
+      carregarDados()
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.body?.error) {
+        setErro(typeof err.body.error === 'string' ? err.body.error : 'Dados inválidos')
+      } else if (err instanceof Error) {
+        setErro(err.message || 'Erro ao salvar série.')
+      } else {
+        setErro('Erro ao salvar série.')
+      }
+      setConfirmacaoFutureAberto(null)
     } finally {
       setSalvando(false)
     }
@@ -780,6 +917,16 @@ export function EventosView() {
                   Apenas este evento
                 </button>
                 <button
+                  onClick={() => {
+                    const item = escolhaSerieAberto
+                    setEscolhaSerieAberto(null)
+                    abrirFormEditarThisAndFuture(item)
+                  }}
+                  className="w-full px-4 py-2 text-sm font-medium text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100"
+                >
+                  Este e os próximos eventos
+                </button>
+                <button
                   onClick={() => setEscolhaSerieAberto(null)}
                   className="w-full px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
                 >
@@ -803,7 +950,7 @@ export function EventosView() {
             </div>
             <div className="p-6">
               <p className="text-slate-700 mb-6">
-                Você está editando apenas esta ocorrência. Ao salvar, ela se tornará uma exceção e não será afetada por alterações globais futuras na série original. Deseja prosseguir?
+                Tem certeza que deseja alterar <strong>apenas este evento</strong>? Ele se tornará uma exceção à série original.
               </p>
               <div className="flex justify-end gap-3">
                 <button
@@ -815,7 +962,7 @@ export function EventosView() {
                 <button
                   onClick={confirmarEditarThis}
                   disabled={salvando}
-                  className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 disabled:opacity-50"
                 >
                   {salvando ? 'Salvando...' : 'Confirmar e Salvar'}
                 </button>
@@ -824,6 +971,51 @@ export function EventosView() {
           </div>
         </div>
       )}
+
+      {/* Modal Confirmação FUTURE */}
+      {confirmacaoFutureAberto && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+          <div role="dialog" aria-modal="true" aria-labelledby="modal-confirm-future-title" className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 id="modal-confirm-future-title" className="text-lg font-semibold text-slate-900">
+                Confirmar Edição
+              </h3>
+              <button onClick={() => setConfirmacaoFutureAberto(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <div className="p-6">
+              <p className="text-slate-700 mb-6">
+                Tem certeza que deseja alterar este e os próximos eventos a partir daqui? Isso atualizará a série e recriará os eventos futuros.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setConfirmacaoFutureAberto(null)}
+                  className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarEditarThisAndFuture}
+                  disabled={salvando}
+                  className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {salvando ? 'Salvando...' : 'Confirmar e Salvar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <SerieFormModal
+        isOpen={serieFormOpen}
+        onClose={() => setSerieFormOpen(false)}
+        title="Editar Evento Recorrente (Este e os próximos)"
+        initialData={serieInitialData}
+        initialTipoEscopo={serieInitialTipoEscopo}
+        lookups={{ locais, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
+        onSubmit={handleSerieSubmit}
+        externalError={erro}
+      />
     </div>
   )
 }
