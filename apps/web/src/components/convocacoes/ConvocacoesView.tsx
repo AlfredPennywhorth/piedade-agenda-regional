@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ConvocacaoCreate, ConvocacaoUpdate, ConvocacaoCreatePayload, ConvocacaoUpdatePayload, Convocacao } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth } from '../../api/apiClient'
-
+import { ConvocacaoFuncoesModal } from './ConvocacaoFuncoesModal'
 interface EventoLookup {
   id: string
   titulo: string
@@ -17,6 +17,7 @@ export function ConvocacoesView() {
   const [formOpen, setFormOpen] = useState(false)
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
+  const [gerenciandoFuncoesId, setGerenciandoFuncoesId] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<ConvocacaoCreatePayload>({
     eventoId: '',
@@ -173,7 +174,15 @@ export function ConvocacoesView() {
                     <p className="text-sm text-slate-600 mt-1 line-clamp-2">{conv.observacoes}</p>
                   )}
                 </div>
-                <div className="flex items-start">
+                <div className="flex items-start gap-2">
+                  {conv.status === 'RASCUNHO' && (
+                    <button
+                      onClick={() => setGerenciandoFuncoesId(conv.id)}
+                      className="text-slate-600 hover:text-slate-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                    >
+                      Gerenciar Funções
+                    </button>
+                  )}
                   <button
                     onClick={() => handleClickEditar(conv)}
                     className="text-brand-600 hover:text-brand-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
@@ -267,6 +276,13 @@ export function ConvocacoesView() {
             </div>
           </div>
         </div>
+      )}
+
+      {gerenciandoFuncoesId && (
+        <ConvocacaoFuncoesModal
+          convocacaoId={gerenciandoFuncoesId}
+          onClose={() => setGerenciandoFuncoesId(null)}
+        />
       )}
     </div>
   )

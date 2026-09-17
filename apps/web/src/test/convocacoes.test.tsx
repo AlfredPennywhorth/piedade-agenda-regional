@@ -173,4 +173,119 @@ describe('ConvocacoesView', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Falha no servidor')
     })
   })
+
+  describe('Gestão de Funções do Rascunho', () => {
+    it('deve exibir listas vazias e permitir adicionar/remover função', async () => {
+      type ConvocacaoFuncaoMock = {
+        id: string
+        convocacaoId: string
+        funcaoId: string
+        createdAt: string
+      }
+      let vinculadas: ConvocacaoFuncaoMock[] = []
+      
+      vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url, options) => {
+        if (options?.method === 'DELETE') {
+          vinculadas = []
+          return { success: true }
+        }
+        if (url === '/funcoes') return [{ id: 'f1', nome: 'Músico', ativo: true }]
+        if (url === `/convocacoes/${CONVOCACAO_ID}/funcoes`) return vinculadas
+        if (url === '/eventos') return mockEventos
+        if (url === '/convocacoes') return mockConvocacoes
+        return []
+      })
+      
+      vi.mocked(apiClient.postWithAuth).mockImplementation(async () => {
+        vinculadas = [{ id: 'v1', convocacaoId: CONVOCACAO_ID, funcaoId: 'f1', createdAt: '2026-09-17' }]
+        return vinculadas[0]
+      })
+
+      render(<ConvocacoesView />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Minha observação rascunho')).toBeInTheDocument()
+      })
+
+      const botoesGerenciar = screen.getAllByRole('button', { name: /gerenciar funções/i })
+      expect(botoesGerenciar).toHaveLength(1) // Apenas RASCUNHO
+
+      fireEvent.click(botoesGerenciar[0])
+
+      await waitFor(() => {
+        expect(screen.getByRole('dialog', { name: /gerenciar funções do rascunho/i })).toBeInTheDocument()
+        expect(screen.getByText('Nenhuma função vinculada.')).toBeInTheDocument()
+      })
+      
+      const select = screen.getByRole('combobox')
+      fireEvent.change(select, { target: { value: 'f1' } })
+      fireEvent.click(screen.getByRole('button', { name: /adicionar/i }))
+      
+      await waitFor(() => {
+        expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/convocacoes/${CONVOCACAO_ID}/funcoes`, { funcaoId: 'f1' })
+        expect(screen.getByText('Músico')).toBeInTheDocument()
+        expect(screen.queryByText('Nenhuma função vinculada.')).not.toBeInTheDocument()
+        expect(screen.getByText('Nenhuma função disponível para adicionar.')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: /remover/i }))
+      
+      await waitFor(() => {
+        expect(apiClient.fetchWithAuth).toHaveBeenCalledWith(`/convocacoes/${CONVOCACAO_ID}/funcoes/f1`, { method: 'DELETE' })
+        expect(screen.getByText('Nenhuma função vinculada.')).toBeInTheDocument()
+      })
+    })
+
+    it('deve exibir erro da API e erro de validação (ex: função já adicionada)', async () => {
+      vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+        if (url === '/funcoes') return [{ id: 'f2', nome: 'Porteiro', ativo: true }]
+        if (url === `/convocacoes/${CONVOCACAO_ID}/funcoes`) return []
+        if (url === '/eventos') return mockEventos
+        if (url === '/convocacoes') return mockConvocacoes
+        return []
+      })
+      
+      vi.mocked(apiClient.postWithAuth).mockRejectedValueOnce(new Error('Função já adicionada a esta convocação'))
+
+      render(<ConvocacoesView />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Minha observação rascunho')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: /gerenciar funções/i }))
+      
+      await waitFor(() => {
+        expect(screen.getByRole('dialog', { name: /gerenciar funções do rascunho/i })).toBeInTheDocument()
+      })
+
+      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'f2' } })
+      fireEvent.click(screen.getByRole('button', { name: /adicionar/i }))
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent('Função já adicionada a esta convocação')
+      })
+    })
+
+    it('deve exibir erro caso falhe o carregamento inicial das funções e listas', async () => {
+      vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+        if (url === '/eventos') return mockEventos
+        if (url === '/convocacoes') return mockConvocacoes
+        if (url.includes('/funcoes')) throw new Error('Falha catastrófica')
+        return []
+      })
+
+      render(<ConvocacoesView />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Minha observação rascunho')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: /gerenciar funções/i }))
+      
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent('Falha catastrófica')
+      })
+    })
+  })
 })
