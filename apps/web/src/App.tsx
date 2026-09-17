@@ -17,10 +17,11 @@ import { MembrosView } from './components/membros/MembrosView'
 import { FuncoesView } from './components/funcoes/FuncoesView'
 import { VinculosFuncionaisView } from './components/vinculos-funcionais/VinculosFuncionaisView'
 import { LocaisView } from './components/locais/LocaisView'
+import { ConvocacoesView } from './components/convocacoes/ConvocacoesView'
 import { fetchWithAuth } from './api/apiClient'
 
 function App() {
-  const [currentTab, setCurrentTab] = useState<'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais'>('agenda')
+  const [currentTab, setCurrentTab] = useState<'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes'>('agenda')
   const [capacidades, setCapacidades] = useState<CapacidadesFrontend>({})
 
   useEffect(() => {
@@ -38,6 +39,7 @@ function App() {
       {currentTab === 'agenda' && <AgendaView />}
       {currentTab === 'eventos' && <EventosView />}
       {currentTab === 'series' && <SeriesView />}
+      {currentTab === 'convocacoes' && <ConvocacoesView />}
       {currentTab === 'calendario' && <CalendarioView />}
       {currentTab === 'portaria' && <PortariaView />}
       {currentTab === 'relatorios' && <RelatoriosView />}
