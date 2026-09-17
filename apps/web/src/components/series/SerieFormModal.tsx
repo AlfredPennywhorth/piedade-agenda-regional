@@ -12,12 +12,14 @@ export interface Lookups {
   gruposTrabalho: { id: string; nome: string }[]
 }
 
+export type TipoEscopo = 'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | ''
+
 export interface SerieFormModalProps {
   isOpen: boolean
   onClose: () => void
   title: string
   initialData: Partial<SerieCreateInput>
-  initialTipoEscopo: 'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | ''
+  initialTipoEscopo: TipoEscopo
   lookups: Lookups
   onSubmit: (data: SerieCreateInput) => Promise<void>
 }
@@ -32,7 +34,7 @@ export function SerieFormModal({
   onSubmit
 }: SerieFormModalProps) {
   const [formData, setFormData] = useState<Partial<SerieCreateInput>>(initialData)
-  const [tipoEscopo, setTipoEscopo] = useState<'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | ''>(initialTipoEscopo)
+  const [tipoEscopo, setTipoEscopo] = useState<TipoEscopo>(initialTipoEscopo)
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState<boolean>(false)
@@ -60,7 +62,7 @@ export function SerieFormModal({
     }))
   }
 
-  const handleTipoEscopoChange = (tipo: 'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | '') => {
+  const handleTipoEscopoChange = (tipo: TipoEscopo) => {
     setTipoEscopo(tipo)
     setFormData(prev => ({
       ...prev,
@@ -111,8 +113,8 @@ export function SerieFormModal({
       const parsed = SerieCreate.safeParse(payload)
 
       if (!parsed.success) {
-        const errors: any = {}
-        parsed.error.issues.forEach((e: any) => {
+        const errors: Record<string, string> = {}
+        parsed.error.issues.forEach((e) => {
           if (e.path[0]) {
             errors[e.path[0].toString()] = e.message
           }
@@ -123,11 +125,13 @@ export function SerieFormModal({
 
       setSalvando(true)
       await onSubmit(parsed.data)
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof ApiError && err.body?.error) {
         setErro(typeof err.body.error === 'string' ? err.body.error : 'Dados inválidos')
-      } else {
+      } else if (err instanceof Error) {
         setErro(err.message || 'Erro ao salvar.')
+      } else {
+        setErro('Erro ao salvar.')
       }
     } finally {
       setSalvando(false)
@@ -338,7 +342,7 @@ export function SerieFormModal({
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         >
                           <option value="">Selecione...</option>
-                          {locais.map((l: any) => (
+                          {locais.map((l) => (
                             <option key={l.id} value={l.id}>{l.nome}</option>
                           ))}
                         </select>
@@ -372,7 +376,7 @@ export function SerieFormModal({
                       <select
                         id="tipoEscopo"
                         value={tipoEscopo}
-                        onChange={e => handleTipoEscopoChange(e.target.value as any)}
+                        onChange={e => handleTipoEscopoChange(e.target.value as TipoEscopo)}
                         className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                       >
                         <option value="">Selecione...</option>
@@ -395,7 +399,7 @@ export function SerieFormModal({
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                           >
                             <option value="">Selecione...</option>
-                            {regionais.map((r: any) => <option key={r.id} value={r.id}>{r.nome}</option>)}
+                            {regionais.map((r) => <option key={r.id} value={r.id}>{r.nome}</option>)}
                           </select>
                         </>
                       )}
@@ -409,7 +413,7 @@ export function SerieFormModal({
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                           >
                             <option value="">Selecione...</option>
-                            {administracoes.map((a: any) => <option key={a.id} value={a.id}>{a.nome}</option>)}
+                            {administracoes.map((a) => <option key={a.id} value={a.id}>{a.nome}</option>)}
                           </select>
                         </>
                       )}
@@ -423,7 +427,7 @@ export function SerieFormModal({
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                           >
                             <option value="">Selecione...</option>
-                            {setores.map((s: any) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                            {setores.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
                           </select>
                         </>
                       )}
@@ -437,7 +441,7 @@ export function SerieFormModal({
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                           >
                             <option value="">Selecione...</option>
-                            {casas.map((c: any) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                            {casas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                           </select>
                         </>
                       )}
@@ -451,7 +455,7 @@ export function SerieFormModal({
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                           >
                             <option value="">Selecione...</option>
-                            {gruposTrabalho.map((g: any) => <option key={g.id} value={g.id}>{g.nome}</option>)}
+                            {gruposTrabalho.map((g) => <option key={g.id} value={g.id}>{g.nome}</option>)}
                           </select>
                         </>
                       )}
@@ -469,7 +473,7 @@ export function SerieFormModal({
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                   >
                     <option value="">Selecione...</option>
-                    {membros.map((m: any) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                    {membros.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
                   </select>
                   {errosForm.organizadorMembroId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.organizadorMembroId}</p>}
                 </div>

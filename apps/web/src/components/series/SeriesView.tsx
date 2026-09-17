@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { SerieCreate, SerieCreateInput } from '@piedade/shared'
+import { SerieCreateInput } from '@piedade/shared'
 import { SerieFormModal } from './SerieFormModal'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import type { Casa } from '../casas/CasasView'
@@ -97,7 +97,6 @@ export function SeriesView() {
   
   const [tipoEscopo, setTipoEscopo] = useState<'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | ''>('')
   
-  const [errosForm, setErrosForm] = useState<Record<string, string>>({})
 
   const carregarDados = async () => {
     setLoading(true)
@@ -125,8 +124,8 @@ export function SeriesView() {
       setSetores(setoresData || [])
       setCasas(casasData || [])
       setGruposTrabalho(gruposData || [])
-    } catch (err: any) {
-      setErro(err.message || 'Erro ao carregar os dados.')
+    } catch (err: unknown) {
+      setErro(err instanceof Error ? err.message : 'Erro ao carregar os dados.')
     } finally {
       setLoading(false)
     }
@@ -136,36 +135,7 @@ export function SeriesView() {
     carregarDados()
   }, [])
 
-  const handleModalidadeChange = (mod: 'PRESENCIAL' | 'ONLINE' | 'HIBRIDO') => {
-    setFormData(prev => ({
-      ...prev,
-      modalidade: mod,
-      localId: mod === 'ONLINE' ? '' : prev.localId,
-      urlOnline: mod === 'PRESENCIAL' ? '' : prev.urlOnline
-    }))
-  }
 
-  const handleTipoEscopoChange = (tipo: 'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | '') => {
-    setTipoEscopo(tipo)
-    setFormData(prev => ({
-      ...prev,
-      regionalId: '',
-      administracaoId: '',
-      setorId: '',
-      casaId: '',
-      grupoTrabalhoId: ''
-    }))
-  }
-
-  const handleFrequenciaChange = (freq: 'DIARIA' | 'SEMANAL' | 'QUINZENAL' | 'MENSAL_DIA_FIXO' | 'MENSAL_POSICAO_SEMANA') => {
-    setFormData(prev => ({
-      ...prev,
-      frequencia: freq,
-      diaSemana: (freq === 'SEMANAL' || freq === 'QUINZENAL' || freq === 'MENSAL_POSICAO_SEMANA') ? (prev.diaSemana ?? 0) : null,
-      diaMes: freq === 'MENSAL_DIA_FIXO' ? (prev.diaMes ?? 1) : null,
-      posicaoSemanaMes: freq === 'MENSAL_POSICAO_SEMANA' ? (prev.posicaoSemanaMes ?? 1) : null
-    }))
-  }
 
   const abrirFormCriar = () => {
     setSerieEditandoId(null)
@@ -195,7 +165,6 @@ export function SeriesView() {
       ativo: true,
     })
     setTipoEscopo('')
-    setErrosForm({})
     setErro(null)
     setFormOpen(true)
   }
@@ -235,70 +204,10 @@ export function SeriesView() {
     else if (serie.grupoTrabalhoId) setTipoEscopo('grupoTrabalho')
     else setTipoEscopo('')
     
-    setErrosForm({})
     setErro(null)
     setFormOpen(true)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setErrosForm({})
-    
-    const payload = {
-      ...formData,
-      descricao: formData.descricao || null,
-      pauta: formData.pauta || null,
-      localId: formData.modalidade === 'ONLINE' ? null : (formData.localId || null),
-      urlOnline: formData.modalidade === 'PRESENCIAL' ? null : (formData.urlOnline || null),
-      organizadorMembroId: formData.organizadorMembroId || null,
-      regionalId: formData.regionalId || null,
-      administracaoId: formData.administracaoId || null,
-      setorId: formData.setorId || null,
-      casaId: formData.casaId || null,
-      grupoTrabalhoId: formData.grupoTrabalhoId || null,
-      observacoes: formData.observacoes || null,
-      
-      diaSemana: formData.diaSemana !== null && formData.diaSemana !== undefined ? formData.diaSemana : null,
-      diaMes: formData.diaMes !== null && formData.diaMes !== undefined ? formData.diaMes : null,
-      posicaoSemanaMes: formData.posicaoSemanaMes !== null && formData.posicaoSemanaMes !== undefined ? formData.posicaoSemanaMes : null,
-      intervalo: 1
-    }
-
-    try {
-      const parsed = SerieCreate.safeParse(payload)
-
-      if (!parsed.success) {
-        const errors: any = {}
-        parsed.error.issues.forEach((e: any) => {
-          if (e.path[0]) {
-            errors[e.path[0].toString()] = e.message
-          }
-        })
-        setErrosForm(errors)
-        return
-      }
-
-      if (serieEditandoId) {
-        setConfirmacaoEditar(parsed.data)
-        return
-      }
-
-      setSalvando(true)
-
-      await postWithAuth('/series-recorrencia', parsed.data)
-
-      setFormOpen(false)
-      carregarDados()
-    } catch (err: any) {
-      if (err instanceof ApiError && err.body?.error) {
-        setErro(typeof err.body.error === 'string' ? err.body.error : 'Dados inválidos')
-      } else {
-        setErro(err.message || 'Erro ao salvar série.')
-      }
-    } finally {
-      setSalvando(false)
-    }
-  }
 
   const confirmarEdicao = async () => {
     if (!serieEditandoId || !confirmacaoEditar) return
@@ -313,11 +222,13 @@ export function SeriesView() {
       setConfirmacaoEditar(null)
       setFormOpen(false)
       carregarDados()
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof ApiError && err.body?.error) {
         setErro(typeof err.body.error === 'string' ? err.body.error : 'Dados inválidos')
+      } else if (err instanceof Error) {
+        setErro(err.message)
       } else {
-        setErro(err.message || 'Erro ao atualizar série.')
+        setErro('Erro ao atualizar série.')
       }
       setConfirmacaoEditar(null)
     } finally {
@@ -337,8 +248,8 @@ export function SeriesView() {
       await patchWithAuth(`/series-recorrencia/${confirmacaoInativar.id}`, payload)
       setConfirmacaoInativar(null)
       carregarDados()
-    } catch (err: any) {
-      setErro(err.message || 'Erro ao inativar série.')
+    } catch (err: unknown) {
+      setErro(err instanceof Error ? err.message : 'Erro ao inativar série.')
       setConfirmacaoInativar(null)
     } finally {
       setSalvando(false)
@@ -452,7 +363,7 @@ export function SeriesView() {
               await postWithAuth('/series-recorrencia', data)
               setFormOpen(false)
               carregarDados()
-            } catch (err: any) {
+            } catch (err: unknown) {
               setSalvando(false)
               throw err
             }
