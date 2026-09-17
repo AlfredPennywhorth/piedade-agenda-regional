@@ -336,7 +336,7 @@ describe('EventosView', () => {
     const dialogEscolha = await screen.findByRole('dialog', { name: /editar evento recorrente/i })
     fireEvent.click(within(dialogEscolha).getByRole('button', { name: /este e os próximos eventos/i }))
 
-    const formDialog = await screen.findByRole('dialog', { name: /editar série/i })
+    const formDialog = await screen.findByRole('dialog', { name: /editar evento recorrente/i })
     const { getByLabelText, getByRole } = within(formDialog)
 
     await waitFor(() => {
@@ -384,7 +384,7 @@ describe('EventosView', () => {
     const dialogEscolha = await screen.findByRole('dialog', { name: /editar evento recorrente/i })
     fireEvent.click(within(dialogEscolha).getByRole('button', { name: /este e os próximos eventos/i }))
 
-    const formDialog = await screen.findByRole('dialog', { name: /editar série/i })
+    const formDialog = await screen.findByRole('dialog', { name: /editar evento recorrente/i })
     const { getByRole } = within(formDialog)
 
     await waitFor(() => {
@@ -400,7 +400,7 @@ describe('EventosView', () => {
       expect(screen.queryByRole('dialog', { name: /confirmar edição/i })).not.toBeInTheDocument()
     })
 
-    expect(screen.getByRole('dialog', { name: /editar série/i })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: /editar evento recorrente/i })).toBeInTheDocument()
 
     const alerts = await screen.findAllByRole('alert')
     expect(alerts.some(alert => alert.textContent === 'Erro na série futura')).toBe(true)
