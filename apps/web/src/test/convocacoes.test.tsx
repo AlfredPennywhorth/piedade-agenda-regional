@@ -189,7 +189,7 @@ describe('ConvocacoesView', () => {
           vinculadas = []
           return { success: true }
         }
-        if (url === '/funcoes') return [{ id: 'f1', nome: 'Músico', ativo: true }]
+        if (url === '/funcoes') return [{ id: '11111111-1111-1111-1111-111111111111', nome: 'Músico', ativo: true }]
         if (url === `/convocacoes/${CONVOCACAO_ID}/funcoes`) return vinculadas
         if (url === '/eventos') return mockEventos
         if (url === '/convocacoes') return mockConvocacoes
@@ -197,7 +197,7 @@ describe('ConvocacoesView', () => {
       })
       
       vi.mocked(apiClient.postWithAuth).mockImplementation(async () => {
-        vinculadas = [{ id: 'v1', convocacaoId: CONVOCACAO_ID, funcaoId: 'f1', createdAt: '2026-09-17' }]
+        vinculadas = [{ id: 'v1', convocacaoId: CONVOCACAO_ID, funcaoId: '11111111-1111-1111-1111-111111111111', createdAt: '2026-09-17' }]
         return vinculadas[0]
       })
 
@@ -218,11 +218,11 @@ describe('ConvocacoesView', () => {
       })
       
       const select = screen.getByRole('combobox')
-      fireEvent.change(select, { target: { value: 'f1' } })
+      fireEvent.change(select, { target: { value: '11111111-1111-1111-1111-111111111111' } })
       fireEvent.click(screen.getByRole('button', { name: /adicionar/i }))
       
       await waitFor(() => {
-        expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/convocacoes/${CONVOCACAO_ID}/funcoes`, { funcaoId: 'f1' })
+        expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/convocacoes/${CONVOCACAO_ID}/funcoes`, { funcaoId: '11111111-1111-1111-1111-111111111111' })
         expect(screen.getByText('Músico')).toBeInTheDocument()
         expect(screen.queryByText('Nenhuma função vinculada.')).not.toBeInTheDocument()
         expect(screen.getByText('Nenhuma função disponível para adicionar.')).toBeInTheDocument()
@@ -231,14 +231,14 @@ describe('ConvocacoesView', () => {
       fireEvent.click(screen.getByRole('button', { name: /remover/i }))
       
       await waitFor(() => {
-        expect(apiClient.fetchWithAuth).toHaveBeenCalledWith(`/convocacoes/${CONVOCACAO_ID}/funcoes/f1`, { method: 'DELETE' })
+        expect(apiClient.fetchWithAuth).toHaveBeenCalledWith(`/convocacoes/${CONVOCACAO_ID}/funcoes/11111111-1111-1111-1111-111111111111`, { method: 'DELETE' })
         expect(screen.getByText('Nenhuma função vinculada.')).toBeInTheDocument()
       })
     })
 
     it('deve exibir erro da API e erro de validação (ex: função já adicionada)', async () => {
       vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
-        if (url === '/funcoes') return [{ id: 'f2', nome: 'Porteiro', ativo: true }]
+        if (url === '/funcoes') return [{ id: '22222222-2222-2222-2222-222222222222', nome: 'Porteiro', ativo: true }]
         if (url === `/convocacoes/${CONVOCACAO_ID}/funcoes`) return []
         if (url === '/eventos') return mockEventos
         if (url === '/convocacoes') return mockConvocacoes
@@ -259,7 +259,7 @@ describe('ConvocacoesView', () => {
         expect(screen.getByRole('dialog', { name: /gerenciar funções do rascunho/i })).toBeInTheDocument()
       })
 
-      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'f2' } })
+      fireEvent.change(screen.getByRole('combobox'), { target: { value: '22222222-2222-2222-2222-222222222222' } })
       fireEvent.click(screen.getByRole('button', { name: /adicionar/i }))
 
       await waitFor(() => {
