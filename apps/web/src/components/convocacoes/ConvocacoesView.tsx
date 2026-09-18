@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { ConvocacaoCreate, ConvocacaoUpdate, ConvocacaoCreatePayload, ConvocacaoUpdatePayload, Convocacao } from '@piedade/shared'
-import { fetchWithAuth, postWithAuth, patchWithAuth } from '../../api/apiClient'
+import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import { ConvocacaoFuncoesModal } from './ConvocacaoFuncoesModal'
 interface EventoLookup {
   id: string
@@ -24,6 +24,38 @@ export function ConvocacoesView() {
     observacoes: '',
   })
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
+
+  const [actionConfirm, setActionConfirm] = useState<{ type: 'PUBLICAR' | 'CANCELAR', convocacao: Convocacao } | null>(null)
+  const [actionLoading, setActionLoading] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+
+  const handleActionConfirm = async () => {
+    if (!actionConfirm) return
+    setActionLoading(true)
+    setActionError(null)
+    
+    try {
+      if (actionConfirm.type === 'PUBLICAR') {
+        await postWithAuth(`/convocacoes/${actionConfirm.convocacao.id}/publicar`, {})
+      } else {
+        await postWithAuth(`/convocacoes/${actionConfirm.convocacao.id}/cancelar`, {})
+      }
+      setActionConfirm(null)
+      carregarDados()
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 409 && actionConfirm.type === 'PUBLICAR') {
+        setActionError('A convocação foi alterada concorrentemente. Por favor, recarregue a lista e tente novamente.')
+      } else if (err instanceof ApiError) {
+        setActionError(err.message || 'Erro ao processar requisição')
+      } else if (err instanceof Error) {
+        setActionError(err.message || 'Erro ao processar requisição')
+      } else {
+        setActionError('Erro ao processar requisição')
+      }
+    } finally {
+      setActionLoading(false)
+    }
+  }
 
   const carregarDados = async () => {
     setLoading(true)
@@ -174,7 +206,15 @@ export function ConvocacoesView() {
                     <p className="text-sm text-slate-600 mt-1 line-clamp-2">{conv.observacoes}</p>
                   )}
                 </div>
-                <div className="flex items-start gap-2">
+                <div className="flex items-start gap-2 flex-wrap justify-end">
+                  {conv.status === 'RASCUNHO' && (
+                    <button
+                      onClick={() => setActionConfirm({ type: 'PUBLICAR', convocacao: conv })}
+                      className="text-green-600 hover:text-green-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors"
+                    >
+                      Publicar
+                    </button>
+                  )}
                   {conv.status === 'RASCUNHO' && (
                     <button
                       onClick={() => setGerenciandoFuncoesId(conv.id)}
@@ -189,6 +229,14 @@ export function ConvocacoesView() {
                   >
                     Editar
                   </button>
+                  {conv.status !== 'CANCELADA' && (
+                    <button
+                      onClick={() => setActionConfirm({ type: 'CANCELAR', convocacao: conv })}
+                      className="text-red-600 hover:text-red-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  )}
                 </div>
               </li>
             ))}
@@ -272,6 +320,57 @@ export function ConvocacoesView() {
                 className="px-4 py-2 bg-brand-600 text-white font-medium hover:bg-brand-700 rounded-lg shadow-sm transition-colors disabled:opacity-50"
               >
                 {salvando ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {actionConfirm && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-dialog-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
+        >
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b border-slate-200">
+              <h2 id="confirm-dialog-title" className="text-xl font-bold text-slate-900">
+                {actionConfirm.type === 'PUBLICAR' ? 'Publicar Convocação' : 'Cancelar Convocação'}
+              </h2>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1 text-slate-700">
+              {actionError && (
+                <div role="alert" className="mb-4 bg-red-50 text-red-700 p-3 rounded-lg border border-red-200 text-sm">
+                  {actionError}
+                </div>
+              )}
+              {actionConfirm.type === 'PUBLICAR' ? (
+                <p>
+                  Ao confirmar a publicação, os destinatários e suas evidências serão materializados e a edição ficará bloqueada.
+                </p>
+              ) : (
+                <p>
+                  Ao cancelar a convocação, eventos futuros vinculados deixarão de valer, preservando o histórico.
+                </p>
+              )}
+            </div>
+            <div className="p-6 border-t border-slate-200 bg-slate-50 rounded-b-xl flex justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => !actionLoading && (setActionConfirm(null), setActionError(null))}
+                disabled={actionLoading}
+                className="px-4 py-2 text-slate-700 font-medium hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                onClick={handleActionConfirm}
+                disabled={actionLoading}
+                className={`px-4 py-2 text-white font-medium rounded-lg shadow-sm transition-colors disabled:opacity-50 ${actionConfirm.type === 'PUBLICAR' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+              >
+                {actionLoading ? 'Processando...' : 'Confirmar'}
               </button>
             </div>
           </div>
