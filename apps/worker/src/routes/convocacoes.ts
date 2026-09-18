@@ -9,14 +9,16 @@ import {
   vinculosFuncionais,
   membros,
   funcoes,
+  rsvp,
 } from '../db/schema'
-import { ConvocacaoCreate, ConvocacaoUpdate, ConvocacaoFuncaoCreate } from '@piedade/shared'
+import { ConvocacaoCreate, ConvocacaoUpdate, ConvocacaoFuncaoCreate, AcompanhamentoRsvpQuerySchema } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
 import {
   criarAuditQuery,
   extrairEscopoDoEvento,
   executarOperacaoComAudit,
 } from '../services/auditoria'
+import { eGestorRelatoriosAutorizadoParaEvento } from '../security/permissoes'
 import { authMiddleware, Variables } from '../middleware/auth'
 
 export const convocacoesRouter = new Hono<{ Variables: Variables }>()
@@ -413,4 +415,112 @@ convocacoesRouter.get('/:id/destinatarios', async c => {
   }))
 
   return c.json(resultado)
+})
+
+convocacoesRouter.get('/:id/acompanhamento-rsvp', async c => {
+  const db = c.get('db')
+  const id = c.req.param('id')
+  const membroId = c.get('membroId')
+
+  if (!membroId) return c.json({ error: 'Sessão indisponível' }, 500)
+
+  const convocacao = await db.select().from(convocacoes).where(eq(convocacoes.id, id)).get()
+  if (!convocacao) return c.json({ error: 'Convocação não encontrada' }, 404)
+  if (convocacao.status !== 'PUBLICADA') return c.json({ error: 'Acompanhamento disponível apenas para convocações PUBLICADAS' }, 400)
+
+  const evento = await db.select().from(eventos).where(eq(eventos.id, convocacao.eventoId)).get()
+  if (!evento) return c.json({ error: 'Evento não encontrado' }, 404)
+
+  const autorizado = await eGestorRelatoriosAutorizadoParaEvento(db, membroId, evento)
+  if (!autorizado) return c.json({ error: 'Acesso não autorizado para acompanhar RSVP desta convocação' }, 403)
+
+  const query = c.req.query()
+  const parsedQuery = AcompanhamentoRsvpQuerySchema.safeParse(query)
+  if (!parsedQuery.success) {
+    return c.json({ error: parsedQuery.error.issues }, 400)
+  }
+  
+  const { page, limit, statusRsvp } = parsedQuery.data
+  const offset = (page - 1) * limit
+
+  const conditions = [eq(convocacaoDestinatarios.convocacaoId, id)]
+  if (statusRsvp) {
+    if (statusRsvp === 'SEM_RESPOSTA') {
+      conditions.push(sql`${rsvp.resposta} IS NULL`)
+    } else {
+      conditions.push(eq(rsvp.resposta, statusRsvp))
+    }
+  }
+
+  const countQuery = await db.select({ total: sql<number>`count(*)` })
+    .from(convocacaoDestinatarios)
+    .leftJoin(rsvp, eq(rsvp.convocacaoDestinatarioId, convocacaoDestinatarios.id))
+    .where(and(...conditions))
+    .get()
+  
+  const total = countQuery?.total || 0
+  const lastPage = Math.ceil(total / limit) || 1
+
+  const destinatariosPage = await db
+    .select({
+      destinatarioId: convocacaoDestinatarios.id,
+      membroId: membros.id,
+      membroNome: membros.nome,
+      respostaRsvp: sql`COALESCE(${rsvp.resposta}, 'SEM_RESPOSTA')`.as('respostaRsvp')
+    })
+    .from(convocacaoDestinatarios)
+    .innerJoin(membros, eq(membros.id, convocacaoDestinatarios.membroId))
+    .leftJoin(rsvp, eq(rsvp.convocacaoDestinatarioId, convocacaoDestinatarios.id))
+    .where(and(...conditions))
+    .limit(limit)
+    .offset(offset)
+    .all()
+
+  if (destinatariosPage.length === 0) {
+    return c.json({
+      data: [],
+      meta: { total, page, lastPage }
+    })
+  }
+
+  type DestinatarioPage = {
+    destinatarioId: string
+    membroId: string
+    membroNome: string
+    respostaRsvp: string
+  }
+  type EvidenciaItem = {
+    convocacaoDestinatarioId: string
+    funcaoId: string
+    vinculoFuncionalId: string
+  }
+
+  const destIds = destinatariosPage.map((d: DestinatarioPage) => d.destinatarioId)
+  const evidencias = await db
+    .select({
+      convocacaoDestinatarioId: convocacaoDestinatarioEvidencias.convocacaoDestinatarioId,
+      funcaoId: convocacaoDestinatarioEvidencias.funcaoId,
+      vinculoFuncionalId: convocacaoDestinatarioEvidencias.vinculoFuncionalId
+    })
+    .from(convocacaoDestinatarioEvidencias)
+    .where(inArray(convocacaoDestinatarioEvidencias.convocacaoDestinatarioId, destIds))
+    .all()
+
+  const data = destinatariosPage.map((d: DestinatarioPage) => ({
+    destinatarioId: d.destinatarioId,
+    membroId: d.membroId,
+    membroNome: d.membroNome,
+    respostaRsvp: d.respostaRsvp,
+    evidencias: evidencias
+      .filter((e: EvidenciaItem) => e.convocacaoDestinatarioId === d.destinatarioId)
+      .map((e: EvidenciaItem) => ({
+        funcaoId: e.funcaoId,
+        vinculoFuncionalId: e.vinculoFuncionalId
+      }))
+  }))
+
+  return c.json({
+    data,
+    meta: { total, page, lastPage }
+  })
 })

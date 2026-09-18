@@ -122,6 +122,7 @@ describe('S06 - Convocações', () => {
       inicioEm: '2026-01-01T10:00:00Z',
       fimEm: '2026-01-01T11:00:00Z',
       setorId: setId,
+      organizadorMembroId: mem1Id,
       localId: locId,
       ativo: true,
     })
@@ -650,6 +651,91 @@ describe('S06 - Convocações', () => {
     expect(
       (await requestSemSessao(`/api/v1/convocacoes/${conv.id}/cancelar`, { method: 'POST' })).status
     ).toBe(401)
+  })
+
+  it('Acompanhamento RSVP - 401 sem sessão, 403 membro não autorizado', async () => {
+    const ctx = await setupBaseData()
+    const cRes = await app.request('/api/v1/convocacoes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId: ctx.evSetorId }),
+    })
+    const conv = await cRes.json()
+
+    await app.request(`/api/v1/convocacoes/${conv.id}/funcoes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ funcaoId: ctx.f1Id }),
+    })
+    await app.request(`/api/v1/convocacoes/${conv.id}/publicar`, { method: 'POST' })
+
+    expect((await requestSemSessao(`/api/v1/convocacoes/${conv.id}/acompanhamento-rsvp`)).status).toBe(401)
+    
+    const memUnauthorizedId = crypto.randomUUID()
+    const token2 = crypto.randomUUID()
+    await db.insert(membros).values({ id: memUnauthorizedId, nome: 'Sem Permissao', casaId: ctx.casId, ativo: true, autenticacaoAtiva: true })
+    await db.insert(sessoes).values({
+      id: crypto.randomUUID(),
+      membroId: memUnauthorizedId,
+      tokenHash: await hashToken(token2),
+      expiraEm: '2030-01-01T00:00:00.000Z',
+      createdAt: new Date().toISOString()
+    })
+
+    const reqUnauth = await requestSemSessao(`/api/v1/convocacoes/${conv.id}/acompanhamento-rsvp`, {
+      headers: { 'Authorization': `Bearer ${token2}` }
+    })
+    expect(reqUnauth.status).toBe(403)
+  })
+
+  it('Acompanhamento RSVP - RASCUNHO/CANCELADA retorna erro', async () => {
+    const ctx = await setupBaseData()
+    const cRes = await app.request('/api/v1/convocacoes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId: ctx.evSetorId }),
+    })
+    const conv = await cRes.json()
+
+    const reqRascunho = await app.request(`/api/v1/convocacoes/${conv.id}/acompanhamento-rsvp`)
+    expect(reqRascunho.status).toBe(400)
+    expect(await reqRascunho.json()).toMatchObject({ error: 'Acompanhamento disponível apenas para convocações PUBLICADAS' })
+  })
+
+  it('Acompanhamento RSVP - organizador obtém dados com SEM_RESPOSTA, paginação, filtro e sem justificativa', async () => {
+    const ctx = await setupBaseData()
+    
+    const cRes = await app.request('/api/v1/convocacoes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId: ctx.evSetorId }),
+    })
+    const conv = await cRes.json()
+    await app.request(`/api/v1/convocacoes/${conv.id}/funcoes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ funcaoId: ctx.f1Id }),
+    })
+    await app.request(`/api/v1/convocacoes/${conv.id}/publicar`, { method: 'POST' })
+
+    const reqAll = await app.request(`/api/v1/convocacoes/${conv.id}/acompanhamento-rsvp`)
+    expect(reqAll.status).toBe(200)
+    let body = await reqAll.json()
+
+    expect(body.data.length).toBeGreaterThan(0)
+    expect(body.data[0].respostaRsvp).toBe('SEM_RESPOSTA')
+    expect(body.data[0]).not.toHaveProperty('justificativa')
+    expect(body.data[0].evidencias.length).toBeGreaterThan(0)
+
+    const reqFiltroSemResp = await app.request(`/api/v1/convocacoes/${conv.id}/acompanhamento-rsvp?statusRsvp=SEM_RESPOSTA`)
+    expect((await reqFiltroSemResp.json()).data.length).toBe(body.data.length)
+
+    const reqFiltroPart = await app.request(`/api/v1/convocacoes/${conv.id}/acompanhamento-rsvp?statusRsvp=PARTICIPAREI`)
+    expect((await reqFiltroPart.json()).data.length).toBe(0)
+
+    const reqPag = await app.request(`/api/v1/convocacoes/${conv.id}/acompanhamento-rsvp?limit=1`)
+    body = await reqPag.json()
+    expect(body.data.length).toBe(1)
   })
 })
 
