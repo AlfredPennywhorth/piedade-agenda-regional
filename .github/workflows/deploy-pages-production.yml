@@ -45,4 +45,4 @@ jobs:
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: pnpm exec wrangler pages deploy apps/web/dist --project-name piedade-agenda-regional --branch develop
+        run: pnpm --filter @piedade/worker exec wrangler pages deploy "$GITHUB_WORKSPACE/apps/web/dist" --project-name piedade-agenda-regional --branch develop
