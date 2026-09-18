@@ -288,4 +288,127 @@ describe('ConvocacoesView', () => {
       })
     })
   })
+
+  describe('Ações: Publicar e Cancelar', () => {
+    it('deve publicar RASCUNHO somente após confirmação e enviar POST correto', async () => {
+      render(<ConvocacoesView />)
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Publicar' })).toBeInTheDocument()
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Publicar' }))
+      await waitFor(() => {
+        expect(screen.getByRole('dialog', { name: /publicar convocação/i })).toBeInTheDocument()
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+      await waitFor(() => {
+        expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/convocacoes/${CONVOCACAO_ID}/publicar`, {})
+      })
+    })
+
+    it('deve cancelar somente após confirmação e enviar POST correto', async () => {
+      render(<ConvocacoesView />)
+      await waitFor(() => {
+        expect(screen.getAllByRole('button', { name: 'Cancelar' }).length).toBeGreaterThan(0)
+      })
+      const btns = screen.getAllByRole('button', { name: 'Cancelar' })
+      fireEvent.click(btns[0]) // Clica no cancelar do rascunho
+      await waitFor(() => {
+        expect(screen.getByRole('dialog', { name: /cancelar convocação/i })).toBeInTheDocument()
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+      await waitFor(() => {
+        expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/convocacoes/${CONVOCACAO_ID}/cancelar`, {})
+      })
+    })
+
+    it('botão cancelar ausente para CANCELADA', async () => {
+      vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+        if (url === '/convocacoes') return [{ ...mockConvocacoes[0], status: 'CANCELADA' }]
+        if (url === '/eventos') return mockEventos
+        return []
+      })
+      render(<ConvocacoesView />)
+      await waitFor(() => {
+        expect(screen.getByText('Minha observação rascunho')).toBeInTheDocument()
+      })
+      expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument()
+    })
+
+    it('cancelar na janela de confirmação não envia request', async () => {
+      render(<ConvocacoesView />)
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Publicar' })).toBeInTheDocument()
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Publicar' }))
+      await waitFor(() => {
+        expect(screen.getByRole('dialog', { name: /publicar convocação/i })).toBeInTheDocument()
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Voltar' }))
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: /publicar convocação/i })).not.toBeInTheDocument()
+      })
+      expect(apiClient.postWithAuth).not.toHaveBeenCalledWith(`/convocacoes/${CONVOCACAO_ID}/publicar`, {})
+    })
+
+    it('erro 400 ao publicar sem funções aparece no alert', async () => {
+      vi.mocked(apiClient.postWithAuth).mockRejectedValueOnce(new Error('É necessário ter pelo menos uma função associada'))
+      render(<ConvocacoesView />)
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Publicar' })).toBeInTheDocument()
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Publicar' }))
+      await waitFor(() => {
+        expect(screen.getByRole('dialog', { name: /publicar convocação/i })).toBeInTheDocument()
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent('É necessário ter pelo menos uma função associada')
+      })
+    })
+
+    it('erro 409 aparece como conflito/necessidade de recarregar', async () => {
+      const err409 = new apiClient.ApiError(409, 'Conflito', {})
+      vi.mocked(apiClient.postWithAuth).mockRejectedValueOnce(err409)
+      
+      render(<ConvocacoesView />)
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Publicar' })).toBeInTheDocument()
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Publicar' }))
+      await waitFor(() => {
+        expect(screen.getByRole('dialog', { name: /publicar convocação/i })).toBeInTheDocument()
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent('A convocação foi alterada concorrentemente')
+      })
+    })
+
+    it('botões ficam indisponíveis enquanto a request está pendente', async () => {
+      let resolvePromise: (v: unknown) => void = () => {}
+      vi.mocked(apiClient.postWithAuth).mockImplementationOnce(() => {
+        return new Promise((resolve) => { resolvePromise = resolve })
+      })
+      render(<ConvocacoesView />)
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Publicar' })).toBeInTheDocument()
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Publicar' }))
+      await waitFor(() => {
+        expect(screen.getByRole('dialog', { name: /publicar convocação/i })).toBeInTheDocument()
+      })
+      const btnConfirmar = screen.getByRole('button', { name: 'Confirmar' })
+      const btnVoltar = screen.getByRole('button', { name: 'Voltar' })
+      fireEvent.click(btnConfirmar)
+      await waitFor(() => {
+        expect(btnConfirmar).toBeDisabled()
+        expect(btnVoltar).toBeDisabled()
+        expect(btnConfirmar).toHaveTextContent('Processando...')
+      })
+      resolvePromise({})
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog', { name: /publicar convocação/i })).not.toBeInTheDocument()
+      })
+    })
+  })
 })
