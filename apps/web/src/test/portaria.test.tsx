@@ -402,7 +402,7 @@ describe('PortariaView', () => {
       expect(alert).toHaveTextContent('Destinatário não encontrado')
     })
   })
-﻿    const getMockParticipantes = () => ({
+    const getMockParticipantes = () => ({
       participantes: [
         {
           convocacaoDestinatarioId: 'dest1',
