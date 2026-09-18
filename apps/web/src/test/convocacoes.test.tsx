@@ -411,4 +411,141 @@ describe('ConvocacoesView', () => {
       })
     })
   })
+
+  describe('Acompanhamento RSVP', () => {
+    it('só exibe botão Acompanhar RSVP para convocação PUBLICADA', async () => {
+      render(<ConvocacoesView />)
+      await waitFor(() => {
+        expect(screen.getByText('Convocação publicada')).toBeInTheDocument()
+      })
+      const botoesAcompanhar = screen.queryAllByRole('button', { name: /Acompanhar RSVP/i })
+      expect(botoesAcompanhar).toHaveLength(1)
+    })
+
+    it('abre modal e carrega dados com page=1 e limit=50', async () => {
+      vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+        if (url.includes('/acompanhamento-rsvp')) {
+          return {
+            data: [
+              { destinatarioId: '1', membroNome: 'João', respostaRsvp: 'PARTICIPAREI' },
+              { destinatarioId: '2', membroNome: 'Maria', respostaRsvp: 'NAO_PARTICIPAREI' },
+              { destinatarioId: '3', membroNome: 'Pedro', respostaRsvp: 'NAO_SEI' },
+              { destinatarioId: '4', membroNome: 'Ana', respostaRsvp: 'SEM_RESPOSTA' },
+            ],
+            meta: { total: 4, page: 1, lastPage: 1 }
+          }
+        }
+        if (url === '/eventos') return mockEventos
+        if (url === '/convocacoes') return mockConvocacoes
+        return []
+      })
+
+      render(<ConvocacoesView />)
+      await waitFor(() => {
+        expect(screen.getByText('Convocação publicada')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: /Acompanhar RSVP/i }))
+
+      await waitFor(() => {
+        expect(screen.getByRole('dialog', { name: /Acompanhamento RSVP/i })).toBeInTheDocument()
+        expect(apiClient.fetchWithAuth).toHaveBeenCalledWith(
+          expect.stringContaining('/acompanhamento-rsvp?page=1&limit=50')
+        )
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('Total de destinatários: 4')).toBeInTheDocument()
+        expect(screen.getByText('João')).toBeInTheDocument()
+        expect(screen.getByText('Maria')).toBeInTheDocument()
+        expect(screen.getByText('Pedro')).toBeInTheDocument()
+        expect(screen.getByText('Ana')).toBeInTheDocument()
+        
+        expect(screen.getByText('Participarei')).toBeInTheDocument()
+        expect(screen.getByText('Não Participarei')).toBeInTheDocument()
+        expect(screen.getByText('Não Sei')).toBeInTheDocument()
+        expect(screen.getByText('Sem Resposta')).toBeInTheDocument()
+      })
+
+      expect(screen.queryByText(/justificativa/i)).not.toBeInTheDocument()
+    })
+
+    it('deve exibir empty state', async () => {
+      vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+        if (url.includes('/acompanhamento-rsvp')) {
+          return { data: [], meta: { total: 0, page: 1, lastPage: 1 } }
+        }
+        if (url === '/eventos') return mockEventos
+        if (url === '/convocacoes') return mockConvocacoes
+        return []
+      })
+
+      render(<ConvocacoesView />)
+      await waitFor(() => screen.getByRole('button', { name: /Acompanhar RSVP/i }))
+      fireEvent.click(screen.getByRole('button', { name: /Acompanhar RSVP/i }))
+
+      await waitFor(() => {
+        expect(screen.getByText('Nenhum destinatário encontrado.')).toBeInTheDocument()
+      })
+    })
+
+    it('deve permitir paginação', async () => {
+      vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+        if (url.includes('/acompanhamento-rsvp?page=1')) {
+          return {
+            data: [{ destinatarioId: '1', membroNome: 'João', respostaRsvp: 'PARTICIPAREI' }],
+            meta: { total: 2, page: 1, lastPage: 2 }
+          }
+        }
+        if (url.includes('/acompanhamento-rsvp?page=2')) {
+          return {
+            data: [{ destinatarioId: '2', membroNome: 'Maria', respostaRsvp: 'PARTICIPAREI' }],
+            meta: { total: 2, page: 2, lastPage: 2 }
+          }
+        }
+        if (url === '/eventos') return mockEventos
+        if (url === '/convocacoes') return mockConvocacoes
+        return []
+      })
+
+      render(<ConvocacoesView />)
+      await waitFor(() => screen.getByRole('button', { name: /Acompanhar RSVP/i }))
+      fireEvent.click(screen.getByRole('button', { name: /Acompanhar RSVP/i }))
+
+      await waitFor(() => {
+        expect(screen.getByText('João')).toBeInTheDocument()
+        expect(screen.getByText('Página 1 de 2')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Próximo' }))
+
+      await waitFor(() => {
+        expect(apiClient.fetchWithAuth).toHaveBeenCalledWith(
+          expect.stringContaining('/acompanhamento-rsvp?page=2&limit=50')
+        )
+        expect(screen.getByText('Maria')).toBeInTheDocument()
+        expect(screen.getByText('Página 2 de 2')).toBeInTheDocument()
+      })
+    })
+
+    it('deve exibir erro 403 e manter modal aberto', async () => {
+      vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+        if (url.includes('/acompanhamento-rsvp')) {
+          throw new apiClient.ApiError(403, 'Acesso negado', {})
+        }
+        if (url === '/eventos') return mockEventos
+        if (url === '/convocacoes') return mockConvocacoes
+        return []
+      })
+
+      render(<ConvocacoesView />)
+      await waitFor(() => screen.getByRole('button', { name: /Acompanhar RSVP/i }))
+      fireEvent.click(screen.getByRole('button', { name: /Acompanhar RSVP/i }))
+
+      await waitFor(() => {
+        expect(screen.getByRole('dialog', { name: /Acompanhamento RSVP/i })).toBeInTheDocument()
+        expect(screen.getByRole('alert')).toHaveTextContent('Acesso não autorizado para acompanhar RSVP desta convocação')
+      })
+    })
+  })
 })
