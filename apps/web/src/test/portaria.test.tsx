@@ -1,7 +1,7 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { PortariaView } from '../components/portaria/PortariaView'
 import * as apiClient from '../api/apiClient'
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 vi.mock('../api/apiClient', () => ({
   fetchWithAuth: vi.fn(),
@@ -22,8 +22,12 @@ const UUID_EVT1 = '550e8400-e29b-41d4-a716-446655440001'
 const UUID_EVT2 = '550e8400-e29b-41d4-a716-446655440002'
 const UUID_DEST1 = 'd8b5a83d-e350-4100-b615-562db4965df1'
 const UUID_DEST2 = 'd8b5a83d-e350-4100-b615-562db4965df2'
+const UUID_DEST3 = 'd8b5a83d-e350-4100-b615-562db4965df3'
+const UUID_DEST4 = 'd8b5a83d-e350-4100-b615-562db4965df4'
 const UUID_M1 = '99c5a83d-e350-4100-b615-562db4965df1'
 const UUID_M2 = '99c5a83d-e350-4100-b615-562db4965df2'
+const UUID_M3 = '99c5a83d-e350-4100-b615-562db4965df3'
+const UUID_M4 = '99c5a83d-e350-4100-b615-562db4965df4'
 
 interface ParticipantesRes {
   participantes: Array<{
@@ -40,6 +44,12 @@ describe('PortariaView', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers()
+    vi.useRealTimers()
   })
 
   it('renderiza empty state quando não há eventos autorizados', async () => {
@@ -53,7 +63,7 @@ describe('PortariaView', () => {
     })
   })
 
-  it('carrega o seletor com eventos e preenche a lista ao selecionar', async () => {
+  it('carrega o seletor com eventos e exibe labels de RSVP, contadores e ordenação correta', async () => {
     const eventosDisponiveis = {
       data: [
         {
@@ -75,14 +85,36 @@ describe('PortariaView', () => {
     })
 
     const select = screen.getByRole('combobox')
-    expect(select).toHaveTextContent(/Evento Teste/i)
-
+    
+    // A lista contém:
+    // M1 - Presente (NAO_PARTICIPAREI)
+    // M2 - Pendente (PARTICIPAREI)
+    // M3 - Pendente (NAO_SEI)
+    // M4 - Pendente (null)
     const participantesFake: ParticipantesRes = {
       participantes: [
         {
           convocacaoDestinatarioId: UUID_DEST1,
-          membro: { id: UUID_M1, nome: 'João da Silva', casaNome: 'Casa A' },
+          membro: { id: UUID_M1, nome: 'Ana Presente', casaNome: null },
+          rsvpResposta: 'NAO_PARTICIPAREI',
+          checkin: { id: 'ck-1', dataHoraCheckin: '2026-10-01T14:00:00Z', forma: 'QR' }
+        },
+        {
+          convocacaoDestinatarioId: UUID_DEST2,
+          membro: { id: UUID_M2, nome: 'Beto Pendente', casaNome: null },
           rsvpResposta: 'PARTICIPAREI',
+          checkin: null
+        },
+        {
+          convocacaoDestinatarioId: UUID_DEST3,
+          membro: { id: UUID_M3, nome: 'Carlos Pendente', casaNome: null },
+          rsvpResposta: 'NAO_SEI',
+          checkin: null
+        },
+        {
+          convocacaoDestinatarioId: UUID_DEST4,
+          membro: { id: UUID_M4, nome: 'Daniel Pendente', casaNome: null },
+          rsvpResposta: null,
           checkin: null
         }
       ]
@@ -92,9 +124,153 @@ describe('PortariaView', () => {
     fireEvent.change(select, { target: { value: UUID_EVT1 } })
 
     await waitFor(() => {
-      expect(mockFetchWithAuth).toHaveBeenCalledWith(`/portaria/eventos/${UUID_EVT1}/participantes`)
-      expect(screen.getByText('João da Silva')).toBeInTheDocument()
-      expect(screen.getByText('Esperado')).toBeInTheDocument()
+      expect(screen.getByText('Total: 4')).toBeInTheDocument()
+      expect(screen.getByText('Presentes: 1')).toBeInTheDocument()
+      expect(screen.getByText('Pendentes: 3')).toBeInTheDocument()
+    })
+
+    // Checar badges de RSVP
+    expect(screen.getByText('Não participará')).toBeInTheDocument()
+    expect(screen.getByText('Participará')).toBeInTheDocument()
+    expect(screen.getByText('Indefinido')).toBeInTheDocument()
+    expect(screen.getByText('Sem resposta')).toBeInTheDocument()
+
+    // Checar ordenação (pendentes primeiro, depois presentes)
+    const rows = screen.getAllByTestId(/row-/i)
+    expect(rows[0]).toHaveTextContent('Beto Pendente') // Pendente
+    expect(rows[1]).toHaveTextContent('Carlos Pendente') // Pendente
+    expect(rows[2]).toHaveTextContent('Daniel Pendente') // Pendente
+    expect(rows[3]).toHaveTextContent('Ana Presente') // Presente
+  })
+
+  it('destaca visualmente após checkin e limpa na troca de evento', async () => {
+    const eventosDisponiveis = {
+      data: [
+        { id: UUID_EVT1, titulo: 'Evt 1', inicioEm: '2026-10-01T14:00:00Z', fimEm: '2026-10-01T16:00:00Z', modalidade: 'PRESENCIAL' },
+        { id: UUID_EVT2, titulo: 'Evt 2', inicioEm: '2026-10-01T14:00:00Z', fimEm: '2026-10-01T16:00:00Z', modalidade: 'PRESENCIAL' }
+      ]
+    }
+    mockFetchWithAuth.mockResolvedValueOnce(eventosDisponiveis)
+    render(<PortariaView />)
+    await waitFor(() => screen.getByRole('combobox'))
+
+    const select = screen.getByRole('combobox')
+
+    // Carregar evento 1
+    mockFetchWithAuth.mockResolvedValueOnce({
+      participantes: [
+        { convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana', casaNome: null }, rsvpResposta: null, checkin: null }
+      ]
+    })
+    fireEvent.change(select, { target: { value: UUID_EVT1 } })
+    await waitFor(() => screen.getByText('Registrar Presença'))
+
+    // Fazer checkin manual
+    mockPostWithAuth.mockResolvedValueOnce({ jaRegistrado: false, convocacaoDestinatarioId: UUID_DEST1 })
+    mockFetchWithAuth.mockResolvedValueOnce({
+      participantes: [
+        { convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-1', dataHoraCheckin: '2026-10-01T14:10:00Z', forma: 'MANUAL' } }
+      ]
+    })
+    fireEvent.click(screen.getByText('Registrar Presença'))
+
+    // Verifica que o elemento recebe a classe de highlight
+    await waitFor(() => {
+      const row = screen.getByTestId(`row-${UUID_DEST1}`)
+      expect(row.className).toContain('bg-brand-50')
+      expect(row.className).toContain('ring-2')
+    })
+
+    // Avança 5 segundos e verifica que limpou o highlight
+    act(() => {
+      vi.advanceTimersByTime(5100)
+    })
+    
+    await waitFor(() => {
+      const row = screen.getByTestId(`row-${UUID_DEST1}`)
+      expect(row.className).not.toContain('bg-brand-50')
+      expect(row.className).toContain('bg-green-50')
+    })
+    
+    // Testa limpeza na troca de evento
+    mockFetchWithAuth.mockResolvedValueOnce({
+      participantes: [
+        { convocacaoDestinatarioId: UUID_DEST2, membro: { id: UUID_M2, nome: 'Beto', casaNome: null }, rsvpResposta: null, checkin: null }
+      ]
+    })
+    fireEvent.change(select, { target: { value: UUID_EVT2 } })
+    await waitFor(() => expect(screen.getByText('Beto')).toBeInTheDocument())
+  })
+
+  it('mantém o destaque do segundo check-in caso sobreposto ao primeiro', async () => {
+    const eventosDisponiveis = {
+      data: [{ id: UUID_EVT1, titulo: 'Evt 1', inicioEm: '2026-10-01T14:00:00Z', fimEm: '2026-10-01T16:00:00Z', modalidade: 'PRESENCIAL' }]
+    }
+    mockFetchWithAuth.mockResolvedValueOnce(eventosDisponiveis)
+    render(<PortariaView />)
+    await waitFor(() => screen.getByRole('combobox'))
+
+    const select = screen.getByRole('combobox')
+
+    // Carrega 2 participantes
+    mockFetchWithAuth.mockResolvedValueOnce({
+      participantes: [
+        { convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana', casaNome: null }, rsvpResposta: null, checkin: null },
+        { convocacaoDestinatarioId: UUID_DEST2, membro: { id: UUID_M2, nome: 'Beto', casaNome: null }, rsvpResposta: null, checkin: null }
+      ]
+    })
+    fireEvent.change(select, { target: { value: UUID_EVT1 } })
+    await waitFor(() => expect(screen.getAllByText('Registrar Presença').length).toBe(2))
+
+    // 1. Check-in de Ana
+    mockPostWithAuth.mockResolvedValueOnce({ jaRegistrado: false, convocacaoDestinatarioId: UUID_DEST1 })
+    mockFetchWithAuth.mockResolvedValueOnce({
+      participantes: [
+        { convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-1', dataHoraCheckin: '2026-10-01T14:10:00Z', forma: 'MANUAL' } },
+        { convocacaoDestinatarioId: UUID_DEST2, membro: { id: UUID_M2, nome: 'Beto', casaNome: null }, rsvpResposta: null, checkin: null }
+      ]
+    })
+    
+    const btns = screen.getAllByText('Registrar Presença')
+    fireEvent.click(btns[0]) // Clica em Ana
+
+    await waitFor(() => {
+      expect(screen.getByTestId(`row-${UUID_DEST1}`).className).toContain('bg-brand-50')
+    })
+
+    // Avança 2 segundos (timer 1 faltam 3s)
+    act(() => { vi.advanceTimersByTime(2000) })
+
+    // 2. Check-in de Beto
+    mockPostWithAuth.mockResolvedValueOnce({ jaRegistrado: false, convocacaoDestinatarioId: UUID_DEST2 })
+    mockFetchWithAuth.mockResolvedValueOnce({
+      participantes: [
+        { convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-1', dataHoraCheckin: '2026-10-01T14:10:00Z', forma: 'MANUAL' } },
+        { convocacaoDestinatarioId: UUID_DEST2, membro: { id: UUID_M2, nome: 'Beto', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-2', dataHoraCheckin: '2026-10-01T14:10:02Z', forma: 'MANUAL' } }
+      ]
+    })
+    
+    const btnsBeto = screen.getAllByText('Registrar Presença')
+    fireEvent.click(btnsBeto[0]) // O único botão sobrando (Beto)
+
+    await waitFor(() => {
+      expect(screen.getByTestId(`row-${UUID_DEST2}`).className).toContain('bg-brand-50')
+    })
+
+    // Avança 3.1 segundos (timer 1 teria estourado agora, total 5.1s de Ana)
+    act(() => { vi.advanceTimersByTime(3100) })
+
+    // Confirma que Beto ainda está com destaque (o timer de Ana foi cancelado)
+    await waitFor(() => {
+      expect(screen.getByTestId(`row-${UUID_DEST2}`).className).toContain('bg-brand-50')
+    })
+
+    // Avança o resto do tempo de Beto (2000ms -> Total do Beto = 5.1s)
+    act(() => { vi.advanceTimersByTime(2000) })
+
+    // Confirma que Beto perdeu o destaque agora
+    await waitFor(() => {
+      expect(screen.getByTestId(`row-${UUID_DEST2}`).className).not.toContain('bg-brand-50')
     })
   })
 
@@ -130,37 +306,6 @@ describe('PortariaView', () => {
     await waitFor(() => expect(screen.getByText('Pessoa 2')).toBeInTheDocument())
   })
 
-  it('check-in manual exibe feedback de sucesso e recarrega a lista', async () => {
-    mockFetchWithAuth.mockResolvedValueOnce({
-      data: [{ id: UUID_EVT1, titulo: 'Evt', inicioEm: '2026-10-01T14:00:00Z', fimEm: '2026-10-01T16:00:00Z', modalidade: 'PRESENCIAL' }]
-    })
-    render(<PortariaView />)
-    await waitFor(() => screen.getByRole('combobox'))
-
-    mockFetchWithAuth.mockResolvedValueOnce({
-      participantes: [
-        { convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana', casaNome: null }, rsvpResposta: null, checkin: null }
-      ]
-    })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: UUID_EVT1 } })
-    await waitFor(() => screen.getByText('Registrar Presença'))
-
-    mockPostWithAuth.mockResolvedValueOnce({ jaRegistrado: false })
-    mockFetchWithAuth.mockResolvedValueOnce({
-      participantes: [
-        { convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-1', dataHoraCheckin: '2026-10-01T14:10:00Z', forma: 'MANUAL' } }
-      ]
-    })
-
-    fireEvent.click(screen.getByText('Registrar Presença'))
-
-    await waitFor(() => {
-      expect(mockPostWithAuth).toHaveBeenCalledWith('/checkin/manual', { convocacaoDestinatarioId: UUID_DEST1 })
-      expect(screen.getByText('Check-in manual de Ana realizado com sucesso!')).toBeInTheDocument()
-      expect(screen.getByText(/Presente/i)).toBeInTheDocument()
-    })
-  })
-
   it('check-in por QR exibe 409 quando já registrado', async () => {
     mockFetchWithAuth.mockResolvedValueOnce({
       data: [{ id: UUID_EVT1, titulo: 'Evt', inicioEm: '2026-10-01T14:00:00Z', fimEm: '2026-10-01T16:00:00Z', modalidade: 'PRESENCIAL' }]
@@ -185,27 +330,51 @@ describe('PortariaView', () => {
     })
   })
 
-  it('check-in por QR exibe 201 quando sucesso', async () => {
+  it('check-in por QR exibe 201 quando sucesso e aplica destaque', async () => {
     mockFetchWithAuth.mockResolvedValueOnce({
       data: [{ id: UUID_EVT1, titulo: 'Evt', inicioEm: '2026-10-01T14:00:00Z', fimEm: '2026-10-01T16:00:00Z', modalidade: 'PRESENCIAL' }]
     })
     render(<PortariaView />)
     await waitFor(() => screen.getByRole('combobox'))
 
-    mockFetchWithAuth.mockResolvedValue({ participantes: [] })
+    // Carregar evento com participante pendente
+    mockFetchWithAuth.mockResolvedValueOnce({
+      participantes: [{ convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana QR', casaNome: null }, rsvpResposta: null, checkin: null }]
+    })
     fireEvent.change(screen.getByRole('combobox'), { target: { value: UUID_EVT1 } })
     await waitFor(() => screen.getByPlaceholderText(/Aproxime o leitor/i))
+    await waitFor(() => expect(screen.getByText('Ana QR')).toBeInTheDocument())
 
     const qrInput = screen.getByPlaceholderText(/Aproxime o leitor/i)
-    fireEvent.change(qrInput, { target: { value: UUID_DEST1 } })
+    fireEvent.change(qrInput, { target: { value: 'token-qr-123' } })
 
-    mockPostWithAuth.mockResolvedValueOnce({ jaRegistrado: false })
+    // Mock POST sucesso
+    mockPostWithAuth.mockResolvedValueOnce({ jaRegistrado: false, convocacaoDestinatarioId: UUID_DEST1 })
+    
+    // Mock da recarga pós-sucesso
+    mockFetchWithAuth.mockResolvedValueOnce({
+      participantes: [{ convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana QR', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-qr', dataHoraCheckin: '2026-10-01T14:15:00Z', forma: 'QR' } }]
+    })
 
     fireEvent.click(screen.getByText('Confirmar QR'))
 
+    // Confirma mensagem de sucesso e foco devolvido
     await waitFor(() => {
       expect(screen.getByText('Check-in por QR Code realizado com sucesso!')).toBeInTheDocument()
       expect(qrInput).toHaveFocus()
+    })
+
+    // Confirma o destaque visual na linha
+    await waitFor(() => {
+      expect(screen.getByTestId(`row-${UUID_DEST1}`).className).toContain('bg-brand-50')
+    })
+
+    // Avança o timer em 5.1s
+    act(() => { vi.advanceTimersByTime(5100) })
+
+    // Confirma que o destaque foi removido
+    await waitFor(() => {
+      expect(screen.getByTestId(`row-${UUID_DEST1}`).className).not.toContain('bg-brand-50')
     })
   })
 

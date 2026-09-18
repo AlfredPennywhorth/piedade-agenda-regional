@@ -20,6 +20,7 @@ interface Participante {
 interface CheckinResponse {
   jaRegistrado?: boolean
   message?: string
+  convocacaoDestinatarioId?: string
 }
 
 interface PortariaEventoItem {
@@ -39,9 +40,12 @@ export function PortariaView() {
   const [qrTokenInput, setQrTokenInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [mensagem, setMensagem] = useState<{ tipo: 'sucesso' | 'aviso' | 'erro'; texto: string } | null>(null)
+  
+  const [ultimoCheckinId, setUltimoCheckinId] = useState<string | null>(null)
 
   const qrInputRef = useRef<HTMLInputElement>(null)
   const currentEvIdRef = useRef('')
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -64,7 +68,10 @@ export function PortariaView() {
       }
     }
     carregarEventos()
-    return () => { mounted = false }
+    return () => { 
+      mounted = false
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -99,10 +106,21 @@ export function PortariaView() {
     setBuscaNome('')
     setQrTokenInput('')
     setMensagem(null)
+    setUltimoCheckinId(null)
+    if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
     
     if (evId) {
       carregarParticipantes(evId)
     }
+  }
+
+  const triggerHighlight = (id: string | undefined) => {
+    if (!id) return
+    if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
+    setUltimoCheckinId(id)
+    highlightTimeoutRef.current = setTimeout(() => {
+      setUltimoCheckinId(null)
+    }, 5000)
   }
 
   const handleCheckinQr = async (e: React.FormEvent) => {
@@ -116,6 +134,7 @@ export function PortariaView() {
         setMensagem({ tipo: 'aviso', texto: 'Atenção: Presença JÁ REGISTRADA previamente!' })
       } else {
         setMensagem({ tipo: 'sucesso', texto: `Check-in por QR Code realizado com sucesso!` })
+        triggerHighlight(res.convocacaoDestinatarioId)
       }
       setQrTokenInput('')
       if (eventoIdAtual) await carregarParticipantes(eventoIdAtual)
@@ -143,6 +162,7 @@ export function PortariaView() {
         setMensagem({ tipo: 'aviso', texto: `Atenção: Presença de ${nomeMembro} JÁ REGISTRADA previamente!` })
       } else {
         setMensagem({ tipo: 'sucesso', texto: `Check-in manual de ${nomeMembro} realizado com sucesso!` })
+        triggerHighlight(res.convocacaoDestinatarioId)
       }
       if (eventoIdAtual) await carregarParticipantes(eventoIdAtual)
     } catch (err: unknown) {
@@ -164,10 +184,30 @@ export function PortariaView() {
     return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   }
 
+  const getRsvpLabel = (rsvp: string | null) => {
+    switch (rsvp) {
+      case 'PARTICIPAREI': return { label: 'Participará', color: 'bg-blue-100 text-blue-800 border-blue-200' }
+      case 'NAO_PARTICIPAREI': return { label: 'Não participará', color: 'bg-red-100 text-red-800 border-red-200' }
+      case 'NAO_SEI': return { label: 'Indefinido', color: 'bg-orange-100 text-orange-800 border-orange-200' }
+      default: return { label: 'Sem resposta', color: 'bg-slate-100 text-slate-600 border-slate-200' }
+    }
+  }
+
   const filtrados = participantes.filter(p =>
     p.membro.nome.toLowerCase().includes(buscaNome.toLowerCase()) ||
     (p.membro.casaNome && p.membro.casaNome.toLowerCase().includes(buscaNome.toLowerCase()))
   )
+
+  const participantesOrdenados = [...filtrados].sort((a, b) => {
+    const aCheck = a.checkin !== null
+    const bCheck = b.checkin !== null
+    if (aCheck === bCheck) return 0
+    return aCheck ? 1 : -1
+  })
+
+  const totalEsperado = participantes.length
+  const presentes = participantes.filter(p => p.checkin !== null).length
+  const pendentes = totalEsperado - presentes
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
@@ -254,11 +294,13 @@ export function PortariaView() {
       {/* Check-in Manual / Busca por Participantes */}
       {eventoIdAtual && (
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-          <div className="flex justify-between items-center flex-wrap gap-2">
-            <h3 className="text-base font-semibold text-slate-800">3. Check-in Manual (Lista de Participantes)</h3>
-            <span className="text-xs bg-slate-100 text-slate-700 font-medium px-3 py-1 rounded-full">
-              Total: {participantes.length} convocados
-            </span>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h3 className="text-base font-semibold text-slate-800">3. Fila de Participantes</h3>
+            <div className="flex items-center gap-2 text-sm font-medium" role="group" aria-label="Contadores">
+              <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full border border-slate-200">Total: {totalEsperado}</span>
+              <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full border border-green-200">Presentes: {presentes}</span>
+              <span className="px-3 py-1 bg-amber-100 text-amber-800 rounded-full border border-amber-200">Pendentes: {pendentes}</span>
+            </div>
           </div>
 
           <input
@@ -270,49 +312,59 @@ export function PortariaView() {
           />
 
           <div className="space-y-3 max-h-[500px] overflow-y-auto pt-2">
-            {filtrados.length === 0 ? (
+            {participantesOrdenados.length === 0 ? (
               <p className="text-center text-slate-500 py-6 text-sm">Nenhum participante encontrado.</p>
             ) : (
-              filtrados.map((p) => (
-                <div
-                  key={p.membro.id}
-                  className={`p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-colors ${
-                    p.checkin ? 'bg-green-50/60 border-green-200' : 'bg-slate-50 border-slate-200'
-                  }`}
-                >
-                  <div>
-                    <h4 className="font-semibold text-slate-900 text-base">{p.membro.nome}</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">{p.membro.casaNome || 'Sem casa vinculada'}</p>
-                    <div className="flex items-center gap-2 mt-1">
+              participantesOrdenados.map((p) => {
+                const rsvp = getRsvpLabel(p.rsvpResposta)
+                const isHighlight = ultimoCheckinId === p.convocacaoDestinatarioId
+                
+                return (
+                  <div
+                    key={p.membro.id}
+                    data-testid={`row-${p.convocacaoDestinatarioId}`}
+                    className={`p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-all duration-500 ${
+                      isHighlight ? 'bg-brand-50 border-brand-300 ring-2 ring-brand-300 shadow-md transform scale-[1.01]' :
+                      p.checkin ? 'bg-green-50/60 border-green-200' : 'bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <div>
+                      <h4 className="font-semibold text-slate-900 text-base">{p.membro.nome}</h4>
+                      <p className="text-xs text-slate-500 mt-0.5">{p.membro.casaNome || 'Sem casa vinculada'}</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${rsvp.color}`}>
+                          {rsvp.label}
+                        </span>
+                        {p.checkin ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-green-200 text-green-800 uppercase">
+                            Presente ({p.checkin.forma} - {formatarDataHora(p.checkin.dataHoraCheckin)})
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-700 uppercase">
+                            Esperado
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-2 sm:mt-0">
                       {p.checkin ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-green-200 text-green-800 uppercase">
-                          Presente ({p.checkin.forma} - {formatarDataHora(p.checkin.dataHoraCheckin)})
+                        <span className="inline-block px-4 py-2 bg-green-600 text-white text-xs font-bold rounded-lg shadow-sm">
+                          ✓ Confirmado
                         </span>
                       ) : (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-700 uppercase">
-                          Esperado
-                        </span>
+                        <button
+                          onClick={() => handleCheckinManual(p.convocacaoDestinatarioId, p.membro.nome)}
+                          disabled={loading}
+                          className="px-5 py-2.5 bg-brand-600 text-white font-medium rounded-lg text-sm hover:bg-brand-700 disabled:opacity-50 transition-colors shadow-sm whitespace-nowrap"
+                        >
+                          Registrar Presença
+                        </button>
                       )}
                     </div>
                   </div>
-
-                  <div>
-                    {p.checkin ? (
-                      <span className="inline-block px-4 py-2 bg-green-600 text-white text-xs font-bold rounded-lg shadow-sm">
-                        ✓ Confirmado
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleCheckinManual(p.convocacaoDestinatarioId, p.membro.nome)}
-                        disabled={loading}
-                        className="px-5 py-2.5 bg-brand-600 text-white font-medium rounded-lg text-sm hover:bg-brand-700 disabled:opacity-50 transition-colors shadow-sm"
-                      >
-                        Registrar Presença
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </div>
