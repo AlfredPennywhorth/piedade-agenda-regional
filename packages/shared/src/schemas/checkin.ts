@@ -25,3 +25,21 @@ export const CheckinSchema = z.object({
   updatedAt: z.string()
 }).strict()
 export type Checkin = z.infer<typeof CheckinSchema>
+
+export const PortariaEventosQuerySchema = z.object({
+  data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data deve estar no formato YYYY-MM-DD').optional(),
+}).strict()
+export type PortariaEventosQuery = z.infer<typeof PortariaEventosQuerySchema>
+
+export const PortariaEventoItemSchema = z.object({
+  id: z.string().uuid(),
+  titulo: z.string(),
+  inicioEm: z.string(),
+  fimEm: z.string(),
+  modalidade: z.enum(['PRESENCIAL', 'ONLINE', 'HIBRIDO']),
+}).strict()
+
+export const PortariaEventosResponseSchema = z.object({
+  data: z.array(PortariaEventoItemSchema),
+}).strict()
+export type PortariaEventosResponse = z.infer<typeof PortariaEventosResponseSchema>
