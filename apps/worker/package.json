@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --env development",
-    "deploy": "wrangler deploy",
+    "deploy": "wrangler deploy --env production",
     "build": "wrangler deploy --dry-run --env development --outdir .wrangler/output",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
