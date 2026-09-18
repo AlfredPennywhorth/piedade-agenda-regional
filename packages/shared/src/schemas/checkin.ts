@@ -3,6 +3,9 @@ import { z } from 'zod'
 export const FormaCheckin = z.enum(['QR', 'MANUAL'])
 export type FormaCheckinEnum = z.infer<typeof FormaCheckin>
 
+export const StatusCheckin = z.enum(['ATIVO', 'RETIFICADO'])
+export type StatusCheckinEnum = z.infer<typeof StatusCheckin>
+
 export const CheckinQrSchema = z.object({
   qrToken: z.string().min(1, 'QR Token é obrigatório')
 }).strict()
@@ -13,6 +16,15 @@ export const CheckinManualSchema = z.object({
 }).strict()
 export type CheckinManualPayload = z.infer<typeof CheckinManualSchema>
 
+export const RetificarCheckinSchema = z.object({
+  motivo: z.string()
+    .trim()
+    .min(5, 'A justificativa precisa ter pelo menos 5 caracteres')
+    .max(100, 'Tamanho máximo excedido. Apenas justifique a operação técnica. Não insira dados pessoais ou sensíveis.')
+    .describe('Dado persistido de forma imutável nos logs de auditoria (S12).')
+}).strict()
+export type RetificarCheckinPayload = z.infer<typeof RetificarCheckinSchema>
+
 export const CheckinSchema = z.object({
   id: z.string().uuid(),
   convocacaoDestinatarioId: z.string().uuid(),
@@ -20,6 +32,7 @@ export const CheckinSchema = z.object({
   membroId: z.string().uuid(),
   dataHoraCheckin: z.string(),
   forma: FormaCheckin,
+  status: StatusCheckin,
   operadorMembroId: z.string().uuid().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string()
