@@ -1,0 +1,48 @@
+name: Deploy Pages — Produção
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: pages-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build frontend · Deploy Pages
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout da versão homologada
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        env:
+          VITE_API_URL: https://piedade-agenda-worker.aws311274.workers.dev/api/v1
+        run: pnpm --filter @piedade/web run build
+
+      - name: Deploy Pages
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm exec wrangler pages deploy apps/web/dist --project-name piedade-agenda-regional --branch develop
