@@ -38,17 +38,21 @@ interface ParticipantesRes {
   }>
 }
 
+const flushPromises = async () => {
+  await act(async () => {
+    for (let i = 0; i < 10; i++) await Promise.resolve()
+  })
+}
+
 describe('PortariaView', () => {
   const mockFetchWithAuth = vi.mocked(apiClient.fetchWithAuth)
   const mockPostWithAuth = vi.mocked(apiClient.postWithAuth)
 
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.useFakeTimers()
   })
 
   afterEach(() => {
-    vi.runOnlyPendingTimers()
     vi.useRealTimers()
   })
 
@@ -86,11 +90,6 @@ describe('PortariaView', () => {
 
     const select = screen.getByRole('combobox')
     
-    // A lista contém:
-    // M1 - Presente (NAO_PARTICIPAREI)
-    // M2 - Pendente (PARTICIPAREI)
-    // M3 - Pendente (NAO_SEI)
-    // M4 - Pendente (null)
     const participantesFake: ParticipantesRes = {
       participantes: [
         {
@@ -129,18 +128,16 @@ describe('PortariaView', () => {
       expect(screen.getByText('Pendentes: 3')).toBeInTheDocument()
     })
 
-    // Checar badges de RSVP
     expect(screen.getByText('Não participará')).toBeInTheDocument()
     expect(screen.getByText('Participará')).toBeInTheDocument()
     expect(screen.getByText('Indefinido')).toBeInTheDocument()
     expect(screen.getByText('Sem resposta')).toBeInTheDocument()
 
-    // Checar ordenação (pendentes primeiro, depois presentes)
     const rows = screen.getAllByTestId(/row-/i)
-    expect(rows[0]).toHaveTextContent('Beto Pendente') // Pendente
-    expect(rows[1]).toHaveTextContent('Carlos Pendente') // Pendente
-    expect(rows[2]).toHaveTextContent('Daniel Pendente') // Pendente
-    expect(rows[3]).toHaveTextContent('Ana Presente') // Presente
+    expect(rows[0]).toHaveTextContent('Beto Pendente')
+    expect(rows[1]).toHaveTextContent('Carlos Pendente')
+    expect(rows[2]).toHaveTextContent('Daniel Pendente')
+    expect(rows[3]).toHaveTextContent('Ana Presente')
   })
 
   it('destaca visualmente após checkin e limpa na troca de evento', async () => {
@@ -156,7 +153,6 @@ describe('PortariaView', () => {
 
     const select = screen.getByRole('combobox')
 
-    // Carregar evento 1
     mockFetchWithAuth.mockResolvedValueOnce({
       participantes: [
         { convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana', casaNome: null }, rsvpResposta: null, checkin: null }
@@ -165,34 +161,29 @@ describe('PortariaView', () => {
     fireEvent.change(select, { target: { value: UUID_EVT1 } })
     await waitFor(() => screen.getByText('Registrar Presença'))
 
-    // Fazer checkin manual
     mockPostWithAuth.mockResolvedValueOnce({ jaRegistrado: false, convocacaoDestinatarioId: UUID_DEST1 })
     mockFetchWithAuth.mockResolvedValueOnce({
       participantes: [
         { convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-1', dataHoraCheckin: '2026-10-01T14:10:00Z', forma: 'MANUAL' } }
       ]
     })
+
+    vi.useFakeTimers()
     fireEvent.click(screen.getByText('Registrar Presença'))
 
-    // Verifica que o elemento recebe a classe de highlight
-    await waitFor(() => {
-      const row = screen.getByTestId(`row-${UUID_DEST1}`)
-      expect(row.className).toContain('bg-brand-50')
-      expect(row.className).toContain('ring-2')
-    })
+    await flushPromises()
 
-    // Avança 5 segundos e verifica que limpou o highlight
-    act(() => {
-      vi.advanceTimersByTime(5100)
-    })
+    const row = screen.getByTestId(`row-${UUID_DEST1}`)
+    expect(row.className).toContain('bg-brand-50')
+    expect(row.className).toContain('ring-2')
+
+    act(() => { vi.advanceTimersByTime(5100) })
     
-    await waitFor(() => {
-      const row = screen.getByTestId(`row-${UUID_DEST1}`)
-      expect(row.className).not.toContain('bg-brand-50')
-      expect(row.className).toContain('bg-green-50')
-    })
+    expect(row.className).not.toContain('bg-brand-50')
+    expect(row.className).toContain('bg-green-50')
     
-    // Testa limpeza na troca de evento
+    vi.useRealTimers()
+
     mockFetchWithAuth.mockResolvedValueOnce({
       participantes: [
         { convocacaoDestinatarioId: UUID_DEST2, membro: { id: UUID_M2, nome: 'Beto', casaNome: null }, rsvpResposta: null, checkin: null }
@@ -212,7 +203,6 @@ describe('PortariaView', () => {
 
     const select = screen.getByRole('combobox')
 
-    // Carrega 2 participantes
     mockFetchWithAuth.mockResolvedValueOnce({
       participantes: [
         { convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana', casaNome: null }, rsvpResposta: null, checkin: null },
@@ -221,6 +211,8 @@ describe('PortariaView', () => {
     })
     fireEvent.change(select, { target: { value: UUID_EVT1 } })
     await waitFor(() => expect(screen.getAllByText('Registrar Presença').length).toBe(2))
+
+    vi.useFakeTimers()
 
     // 1. Check-in de Ana
     mockPostWithAuth.mockResolvedValueOnce({ jaRegistrado: false, convocacaoDestinatarioId: UUID_DEST1 })
@@ -232,11 +224,10 @@ describe('PortariaView', () => {
     })
     
     const btns = screen.getAllByText('Registrar Presença')
-    fireEvent.click(btns[0]) // Clica em Ana
+    fireEvent.click(btns[0])
 
-    await waitFor(() => {
-      expect(screen.getByTestId(`row-${UUID_DEST1}`).className).toContain('bg-brand-50')
-    })
+    await flushPromises()
+    expect(screen.getByTestId(`row-${UUID_DEST1}`).className).toContain('bg-brand-50')
 
     // Avança 2 segundos (timer 1 faltam 3s)
     act(() => { vi.advanceTimersByTime(2000) })
@@ -251,27 +242,24 @@ describe('PortariaView', () => {
     })
     
     const btnsBeto = screen.getAllByText('Registrar Presença')
-    fireEvent.click(btnsBeto[0]) // O único botão sobrando (Beto)
+    fireEvent.click(btnsBeto[0])
 
-    await waitFor(() => {
-      expect(screen.getByTestId(`row-${UUID_DEST2}`).className).toContain('bg-brand-50')
-    })
+    await flushPromises()
+    expect(screen.getByTestId(`row-${UUID_DEST2}`).className).toContain('bg-brand-50')
 
     // Avança 3.1 segundos (timer 1 teria estourado agora, total 5.1s de Ana)
     act(() => { vi.advanceTimersByTime(3100) })
 
-    // Confirma que Beto ainda está com destaque (o timer de Ana foi cancelado)
-    await waitFor(() => {
-      expect(screen.getByTestId(`row-${UUID_DEST2}`).className).toContain('bg-brand-50')
-    })
+    // Confirma que Beto ainda está com destaque
+    expect(screen.getByTestId(`row-${UUID_DEST2}`).className).toContain('bg-brand-50')
 
-    // Avança o resto do tempo de Beto (2000ms -> Total do Beto = 5.1s)
+    // Avança o resto do tempo de Beto
     act(() => { vi.advanceTimersByTime(2000) })
 
     // Confirma que Beto perdeu o destaque agora
-    await waitFor(() => {
-      expect(screen.getByTestId(`row-${UUID_DEST2}`).className).not.toContain('bg-brand-50')
-    })
+    expect(screen.getByTestId(`row-${UUID_DEST2}`).className).not.toContain('bg-brand-50')
+
+    vi.useRealTimers()
   })
 
   it('limpa os dados residuais ao trocar de evento e ignora corrida', async () => {
@@ -337,7 +325,6 @@ describe('PortariaView', () => {
     render(<PortariaView />)
     await waitFor(() => screen.getByRole('combobox'))
 
-    // Carregar evento com participante pendente
     mockFetchWithAuth.mockResolvedValueOnce({
       participantes: [{ convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana QR', casaNome: null }, rsvpResposta: null, checkin: null }]
     })
@@ -348,34 +335,26 @@ describe('PortariaView', () => {
     const qrInput = screen.getByPlaceholderText(/Aproxime o leitor/i)
     fireEvent.change(qrInput, { target: { value: 'token-qr-123' } })
 
-    // Mock POST sucesso
     mockPostWithAuth.mockResolvedValueOnce({ jaRegistrado: false, convocacaoDestinatarioId: UUID_DEST1 })
     
-    // Mock da recarga pós-sucesso
     mockFetchWithAuth.mockResolvedValueOnce({
       participantes: [{ convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana QR', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-qr', dataHoraCheckin: '2026-10-01T14:15:00Z', forma: 'QR' } }]
     })
 
+    vi.useFakeTimers()
     fireEvent.click(screen.getByText('Confirmar QR'))
 
-    // Confirma mensagem de sucesso e foco devolvido
-    await waitFor(() => {
-      expect(screen.getByText('Check-in por QR Code realizado com sucesso!')).toBeInTheDocument()
-      expect(qrInput).toHaveFocus()
-    })
+    await flushPromises()
 
-    // Confirma o destaque visual na linha
-    await waitFor(() => {
-      expect(screen.getByTestId(`row-${UUID_DEST1}`).className).toContain('bg-brand-50')
-    })
+    expect(screen.getByText('Check-in por QR Code realizado com sucesso!')).toBeInTheDocument()
+    expect(qrInput).toHaveFocus()
+    expect(screen.getByTestId(`row-${UUID_DEST1}`).className).toContain('bg-brand-50')
 
-    // Avança o timer em 5.1s
     act(() => { vi.advanceTimersByTime(5100) })
 
-    // Confirma que o destaque foi removido
-    await waitFor(() => {
-      expect(screen.getByTestId(`row-${UUID_DEST1}`).className).not.toContain('bg-brand-50')
-    })
+    expect(screen.getByTestId(`row-${UUID_DEST1}`).className).not.toContain('bg-brand-50')
+
+    vi.useRealTimers()
   })
 
   it('check-in manual exibe erro 400 em payload invalido com alert role', async () => {
