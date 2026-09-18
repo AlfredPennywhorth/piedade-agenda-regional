@@ -59,7 +59,7 @@ checkinRouter.post('/qr', async (c) => {
     const checkinExistente = await db
       .select()
       .from(checkins)
-      .where(and(eq(checkins.eventoId, eventoId), eq(checkins.membroId, membroId)))
+      .where(and(eq(checkins.eventoId, eventoId), eq(checkins.membroId, membroId), eq(checkins.status, 'ATIVO')))
       .get()
 
     if (checkinExistente) {
@@ -78,6 +78,7 @@ checkinRouter.post('/qr', async (c) => {
       eventoId,
       membroId,
       forma: 'QR',
+      status: 'ATIVO',
       operadorMembroId,
       dataHoraCheckin: nowIso,
       createdAt: nowIso,
@@ -158,7 +159,7 @@ checkinRouter.post('/manual', async (c) => {
     const checkinExistente = await db
       .select()
       .from(checkins)
-      .where(and(eq(checkins.eventoId, eventoId), eq(checkins.membroId, membroId)))
+      .where(and(eq(checkins.eventoId, eventoId), eq(checkins.membroId, membroId), eq(checkins.status, 'ATIVO')))
       .get()
 
     if (checkinExistente) {
@@ -176,6 +177,7 @@ checkinRouter.post('/manual', async (c) => {
       eventoId,
       membroId,
       forma: 'MANUAL',
+      status: 'ATIVO',
       operadorMembroId,
       dataHoraCheckin: nowIso,
       createdAt: nowIso,
