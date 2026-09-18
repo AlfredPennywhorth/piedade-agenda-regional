@@ -314,6 +314,7 @@ export function setupDb(sqlite: any) {
       membro_id text NOT NULL,
       data_hora_checkin text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
       forma text NOT NULL,
+      status text DEFAULT 'ATIVO' NOT NULL,
       operador_membro_id text,
       created_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
       updated_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
@@ -321,9 +322,10 @@ export function setupDb(sqlite: any) {
       FOREIGN KEY (evento_id) REFERENCES eventos(id),
       FOREIGN KEY (membro_id) REFERENCES membros(id),
       FOREIGN KEY (operador_membro_id) REFERENCES membros(id),
-      CONSTRAINT check_checkin_forma CHECK (forma IN ('QR', 'MANUAL'))
+      CONSTRAINT check_checkin_forma CHECK (forma IN ('QR', 'MANUAL')),
+      CONSTRAINT check_checkin_status CHECK (status IN ('ATIVO', 'RETIFICADO'))
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_checkin_evento_membro_unico ON checkins (evento_id, membro_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_checkin_evento_membro_unico ON checkins (evento_id, membro_id) WHERE status = 'ATIVO';
     CREATE INDEX IF NOT EXISTS idx_checkin_destinatario ON checkins (convocacao_destinatario_id);
     CREATE INDEX IF NOT EXISTS idx_checkin_membro ON checkins (membro_id);
 
