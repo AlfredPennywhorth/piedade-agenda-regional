@@ -223,14 +223,12 @@ export function ConvocacoesView() {
                       Gerenciar Funções
                     </button>
                   )}
-                  {conv.status === 'RASCUNHO' && (
-                    <button
-                      onClick={() => handleClickEditar(conv)}
-                      className="text-brand-600 hover:text-brand-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
-                    >
-                      Editar
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleClickEditar(conv)}
+                    className="text-brand-600 hover:text-brand-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
+                  >
+                    Editar
+                  </button>
                   {conv.status !== 'CANCELADA' && (
                     <button
                       onClick={() => setActionConfirm({ type: 'CANCELAR', convocacao: conv })}
