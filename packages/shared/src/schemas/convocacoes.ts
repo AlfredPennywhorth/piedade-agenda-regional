@@ -104,3 +104,32 @@ export const RsvpUpsert = z.object({
   }
 })
 export type RsvpUpsertPayload = z.infer<typeof RsvpUpsert>
+
+export const StatusRsvpFiltro = z.enum(['PARTICIPAREI', 'NAO_PARTICIPAREI', 'NAO_SEI', 'SEM_RESPOSTA'])
+export type StatusRsvpFiltroEnum = z.infer<typeof StatusRsvpFiltro>
+
+export const AcompanhamentoRsvpQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(50),
+  statusRsvp: StatusRsvpFiltro.optional()
+})
+export type AcompanhamentoRsvpQuery = z.infer<typeof AcompanhamentoRsvpQuerySchema>
+
+export const AcompanhamentoRsvpResponseSchema = z.object({
+  data: z.array(z.object({
+    destinatarioId: z.string().uuid(),
+    membroId: z.string().uuid(),
+    membroNome: z.string(),
+    respostaRsvp: StatusRsvpFiltro,
+    evidencias: z.array(z.object({
+      funcaoId: z.string().uuid(),
+      vinculoFuncionalId: z.string().uuid()
+    }))
+  })),
+  meta: z.object({
+    total: z.number().int().nonnegative(),
+    page: z.number().int().positive(),
+    lastPage: z.number().int().positive()
+  })
+})
+export type AcompanhamentoRsvpResponse = z.infer<typeof AcompanhamentoRsvpResponseSchema>
