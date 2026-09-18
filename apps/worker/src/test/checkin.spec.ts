@@ -461,4 +461,133 @@ describe('S11 - Portaria e Check-in', () => {
     const mem1Presente = json.participantes.some((p: any) => p.membro.id === ctx.mem1Id)
     expect(mem1Presente).toBe(true)
   })
+
+  describe('GET /api/v1/portaria/eventos', () => {
+    interface PortariaEventoItem {
+      id: string
+      titulo: string
+      inicioEm: string
+      fimEm: string
+      modalidade: string
+    }
+
+    it('operador autorizado vê somente evento do seu escopo; evento fora da data e inativo não aparecem; data ausente usa SP', async () => {
+      const ctx = await setupBaseData()
+      
+      const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' })
+      const hojeSp = formatter.format(new Date())
+
+      // 1. Evento hoje, ativo, MESMO escopo (ctx.setId)
+      const evHojeDentroId = crypto.randomUUID()
+      await db.insert(eventos).values({
+        id: evHojeDentroId,
+        titulo: 'Hoje Dentro',
+        modalidade: 'PRESENCIAL',
+        inicioEm: `${hojeSp}T14:00:00Z`,
+        fimEm: `${hojeSp}T16:00:00Z`,
+        setorId: ctx.setId,
+        ativo: true
+      })
+
+      // 2. Evento hoje, ativo, OUTRO escopo (ctx.regId - Operador no Setor Norte não tem na Regional SP, só no Setor Norte)
+      const evHojeForaId = crypto.randomUUID()
+      await db.insert(eventos).values({
+        id: evHojeForaId,
+        titulo: 'Hoje Fora',
+        modalidade: 'ONLINE',
+        inicioEm: `${hojeSp}T15:00:00Z`,
+        fimEm: `${hojeSp}T17:00:00Z`,
+        regionalId: ctx.regId,
+        ativo: true
+      })
+
+      // 3. Evento hoje, INATIVO, MESMO escopo
+      const evHojeInativoId = crypto.randomUUID()
+      await db.insert(eventos).values({
+        id: evHojeInativoId,
+        titulo: 'Hoje Inativo',
+        modalidade: 'PRESENCIAL',
+        inicioEm: `${hojeSp}T10:00:00Z`,
+        fimEm: `${hojeSp}T11:00:00Z`,
+        setorId: ctx.setId,
+        ativo: false
+      })
+
+      // O operador (tokenOperador) busca sem passar 'data' -> Usa hojeSp implicitamente
+      const res = await app.request('/api/v1/portaria/eventos', {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${ctx.tokenOperador}` }
+      })
+
+      expect(res.status).toBe(200)
+      const json = await res.json()
+
+      const ids = json.data.map((e: PortariaEventoItem) => e.id)
+      expect(ids).toContain(evHojeDentroId) // Vê do seu escopo
+      expect(ids).not.toContain(evHojeForaId) // Não vê escopo alheio
+      expect(ids).not.toContain(evHojeInativoId) // Não vê inativos
+      
+      // Resposta contém apenas os campos do DTO
+      const ev = json.data.find((e: PortariaEventoItem) => e.id === evHojeDentroId)
+      expect(ev).toBeDefined()
+      if (ev) {
+        expect(Object.keys(ev).sort()).toEqual(['fimEm', 'id', 'inicioEm', 'modalidade', 'titulo'])
+      }
+    })
+
+    it('operador não autorizado não vê evento e recebe data: []', async () => {
+      const ctx = await setupBaseData()
+      
+      const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' })
+      const hojeSp = formatter.format(new Date())
+
+      await db.insert(eventos).values({
+        id: crypto.randomUUID(),
+        titulo: 'Evento SP Comum',
+        modalidade: 'PRESENCIAL',
+        inicioEm: `${hojeSp}T14:00:00Z`,
+        fimEm: `${hojeSp}T16:00:00Z`,
+        setorId: ctx.setId,
+        ativo: true
+      })
+
+      // Organizador e Membro Comum não são operadores autorizados
+      const resComum = await app.request('/api/v1/portaria/eventos', {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${ctx.tokenComum}` }
+      })
+
+      expect(resComum.status).toBe(200)
+      const jsonComum = await resComum.json()
+      expect(jsonComum.data).toEqual([])
+    })
+
+    it('filtro por `data` funciona', async () => {
+      const ctx = await setupBaseData()
+      
+      const dataAlvo = '2030-05-15'
+
+      const evFuturoId = crypto.randomUUID()
+      await db.insert(eventos).values({
+        id: evFuturoId,
+        titulo: 'Evento Futuro',
+        modalidade: 'HIBRIDO',
+        inicioEm: `${dataAlvo}T12:00:00Z`,
+        fimEm: `${dataAlvo}T14:00:00Z`,
+        setorId: ctx.setId,
+        ativo: true
+      })
+
+      const res = await app.request(`/api/v1/portaria/eventos?data=${dataAlvo}`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${ctx.tokenOperador}` }
+      })
+
+      expect(res.status).toBe(200)
+      const json = await res.json()
+      const ids = json.data.map((e: PortariaEventoItem) => e.id)
+      
+      expect(ids).toContain(evFuturoId)
+    })
+  })
 })
