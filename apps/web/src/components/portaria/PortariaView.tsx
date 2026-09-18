@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import * as apiClient from '../../api/apiClient'
+import { PortariaEventosResponseSchema } from '@piedade/shared'
 
 interface Participante {
   convocacaoDestinatarioId: string
@@ -21,8 +22,17 @@ interface CheckinResponse {
   message?: string
 }
 
+interface PortariaEventoItem {
+  id: string
+  titulo: string
+  inicioEm: string
+  fimEm: string
+  modalidade: string
+}
+
 export function PortariaView() {
-  const [eventoIdInput, setEventoIdInput] = useState('')
+  const [eventosDisponiveis, setEventosDisponiveis] = useState<PortariaEventoItem[]>([])
+  const [isLoadingEventos, setIsLoadingEventos] = useState(true)
   const [eventoIdAtual, setEventoIdAtual] = useState('')
   const [participantes, setParticipantes] = useState<Participante[]>([])
   const [buscaNome, setBuscaNome] = useState('')
@@ -30,18 +40,68 @@ export function PortariaView() {
   const [loading, setLoading] = useState(false)
   const [mensagem, setMensagem] = useState<{ tipo: 'sucesso' | 'aviso' | 'erro'; texto: string } | null>(null)
 
-  const carregarParticipantes = async (evId: string, limparMensagem = true) => {
-    if (!evId.trim()) return
+  const qrInputRef = useRef<HTMLInputElement>(null)
+  const currentEvIdRef = useRef('')
+
+  useEffect(() => {
+    let mounted = true
+    const carregarEventos = async () => {
+      try {
+        const data = await apiClient.fetchWithAuth('/portaria/eventos')
+        const result = PortariaEventosResponseSchema.safeParse(data)
+        if (result.success && mounted) {
+          setEventosDisponiveis(result.data.data)
+        } else if (!result.success && mounted) {
+          setMensagem({ tipo: 'erro', texto: 'Falha na validação do contrato de eventos.' })
+        }
+      } catch (err: unknown) {
+        if (mounted) {
+          const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar eventos autorizados.'
+          setMensagem({ tipo: 'erro', texto: errorMessage })
+        }
+      } finally {
+        if (mounted) setIsLoadingEventos(false)
+      }
+    }
+    carregarEventos()
+    return () => { mounted = false }
+  }, [])
+
+  useEffect(() => {
+    if (eventoIdAtual) {
+      qrInputRef.current?.focus()
+    }
+  }, [eventoIdAtual])
+
+  const carregarParticipantes = async (evId: string) => {
     setLoading(true)
-    if (limparMensagem) setMensagem(null)
     try {
       const data = await apiClient.fetchWithAuth<{ participantes: Participante[] }>(`/portaria/eventos/${evId}/participantes`)
-      setParticipantes(data.participantes || [])
-      setEventoIdAtual(evId)
-    } catch (err: any) {
-      setMensagem({ tipo: 'erro', texto: err.message || 'Erro ao carregar participantes do evento.' })
+      if (currentEvIdRef.current === evId) {
+        setParticipantes(data.participantes || [])
+      }
+    } catch (err: unknown) {
+      if (currentEvIdRef.current === evId) {
+        const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar participantes do evento.'
+        setMensagem({ tipo: 'erro', texto: errorMessage })
+      }
     } finally {
-      setLoading(false)
+      if (currentEvIdRef.current === evId) {
+        setLoading(false)
+      }
+    }
+  }
+
+  const handleSelecionarEvento = (evId: string) => {
+    setEventoIdAtual(evId)
+    currentEvIdRef.current = evId
+    setParticipantes([])
+    setBuscaNome('')
+    setQrTokenInput('')
+    setMensagem(null)
+    
+    if (evId) {
+      carregarParticipantes(evId)
     }
   }
 
@@ -58,17 +118,19 @@ export function PortariaView() {
         setMensagem({ tipo: 'sucesso', texto: `Check-in por QR Code realizado com sucesso!` })
       }
       setQrTokenInput('')
-      if (eventoIdAtual) carregarParticipantes(eventoIdAtual, false)
-    } catch (err: any) {
-      if (err?.status === 409 && err?.body?.jaRegistrado === true) {
+      if (eventoIdAtual) carregarParticipantes(eventoIdAtual)
+    } catch (err: unknown) {
+      if (err instanceof apiClient.ApiError && err.status === 409 && (err.body as CheckinResponse)?.jaRegistrado === true) {
         setMensagem({ tipo: 'aviso', texto: 'Atenção: Presença JÁ REGISTRADA previamente!' })
         setQrTokenInput('')
-        if (eventoIdAtual) carregarParticipantes(eventoIdAtual, false)
+        if (eventoIdAtual) carregarParticipantes(eventoIdAtual)
       } else {
-        setMensagem({ tipo: 'erro', texto: err.message || 'Falha ao validar QR Code.' })
+        const errorMessage = err instanceof Error ? err.message : 'Falha ao validar QR Code.'
+        setMensagem({ tipo: 'erro', texto: errorMessage })
       }
     } finally {
       setLoading(false)
+      qrInputRef.current?.focus()
     }
   }
 
@@ -82,17 +144,24 @@ export function PortariaView() {
       } else {
         setMensagem({ tipo: 'sucesso', texto: `Check-in manual de ${nomeMembro} realizado com sucesso!` })
       }
-      if (eventoIdAtual) carregarParticipantes(eventoIdAtual, false)
-    } catch (err: any) {
-      if (err?.status === 409 && err?.body?.jaRegistrado === true) {
+      if (eventoIdAtual) carregarParticipantes(eventoIdAtual)
+    } catch (err: unknown) {
+      if (err instanceof apiClient.ApiError && err.status === 409 && (err.body as CheckinResponse)?.jaRegistrado === true) {
         setMensagem({ tipo: 'aviso', texto: `Atenção: Presença de ${nomeMembro} JÁ REGISTRADA previamente!` })
-        if (eventoIdAtual) carregarParticipantes(eventoIdAtual, false)
+        if (eventoIdAtual) carregarParticipantes(eventoIdAtual)
       } else {
-        setMensagem({ tipo: 'erro', texto: err.message || 'Falha ao registrar check-in manual.' })
+        const errorMessage = err instanceof Error ? err.message : 'Falha ao registrar check-in manual.'
+        setMensagem({ tipo: 'erro', texto: errorMessage })
       }
     } finally {
       setLoading(false)
+      qrInputRef.current?.focus()
     }
+  }
+
+  const formatarDataHora = (isoStr: string) => {
+    const d = new Date(isoStr)
+    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   }
 
   const filtrados = participantes.filter(p =>
@@ -112,27 +181,35 @@ export function PortariaView() {
       {/* Seção de Seleção de Evento */}
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
         <h3 className="text-base font-semibold text-slate-800">1. Selecionar Evento</h3>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={eventoIdInput}
-            onChange={(e) => setEventoIdInput(e.target.value)}
-            placeholder="Digite o ID do Evento..."
-            className="flex-1 p-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-          />
-          <button
-            onClick={() => carregarParticipantes(eventoIdInput)}
-            disabled={loading || !eventoIdInput.trim()}
-            className="px-6 py-3 bg-brand-600 text-white font-medium rounded-lg text-sm hover:bg-brand-700 disabled:opacity-50 transition-colors"
-          >
-            {loading ? 'Carregando...' : 'Carregar Evento'}
-          </button>
-        </div>
+        {isLoadingEventos ? (
+          <p className="text-slate-500 text-sm">Carregando eventos autorizados...</p>
+        ) : eventosDisponiveis.length === 0 ? (
+          <div role="alert" className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium text-center">
+            Nenhum evento ativo com autorização de operação encontrado para hoje
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <select
+              value={eventoIdAtual}
+              onChange={(e) => handleSelecionarEvento(e.target.value)}
+              disabled={loading}
+              className="flex-1 p-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+            >
+              <option value="">Selecione um evento para iniciar a portaria...</option>
+              {eventosDisponiveis.map(ev => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.titulo} — {formatarDataHora(ev.inicioEm)} às {formatarDataHora(ev.fimEm)} ({ev.modalidade})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Feedback Visual Inequívoco */}
       {mensagem && (
         <div
+          role="alert"
           className={`p-4 rounded-xl text-base font-semibold border text-center animate-in fade-in ${
             mensagem.tipo === 'sucesso'
               ? 'bg-green-100 border-green-300 text-green-900'
@@ -156,14 +233,17 @@ export function PortariaView() {
         <form onSubmit={handleCheckinQr} className="flex gap-2">
           <input
             type="text"
+            ref={qrInputRef}
+            autoFocus
             value={qrTokenInput}
             onChange={(e) => setQrTokenInput(e.target.value)}
-            placeholder="Aproxime o leitor ou cole o QR Token..."
+            disabled={!eventoIdAtual || loading}
+            placeholder={eventoIdAtual ? "Aproxime o leitor ou cole o QR Token..." : "Selecione um evento primeiro..."}
             className="flex-1 p-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 font-mono"
           />
           <button
             type="submit"
-            disabled={loading || !qrTokenInput.trim()}
+            disabled={loading || !qrTokenInput.trim() || !eventoIdAtual}
             className="px-6 py-3 bg-green-600 text-white font-semibold rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 transition-colors min-w-[140px]"
           >
             Confirmar QR
@@ -204,14 +284,13 @@ export function PortariaView() {
                     <h4 className="font-semibold text-slate-900 text-base">{p.membro.nome}</h4>
                     <p className="text-xs text-slate-500 mt-0.5">{p.membro.casaNome || 'Sem casa vinculada'}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      {p.rsvpResposta && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-700 uppercase">
-                          RSVP: {p.rsvpResposta}
-                        </span>
-                      )}
-                      {p.checkin && (
+                      {p.checkin ? (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-green-200 text-green-800 uppercase">
-                          Presente ({p.checkin.forma})
+                          Presente ({p.checkin.forma} - {formatarDataHora(p.checkin.dataHoraCheckin)})
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-700 uppercase">
+                          Esperado
                         </span>
                       )}
                     </div>

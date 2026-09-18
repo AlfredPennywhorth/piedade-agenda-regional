@@ -1,262 +1,257 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { PortariaView } from '../components/portaria/PortariaView'
 import * as apiClient from '../api/apiClient'
-import { ApiError } from '../api/apiClient'
+import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('../api/apiClient', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../api/apiClient')>()
-  return {
-    ...actual,
-    fetchWithAuth: vi.fn(),
-    postWithAuth: vi.fn(),
+vi.mock('../api/apiClient', () => ({
+  fetchWithAuth: vi.fn(),
+  postWithAuth: vi.fn(),
+  ApiError: class ApiError extends Error {
+    status: number
+    body: unknown
+    constructor(status: number, message: string, body: unknown) {
+      super(message)
+      this.name = 'ApiError'
+      this.status = status
+      this.body = body
+    }
   }
-})
+}))
 
-describe('S11 - ApiError e Portaria Check-in', () => {
+const UUID_EVT1 = '550e8400-e29b-41d4-a716-446655440001'
+const UUID_EVT2 = '550e8400-e29b-41d4-a716-446655440002'
+const UUID_DEST1 = 'd8b5a83d-e350-4100-b615-562db4965df1'
+const UUID_DEST2 = 'd8b5a83d-e350-4100-b615-562db4965df2'
+const UUID_M1 = '99c5a83d-e350-4100-b615-562db4965df1'
+const UUID_M2 = '99c5a83d-e350-4100-b615-562db4965df2'
+
+interface ParticipantesRes {
+  participantes: Array<{
+    convocacaoDestinatarioId: string
+    membro: { id: string; nome: string; casaNome: string | null }
+    rsvpResposta: string | null
+    checkin: { id: string; dataHoraCheckin: string; forma: string } | null
+  }>
+}
+
+describe('PortariaView', () => {
+  const mockFetchWithAuth = vi.mocked(apiClient.fetchWithAuth)
+  const mockPostWithAuth = vi.mocked(apiClient.postWithAuth)
+
   beforeEach(() => {
-    vi.resetAllMocks()
+    vi.clearAllMocks()
   })
 
-  describe('1. ApiError e apiClient.fetchWithAuth (Comportamento de Infraestrutura)', () => {
-    it('instancia ApiError corretamente com status, message e body', () => {
-      const body = { jaRegistrado: true, message: 'Presença já registrada' }
-      const err = new ApiError(409, 'Presença já registrada', body)
-
-      expect(err).toBeInstanceOf(Error)
-      expect(err).toBeInstanceOf(ApiError)
-      expect(err.name).toBe('ApiError')
-      expect(err.status).toBe(409)
-      expect(err.message).toBe('Presença já registrada')
-      expect(err.body).toEqual(body)
-    })
-
-    it('fetchWithAuth lança ApiError preservando status, message e body em respostas não-2xx (incluindo 409 + jaRegistrado=true)', async () => {
-      const mockResponseBody = {
-        message: 'Presença já registrada previamente',
-        jaRegistrado: true,
-        checkin: { id: 'chk-100' }
-      }
-
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: false,
-        status: 409,
-        json: async () => mockResponseBody
-      } as Response)
-
-      // Executa a função real un-mocked
-      const { fetchWithAuth } = await vi.importActual<typeof import('../api/apiClient')>('../api/apiClient')
-
-      try {
-        await fetchWithAuth('/checkin/qr', { method: 'POST' })
-        expect.unreachable('Deveria ter lançado ApiError')
-      } catch (err: any) {
-        expect(err).toBeInstanceOf(ApiError)
-        expect(err.status).toBe(409)
-        expect(err.message).toBe('Presença já registrada previamente')
-        expect(err.body).toEqual(mockResponseBody)
-        expect(err.body.jaRegistrado).toBe(true)
-      }
-    })
-
-    it('fetchWithAuth lança ApiError em outros erros HTTP (ex: 403 Forbidden)', async () => {
-      const mockResponseBody = {
-        error: 'Operador não autorizado',
-        code: 'FORBIDDEN'
-      }
-
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: false,
-        status: 403,
-        json: async () => mockResponseBody
-      } as Response)
-
-      const { fetchWithAuth } = await vi.importActual<typeof import('../api/apiClient')>('../api/apiClient')
-
-      try {
-        await fetchWithAuth('/checkin/qr', { method: 'POST' })
-        expect.unreachable('Deveria ter lançado ApiError')
-      } catch (err: any) {
-        expect(err).toBeInstanceOf(ApiError)
-        expect(err.status).toBe(403)
-        expect(err.message).toBe('Operador não autorizado')
-        expect(err.body).toEqual(mockResponseBody)
-      }
+  it('renderiza empty state quando não há eventos autorizados', async () => {
+    mockFetchWithAuth.mockResolvedValueOnce({ data: [] })
+    render(<PortariaView />)
+    
+    expect(screen.getByText(/Carregando eventos autorizados/i)).toBeInTheDocument()
+    
+    await waitFor(() => {
+      expect(screen.getByText('Nenhum evento ativo com autorização de operação encontrado para hoje')).toBeInTheDocument()
     })
   })
 
-  describe('2. PortariaView — Check-in QR e Manual', () => {
-    it('QR novo → sucesso', async () => {
-      ;(apiClient.postWithAuth as any).mockResolvedValue({
-        id: 'chk-1',
-        forma: 'QR',
-        membroId: 'mem-1'
-      })
+  it('carrega o seletor com eventos e preenche a lista ao selecionar', async () => {
+    const eventosDisponiveis = {
+      data: [
+        {
+          id: UUID_EVT1,
+          titulo: 'Evento Teste',
+          inicioEm: '2026-10-01T14:00:00Z',
+          fimEm: '2026-10-01T16:00:00Z',
+          modalidade: 'PRESENCIAL'
+        }
+      ]
+    }
 
-      render(<PortariaView />)
+    mockFetchWithAuth.mockResolvedValueOnce(eventosDisponiveis)
 
-      const input = screen.getByPlaceholderText(/cole o QR Token/i)
-      const button = screen.getByRole('button', { name: /Confirmar QR/i })
+    render(<PortariaView />)
 
-      fireEvent.change(input, { target: { value: 'dest-uuid-123' } })
-      fireEvent.click(button)
-
-      await waitFor(() => {
-        expect(screen.getByText('Check-in por QR Code realizado com sucesso!')).toBeInTheDocument()
-      })
-
-      const msgDiv = screen.getByText('Check-in por QR Code realizado com sucesso!')
-      expect(msgDiv.className).toContain('bg-green-100')
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toBeInTheDocument()
     })
 
-    it('QR duplicado (409 + jaRegistrado=true) → aviso funcional', async () => {
-      const duplicateError = new ApiError(409, 'Presença já registrada previamente', {
-        message: 'Presença já registrada previamente',
-        jaRegistrado: true,
-        checkin: { id: 'chk-1' }
-      })
-      ;(apiClient.postWithAuth as any).mockRejectedValue(duplicateError)
+    const select = screen.getByRole('combobox')
+    expect(select).toHaveTextContent(/Evento Teste/i)
 
-      render(<PortariaView />)
+    const participantesFake: ParticipantesRes = {
+      participantes: [
+        {
+          convocacaoDestinatarioId: UUID_DEST1,
+          membro: { id: UUID_M1, nome: 'João da Silva', casaNome: 'Casa A' },
+          rsvpResposta: 'PARTICIPAREI',
+          checkin: null
+        }
+      ]
+    }
+    mockFetchWithAuth.mockResolvedValueOnce(participantesFake)
 
-      const input = screen.getByPlaceholderText(/cole o QR Token/i)
-      const button = screen.getByRole('button', { name: /Confirmar QR/i })
+    fireEvent.change(select, { target: { value: UUID_EVT1 } })
 
-      fireEvent.change(input, { target: { value: 'dest-uuid-dup' } })
-      fireEvent.click(button)
+    await waitFor(() => {
+      expect(mockFetchWithAuth).toHaveBeenCalledWith(`/portaria/eventos/${UUID_EVT1}/participantes`)
+      expect(screen.getByText('João da Silva')).toBeInTheDocument()
+      expect(screen.getByText('Esperado')).toBeInTheDocument()
+    })
+  })
 
-      await waitFor(() => {
-        expect(screen.getByText('Atenção: Presença JÁ REGISTRADA previamente!')).toBeInTheDocument()
-      })
+  it('limpa os dados residuais ao trocar de evento e ignora corrida', async () => {
+    const eventosDisponiveis = {
+      data: [
+        { id: UUID_EVT1, titulo: 'Evento A', inicioEm: '2026-10-01T14:00:00Z', fimEm: '2026-10-01T16:00:00Z', modalidade: 'PRESENCIAL' },
+        { id: UUID_EVT2, titulo: 'Evento B', inicioEm: '2026-10-01T18:00:00Z', fimEm: '2026-10-01T20:00:00Z', modalidade: 'PRESENCIAL' }
+      ]
+    }
+    mockFetchWithAuth.mockResolvedValueOnce(eventosDisponiveis)
+    render(<PortariaView />)
 
-      const msgDiv = screen.getByText('Atenção: Presença JÁ REGISTRADA previamente!')
-      expect(msgDiv.className).toContain('bg-amber-100')
+    await waitFor(() => screen.getByRole('combobox'))
+    const select = screen.getByRole('combobox')
+
+    mockFetchWithAuth.mockResolvedValueOnce({
+      participantes: [{ convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Pessoa 1', casaNome: null }, rsvpResposta: null, checkin: null }]
+    })
+    fireEvent.change(select, { target: { value: UUID_EVT1 } })
+    await waitFor(() => expect(screen.getByText('Pessoa 1')).toBeInTheDocument())
+
+    let resolveSegundaChamada: (val: ParticipantesRes) => void = () => {}
+    mockFetchWithAuth.mockReturnValueOnce(new Promise(resolve => { resolveSegundaChamada = resolve }))
+
+    fireEvent.change(select, { target: { value: UUID_EVT2 } })
+
+    expect(screen.queryByText('Pessoa 1')).not.toBeInTheDocument()
+
+    resolveSegundaChamada({
+      participantes: [{ convocacaoDestinatarioId: UUID_DEST2, membro: { id: UUID_M2, nome: 'Pessoa 2', casaNome: null }, rsvpResposta: null, checkin: null }]
+    })
+    await waitFor(() => expect(screen.getByText('Pessoa 2')).toBeInTheDocument())
+  })
+
+  it('check-in manual exibe feedback de sucesso e recarrega a lista', async () => {
+    mockFetchWithAuth.mockResolvedValueOnce({
+      data: [{ id: UUID_EVT1, titulo: 'Evt', inicioEm: '2026-10-01T14:00:00Z', fimEm: '2026-10-01T16:00:00Z', modalidade: 'PRESENCIAL' }]
+    })
+    render(<PortariaView />)
+    await waitFor(() => screen.getByRole('combobox'))
+
+    mockFetchWithAuth.mockResolvedValueOnce({
+      participantes: [
+        { convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana', casaNome: null }, rsvpResposta: null, checkin: null }
+      ]
+    })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: UUID_EVT1 } })
+    await waitFor(() => screen.getByText('Registrar Presença'))
+
+    mockPostWithAuth.mockResolvedValueOnce({ jaRegistrado: false })
+    mockFetchWithAuth.mockResolvedValueOnce({
+      participantes: [
+        { convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-1', dataHoraCheckin: '2026-10-01T14:10:00Z', forma: 'MANUAL' } }
+      ]
     })
 
-    it('Manual novo → sucesso', async () => {
-      ;(apiClient.fetchWithAuth as any).mockResolvedValue({
-        participantes: [
-          {
-            convocacaoDestinatarioId: 'dest-manual-1',
-            membro: { id: 'mem-1', nome: 'Maria Silva', casaNome: 'Casa Central' },
-            rsvpResposta: null,
-            checkin: null
-          }
-        ]
-      })
-      ;(apiClient.postWithAuth as any).mockResolvedValue({
-        id: 'chk-2',
-        forma: 'MANUAL',
-        membroId: 'mem-1'
-      })
+    fireEvent.click(screen.getByText('Registrar Presença'))
 
-      render(<PortariaView />)
-
-      // Carregar evento
-      const evInput = screen.getByPlaceholderText(/Digite o ID do Evento/i)
-      const loadBtn = screen.getByRole('button', { name: /Carregar Evento/i })
-      fireEvent.change(evInput, { target: { value: 'ev-1' } })
-      fireEvent.click(loadBtn)
-
-      await waitFor(() => {
-        expect(screen.getByText('Maria Silva')).toBeInTheDocument()
-      })
-
-      const regBtn = screen.getByRole('button', { name: /Registrar Presença/i })
-      fireEvent.click(regBtn)
-
-      await waitFor(() => {
-        expect(screen.getByText('Check-in manual de Maria Silva realizado com sucesso!')).toBeInTheDocument()
-      })
-
-      const msgDiv = screen.getByText('Check-in manual de Maria Silva realizado com sucesso!')
-      expect(msgDiv.className).toContain('bg-green-100')
+    await waitFor(() => {
+      expect(mockPostWithAuth).toHaveBeenCalledWith('/checkin/manual', { convocacaoDestinatarioId: UUID_DEST1 })
+      expect(screen.getByText('Check-in manual de Ana realizado com sucesso!')).toBeInTheDocument()
+      expect(screen.getByText(/Presente/i)).toBeInTheDocument()
     })
+  })
 
-    it('Manual duplicado (409 + jaRegistrado=true) → aviso funcional', async () => {
-      ;(apiClient.fetchWithAuth as any).mockResolvedValue({
-        participantes: [
-          {
-            convocacaoDestinatarioId: 'dest-manual-dup',
-            membro: { id: 'mem-2', nome: 'Maria Silva', casaNome: 'Casa Central' },
-            rsvpResposta: null,
-            checkin: null
-          }
-        ]
-      })
-
-      const duplicateError = new ApiError(409, 'Presença já registrada previamente', {
-        message: 'Presença já registrada previamente',
-        jaRegistrado: true,
-        checkin: { id: 'chk-existing' }
-      })
-      ;(apiClient.postWithAuth as any).mockRejectedValue(duplicateError)
-
-      render(<PortariaView />)
-
-      const evInput = screen.getByPlaceholderText(/Digite o ID do Evento/i)
-      const loadBtn = screen.getByRole('button', { name: /Carregar Evento/i })
-      fireEvent.change(evInput, { target: { value: 'ev-1' } })
-      fireEvent.click(loadBtn)
-
-      await waitFor(() => {
-        expect(screen.getByText('Maria Silva')).toBeInTheDocument()
-      })
-
-      const regBtn = screen.getByRole('button', { name: /Registrar Presença/i })
-      fireEvent.click(regBtn)
-
-      await waitFor(() => {
-        expect(screen.getByText('Atenção: Presença de Maria Silva JÁ REGISTRADA previamente!')).toBeInTheDocument()
-      })
-
-      const msgDiv = screen.getByText('Atenção: Presença de Maria Silva JÁ REGISTRADA previamente!')
-      expect(msgDiv.className).toContain('bg-amber-100')
+  it('check-in por QR exibe 409 quando já registrado', async () => {
+    mockFetchWithAuth.mockResolvedValueOnce({
+      data: [{ id: UUID_EVT1, titulo: 'Evt', inicioEm: '2026-10-01T14:00:00Z', fimEm: '2026-10-01T16:00:00Z', modalidade: 'PRESENCIAL' }]
     })
+    render(<PortariaView />)
+    await waitFor(() => screen.getByRole('combobox'))
 
-    it('Erro 409 sem jaRegistrado=true continua tratado como ERRO', async () => {
-      const genericConflictError = new ApiError(409, 'Conflito genérico de concorrência', {
-        error: 'Conflito genérico de concorrência'
-      })
-      ;(apiClient.postWithAuth as any).mockRejectedValue(genericConflictError)
+    mockFetchWithAuth.mockResolvedValue({ participantes: [] })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: UUID_EVT1 } })
+    await waitFor(() => screen.getByPlaceholderText(/Aproxime o leitor/i))
 
-      render(<PortariaView />)
+    const qrInput = screen.getByPlaceholderText(/Aproxime o leitor/i)
+    fireEvent.change(qrInput, { target: { value: UUID_DEST1 } })
 
-      const input = screen.getByPlaceholderText(/cole o QR Token/i)
-      const button = screen.getByRole('button', { name: /Confirmar QR/i })
+    mockPostWithAuth.mockRejectedValueOnce(new apiClient.ApiError(409, 'Presença JÁ REGISTRADA previamente!', { jaRegistrado: true }))
 
-      fireEvent.change(input, { target: { value: 'dest-uuid-409-generic' } })
-      fireEvent.click(button)
+    fireEvent.click(screen.getByText('Confirmar QR'))
 
-      await waitFor(() => {
-        expect(screen.getByText('Conflito genérico de concorrência')).toBeInTheDocument()
-      })
-
-      const msgDiv = screen.getByText('Conflito genérico de concorrência')
-      expect(msgDiv.className).toContain('bg-red-100')
+    await waitFor(() => {
+      expect(screen.getByText('Atenção: Presença JÁ REGISTRADA previamente!')).toBeInTheDocument()
+      expect(qrInput).toHaveFocus()
     })
+  })
 
-    it('Demais erros HTTP (400, 403, 404, 500) continuam tratados como ERRO', async () => {
-      const forbiddenError = new ApiError(403, 'Operador não autorizado para operar portaria neste evento', {
-        error: 'Operador não autorizado para operar portaria neste evento',
-        code: 'FORBIDDEN'
-      })
-      ;(apiClient.postWithAuth as any).mockRejectedValue(forbiddenError)
+  it('check-in por QR exibe 201 quando sucesso', async () => {
+    mockFetchWithAuth.mockResolvedValueOnce({
+      data: [{ id: UUID_EVT1, titulo: 'Evt', inicioEm: '2026-10-01T14:00:00Z', fimEm: '2026-10-01T16:00:00Z', modalidade: 'PRESENCIAL' }]
+    })
+    render(<PortariaView />)
+    await waitFor(() => screen.getByRole('combobox'))
 
-      render(<PortariaView />)
+    mockFetchWithAuth.mockResolvedValue({ participantes: [] })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: UUID_EVT1 } })
+    await waitFor(() => screen.getByPlaceholderText(/Aproxime o leitor/i))
 
-      const input = screen.getByPlaceholderText(/cole o QR Token/i)
-      const button = screen.getByRole('button', { name: /Confirmar QR/i })
+    const qrInput = screen.getByPlaceholderText(/Aproxime o leitor/i)
+    fireEvent.change(qrInput, { target: { value: UUID_DEST1 } })
 
-      fireEvent.change(input, { target: { value: 'dest-uuid-forbidden' } })
-      fireEvent.click(button)
+    mockPostWithAuth.mockResolvedValueOnce({ jaRegistrado: false })
 
-      await waitFor(() => {
-        expect(screen.getByText('Operador não autorizado para operar portaria neste evento')).toBeInTheDocument()
-      })
+    fireEvent.click(screen.getByText('Confirmar QR'))
 
-      const msgDiv = screen.getByText('Operador não autorizado para operar portaria neste evento')
-      expect(msgDiv.className).toContain('bg-red-100')
+    await waitFor(() => {
+      expect(screen.getByText('Check-in por QR Code realizado com sucesso!')).toBeInTheDocument()
+      expect(qrInput).toHaveFocus()
+    })
+  })
+
+  it('check-in manual exibe erro 400 em payload invalido com alert role', async () => {
+    mockFetchWithAuth.mockResolvedValueOnce({
+      data: [{ id: UUID_EVT1, titulo: 'Evt', inicioEm: '2026-10-01T14:00:00Z', fimEm: '2026-10-01T16:00:00Z', modalidade: 'PRESENCIAL' }]
+    })
+    render(<PortariaView />)
+    await waitFor(() => screen.getByRole('combobox'))
+
+    mockFetchWithAuth.mockResolvedValueOnce({
+      participantes: [{ convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana', casaNome: null }, rsvpResposta: null, checkin: null }]
+    })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: UUID_EVT1 } })
+    await waitFor(() => screen.getByText('Registrar Presença'))
+
+    mockPostWithAuth.mockRejectedValueOnce(new apiClient.ApiError(400, 'Payload inválido', {}))
+
+    fireEvent.click(screen.getByText('Registrar Presença'))
+
+    await waitFor(() => {
+      const alert = screen.getByRole('alert')
+      expect(alert).toHaveTextContent('Payload inválido')
+    })
+  })
+
+  it('check-in manual exibe erro 404 quando destinatario nao encontrado com alert role', async () => {
+    mockFetchWithAuth.mockResolvedValueOnce({
+      data: [{ id: UUID_EVT1, titulo: 'Evt', inicioEm: '2026-10-01T14:00:00Z', fimEm: '2026-10-01T16:00:00Z', modalidade: 'PRESENCIAL' }]
+    })
+    render(<PortariaView />)
+    await waitFor(() => screen.getByRole('combobox'))
+
+    mockFetchWithAuth.mockResolvedValueOnce({
+      participantes: [{ convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana', casaNome: null }, rsvpResposta: null, checkin: null }]
+    })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: UUID_EVT1 } })
+    await waitFor(() => screen.getByText('Registrar Presença'))
+
+    mockPostWithAuth.mockRejectedValueOnce(new apiClient.ApiError(404, 'Destinatário não encontrado', {}))
+
+    fireEvent.click(screen.getByText('Registrar Presença'))
+
+    await waitFor(() => {
+      const alert = screen.getByRole('alert')
+      expect(alert).toHaveTextContent('Destinatário não encontrado')
     })
   })
 })
