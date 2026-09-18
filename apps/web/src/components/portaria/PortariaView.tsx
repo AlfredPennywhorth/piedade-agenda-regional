@@ -118,12 +118,12 @@ export function PortariaView() {
         setMensagem({ tipo: 'sucesso', texto: `Check-in por QR Code realizado com sucesso!` })
       }
       setQrTokenInput('')
-      if (eventoIdAtual) carregarParticipantes(eventoIdAtual)
+      if (eventoIdAtual) await carregarParticipantes(eventoIdAtual)
     } catch (err: unknown) {
       if (err instanceof apiClient.ApiError && err.status === 409 && (err.body as CheckinResponse)?.jaRegistrado === true) {
         setMensagem({ tipo: 'aviso', texto: 'Atenção: Presença JÁ REGISTRADA previamente!' })
         setQrTokenInput('')
-        if (eventoIdAtual) carregarParticipantes(eventoIdAtual)
+        if (eventoIdAtual) await carregarParticipantes(eventoIdAtual)
       } else {
         const errorMessage = err instanceof Error ? err.message : 'Falha ao validar QR Code.'
         setMensagem({ tipo: 'erro', texto: errorMessage })
@@ -144,11 +144,11 @@ export function PortariaView() {
       } else {
         setMensagem({ tipo: 'sucesso', texto: `Check-in manual de ${nomeMembro} realizado com sucesso!` })
       }
-      if (eventoIdAtual) carregarParticipantes(eventoIdAtual)
+      if (eventoIdAtual) await carregarParticipantes(eventoIdAtual)
     } catch (err: unknown) {
       if (err instanceof apiClient.ApiError && err.status === 409 && (err.body as CheckinResponse)?.jaRegistrado === true) {
         setMensagem({ tipo: 'aviso', texto: `Atenção: Presença de ${nomeMembro} JÁ REGISTRADA previamente!` })
-        if (eventoIdAtual) carregarParticipantes(eventoIdAtual)
+        if (eventoIdAtual) await carregarParticipantes(eventoIdAtual)
       } else {
         const errorMessage = err instanceof Error ? err.message : 'Falha ao registrar check-in manual.'
         setMensagem({ tipo: 'erro', texto: errorMessage })
