@@ -566,15 +566,16 @@ export const checkins = sqliteTable(
       .notNull()
       .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
     forma: text('forma').notNull(), // QR, MANUAL
+    status: text('status').notNull().default('ATIVO'),
     operadorMembroId: text('operador_membro_id').references(() => membros.id),
     ...timestampsS02,
   },
   table => ({
     checkForma: check('check_checkin_forma', sql`${table.forma} IN ('QR', 'MANUAL')`),
-    uniqueEventoMembro: uniqueIndex('idx_checkin_evento_membro_unico').on(
-      table.eventoId,
-      table.membroId
-    ),
+    checkStatus: check('check_checkin_status', sql`${table.status} IN ('ATIVO', 'RETIFICADO')`),
+    uniqueEventoMembro: uniqueIndex('idx_checkin_evento_membro_unico')
+      .on(table.eventoId, table.membroId)
+      .where(sql`${table.status} = 'ATIVO'`),
     idxDestinatario: index('idx_checkin_destinatario').on(table.convocacaoDestinatarioId),
     idxMembro: index('idx_checkin_membro').on(table.membroId),
   })
