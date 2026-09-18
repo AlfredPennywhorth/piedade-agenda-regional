@@ -75,10 +75,10 @@ export function PortariaView() {
   }, [])
 
   useEffect(() => {
-    if (eventoIdAtual) {
+    if (eventoIdAtual && !loading) {
       qrInputRef.current?.focus()
     }
-  }, [eventoIdAtual])
+  }, [eventoIdAtual, loading])
 
   const carregarParticipantes = async (evId: string) => {
     setLoading(true)
