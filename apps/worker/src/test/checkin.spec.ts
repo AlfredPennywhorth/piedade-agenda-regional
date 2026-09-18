@@ -4,7 +4,7 @@ import { setupDb } from './setup'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { eq } from 'drizzle-orm'
 import Database from 'better-sqlite3'
-import { regionais, administracoes, setores, casas, membros, funcoes, vinculosFuncionais, locais, eventos, convocacoes, convocacaoDestinatarios, sessoes, rsvp } from '../db/schema'
+import { regionais, administracoes, setores, casas, membros, funcoes, vinculosFuncionais, locais, eventos, convocacoes, convocacaoDestinatarios, sessoes, rsvp, checkins, auditoriaLogs } from '../db/schema'
 import { hashToken } from '../security/tokens'
 
 describe('S11 - Portaria e Check-in', () => {
@@ -473,7 +473,7 @@ describe('S11 - Portaria e Check-in', () => {
 
     it('operador autorizado vê somente evento do seu escopo; evento fora da data e inativo não aparecem; data ausente usa SP', async () => {
       const ctx = await setupBaseData()
-      
+
       const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' })
       const hojeSp = formatter.format(new Date())
 
@@ -526,7 +526,7 @@ describe('S11 - Portaria e Check-in', () => {
       expect(ids).toContain(evHojeDentroId) // Vê do seu escopo
       expect(ids).not.toContain(evHojeForaId) // Não vê escopo alheio
       expect(ids).not.toContain(evHojeInativoId) // Não vê inativos
-      
+
       // Resposta contém apenas os campos do DTO
       const ev = json.data.find((e: PortariaEventoItem) => e.id === evHojeDentroId)
       expect(ev).toBeDefined()
@@ -537,7 +537,7 @@ describe('S11 - Portaria e Check-in', () => {
 
     it('operador não autorizado não vê evento e recebe data: []', async () => {
       const ctx = await setupBaseData()
-      
+
       const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' })
       const hojeSp = formatter.format(new Date())
 
@@ -564,7 +564,7 @@ describe('S11 - Portaria e Check-in', () => {
 
     it('filtro por `data` funciona', async () => {
       const ctx = await setupBaseData()
-      
+
       const dataAlvo = '2030-05-15'
 
       const evFuturoId = crypto.randomUUID()
@@ -586,8 +586,222 @@ describe('S11 - Portaria e Check-in', () => {
       expect(res.status).toBe(200)
       const json = await res.json()
       const ids = json.data.map((e: PortariaEventoItem) => e.id)
-      
+
       expect(ids).toContain(evFuturoId)
+    })
+  })
+  describe('POST /api/v1/checkin/:checkinId/retificar', () => {
+    type LocalAuditLog = { acao: string; contexto: Record<string, unknown> | null }
+    type LocalParticipante = { convocacaoDestinatarioId: string; checkin: unknown }
+    it('Deve retornar 400 para payload inválido', async () => {
+      const ctx = await setupBaseData()
+      const checkinId = crypto.randomUUID()
+      const res = await app.request(`/api/v1/checkin/${checkinId}/retificar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${ctx.tokenOperador}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ motivo: 'curt' }) // < 5 caracteres
+      })
+      expect(res.status).toBe(400)
+    })
+
+    it('Deve retornar 404 para check-in inexistente', async () => {
+      const ctx = await setupBaseData()
+      const checkinId = crypto.randomUUID()
+      const res = await app.request(`/api/v1/checkin/${checkinId}/retificar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${ctx.tokenOperador}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ motivo: 'Erro operacional de leitura do QR code' })
+      })
+      expect(res.status).toBe(404)
+    })
+
+    it('Deve retornar 403 para operador sem escopo na retificação', async () => {
+      const ctx = await setupBaseData()
+
+      // Cria o check-in primeiro com operador autorizado
+      const resCheckin = await app.request('/api/v1/checkin/qr', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${ctx.tokenOperador}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ qrToken: ctx.dest1Id })
+      })
+      expect(resCheckin.status).toBe(201)
+      const checkinData = await resCheckin.json()
+
+      // Tenta retificar com operador de outro escopo
+      const res = await app.request(`/api/v1/checkin/${checkinData.id}/retificar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${ctx.tokenOperadorOutro}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ motivo: 'Erro operacional de leitura' })
+      })
+      expect(res.status).toBe(403)
+    })
+
+    it('Deve retornar 200, gravar status RETIFICADO e auditar com contexto limitado', async () => {
+      const ctx = await setupBaseData()
+
+      const resCheckin = await app.request('/api/v1/checkin/qr', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${ctx.tokenOperador}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ qrToken: ctx.dest1Id })
+      })
+      const checkinData = await resCheckin.json()
+
+      const res = await app.request(`/api/v1/checkin/${checkinData.id}/retificar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${ctx.tokenOperador}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ motivo: 'Erro de leitura do QR, batido duas vezes' })
+      })
+      expect(res.status).toBe(200)
+
+      // Verifica status retificado
+      const chkDb = await db.select().from(checkins).where(eq(checkins.id, checkinData.id)).get()
+      expect(chkDb.status).toBe('RETIFICADO')
+
+      // Verifica auditoria
+      const audit = await db.select().from(auditoriaLogs).where(eq(auditoriaLogs.recursoId, checkinData.id)).all()
+      // Tem 2 logs: CHECKIN_QR e CHECKIN_RETIFICADO
+      const retifLog = audit.find((a: LocalAuditLog) => a.acao === 'CHECKIN_RETIFICADO')
+      expect(retifLog).toBeDefined()
+      expect(retifLog.contexto).toHaveProperty('motivo', 'Erro de leitura do QR, batido duas vezes')
+      expect(retifLog.contexto).toHaveProperty('formaOriginal', 'QR')
+      expect(retifLog.contexto).toHaveProperty('dataHoraCheckinOriginal')
+    })
+
+    it('Deve retornar 409 em retificação sequencial sem gerar segundo log de auditoria', async () => {
+      const ctx = await setupBaseData()
+
+      const resCheckin = await app.request('/api/v1/checkin/qr', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${ctx.tokenOperador}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ qrToken: ctx.dest1Id })
+      })
+      const checkinData = await resCheckin.json()
+
+      // Primeira retificacao
+      await app.request(`/api/v1/checkin/${checkinData.id}/retificar`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ctx.tokenOperador}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motivo: 'Erro operacional' })
+      })
+
+      // Segunda retificacao (sequencial)
+      const res2 = await app.request(`/api/v1/checkin/${checkinData.id}/retificar`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ctx.tokenOperador}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motivo: 'Outro motivo' })
+      })
+      expect(res2.status).toBe(409)
+
+      // Verifica se houve apenas 1 log de RETIFICADO
+      const audit = await db.select().from(auditoriaLogs).where(eq(auditoriaLogs.recursoId, checkinData.id)).all()
+      const retifLogs = audit.filter((a: LocalAuditLog) => a.acao === 'CHECKIN_RETIFICADO')
+      expect(retifLogs.length).toBe(1)
+    })
+
+    it('Deve lidar com duas chamadas simultâneas (concorrência OCC): exato um 200, um 409 e uma auditoria', async () => {
+      const ctx = await setupBaseData()
+
+      const resCheckin = await app.request('/api/v1/checkin/qr', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ctx.tokenOperador}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrToken: ctx.dest1Id })
+      })
+      const checkinData = await resCheckin.json()
+
+      // Chamadas simultaneas
+      const req1 = app.request(`/api/v1/checkin/${checkinData.id}/retificar`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ctx.tokenOperador}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motivo: 'Erro concorrente 1' })
+      })
+      const req2 = app.request(`/api/v1/checkin/${checkinData.id}/retificar`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ctx.tokenOperador}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motivo: 'Erro concorrente 2' })
+      })
+
+      const [res1, res2] = await Promise.all([req1, req2])
+
+      const statuses = [res1.status, res2.status]
+      expect(statuses).toContain(200)
+      expect(statuses).toContain(409)
+
+      const audit = await db.select().from(auditoriaLogs).where(eq(auditoriaLogs.recursoId, checkinData.id)).all()
+      const retifLogs = audit.filter((a: LocalAuditLog) => a.acao === 'CHECKIN_RETIFICADO')
+      expect(retifLogs.length).toBe(1)
+    })
+
+    it('Deve apresentar o participante como pendente na Portaria e aceitar novo check-in QR com 201', async () => {
+      const ctx = await setupBaseData()
+
+      const dataAlvo = new Date().toISOString().split('T')[0]
+      const evHibridoId = crypto.randomUUID()
+      await db.insert(eventos).values({
+        id: evHibridoId,
+        titulo: 'Evento Híbrido S11',
+        modalidade: 'HIBRIDO',
+        inicioEm: `${dataAlvo}T08:00:00Z`,
+        fimEm: `${dataAlvo}T18:00:00Z`,
+        setorId: ctx.setId,
+        ativo: true
+      })
+
+      // Associa a convocação e destinatário a este evento para aparecer na Portaria
+      await db.update(convocacoes).set({ eventoId: evHibridoId }).where(eq(convocacoes.id, ctx.convId))
+
+      // Check-in inicial
+      const resCheckin = await app.request('/api/v1/checkin/qr', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ctx.tokenOperador}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrToken: ctx.dest1Id })
+      })
+      const checkinData = await resCheckin.json()
+
+      // Retifica
+      await app.request(`/api/v1/checkin/${checkinData.id}/retificar`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ctx.tokenOperador}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motivo: 'Erro operacional' })
+      })
+
+      // Verifica Portaria (participante deve estar pendente = checkin null)
+      const resPortaria = await app.request(`/api/v1/portaria/eventos/${evHibridoId}/participantes`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${ctx.tokenOperador}` }
+      })
+      const portariaJson = await resPortaria.json()
+      const participante = portariaJson.participantes.find((p: LocalParticipante) => p.convocacaoDestinatarioId === ctx.dest1Id)
+      expect(participante).toBeDefined()
+      expect(participante.checkin).toBeNull()
+
+      // Novo check-in QR
+      const resNovoCheckin = await app.request('/api/v1/checkin/qr', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ctx.tokenOperador}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrToken: ctx.dest1Id })
+      })
+      expect(resNovoCheckin.status).toBe(201)
     })
   })
 })

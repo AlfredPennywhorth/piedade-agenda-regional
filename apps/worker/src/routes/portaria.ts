@@ -122,7 +122,8 @@ portariaRouter.get('/eventos/:eventoId/participantes', async (c) => {
       checkins,
       and(
         eq(checkins.eventoId, eventoId),
-        eq(checkins.membroId, membros.id)
+        eq(checkins.membroId, membros.id),
+        eq(checkins.status, 'ATIVO')
       )
     )
     .where(
