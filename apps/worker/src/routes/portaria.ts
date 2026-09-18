@@ -67,11 +67,12 @@ portariaRouter.get('/eventos', async (c) => {
     authorizedEvents.sort((a, b) => a.inicioEm.localeCompare(b.inicioEm))
 
     return c.json({ data: authorizedEvents }, 200)
-  } catch (err: any) {
-    if (err.issues) {
-      return c.json({ error: 'Payload inválido', details: err.issues }, 400)
+  } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'issues' in err) {
+      return c.json({ error: 'Payload inválido', details: (err as { issues: unknown }).issues }, 400)
     }
-    return c.json({ error: err.message || 'Erro ao carregar eventos da portaria' }, 400)
+    const message = err instanceof Error ? err.message : 'Erro ao carregar eventos da portaria'
+    return c.json({ error: message }, 400)
   }
 })
 
