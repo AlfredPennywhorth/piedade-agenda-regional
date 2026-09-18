@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import * as apiClient from '../../api/apiClient'
-import { PortariaEventosResponseSchema } from '@piedade/shared'
+import { PortariaEventosResponseSchema, RetificarCheckinSchema } from '@piedade/shared'
 
 interface Participante {
   convocacaoDestinatarioId: string
@@ -40,8 +40,9 @@ export function PortariaView() {
   const [qrTokenInput, setQrTokenInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [mensagem, setMensagem] = useState<{ tipo: 'sucesso' | 'aviso' | 'erro'; texto: string } | null>(null)
-  
+
   const [ultimoCheckinId, setUltimoCheckinId] = useState<string | null>(null)
+  const [modalRetificacao, setModalRetificacao] = useState<{isOpen: boolean; checkinId: string; participanteNome: string; motivo: string; error: string | null; isSubmitting: boolean} | null>(null)
 
   const qrInputRef = useRef<HTMLInputElement>(null)
   const currentEvIdRef = useRef('')
@@ -68,7 +69,7 @@ export function PortariaView() {
       }
     }
     carregarEventos()
-    return () => { 
+    return () => {
       mounted = false
       if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
     }
@@ -108,7 +109,7 @@ export function PortariaView() {
     setMensagem(null)
     setUltimoCheckinId(null)
     if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
-    
+
     if (evId) {
       carregarParticipantes(evId)
     }
@@ -204,6 +205,47 @@ export function PortariaView() {
     if (aCheck === bCheck) return 0
     return aCheck ? 1 : -1
   })
+
+
+  const handleCloseModal = () => {
+    setModalRetificacao(null)
+    setTimeout(() => {
+      if (!loading && eventoIdAtual) {
+        qrInputRef.current?.focus()
+      }
+    }, 10)
+  }
+
+  const handleRetificarSubmit = async () => {
+    if (!modalRetificacao) return
+
+    const result = RetificarCheckinSchema.safeParse({ motivo: modalRetificacao.motivo })
+    if (!result.success) {
+      setModalRetificacao(prev => prev ? { ...prev, error: 'O motivo deve ter entre 5 e 100 caracteres válidos.' } : null)
+      return
+    }
+
+    setModalRetificacao(prev => prev ? { ...prev, isSubmitting: true, error: null } : null)
+
+    try {
+      await apiClient.postWithAuth(`/checkin/${modalRetificacao.checkinId}/retificar`, { motivo: result.data.motivo })
+
+      setMensagem({ tipo: 'sucesso', texto: 'Check-in retificado com sucesso.' })
+      setUltimoCheckinId(null)
+      if (eventoIdAtual) {
+        await carregarParticipantes(eventoIdAtual)
+      }
+      handleCloseModal()
+    } catch (err: unknown) {
+      let errorMsg = 'Erro inesperado ao retificar check-in.'
+      if (err instanceof apiClient.ApiError) {
+        if (err.status === 403) errorMsg = 'Sem autorização para retificar neste evento.'
+        else if (err.status === 404) errorMsg = 'Check-in não encontrado.'
+        else if (err.status === 409) errorMsg = 'Check-in já foi retificado por outra operação.'
+      }
+      setModalRetificacao(prev => prev ? { ...prev, isSubmitting: false, error: errorMsg } : null)
+    }
+  }
 
   const totalEsperado = participantes.length
   const presentes = participantes.filter(p => p.checkin !== null).length
@@ -318,7 +360,7 @@ export function PortariaView() {
               participantesOrdenados.map((p) => {
                 const rsvp = getRsvpLabel(p.rsvpResposta)
                 const isHighlight = ultimoCheckinId === p.convocacaoDestinatarioId
-                
+
                 return (
                   <div
                     key={p.membro.id}
@@ -347,12 +389,28 @@ export function PortariaView() {
                       </div>
                     </div>
 
-                    <div className="mt-2 sm:mt-0">
-                      {p.checkin ? (
-                        <span className="inline-block px-4 py-2 bg-green-600 text-white text-xs font-bold rounded-lg shadow-sm">
-                          ✓ Confirmado
-                        </span>
-                      ) : (
+                                          <div className="mt-2 sm:mt-0 flex flex-col gap-2 items-end">
+                        {p.checkin ? (
+                          <>
+                            <span className="inline-block px-4 py-2 bg-green-600 text-white text-xs font-bold rounded-lg shadow-sm">
+                              Confirmado
+                            </span>
+                            <button
+                              onClick={() => setModalRetificacao({
+                                isOpen: true,
+                                checkinId: p.checkin!.id,
+                                participanteNome: p.membro.nome,
+                                motivo: '',
+                                error: null,
+                                isSubmitting: false
+                              })}
+                              disabled={loading}
+                              className="text-xs font-medium text-slate-500 hover:text-slate-700 underline"
+                            >
+                              Retificar check-in
+                            </button>
+                          </>
+                        ) : (
                         <button
                           onClick={() => handleCheckinManual(p.convocacaoDestinatarioId, p.membro.nome)}
                           disabled={loading}
@@ -366,6 +424,63 @@ export function PortariaView() {
                 )
               })
             )}
+          </div>
+        </div>
+      )}
+
+      {modalRetificacao && modalRetificacao.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="modal-retificar-title" className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden">
+            <div className="p-6 space-y-4">
+              <h2 id="modal-retificar-title" className="text-lg font-semibold text-slate-900">
+                Retificar Check-in
+              </h2>
+              <p className="text-sm text-slate-600">
+                Participante: <span className="font-medium text-slate-800">{modalRetificacao.participanteNome}</span>
+              </p>
+
+              {modalRetificacao.error && (
+                <div role="alert" className="p-3 bg-red-100 border border-red-300 text-red-900 text-sm rounded-lg">
+                  {modalRetificacao.error}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label htmlFor="motivo-retificacao" className="block text-sm font-medium text-slate-700">
+                  Motivo da retificação
+                </label>
+                <textarea
+                  id="motivo-retificacao"
+                  autoFocus
+                  rows={3}
+                  disabled={modalRetificacao.isSubmitting}
+                  className="w-full p-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                  placeholder="Ex: Erro operacional..."
+                  value={modalRetificacao.motivo}
+                  onChange={e => setModalRetificacao(prev => prev ? { ...prev, motivo: e.target.value, error: null } : null)}
+                />
+                <p className="text-xs text-amber-700 font-medium bg-amber-50 p-2 rounded border border-amber-200">
+                  Descreva apenas o erro operacional. Não informe dados pessoais ou sensíveis.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-100">
+              <button
+                onClick={handleCloseModal}
+                disabled={modalRetificacao.isSubmitting}
+                className="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 bg-slate-100 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleRetificarSubmit}
+                disabled={modalRetificacao.isSubmitting}
+                className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {modalRetificacao.isSubmitting ? 'Confirmando...' : 'Confirmar retificação'}
+              </button>
+            </div>
           </div>
         </div>
       )}

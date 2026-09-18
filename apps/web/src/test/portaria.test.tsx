@@ -59,9 +59,9 @@ describe('PortariaView', () => {
   it('renderiza empty state quando não há eventos autorizados', async () => {
     mockFetchWithAuth.mockResolvedValueOnce({ data: [] })
     render(<PortariaView />)
-    
+
     expect(screen.getByText(/Carregando eventos autorizados/i)).toBeInTheDocument()
-    
+
     await waitFor(() => {
       expect(screen.getByText('Nenhum evento ativo com autorização de operação encontrado para hoje')).toBeInTheDocument()
     })
@@ -89,7 +89,7 @@ describe('PortariaView', () => {
     })
 
     const select = screen.getByRole('combobox')
-    
+
     const participantesFake: ParticipantesRes = {
       participantes: [
         {
@@ -178,10 +178,10 @@ describe('PortariaView', () => {
     expect(row.className).toContain('ring-2')
 
     act(() => { vi.advanceTimersByTime(5100) })
-    
+
     expect(row.className).not.toContain('bg-brand-50')
     expect(row.className).toContain('bg-green-50')
-    
+
     vi.useRealTimers()
 
     mockFetchWithAuth.mockResolvedValueOnce({
@@ -222,7 +222,7 @@ describe('PortariaView', () => {
         { convocacaoDestinatarioId: UUID_DEST2, membro: { id: UUID_M2, nome: 'Beto', casaNome: null }, rsvpResposta: null, checkin: null }
       ]
     })
-    
+
     const btns = screen.getAllByText('Registrar Presença')
     fireEvent.click(btns[0])
 
@@ -240,7 +240,7 @@ describe('PortariaView', () => {
         { convocacaoDestinatarioId: UUID_DEST2, membro: { id: UUID_M2, nome: 'Beto', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-2', dataHoraCheckin: '2026-10-01T14:10:02Z', forma: 'MANUAL' } }
       ]
     })
-    
+
     const btnsBeto = screen.getAllByText('Registrar Presença')
     fireEvent.click(btnsBeto[0])
 
@@ -336,7 +336,7 @@ describe('PortariaView', () => {
     fireEvent.change(qrInput, { target: { value: 'token-qr-123' } })
 
     mockPostWithAuth.mockResolvedValueOnce({ jaRegistrado: false, convocacaoDestinatarioId: UUID_DEST1 })
-    
+
     mockFetchWithAuth.mockResolvedValueOnce({
       participantes: [{ convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Ana QR', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-qr', dataHoraCheckin: '2026-10-01T14:15:00Z', forma: 'QR' } }]
     })
@@ -402,4 +402,200 @@ describe('PortariaView', () => {
       expect(alert).toHaveTextContent('Destinatário não encontrado')
     })
   })
+    const getMockParticipantes = () => ({
+      participantes: [
+        {
+          convocacaoDestinatarioId: 'dest1',
+          membro: { id: 'm1', nome: 'João Ativo', casaNome: 'Casa 1' },
+          rsvpResposta: 'CONFIRMADO',
+          checkin: { id: 'chk1', dataHoraCheckin: '2026-09-18T10:00:00Z', forma: 'QR' }
+        },
+        {
+          convocacaoDestinatarioId: 'dest2',
+          membro: { id: 'm2', nome: 'Maria Pendente', casaNome: 'Casa 1' },
+          rsvpResposta: 'CONFIRMADO',
+          checkin: null
+        }
+      ]
+    })
+
+    const mockEventos = { data: [{ id: '11111111-1111-1111-1111-111111111111', titulo: 'Evento de Teste', inicioEm: '2026-09-18T10:00:00Z', fimEm: '2026-09-18T12:00:00Z', modalidade: 'PRESENCIAL' }] }
+
+    describe('Retificação de Check-in', () => {
+      it('exibe o botão Retificar check-in somente para participante com checkin ativo', async () => {
+        mockFetchWithAuth.mockImplementation(async (url) => {
+          if (url.includes('/eventos/11111111-1111-1111-1111-111111111111/participantes')) return getMockParticipantes()
+          return mockEventos
+        })
+        render(<PortariaView />)
+        await flushPromises()
+        fireEvent.change(screen.getByRole('combobox'), { target: { value: '11111111-1111-1111-1111-111111111111' } })
+        await flushPromises()
+
+        const cards = screen.getAllByTestId(/row-/)
+        expect(cards[1]).toHaveTextContent('Retificar check-in')
+        expect(cards[0]).not.toHaveTextContent('Retificar check-in')
+        expect(cards[0]).toHaveTextContent('Registrar Presença')
+      })
+
+      it('abre modal de retificação, mostra aviso LGPD e foca o textarea, cancela sem POST', async () => {
+        mockFetchWithAuth.mockImplementation(async (url) => {
+          if (url.includes('/eventos/11111111-1111-1111-1111-111111111111/participantes')) return getMockParticipantes()
+          return mockEventos
+        })
+        render(<PortariaView />)
+        await flushPromises()
+        fireEvent.change(screen.getByRole('combobox'), { target: { value: '11111111-1111-1111-1111-111111111111' } })
+        await flushPromises()
+
+        fireEvent.click(screen.getByText('Retificar check-in'))
+
+        const dialog = screen.getByRole('dialog')
+        expect(dialog).toBeInTheDocument()
+        expect(screen.getAllByText(/João Ativo/).length).toBeGreaterThan(0)
+        expect(screen.getByText(/Descreva apenas o erro operacional. Não informe dados pessoais ou sensíveis./)).toBeInTheDocument()
+
+        const textarea = screen.getByLabelText(/Motivo da retificação/)
+        await waitFor(() => expect(textarea).toHaveFocus())
+
+        // Cancelar
+        fireEvent.click(screen.getByText('Cancelar'))
+
+        await waitFor(() => {
+          expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        })
+        expect(mockPostWithAuth).not.toHaveBeenCalled()
+
+        const qrInput = screen.getByPlaceholderText(/Aproxime o leitor/i)
+        await waitFor(() => expect(qrInput).toHaveFocus())
+      })
+
+      it('impede submissão de motivo inválido exibindo alert local sem disparar POST', async () => {
+        mockFetchWithAuth.mockImplementation(async (url) => {
+          if (url.includes('/eventos/11111111-1111-1111-1111-111111111111/participantes')) return getMockParticipantes()
+          return mockEventos
+        })
+        render(<PortariaView />)
+        await flushPromises()
+        fireEvent.change(screen.getByRole('combobox'), { target: { value: '11111111-1111-1111-1111-111111111111' } })
+        await flushPromises()
+
+        fireEvent.click(screen.getByText('Retificar check-in'))
+        fireEvent.change(screen.getByLabelText(/Motivo da retificação/), { target: { value: 'abc' } }) // < 5 caracteres
+        fireEvent.click(screen.getByText('Confirmar retificação'))
+
+        await waitFor(() => {
+          expect(screen.getByText(/O motivo deve ter entre 5 e 100 caracteres válidos/i)).toBeInTheDocument()
+        })
+        expect(mockPostWithAuth).not.toHaveBeenCalled()
+      })
+
+      it('sucesso no POST, recarrega participantes, fecha modal e mostra toast global', async () => {
+        let isFirstCall = true
+        mockFetchWithAuth.mockImplementation(async (url) => {
+          if (url.includes('/eventos/11111111-1111-1111-1111-111111111111/participantes')) {
+            if (isFirstCall) {
+              isFirstCall = false
+              return getMockParticipantes()
+            }
+            // Na segunda chamada o participante volta a pendente
+            return {
+              participantes: [
+                { ...getMockParticipantes().participantes[0], checkin: null },
+                getMockParticipantes().participantes[1]
+              ]
+            }
+          }
+          return mockEventos
+        })
+        mockPostWithAuth.mockResolvedValueOnce({ success: true })
+
+        render(<PortariaView />)
+        await flushPromises()
+        fireEvent.change(screen.getByRole('combobox'), { target: { value: '11111111-1111-1111-1111-111111111111' } })
+        await flushPromises()
+
+        fireEvent.click(screen.getByText('Retificar check-in'))
+        fireEvent.change(screen.getByLabelText(/Motivo da retificação/), { target: { value: 'Duplo clique no QR' } })
+        fireEvent.click(screen.getByText('Confirmar retificação'))
+
+        await flushPromises()
+
+        expect(mockPostWithAuth).toHaveBeenCalledWith('/checkin/chk1/retificar', { motivo: 'Duplo clique no QR' })
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        expect(screen.getByRole('alert')).toHaveTextContent(/Check-in retificado com sucesso/)
+
+        const cards = screen.getAllByTestId(/row-/)
+        expect(cards[0]).toHaveTextContent('Registrar Presença')
+
+        const qrInput = screen.getByPlaceholderText(/Aproxime o leitor/i)
+        await waitFor(() => expect(qrInput).toHaveFocus())
+      })
+
+      it('mantém loading impedindo duplo clique e mostra mensagem do ApiError ao receber erro (ex: 409)', async () => {
+        mockFetchWithAuth.mockImplementation(async (url) => {
+          if (url.includes('/eventos/11111111-1111-1111-1111-111111111111/participantes')) return getMockParticipantes()
+          return mockEventos
+        })
+
+        let rejectPost: ((reason?: unknown) => void) | undefined;
+        const postPromise = new Promise((_, reject) => rejectPost = reject)
+        mockPostWithAuth.mockImplementationOnce(() => postPromise)
+
+        render(<PortariaView />)
+        await flushPromises()
+        fireEvent.change(screen.getByRole('combobox'), { target: { value: '11111111-1111-1111-1111-111111111111' } })
+        await flushPromises()
+
+        fireEvent.click(screen.getByText('Retificar check-in'))
+        fireEvent.change(screen.getByLabelText(/Motivo da retificação/), { target: { value: 'Duplo clique no QR' } })
+
+        const btnConfirmar = screen.getByText('Confirmar retificação')
+        fireEvent.click(btnConfirmar)
+
+        await waitFor(() => {
+          expect(screen.getByText('Confirmando...')).toBeDisabled()
+        })
+        expect(screen.getByText('Cancelar')).toBeDisabled()
+
+        // Simula rejeição 409
+        if (!rejectPost) throw new Error('rejectPost n�o inicializado');
+        rejectPost(new apiClient.ApiError(409, 'Conflict', {}))
+        await flushPromises()
+
+        expect(screen.getByRole('dialog')).toBeInTheDocument()
+        const alert = screen.getByRole('alert')
+        expect(alert).toHaveTextContent(/Check-in já foi retificado por outra operação/)
+      })
+
+      it('trata erros 403 e 404', async () => {
+        mockFetchWithAuth.mockImplementation(async (url) => {
+          if (url.includes('/eventos/11111111-1111-1111-1111-111111111111/participantes')) return getMockParticipantes()
+          return mockEventos
+        })
+
+        mockPostWithAuth.mockRejectedValueOnce(new apiClient.ApiError(403, 'Forbidden', {}))
+
+        render(<PortariaView />)
+        await flushPromises()
+        fireEvent.change(screen.getByRole('combobox'), { target: { value: '11111111-1111-1111-1111-111111111111' } })
+        await flushPromises()
+
+        fireEvent.click(screen.getByText('Retificar check-in'))
+        fireEvent.change(screen.getByLabelText(/Motivo da retificação/), { target: { value: 'Valido motivo' } })
+        fireEvent.click(screen.getByText('Confirmar retificação'))
+        await flushPromises()
+
+        expect(screen.getByRole('alert')).toHaveTextContent(/Sem autorização para retificar neste evento/)
+
+        // Tenta de novo e forja um 404
+        mockPostWithAuth.mockRejectedValueOnce(new apiClient.ApiError(404, 'Not Found', {}))
+        fireEvent.change(screen.getByLabelText(/Motivo da retificação/), { target: { value: 'Valido 2' } })
+        fireEvent.click(screen.getByText('Confirmar retificação'))
+        await flushPromises()
+
+        expect(screen.getByRole('alert')).toHaveTextContent(/Check-in n.*o encontrado/)
+      })
+    })
+
 })
