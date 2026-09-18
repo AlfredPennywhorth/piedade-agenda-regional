@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, sql } from 'drizzle-orm'
 import { checkins, convocacaoDestinatarios, convocacoes, eventos } from '../db/schema'
-import { CheckinQrSchema, CheckinManualSchema } from '@piedade/shared'
+import { CheckinQrSchema, CheckinManualSchema, RetificarCheckinSchema } from '@piedade/shared'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eOperadorPortariaAutorizado } from '../security/permissoes'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
@@ -213,6 +213,88 @@ checkinRouter.post('/manual', async (c) => {
   }
 })
 
+// POST /api/v1/checkin/:checkinId/retificar
+checkinRouter.post('/:checkinId/retificar', async (c) => {
+  const db = c.get('db')
+  const membroSessaoId = c.get('membroId')
+  const checkinId = c.req.param('checkinId')
+
+  if (!db || !membroSessaoId) {
+    return c.json({ error: 'Sessǜo ou banco indisponvel', code: 'INTERNAL_ERROR' }, 500)
+  }
+
+  try {
+    const body = await c.req.json()
+    const parsed = RetificarCheckinSchema.parse(body)
+
+    const checkin = await db
+      .select()
+      .from(checkins)
+      .where(eq(checkins.id, checkinId))
+      .get()
+
+    if (!checkin) {
+      return c.json({ error: 'Check-in não encontrado', code: 'NOT_FOUND' }, 404)
+    }
+
+    if (checkin.status === 'RETIFICADO') {
+      return c.json({ error: 'Check-in já retificado', code: 'CONFLICT' }, 409)
+    }
+
+    const evento = await db
+      .select()
+      .from(eventos)
+      .where(eq(eventos.id, checkin.eventoId))
+      .get()
+
+    if (!evento) {
+      return c.json({ error: 'Evento não encontrado', code: 'NOT_FOUND' }, 404)
+    }
+
+    const autorizado = await eOperadorPortariaAutorizado(db, membroSessaoId, evento)
+    if (!autorizado) {
+      return c.json({ error: 'Operador não autorizado para operar portaria neste evento', code: 'FORBIDDEN' }, 403)
+    }
+
+    const nowIso = new Date().toISOString()
+    const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [
+        qdb.update(checkins)
+          .set({
+            status: sql`CASE WHEN ${checkins.status} = 'ATIVO' THEN 'RETIFICADO' ELSE 'ABORT_OCC' END`,
+            updatedAt: nowIso
+          })
+          .where(eq(checkins.id, checkinId))
+      ],
+      {
+        acao: 'CHECKIN_RETIFICADO',
+        atorMembroId: membroSessaoId,
+        recursoTipo: 'CHECKIN',
+        recursoId: checkinId,
+        escopoTipo,
+        escopoId,
+        contexto: {
+          motivo: parsed.motivo,
+          formaOriginal: checkin.forma,
+          dataHoraCheckinOriginal: checkin.dataHoraCheckin
+        }
+      }
+    )
+
+    return c.json({ success: true, message: 'Check-in retificado com sucesso' }, 200)
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message.includes('check_checkin_status')) {
+      return c.json({ error: 'Conflito: o check-in já foi retificado por outra operação.', code: 'CONFLICT' }, 409)
+    }
+    if (err && typeof err === 'object' && 'issues' in err) {
+      return c.json({ error: 'Payload inválido', details: (err as { issues: unknown }).issues }, 400)
+    }
+    return c.json({ error: err instanceof Error ? err.message : 'Erro ao retificar check-in' }, 400)
+  }
+})
 
 // GET /api/v1/checkin/destinatarios/:destinatarioId/presenca
 checkinRouter.get('/destinatarios/:destinatarioId/presenca', async (c) => {
