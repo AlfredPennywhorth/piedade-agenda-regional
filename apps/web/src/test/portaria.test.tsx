@@ -538,8 +538,8 @@ describe('PortariaView', () => {
           return mockEventos
         })
 
-        let resolvePost;
-        const postPromise = new Promise(resolve => resolvePost = resolve)
+        let rejectPost: ((reason?: unknown) => void) | undefined;
+        const postPromise = new Promise((_, reject) => rejectPost = reject)
         mockPostWithAuth.mockImplementationOnce(() => postPromise)
 
         render(<PortariaView />)
@@ -559,7 +559,8 @@ describe('PortariaView', () => {
         expect(screen.getByText('Cancelar')).toBeDisabled()
 
         // Simula rejeição 409
-        resolvePost(Promise.reject(new apiClient.ApiError(409, 'Conflict', {})))
+        if (!rejectPost) throw new Error('rejectPost n�o inicializado');
+        rejectPost(new apiClient.ApiError(409, 'Conflict', {}))
         await flushPromises()
 
         expect(screen.getByRole('dialog')).toBeInTheDocument()
