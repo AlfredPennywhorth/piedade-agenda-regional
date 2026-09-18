@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { ConvocacaoCreate, ConvocacaoUpdate, ConvocacaoCreatePayload, ConvocacaoUpdatePayload, Convocacao } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import { ConvocacaoFuncoesModal } from './ConvocacaoFuncoesModal'
+import { AcompanhamentoRsvpModal } from './AcompanhamentoRsvpModal'
 interface EventoLookup {
   id: string
   titulo: string
@@ -18,6 +19,7 @@ export function ConvocacoesView() {
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [gerenciandoFuncoesId, setGerenciandoFuncoesId] = useState<string | null>(null)
+  const [acompanhamentoConvocacaoId, setAcompanhamentoConvocacaoId] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<ConvocacaoCreatePayload>({
     eventoId: '',
@@ -223,6 +225,14 @@ export function ConvocacoesView() {
                       Gerenciar Funções
                     </button>
                   )}
+                  {conv.status === 'PUBLICADA' && (
+                    <button
+                      onClick={() => setAcompanhamentoConvocacaoId(conv.id)}
+                      className="text-brand-600 hover:text-brand-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
+                    >
+                      Acompanhar RSVP
+                    </button>
+                  )}
                   <button
                     onClick={() => handleClickEditar(conv)}
                     className="text-brand-600 hover:text-brand-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
@@ -381,6 +391,13 @@ export function ConvocacoesView() {
         <ConvocacaoFuncoesModal
           convocacaoId={gerenciandoFuncoesId}
           onClose={() => setGerenciandoFuncoesId(null)}
+        />
+      )}
+
+      {acompanhamentoConvocacaoId && (
+        <AcompanhamentoRsvpModal
+          convocacaoId={acompanhamentoConvocacaoId}
+          onClose={() => setAcompanhamentoConvocacaoId(null)}
         />
       )}
     </div>
