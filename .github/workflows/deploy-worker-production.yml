@@ -1,0 +1,65 @@
+name: Deploy Worker — Produção
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: worker-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Migrate D1 · Deploy Worker · Configure secret
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout da versão homologada
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Materialize D1 production configuration
+        shell: bash
+        env:
+          D1_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_DATABASE_ID }}
+        run: |
+          test -n "$D1_DATABASE_ID"
+          sed -i "s|__D1_DATABASE_ID__|$D1_DATABASE_ID|" apps/worker/wrangler.toml
+          grep -q "$D1_DATABASE_ID" apps/worker/wrangler.toml
+
+      - name: Apply D1 migrations
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm --filter @piedade/worker exec wrangler d1 migrations apply piedade-agenda-db-prod --remote --env production
+
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm --filter @piedade/worker deploy
+
+      - name: Configure PIN_PEPPER
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PIN_PEPPER: ${{ secrets.PIN_PEPPER }}
+        run: printf '%s' "$PIN_PEPPER" | pnpm --filter @piedade/worker exec wrangler secret put PIN_PEPPER --env production
