@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import * as apiClient from '../../api/apiClient'
 import { PortariaEventosResponseSchema, RetificarCheckinSchema } from '@piedade/shared'
+import { generateQrMatrix } from '../agenda/qrGenerator'
 
 interface Participante {
   convocacaoDestinatarioId: string
@@ -31,6 +32,28 @@ interface PortariaEventoItem {
   modalidade: string
 }
 
+interface ConvidadoPortaria {
+  id: string
+  nome: string
+  localidade: string
+  referencia: string | null
+  observacoes: string | null
+  status: 'PENDENTE' | 'VALIDADO'
+  presencaId: string | null
+  registradoEm: string | null
+  forma: string | null
+}
+
+interface CredencialCadastroConvidado {
+  eventoId: string
+  credencial: {
+    token: string
+    expiraEm: string
+    caminhoCadastro: string
+    endpointCadastro: string
+  }
+}
+
 export function PortariaView() {
   const [eventosDisponiveis, setEventosDisponiveis] = useState<PortariaEventoItem[]>([])
   const [isLoadingEventos, setIsLoadingEventos] = useState(true)
@@ -40,6 +63,8 @@ export function PortariaView() {
   const [qrTokenInput, setQrTokenInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [mensagem, setMensagem] = useState<{ tipo: 'sucesso' | 'aviso' | 'erro'; texto: string } | null>(null)
+  const [convidados, setConvidados] = useState<ConvidadoPortaria[]>([])
+  const [cadastroQrUrl, setCadastroQrUrl] = useState<string | null>(null)
 
   const [ultimoCheckinId, setUltimoCheckinId] = useState<string | null>(null)
   const [modalRetificacao, setModalRetificacao] = useState<{isOpen: boolean; checkinId: string; participanteNome: string; motivo: string; error: string | null; isSubmitting: boolean} | null>(null)
@@ -100,10 +125,27 @@ export function PortariaView() {
     }
   }
 
+  const carregarConvidados = async (evId: string) => {
+    try {
+      const data = await apiClient.fetchWithAuth<{ data: ConvidadoPortaria[] }>(
+        `/portaria/eventos/${evId}/convidados`
+      )
+      if (currentEvIdRef.current === evId) {
+        setConvidados(data.data || [])
+      }
+    } catch {
+      if (currentEvIdRef.current === evId) {
+        setConvidados([])
+      }
+    }
+  }
+
   const handleSelecionarEvento = (evId: string) => {
     setEventoIdAtual(evId)
     currentEvIdRef.current = evId
     setParticipantes([])
+    setConvidados([])
+    setCadastroQrUrl(null)
     setBuscaNome('')
     setQrTokenInput('')
     setMensagem(null)
@@ -111,7 +153,44 @@ export function PortariaView() {
     if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
 
     if (evId) {
-      carregarParticipantes(evId)
+      void Promise.all([carregarParticipantes(evId), carregarConvidados(evId)])
+    }
+  }
+
+  const handleGerarQrConvidados = async () => {
+    if (!eventoIdAtual) return
+    setLoading(true)
+    setMensagem(null)
+    try {
+      const data = await apiClient.postWithAuth<CredencialCadastroConvidado>(
+        `/portaria/eventos/${eventoIdAtual}/cadastro-convidados/credencial`,
+        {}
+      )
+      setCadastroQrUrl(`${window.location.origin}${data.credencial.caminhoCadastro}`)
+    } catch (err: unknown) {
+      const texto = err instanceof Error ? err.message : 'Falha ao gerar QR de convidados.'
+      setMensagem({ tipo: 'erro', texto })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleValidarConvidado = async (convidado: ConvidadoPortaria) => {
+    if (!eventoIdAtual) return
+    setLoading(true)
+    setMensagem(null)
+    try {
+      await apiClient.postWithAuth(
+        `/portaria/eventos/${eventoIdAtual}/convidados/${convidado.id}/validar`,
+        {}
+      )
+      setMensagem({ tipo: 'sucesso', texto: `Presença de ${convidado.nome} validada.` })
+      await carregarConvidados(eventoIdAtual)
+    } catch (err: unknown) {
+      const texto = err instanceof Error ? err.message : 'Falha ao validar convidado.'
+      setMensagem({ tipo: 'erro', texto })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -333,11 +412,96 @@ export function PortariaView() {
         </form>
       </div>
 
+      {eventoIdAtual && (
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between gap-3 sm:items-center">
+            <div>
+              <h3 className="text-base font-semibold text-slate-800">3. Convidados não cadastrados</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                O convidado preenche os próprios dados pelo celular; o porteiro apenas valida a presença.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleGerarQrConvidados}
+              disabled={loading}
+              className="px-4 py-2.5 bg-brand-600 text-white font-semibold rounded-lg text-sm hover:bg-brand-700 disabled:opacity-50"
+            >
+              Gerar QR para convidados
+            </button>
+          </div>
+
+          {cadastroQrUrl && (() => {
+            const matrix = generateQrMatrix(cadastroQrUrl)
+            const size = matrix.length
+            return (
+              <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 flex flex-col sm:flex-row gap-4 items-center">
+                <div className="bg-white p-3 rounded-xl border border-slate-200" data-testid="qr-autocadastro-convidados">
+                  <svg
+                    viewBox={`0 0 ${size} ${size}`}
+                    className="w-44 h-44 bg-white"
+                    shapeRendering="crispEdges"
+                    role="img"
+                    aria-label="QR Code para autocadastro de convidados"
+                  >
+                    {matrix.map((row, r) =>
+                      row.map((cell, col) =>
+                        cell ? <rect key={`${r}-${col}`} x={col} y={r} width={1} height={1} fill="#000000" /> : null
+                      )
+                    )}
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800">Autocadastro desta reunião</p>
+                  <p className="text-xs text-slate-600 mt-1">
+                    Os convidados podem usar o mesmo QR. Após preencherem o formulário, aparecerão abaixo como pendentes.
+                  </p>
+                  <p className="mt-2 text-[10px] font-mono break-all text-slate-500">{cadastroQrUrl}</p>
+                </div>
+              </div>
+            )
+          })()}
+
+          <div className="space-y-2">
+            {convidados.length === 0 ? (
+              <p className="text-sm text-slate-500 py-3">Nenhum convidado autocadastrado ainda.</p>
+            ) : (
+              convidados.map(convidado => (
+                <div key={convidado.id} className="rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-slate-900">{convidado.nome}</p>
+                    <p className="text-sm text-slate-600">{convidado.localidade}</p>
+                    {convidado.referencia && <p className="text-xs text-slate-500 mt-1">{convidado.referencia}</p>}
+                    <span className={`inline-block mt-2 text-[10px] font-bold px-2 py-1 rounded uppercase ${
+                      convidado.status === 'VALIDADO'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      {convidado.status === 'VALIDADO' ? 'Presença validada' : 'Aguardando validação'}
+                    </span>
+                  </div>
+                  {convidado.status === 'PENDENTE' && (
+                    <button
+                      type="button"
+                      onClick={() => void handleValidarConvidado(convidado)}
+                      disabled={loading}
+                      className="px-5 py-2.5 bg-green-600 text-white font-semibold rounded-lg text-sm hover:bg-green-700 disabled:opacity-50"
+                    >
+                      Validar presença
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Check-in Manual / Busca por Participantes */}
       {eventoIdAtual && (
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <h3 className="text-base font-semibold text-slate-800">3. Fila de Participantes</h3>
+            <h3 className="text-base font-semibold text-slate-800">4. Fila de Participantes</h3>
             <div className="flex items-center gap-2 text-sm font-medium" role="group" aria-label="Contadores">
               <span className="px-3 py-1 bg-slate-100 text-slate-700 rounded-full border border-slate-200">Total: {totalEsperado}</span>
               <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full border border-green-200">Presentes: {presentes}</span>
