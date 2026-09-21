@@ -33,12 +33,21 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
 
       INSERT INTO membros (id, nome, casa_id, ativo) VALUES
         ('${gestorId}', 'Gestor Relatórios', 'casa-rel', 1),
+        ('gestor-tecnico', 'Gestor Técnico', 'casa-rel', 1),
         ('${semAcessoId}', 'Sem Acesso', 'casa-rel', 1),
         ('membro-alvo', 'Membro Alvo', 'casa-rel', 1),
         ('membro-outro', 'Outro Membro', 'casa-rel', 1);
 
       INSERT INTO funcoes (id, nome, codigo, ativo)
         VALUES ('func-gestor', 'Gestor Relatórios', 'GESTOR_RELATORIOS', 1);
+
+      INSERT INTO contas_acesso (id, membro_id, status, ativado_em)
+        VALUES ('conta-gestor-tecnico', 'gestor-tecnico', 'ATIVA', CURRENT_TIMESTAMP);
+
+      INSERT INTO acessos_conta
+        (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id)
+      VALUES
+        ('acesso-gestor-tecnico', 'conta-gestor-tecnico', 'GESTOR_RELATORIOS', 'SETOR', '${setorId}');
 
       INSERT INTO vinculos_funcionais
         (id, membro_id, funcao_id, setor_id, ativo)
@@ -85,15 +94,16 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
     `)
   })
 
-  async function sessao(membroId: string, token: string) {
+  async function sessao(membroId: string, token: string, contaAcessoId: string | null = null) {
     const tokenHash = await hashToken(token)
     const agora = new Date().toISOString()
     sqlite.prepare(`
       INSERT INTO sessoes
-        (id, membro_id, token_hash, expira_em, ultimo_acesso_em, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
+        (id, conta_acesso_id, membro_id, token_hash, expira_em, ultimo_acesso_em, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
       `sessao-${membroId}`,
+      contaAcessoId,
       membroId,
       tokenHash,
       new Date(Date.now() + 60 * 60 * 1000).toISOString(),
@@ -124,6 +134,17 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
       totalPresentes: 2,
     })
     expect(body.itens).toHaveLength(3)
+  })
+
+  it('perfil técnico GESTOR_RELATORIOS no escopo acessa relatório final', async () => {
+    await sessao('gestor-tecnico', 'token-gestor-tecnico', 'conta-gestor-tecnico')
+
+    const res = await app.request('/api/v1/relatorios/presencas/eventos/evento-a/final', {
+      headers: auth('token-gestor-tecnico'),
+    })
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ fonte: 'SNAPSHOT_FECHAMENTO' })
   })
 
   it('nega relatório final a usuário sem permissão', async () => {
