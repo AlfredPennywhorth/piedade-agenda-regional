@@ -119,7 +119,7 @@ export async function montarSnapshotFechamentoPortaria(
     )
     .all()
 
-  const itensConvidados: ItemFechamentoPortaria[] = registrosConvidados.map(reg => ({
+  const itensConvidados: ItemFechamentoPortaria[] = registrosConvidados.map((reg: typeof registrosConvidados[number]) => ({
     tipoPessoa: 'CONVIDADO',
     origemId: reg.id,
     nome: reg.nome,
