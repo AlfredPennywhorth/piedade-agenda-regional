@@ -41,12 +41,14 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
       INSERT INTO funcoes (id, nome, codigo, ativo)
         VALUES ('func-gestor', 'Gestor Relatórios', 'GESTOR_RELATORIOS', 1);
 
-      INSERT INTO contas_acesso (id, membro_id, status, ativado_em)
-        VALUES ('conta-gestor-tecnico', 'gestor-tecnico', 'ATIVA', CURRENT_TIMESTAMP);
+      INSERT INTO contas_acesso (id, membro_id, status, ativado_em) VALUES
+        ('conta-gestor', '${gestorId}', 'ATIVA', CURRENT_TIMESTAMP),
+        ('conta-gestor-tecnico', 'gestor-tecnico', 'ATIVA', CURRENT_TIMESTAMP);
 
       INSERT INTO acessos_conta
         (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id)
       VALUES
+        ('acesso-gestor', 'conta-gestor', 'GESTOR_RELATORIOS', 'SETOR', '${setorId}'),
         ('acesso-gestor-tecnico', 'conta-gestor-tecnico', 'GESTOR_RELATORIOS', 'SETOR', '${setorId}');
 
       INSERT INTO vinculos_funcionais
@@ -117,7 +119,7 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
   })
 
   it('relatório final de reunião usa snapshot materializado', async () => {
-    await sessao(gestorId, 'token-gestor')
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
 
     const res = await app.request('/api/v1/relatorios/presencas/eventos/evento-a/final', {
       headers: auth('token-gestor'),
@@ -158,7 +160,7 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
   })
 
   it('histórico de membro lista somente reuniões fechadas autorizadas', async () => {
-    await sessao(gestorId, 'token-gestor')
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
 
     const res = await app.request(
       '/api/v1/relatorios/presencas/membros/membro-alvo?dataInicio=2026-08-01T00:00:00.000Z&dataFim=2026-09-30T23:59:59.999Z',
@@ -188,7 +190,7 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
   })
 
   it('histórico de membro respeita filtro de período', async () => {
-    await sessao(gestorId, 'token-gestor')
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
 
     const res = await app.request(
       '/api/v1/relatorios/presencas/membros/membro-alvo?dataInicio=2026-09-01T00:00:00.000Z',
@@ -201,7 +203,7 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
   })
 
   it('consolidado por período totaliza snapshots do escopo', async () => {
-    await sessao(gestorId, 'token-gestor')
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
 
     const res = await app.request(
       `/api/v1/relatorios/presencas/periodo?escopoTipo=SETOR&escopoId=${setorId}&dataInicio=2026-08-01T00:00:00.000Z&dataFim=2026-09-30T23:59:59.999Z`,
