@@ -247,6 +247,7 @@ describe('PORT-03 — fechamento e lista final consolidada', () => {
       method: 'POST',
       headers: auth('token-porteiro'),
     })
-    expect(segundo.status).toBe(403)
+    expect(segundo.status).toBe(409)
+    expect(await segundo.json()).toMatchObject({ code: 'PORTARIA_FECHADA' })
   })
 })
