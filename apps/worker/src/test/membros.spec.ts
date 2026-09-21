@@ -58,8 +58,8 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
       INSERT INTO casas (id, setor_id, nome)
       VALUES ('${casaId2}', '${setorId}', 'Casa 2');
 
-      INSERT INTO membros (id, nome, celular, data_nascimento, casa_id, ativo)
-      VALUES ('${membroId}', 'Pessoa Teste Base', '11999999999', '1990-01-01', '${casaId}', 1);
+      INSERT INTO membros (id, nome, celular, data_ordenacao, codigo_carteirinha, casa_id, ativo)
+      VALUES ('${membroId}', 'Pessoa Teste Base', '11999999999', '1990-01-01', 'BASE-001', '${casaId}', 1);
     `)
   })
 
@@ -68,6 +68,8 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
       method: 'POST',
       body: JSON.stringify({
         nome: 'Pessoa Teste A',
+        dataOrdenacao: '2000-01-01',
+        codigoCarteirinha: 'TESTE-A',
         casaId,
       }),
     })
@@ -84,6 +86,8 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
       method: 'POST',
       body: JSON.stringify({
         nome: 'Pessoa Teste B',
+        dataOrdenacao: '2000-01-01',
+        codigoCarteirinha: 'TESTE-B',
         casaId: casaInexistenteId,
       }),
     })
@@ -143,7 +147,7 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
   it('19. Deve rejeitar celular com formato inválido no POST', async () => {
     const res = await req('/api/v1/membros', {
       method: 'POST',
-      body: JSON.stringify({ nome: 'Membro Teste', casaId, celular: '123' }), // Inválido
+      body: JSON.stringify({ nome: 'Membro Teste', dataOrdenacao: '2000-01-01', codigoCarteirinha: 'TESTE-19', casaId, celular: '123' }), // Inválido
     })
     const json = await res.json() as any
     expect(res.status).toBe(400)
@@ -153,7 +157,7 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
   it('20. Deve normalizar celular corretamente no POST', async () => {
     const res = await req('/api/v1/membros', {
       method: 'POST',
-      body: JSON.stringify({ nome: 'Membro Normalizado', casaId, celular: '+55 (11) 98888-7777' }),
+      body: JSON.stringify({ nome: 'Membro Normalizado', dataOrdenacao: '2000-01-01', codigoCarteirinha: 'TESTE-20', casaId, celular: '+55 (11) 98888-7777' }),
     })
     const json = await res.json() as any
     expect(res.status).toBe(201)
@@ -166,7 +170,7 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
   it('21. Deve bloquear celular duplicado no POST e registrar tentativa', async () => {
     const res = await req('/api/v1/membros', {
       method: 'POST',
-      body: JSON.stringify({ nome: 'Duplicado', casaId, celular: '+55 11 99999-9999' }), // celular do membroId base ('11999999999')
+      body: JSON.stringify({ nome: 'Duplicado', dataOrdenacao: '2000-01-01', codigoCarteirinha: 'TESTE-21', casaId, celular: '+55 11 99999-9999' }), // celular do membroId base ('11999999999')
     })
     const json = await res.json() as any
     expect(res.status).toBe(409)
@@ -182,7 +186,7 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     // Cria um segundo membro com celular diferente
     const resCreate = await req('/api/v1/membros', {
       method: 'POST',
-      body: JSON.stringify({ nome: 'Segundo Membro', casaId, celular: '11977777777' }),
+      body: JSON.stringify({ nome: 'Segundo Membro', dataOrdenacao: '2000-01-01', codigoCarteirinha: 'TESTE-22', casaId, celular: '11977777777' }),
     })
     const jsonCreate = await resCreate.json() as any
     const segundoMembroId = jsonCreate.id
