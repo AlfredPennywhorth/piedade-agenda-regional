@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { and, eq } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { authMiddleware, Variables } from '../../middleware/auth'
+import { executeAtomic } from '../../db/batch'
 
 export const RESPONSABILIDADE_PMO_VERSAO = '2026-09-21.v1'
 
@@ -130,8 +131,8 @@ responsabilidadeRegionalApp.post('/ciencia', async c => {
   const cienciaId = crypto.randomUUID()
   const textoHash = await hashTexto(RESPONSABILIDADE_PMO_TEXTO)
 
-  await db.batch([
-    db.insert(schema.cienciasResponsabilidade).values({
+  await executeAtomic(db, tx => [
+    tx.insert(schema.cienciasResponsabilidade).values({
       id: cienciaId,
       contaAcessoId,
       acessoContaId: acesso.id,
@@ -140,7 +141,7 @@ responsabilidadeRegionalApp.post('/ciencia', async c => {
       textoHash,
       cienteEm: agora,
     }),
-    db.insert(schema.auditoriaLogs).values({
+    tx.insert(schema.auditoriaLogs).values({
       id: crypto.randomUUID(),
       acao: 'CIENCIA_RESPONSABILIDADE_PMO',
       atorMembroId: membroId,
