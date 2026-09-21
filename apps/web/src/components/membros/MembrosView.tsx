@@ -72,6 +72,7 @@ export function MembrosView() {
     setCasaId(filtroCasaId || (casas.length > 0 ? casas[0].id : ''))
     setNome('')
     setDataOrdenacao('')
+    setCodigoCarteirinha('')
     setCelular('')
     setAtivo(true)
     setErrosForm({})
@@ -92,6 +93,7 @@ export function MembrosView() {
       setCasaId(item.casaId || '')
       setNome(item.nome || '')
       setDataOrdenacao(item.dataOrdenacao ? item.dataOrdenacao.substring(0, 10) : '')
+      setCodigoCarteirinha(item.codigoCarteirinha || '')
       setCelular(item.celular || '')
       setAtivo(item.ativo ?? true)
     } catch (err: any) {
