@@ -832,6 +832,57 @@ export const presencasConvidadoEvento = sqliteTable(
   })
 )
 
+export const portariaFechamentos = sqliteTable(
+  'portaria_fechamentos',
+  {
+    id: text('id').primaryKey(),
+    eventoId: text('evento_id').notNull().unique().references(() => eventos.id),
+    fechadoPorMembroId: text('fechado_por_membro_id').references(() => membros.id),
+    fechadoEm: text('fechado_em').notNull(),
+    totalConvocados: integer('total_convocados').notNull().default(0),
+    totalConvocadosPresentes: integer('total_convocados_presentes').notNull().default(0),
+    totalConvocadosAusentes: integer('total_convocados_ausentes').notNull().default(0),
+    totalConvidadosValidados: integer('total_convidados_validados').notNull().default(0),
+    totalConvidadosPendentes: integer('total_convidados_pendentes').notNull().default(0),
+    totalPresentes: integer('total_presentes').notNull().default(0),
+    ...timestampsS02,
+  },
+  table => ({
+    idxEvento: uniqueIndex('idx_portaria_fechamento_evento').on(table.eventoId),
+  })
+)
+
+export const portariaFechamentoItens = sqliteTable(
+  'portaria_fechamento_itens',
+  {
+    id: text('id').primaryKey(),
+    fechamentoId: text('fechamento_id').notNull().references(() => portariaFechamentos.id),
+    eventoId: text('evento_id').notNull().references(() => eventos.id),
+    tipoPessoa: text('tipo_pessoa').notNull(),
+    origemId: text('origem_id').notNull(),
+    nome: text('nome').notNull(),
+    localidade: text('localidade'),
+    situacao: text('situacao').notNull(),
+    respostaRsvp: text('resposta_rsvp'),
+    formaPresenca: text('forma_presenca'),
+    registradoEm: text('registrado_em'),
+    ...timestampsS02,
+  },
+  table => ({
+    checkTipoPessoa: check(
+      'check_portaria_fechamento_tipo_pessoa',
+      sql`${table.tipoPessoa} IN ('MEMBRO','CONVIDADO')`
+    ),
+    checkSituacao: check(
+      'check_portaria_fechamento_situacao',
+      sql`${table.situacao} IN ('PRESENTE','AUSENTE','PENDENTE')`
+    ),
+    uniqueOrigem: uniqueIndex('idx_portaria_fechamento_origem_unica')
+      .on(table.fechamentoId, table.tipoPessoa, table.origemId),
+    idxEvento: index('idx_portaria_fechamento_itens_evento').on(table.eventoId),
+  })
+)
+
 // ============================================================
 // Auditoria (S12)
 // ============================================================
