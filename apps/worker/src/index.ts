@@ -14,6 +14,7 @@ export interface Env {
   APP_ENV: string
   APP_VERSION: string
   PIN_PEPPER: string
+  MASTER_BOOTSTRAP_SECRET: string
   DB: D1Database
   CORS_ORIGIN?: string
 }
@@ -44,6 +45,8 @@ import { checkinRouter } from './routes/checkin'
 import { portariaRouter } from './routes/portaria'
 import { relatoriosRouter } from './routes/relatorios'
 import { auditoriaRouter } from './routes/auditoria'
+import { bootstrapMasterApp } from './routes/bootstrap/master'
+import { responsabilidadeRegionalApp } from './routes/governanca/responsabilidade-regional'
 export interface AppOptions {
   enableAdminRoutes?: boolean
 }
@@ -96,6 +99,8 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.use('/api/v1/portaria/*', noStore)
   app.use('/api/v1/relatorios/*', noStore)
   app.use('/api/v1/auditoria/*', noStore)
+  app.use('/api/v1/bootstrap/*', noStore)
+  app.use('/api/v1/governanca/*', noStore)
 
   // ============================================================
   // Rotas de infraestrutura — S00
@@ -185,6 +190,8 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.route('/api/v1/auth/login', loginApp)
   app.route('/api/v1/auth/logout', logoutApp)
   app.route('/api/v1/auth/me', meApp)
+  app.route('/api/v1/bootstrap/master', bootstrapMasterApp)
+  app.route('/api/v1/governanca/responsabilidade-regional', responsabilidadeRegionalApp)
 
   if (options?.enableAdminRoutes) {
     app.route('/api/v1/admin/membros', adminMembrosApp)
