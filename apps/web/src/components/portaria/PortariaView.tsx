@@ -259,6 +259,37 @@ export function PortariaView() {
     }
   }
 
+  const handleFecharPortaria = async () => {
+    if (!eventoIdAtual) return
+
+    const confirmou = window.confirm(
+      'Fechar esta Portaria? Após o fechamento, novos check-ins e autocadastros de convidados serão bloqueados.'
+    )
+    if (!confirmou) return
+
+    setLoading(true)
+    setMensagem(null)
+
+    try {
+      await apiClient.postWithAuth(`/portaria/eventos/${eventoIdAtual}/fechar`, {})
+      setMensagem({ tipo: 'sucesso', texto: 'Portaria fechada e lista final consolidada com sucesso.' })
+      setEventosDisponiveis(prev => prev.filter(evento => evento.id !== eventoIdAtual))
+      setEventoIdAtual('')
+      currentEvIdRef.current = ''
+      setParticipantes([])
+      setConvidados([])
+      setCadastroQrUrl(null)
+      setBuscaNome('')
+      setQrTokenInput('')
+      setUltimoCheckinId(null)
+    } catch (err: unknown) {
+      const texto = err instanceof Error ? err.message : 'Falha ao fechar a Portaria.'
+      setMensagem({ tipo: 'erro', texto })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const formatarDataHora = (isoStr: string) => {
     const d = new Date(isoStr)
     return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -380,6 +411,25 @@ export function PortariaView() {
           }`}
         >
           {mensagem.texto}
+        </div>
+      )}
+
+      {eventoIdAtual && (
+        <div className="bg-white p-4 rounded-xl border border-red-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-800">Encerramento da Portaria</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Use somente ao final da recepção. O fechamento bloqueia novos registros e consolida a lista final.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleFecharPortaria()}
+            disabled={loading}
+            className="px-4 py-2.5 bg-red-600 text-white font-semibold rounded-lg text-sm hover:bg-red-700 disabled:opacity-50"
+          >
+            Fechar Portaria
+          </button>
         </div>
       )}
 
