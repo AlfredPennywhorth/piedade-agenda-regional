@@ -137,7 +137,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     mockAgenda(mockEventos)
     render(<App />)
     
-    const calTab = screen.getByText('Calendário')
+    const calTab = await screen.findByText('Calendário')
     fireEvent.click(calTab)
     
     await waitFor(() => {
@@ -165,7 +165,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     render(<App />)
     
     // Go to calendar
-    fireEvent.click(screen.getByText('Calendário'))
+    fireEvent.click(await screen.findByText('Calendário'))
     await waitFor(() => expect(screen.getByText('Dom')).toBeInTheDocument())
     
     // Find the day button (tomorrow)
@@ -184,7 +184,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     render(<App />)
     
     // Go to calendar
-    fireEvent.click(screen.getByText('Calendário'))
+    fireEvent.click(await screen.findByText('Calendário'))
     await waitFor(() => expect(screen.getByText('Dom')).toBeInTheDocument())
     
     // Find a day without event (assuming day 1 has no events in mock)
@@ -229,7 +229,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     render(<App />)
     
     // Go to calendar
-    fireEvent.click(screen.getByText('Calendário'))
+    fireEvent.click(await screen.findByText('Calendário'))
     await waitFor(() => expect(screen.getByText('Dom')).toBeInTheDocument())
     
     // Click day
