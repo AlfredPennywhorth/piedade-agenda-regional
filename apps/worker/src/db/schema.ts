@@ -225,6 +225,121 @@ export const contasAcesso = sqliteTable(
 )
 
 // ============================================================
+// Perfis técnicos, escopos e governança de acesso (PR-ACC-03)
+// ============================================================
+
+export const perfisAcesso = sqliteTable(
+  'perfis_acesso',
+  {
+    codigo: text('codigo').primaryKey(),
+    nome: text('nome').notNull(),
+    descricao: text('descricao').notNull(),
+    ativo: ativoDefault,
+    ...timestampsS02,
+  },
+  table => ({
+    checkAtivo: check('check_perfil_acesso_ativo', sql`${table.ativo} IN (0, 1)`),
+  })
+)
+
+export const acessosConta = sqliteTable(
+  'acessos_conta',
+  {
+    id: text('id').primaryKey(),
+    contaAcessoId: text('conta_acesso_id')
+      .notNull()
+      .references(() => contasAcesso.id),
+    perfilCodigo: text('perfil_codigo')
+      .notNull()
+      .references(() => perfisAcesso.codigo),
+    escopoTipo: text('escopo_tipo').notNull(),
+    escopoId: text('escopo_id'),
+    concedidoPorContaId: text('concedido_por_conta_id').references(() => contasAcesso.id),
+    revogadoPorContaId: text('revogado_por_conta_id').references(() => contasAcesso.id),
+    revogadoEm: text('revogado_em'),
+    ativo: ativoDefault,
+    ...timestampsS02,
+  },
+  table => ({
+    checkEscopo: check(
+      'check_acesso_conta_escopo',
+      sql`(${table.escopoTipo} = 'GLOBAL' AND ${table.escopoId} IS NULL)
+        OR (${table.escopoTipo} IN ('REGIONAL','ADMINISTRACAO','SETOR','CASA','GRUPO_TRABALHO')
+          AND ${table.escopoId} IS NOT NULL)`
+    ),
+    checkMasterGlobal: check(
+      'check_master_somente_global',
+      sql`(${table.perfilCodigo} = 'MASTER_SISTEMA'
+          AND ${table.escopoTipo} = 'GLOBAL' AND ${table.escopoId} IS NULL)
+        OR (${table.perfilCodigo} <> 'MASTER_SISTEMA' AND ${table.escopoTipo} <> 'GLOBAL')`
+    ),
+    checkAdminRegional: check(
+      'check_admin_somente_regional',
+      sql`${table.perfilCodigo} <> 'ADMINISTRADOR_SISTEMA'
+        OR ${table.escopoTipo} = 'REGIONAL'`
+    ),
+    checkAuditorEscopo: check(
+      'check_auditor_escopo',
+      sql`${table.perfilCodigo} <> 'AUDITOR'
+        OR ${table.escopoTipo} IN ('REGIONAL','ADMINISTRACAO')`
+    ),
+    idxConta: index('idx_acessos_conta_conta').on(table.contaAcessoId, table.ativo),
+    idxEscopo: index('idx_acessos_conta_escopo').on(
+      table.escopoTipo,
+      table.escopoId,
+      table.ativo
+    ),
+  })
+)
+
+export const cienciasResponsabilidade = sqliteTable(
+  'ciencias_responsabilidade',
+  {
+    id: text('id').primaryKey(),
+    contaAcessoId: text('conta_acesso_id')
+      .notNull()
+      .references(() => contasAcesso.id),
+    acessoContaId: text('acesso_conta_id')
+      .notNull()
+      .references(() => acessosConta.id),
+    tipo: text('tipo').notNull(),
+    versaoTexto: text('versao_texto').notNull(),
+    textoHash: text('texto_hash').notNull(),
+    cienteEm: text('ciente_em')
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  },
+  table => ({
+    checkTipo: check(
+      'check_ciencia_tipo',
+      sql`${table.tipo} IN ('RESPONSAVEL_REGIONAL_PMO','AVISO_PRIVACIDADE')`
+    ),
+    uniqueCiencia: uniqueIndex('idx_ciencia_responsabilidade_unica').on(
+      table.contaAcessoId,
+      table.acessoContaId,
+      table.tipo,
+      table.versaoTexto
+    ),
+  })
+)
+
+export const bootstrapMaster = sqliteTable(
+  'bootstrap_master',
+  {
+    id: text('id').primaryKey(),
+    contaAcessoId: text('conta_acesso_id')
+      .notNull()
+      .references(() => contasAcesso.id),
+    concluidoEm: text('concluido_em')
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  },
+  table => ({
+    checkId: check('check_bootstrap_master_unico', sql`${table.id} = 'PRIMEIRO_MASTER'`),
+  })
+)
+
+// ============================================================
 // Autenticação e Permissões (S03)
 // ============================================================
 
@@ -626,6 +741,7 @@ export const auditoriaLogs = sqliteTable(
     id: text('id').primaryKey(),
     acao: text('acao').notNull(),
     atorMembroId: text('ator_membro_id').references(() => membros.id),
+  atorContaAcessoId: text('ator_conta_acesso_id').references(() => contasAcesso.id),
     recursoTipo: text('recurso_tipo').notNull(),
     recursoId: text('recurso_id').notNull(),
     escopoTipo: text('escopo_tipo'),
