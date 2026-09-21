@@ -56,7 +56,9 @@ export function ResponsabilidadeRegionalGate({ children }: Props) {
     )
   }
 
-  const pendente = responsabilidade?.acessos.find(acesso => !acesso.ciente)
+  if (!responsabilidade) return <>{children}</>
+  const responsabilidadeAtual = responsabilidade
+  const pendente = responsabilidadeAtual.acessos.find(acesso => !acesso.ciente)
   if (!pendente) return <>{children}</>
 
   const registrar = async () => {
@@ -70,7 +72,7 @@ export function ResponsabilidadeRegionalGate({ children }: Props) {
     try {
       await postWithAuth('/governanca/responsabilidade-regional/ciencia', {
         acessoContaId: pendente.acessoContaId,
-        versao: responsabilidade.versao,
+        versao: responsabilidadeAtual.versao,
         ciente: true,
       })
       await consultar()
@@ -97,11 +99,11 @@ export function ResponsabilidadeRegionalGate({ children }: Props) {
         </header>
 
         <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-sm leading-6 text-slate-700">
-          {responsabilidade.texto}
+          {responsabilidadeAtual.texto}
         </div>
 
         <p className="text-xs text-slate-500">
-          Versão do texto: {responsabilidade.versao}. Esta confirmação registra ciência das
+          Versão do texto: {responsabilidadeAtual.versao}. Esta confirmação registra ciência das
           responsabilidades e não é solicitação de consentimento.
         </p>
 
