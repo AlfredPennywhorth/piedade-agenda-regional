@@ -211,15 +211,15 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
     return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
   }
 
-  const autorizado = await eOperadorPortariaAutorizado(db, atorMembroId, evento)
-  if (!autorizado) {
-    return c.json({ error: 'Operador não autorizado para fechar esta Portaria', code: 'FORBIDDEN' }, 403)
-  }
-
   const estado = await db.select().from(portariasEvento)
     .where(eq(portariasEvento.eventoId, eventoId)).get()
   if (estado?.status === 'FECHADA') {
     return c.json({ error: 'A Portaria já está fechada', code: 'PORTARIA_FECHADA' }, 409)
+  }
+
+  const autorizado = await eOperadorPortariaAutorizado(db, atorMembroId, evento)
+  if (!autorizado) {
+    return c.json({ error: 'Operador não autorizado para fechar esta Portaria', code: 'FORBIDDEN' }, 403)
   }
 
   const existente = await db.select({ id: portariaFechamentos.id })
