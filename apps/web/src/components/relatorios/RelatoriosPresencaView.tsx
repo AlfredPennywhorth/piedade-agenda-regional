@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import * as apiClient from '../../api/apiClient'
+import { baixarCsv, montarCsv } from '../../utils/csv'
 
 type EscopoTipo = 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO'
 
@@ -194,6 +195,71 @@ export function RelatoriosPresencaView() {
     </div>
   )
 
+  const imprimirRelatorio = () => window.print()
+
+  const exportarEventoCsv = () => {
+    if (!evento) return
+    const csv = montarCsv(
+      ['Nome', 'Tipo', 'Localidade', 'Situação', 'RSVP', 'Forma de presença', 'Registrado em'],
+      evento.itens.map(item => [
+        item.nome,
+        item.tipoPessoa === 'MEMBRO' ? 'Membro' : 'Convidado',
+        item.localidade,
+        item.situacao,
+        item.respostaRsvp,
+        item.formaPresenca,
+        item.registradoEm,
+      ])
+    )
+    baixarCsv(`presencas-${evento.evento.id}.csv`, csv)
+  }
+
+  const exportarHistoricoCsv = () => {
+    if (!historico) return
+    const csv = montarCsv(
+      ['Reunião', 'Início', 'Situação', 'RSVP', 'Forma de presença', 'Registrado em', 'Localidade'],
+      historico.reunioes.map(item => [
+        item.eventoTitulo,
+        item.inicioEm,
+        item.situacao,
+        item.respostaRsvp,
+        item.formaPresenca,
+        item.registradoEm,
+        item.localidade,
+      ])
+    )
+    baixarCsv(`historico-presenca-${historico.membro.id}.csv`, csv)
+  }
+
+  const exportarPeriodoCsv = () => {
+    if (!periodo) return
+    const csv = montarCsv(
+      ['Reunião', 'Início', 'Convocados', 'Presentes convocados', 'Ausentes', 'Convidados presentes', 'Convidados pendentes', 'Total presentes'],
+      periodo.eventos.map(item => [
+        item.titulo,
+        item.inicioEm,
+        item.totalConvocados,
+        item.totalConvocadosPresentes,
+        item.totalConvocadosAusentes,
+        item.totalConvidadosValidados,
+        item.totalConvidadosPendentes,
+        item.totalPresentes,
+      ])
+    )
+    baixarCsv(`presencas-periodo-${periodo.escopo.escopoTipo.toLowerCase()}-${periodo.escopo.escopoId}.csv`, csv)
+  }
+
+  const AcoesRelatorio = ({ onCsv }: { onCsv: () => void }) => (
+    <div className="relatorio-controles flex flex-wrap justify-end gap-2">
+      <button type="button" onClick={onCsv} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        Exportar CSV
+      </button>
+      <button type="button" onClick={imprimirRelatorio} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        Imprimir / Salvar PDF
+      </button>
+    </div>
+  )
+
   const optionVazia = carregandoLookups ? 'Carregando...' : 'Selecione...'
 
   return (
@@ -230,7 +296,8 @@ export function RelatoriosPresencaView() {
             <button disabled={carregando || !eventoId} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Consultar</button>
           </form>
 
-          {evento && <>
+          {evento && <div className="relatorio-impressao space-y-5">
+            <AcoesRelatorio onCsv={exportarEventoCsv} />
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <h3 className="font-semibold text-slate-900">{evento.evento.titulo}</h3>
               <p className="mt-1 text-xs text-slate-500">{evento.fonte === 'SNAPSHOT_FECHAMENTO' ? 'Lista final da reunião' : 'Prévia operacional'}</p>
@@ -257,7 +324,7 @@ export function RelatoriosPresencaView() {
                 ))}</tbody>
               </table>
             </div>
-          </>}
+          </div>}
         </div>
       )}
 
@@ -276,7 +343,8 @@ export function RelatoriosPresencaView() {
             <button disabled={carregando || !membroId} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white sm:col-span-2 disabled:opacity-50">Consultar histórico</button>
           </form>
 
-          {historico && <>
+          {historico && <div className="relatorio-impressao space-y-5">
+            <AcoesRelatorio onCsv={exportarHistoricoCsv} />
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <h3 className="font-semibold text-slate-900">{historico.membro.nome}</h3>
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -294,7 +362,7 @@ export function RelatoriosPresencaView() {
                 </div>
               </div>
             ))}</div>
-          </>}
+          </div>}
         </div>
       )}
 
@@ -332,7 +400,8 @@ export function RelatoriosPresencaView() {
             <button disabled={carregando || !escopoSelecionadoId} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white sm:col-span-2 disabled:opacity-50">Consolidar período</button>
           </form>
 
-          {periodo && <>
+          {periodo && <div className="relatorio-impressao space-y-5">
+            <AcoesRelatorio onCsv={exportarPeriodoCsv} />
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {resumoCard('Eventos', periodo.resumo.totalEventos)}{resumoCard('Convocados', periodo.resumo.totalConvocados)}
               {resumoCard('Presentes', periodo.resumo.totalConvocadosPresentes)}{resumoCard('Taxa convocados', `${periodo.resumo.taxaPresencaConvocados}%`)}
@@ -347,7 +416,7 @@ export function RelatoriosPresencaView() {
                 </div>
               </div>
             ))}</div>
-          </>}
+          </div>}
         </div>
       )}
     </section>
