@@ -3,10 +3,12 @@ import { eq } from 'drizzle-orm'
 import { membros, vinculosFuncionais, tentativasAcesso } from '../db/schema'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
+import { exigirMasterParaEscrita } from '../middleware/master-write'
 
 export const membrosRouter = new Hono<any>()
 
 membrosRouter.use('*', authMiddleware)
+membrosRouter.use('*', exigirMasterParaEscrita)
 
 const membroPublico = {
   id: membros.id,
