@@ -80,7 +80,7 @@ export async function authMiddleware(c: Context<{ Variables: Variables }>, next:
       .execute()
   }
 
-  const contextoPermissoes = await carregarContextoPermissoes(db, membro.id)
+  const contextoPermissoes = await carregarContextoPermissoes(db, membro.id, conta.id)
 
   c.set('membroId', membro.id)
   c.set('contaAcessoId', conta.id)
