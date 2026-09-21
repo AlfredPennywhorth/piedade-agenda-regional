@@ -227,4 +227,152 @@ describe('Perfis, escopos e governança — PR-ACC-03', () => {
     )
     expect(repetida.status).toBe(409)
   })
+
+  it('permite ao Master nomear o Administrador Regional e audita a concessão', async () => {
+    const bootstrap = await requisicao('/api/v1/bootstrap/master', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bootstrap-Secret': bootstrapSecret,
+      },
+      body: JSON.stringify({
+        codigoCarteirinha: 'CARTEIRA-MASTER',
+        confirmacao: 'CRIAR PRIMEIRO MASTER',
+      }),
+    })
+    expect(bootstrap.status).toBe(201)
+
+    const tokenMaster = 'token-master-admin'
+    const hashMaster = await hashToken(tokenMaster)
+    const agora = new Date().toISOString()
+    sqlite
+      .prepare(
+        `INSERT INTO sessoes
+          (id, conta_acesso_id, membro_id, token_hash, expira_em,
+           ultimo_acesso_em, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        'sessao-master-admin',
+        'conta-master',
+        'membro-master',
+        hashMaster,
+        new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        agora,
+        agora
+      )
+
+    const conceder = await requisicao('/api/v1/admin/acessos', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${tokenMaster}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contaAcessoId: 'conta-pmo',
+        perfilCodigo: 'ADMINISTRADOR_SISTEMA',
+        escopoTipo: 'REGIONAL',
+        escopoId: 'regional-1',
+      }),
+    })
+
+    expect(conceder.status).toBe(201)
+    const acesso = (await conceder.json()) as any
+    expect(acesso.perfilCodigo).toBe('ADMINISTRADOR_SISTEMA')
+    expect(acesso.escopoId).toBe('regional-1')
+
+    const auditoria = sqlite
+      .prepare(
+        `SELECT acao FROM auditoria_logs
+         WHERE recurso_id = ? AND ator_conta_acesso_id = ?`
+      )
+      .get(acesso.id, 'conta-master') as any
+    expect(auditoria.acao).toBe('ACESSO_CONCEDIDO')
+  })
+
+  it('limita o Administrador à própria Regional e protege o último Master', async () => {
+    sqlite.exec(`
+      INSERT INTO acessos_conta
+        (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id)
+      VALUES
+        ('acesso-master', 'conta-master', 'MASTER_SISTEMA', 'GLOBAL', NULL),
+        ('acesso-admin', 'conta-pmo', 'ADMINISTRADOR_SISTEMA', 'REGIONAL', 'regional-1');
+      INSERT INTO bootstrap_master (id, conta_acesso_id)
+      VALUES ('PRIMEIRO_MASTER', 'conta-master');
+    `)
+
+    const agora = new Date().toISOString()
+    const tokenAdmin = 'token-pmo-admin'
+    const tokenMaster = 'token-master-revogacao'
+    const hashAdmin = await hashToken(tokenAdmin)
+    const hashMaster = await hashToken(tokenMaster)
+
+    const inserirSessao = sqlite.prepare(
+      `INSERT INTO sessoes
+        (id, conta_acesso_id, membro_id, token_hash, expira_em,
+         ultimo_acesso_em, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    )
+    inserirSessao.run(
+      'sessao-pmo-admin',
+      'conta-pmo',
+      'membro-pmo',
+      hashAdmin,
+      new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      agora,
+      agora
+    )
+    inserirSessao.run(
+      'sessao-master-revogacao',
+      'conta-master',
+      'membro-master',
+      hashMaster,
+      new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      agora,
+      agora
+    )
+
+    const permitido = await requisicao('/api/v1/admin/acessos', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${tokenAdmin}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contaAcessoId: 'conta-pmo',
+        perfilCodigo: 'GESTOR_AGENDA',
+        escopoTipo: 'REGIONAL',
+        escopoId: 'regional-1',
+      }),
+    })
+    expect(permitido.status).toBe(201)
+
+    const elevarMaster = await requisicao('/api/v1/admin/acessos', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${tokenAdmin}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contaAcessoId: 'conta-pmo',
+        perfilCodigo: 'MASTER_SISTEMA',
+        escopoTipo: 'GLOBAL',
+        escopoId: null,
+      }),
+    })
+    expect(elevarMaster.status).toBe(403)
+
+    const revogarUltimoMaster = await requisicao(
+      '/api/v1/admin/acessos/acesso-master',
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${tokenMaster}` },
+      }
+    )
+    expect(revogarUltimoMaster.status).toBe(409)
+    expect((await revogarUltimoMaster.json()) as any).toMatchObject({
+      code: 'ULTIMO_MASTER',
+    })
+  })
+
 })
