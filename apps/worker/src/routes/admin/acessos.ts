@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, count, eq } from 'drizzle-orm'
+import { and, count, eq, isNull } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { executeAtomic } from '../../db/batch'
 import { authMiddleware, Variables } from '../../middleware/auth'
@@ -210,7 +210,7 @@ adminAcessosApp.post('/', async c => {
         eq(schema.acessosConta.perfilCodigo, body.perfilCodigo),
         eq(schema.acessosConta.escopoTipo, body.escopoTipo),
         escopoId === null
-          ? eq(schema.acessosConta.escopoId, null)
+          ? isNull(schema.acessosConta.escopoId)
           : eq(schema.acessosConta.escopoId, escopoId),
         eq(schema.acessosConta.ativo, true)
       )
