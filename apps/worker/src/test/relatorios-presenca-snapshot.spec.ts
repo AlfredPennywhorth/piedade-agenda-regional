@@ -177,6 +177,16 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
     expect(body.reunioes.map((item: any) => item.eventoId)).toEqual(['evento-b', 'evento-a'])
   })
 
+  it('nega histórico de membro quando nenhum evento do histórico é autorizado', async () => {
+    await sessao(semAcessoId, 'token-sem-acesso')
+
+    const res = await app.request('/api/v1/relatorios/presencas/membros/membro-alvo', {
+      headers: auth('token-sem-acesso'),
+    })
+
+    expect(res.status).toBe(403)
+  })
+
   it('histórico de membro respeita filtro de período', async () => {
     await sessao(gestorId, 'token-gestor')
 
