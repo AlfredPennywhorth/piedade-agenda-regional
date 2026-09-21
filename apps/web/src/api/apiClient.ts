@@ -63,3 +63,32 @@ export async function patchWithAuth<T = any>(endpoint: string, body: any): Promi
     body: JSON.stringify(body)
   })
 }
+
+
+export async function postPublic<T = any>(endpoint: string, body: any): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}))
+    const message = errorBody.error || errorBody.message || `HTTP error! status: ${response.status}`
+    throw new ApiError(response.status, message, errorBody)
+  }
+
+  return response.json()
+}
+
+export function salvarTokenSessao(token: string) {
+  localStorage.setItem('session_token', token)
+}
+
+export function limparTokenSessao() {
+  localStorage.removeItem('session_token')
+}
+
+export function possuiTokenSessao() {
+  return Boolean(localStorage.getItem('session_token'))
+}

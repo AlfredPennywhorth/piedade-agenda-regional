@@ -1,30 +1,58 @@
-import { describe, it, expect, vi } from 'vitest'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import App from '../App'
 import * as apiClient from '../api/apiClient'
 
 vi.mock('../api/apiClient', () => ({
   fetchWithAuth: vi.fn(),
-  API_BASE_URL: 'http://test'
+  postWithAuth: vi.fn(),
+  limparTokenSessao: vi.fn(() => localStorage.removeItem('session_token')),
+  possuiTokenSessao: vi.fn(() => Boolean(localStorage.getItem('session_token'))),
+  API_BASE_URL: 'http://test',
 }))
 
 describe('App — S07 Minha Agenda', () => {
-  it('renderiza o elemento main', () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue([])
-    render(<App />)
-    expect(screen.getByRole('main')).toBeDefined()
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.setItem('session_token', 'sessao-teste')
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/auth/me') {
+        return { nome: 'Pessoa Teste', capacidades: {} }
+      }
+      if (endpoint === '/governanca/responsabilidade-regional') {
+        return {
+          tipo: 'RESPONSAVEL_REGIONAL_PMO',
+          natureza: 'CIENCIA_DE_RESPONSABILIDADE',
+          versao: 'teste',
+          texto: 'Responsabilidades',
+          acessos: [],
+        }
+      }
+      return []
+    })
   })
 
-  it('exibe o título atual da aplicação', () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue([])
+  it('renderiza o elemento main após validar a sessão', async () => {
     render(<App />)
-    expect(screen.getByText('Agenda Regional SP')).toBeDefined()
+    expect(await screen.findByRole('main')).toBeDefined()
   })
 
-  it('exibe a navegação principal da S07', () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue([])
+  it('exibe o título atual da aplicação', async () => {
     render(<App />)
-    expect(screen.getByText('Minha Agenda')).toBeDefined()
+    expect(await screen.findByText('Agenda Regional SP')).toBeDefined()
+    expect(screen.getByText('Pessoa Teste')).toBeDefined()
+  })
+
+  it('exibe a navegação principal da S07', async () => {
+    render(<App />)
+    expect(await screen.findByText('Minha Agenda')).toBeDefined()
     expect(screen.getByText('Calendário')).toBeDefined()
+  })
+
+  it('exibe login quando não existe sessão local', async () => {
+    localStorage.removeItem('session_token')
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeDefined()
+    expect(screen.queryByText('Minha Agenda')).toBeNull()
   })
 })

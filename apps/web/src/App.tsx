@@ -18,24 +18,99 @@ import { FuncoesView } from './components/funcoes/FuncoesView'
 import { VinculosFuncionaisView } from './components/vinculos-funcionais/VinculosFuncionaisView'
 import { LocaisView } from './components/locais/LocaisView'
 import { ConvocacoesView } from './components/convocacoes/ConvocacoesView'
-import { fetchWithAuth } from './api/apiClient'
+import { fetchWithAuth, limparTokenSessao, possuiTokenSessao, postWithAuth } from './api/apiClient'
+import { AuthView } from './components/auth/AuthView'
+import { ResponsabilidadeRegionalGate } from './components/governanca/ResponsabilidadeRegionalGate'
 
 function App() {
   const [currentTab, setCurrentTab] = useState<'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes'>('agenda')
   const [capacidades, setCapacidades] = useState<CapacidadesFrontend>({})
+  const [nomeUsuario, setNomeUsuario] = useState('')
+  const [estadoSessao, setEstadoSessao] = useState<'verificando' | 'autenticada' | 'anonima'>('verificando')
+  const [tokenAtivacao, setTokenAtivacao] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('ativacao') || params.get('token')
+  })
+
+  const carregarIdentidade = async () => {
+    if (!possuiTokenSessao()) {
+      setEstadoSessao('anonima')
+      return
+    }
+
+    try {
+      const data = await fetchWithAuth<{
+        nome?: string
+        capacidades?: CapacidadesFrontend
+      }>('/auth/me')
+      setNomeUsuario(data.nome || '')
+      setCapacidades(data.capacidades || {})
+      setEstadoSessao('autenticada')
+    } catch {
+      limparTokenSessao()
+      setNomeUsuario('')
+      setCapacidades({})
+      setEstadoSessao('anonima')
+    }
+  }
 
   useEffect(() => {
-    fetchWithAuth<{ capacidades?: CapacidadesFrontend }>('/auth/me')
-      .then((data) => {
-        if (data && data.capacidades) {
-          setCapacidades(data.capacidades)
-        }
-      })
-      .catch(() => {})
+    carregarIdentidade()
   }, [])
 
+  const concluirAutenticacao = async () => {
+    setTokenAtivacao(null)
+    window.history.replaceState({}, document.title, window.location.pathname)
+    setEstadoSessao('verificando')
+    await carregarIdentidade()
+  }
+
+  const cancelarAtivacao = () => {
+    setTokenAtivacao(null)
+    window.history.replaceState({}, document.title, window.location.pathname)
+  }
+
+  const sair = async () => {
+    try {
+      await postWithAuth('/auth/logout', {})
+    } catch {
+      // A limpeza local também encerra uma sessão já expirada.
+    } finally {
+      limparTokenSessao()
+      setNomeUsuario('')
+      setCapacidades({})
+      setCurrentTab('agenda')
+      setEstadoSessao('anonima')
+    }
+  }
+
+  if (estadoSessao === 'verificando') {
+    return (
+      <main className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <p className="text-sm text-slate-600">Verificando acesso...</p>
+      </main>
+    )
+  }
+
+  if (estadoSessao === 'anonima') {
+    return (
+      <AuthView
+        tokenAtivacao={tokenAtivacao}
+        onAuthenticated={concluirAutenticacao}
+        onCancelarAtivacao={tokenAtivacao ? cancelarAtivacao : undefined}
+      />
+    )
+  }
+
   return (
-    <MainLayout currentTab={currentTab} onTabChange={setCurrentTab} capacidades={capacidades}>
+    <ResponsabilidadeRegionalGate>
+    <MainLayout
+      currentTab={currentTab}
+      onTabChange={setCurrentTab}
+      capacidades={capacidades}
+      nomeUsuario={nomeUsuario}
+      onLogout={sair}
+    >
       {currentTab === 'agenda' && <AgendaView />}
       {currentTab === 'eventos' && <EventosView />}
       {currentTab === 'series' && <SeriesView />}
@@ -69,6 +144,7 @@ function App() {
         </div>
       )}
     </MainLayout>
+    </ResponsabilidadeRegionalGate>
   )
 }
 
