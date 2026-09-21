@@ -1,11 +1,9 @@
 import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 
-const migrationPath = fileURLToPath(
-  new URL('../../drizzle/0014_acc_pessoas_contas_acesso.sql', import.meta.url)
-)
+const migrationPath = resolve(process.cwd(), 'drizzle/0014_acc_pessoas_contas_acesso.sql')
 
 function criarBancoLegado() {
   const sqlite = new Database(':memory:')
