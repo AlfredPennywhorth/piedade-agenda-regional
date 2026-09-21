@@ -297,6 +297,14 @@ portariaRouter.post('/eventos/:eventoId/cadastro-convidados/credencial', async c
   await executarOperacaoComAudit(
     db,
     qdb => [
+      qdb.update(credenciaisCadastroPortariaEvento).set({
+        ativo: false,
+        revogadoEm: agora,
+        updatedAt: agora,
+      }).where(and(
+        eq(credenciaisCadastroPortariaEvento.eventoId, eventoId),
+        eq(credenciaisCadastroPortariaEvento.ativo, true)
+      )),
       qdb.insert(credenciaisCadastroPortariaEvento).values({
         id: credencialId,
         eventoId,
