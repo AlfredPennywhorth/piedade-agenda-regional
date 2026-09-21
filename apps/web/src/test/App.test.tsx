@@ -13,7 +13,7 @@ vi.mock('../api/apiClient', () => ({
 
 describe('App — S07 Minha Agenda', () => {
   beforeEach(() => {
-    vi.resetAllMocks()
+    vi.clearAllMocks()
     localStorage.setItem('session_token', 'sessao-teste')
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
       if (endpoint === '/auth/me') {
