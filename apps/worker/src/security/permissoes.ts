@@ -308,12 +308,35 @@ export async function eOperadorPortariaAutorizado(db: any, membroId: string, eve
 export async function eGestorRelatoriosAutorizadoParaEvento(db: any, membroId: string, evento: any): Promise<boolean> {
   if (!db || !membroId || !evento) return false
 
-  // 1. Organizador do evento
+  const contexto = await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) return true
+
+  const escopoEvento =
+    evento.regionalId ? { tipo: 'REGIONAL', id: evento.regionalId } :
+    evento.administracaoId ? { tipo: 'ADMINISTRACAO', id: evento.administracaoId } :
+    evento.setorId ? { tipo: 'SETOR', id: evento.setorId } :
+    evento.casaId ? { tipo: 'CASA', id: evento.casaId } :
+    evento.grupoTrabalhoId ? { tipo: 'GRUPO_TRABALHO', id: evento.grupoTrabalhoId } :
+    null
+
+  if (
+    escopoEvento &&
+    contexto.acessosAtivos.some(
+      acesso =>
+        acesso.perfilCodigo === 'GESTOR_RELATORIOS' &&
+        acesso.escopoTipo === escopoEvento.tipo &&
+        acesso.escopoId === escopoEvento.id
+    )
+  ) {
+    return true
+  }
+
+  // Compatibilidade: organizador do evento.
   if (evento.organizadorMembroId === membroId) {
     return true
   }
 
-  // 2. Vínculo GESTOR_RELATORIOS no mesmo escopo
+  // Compatibilidade legada: vínculo funcional GESTOR_RELATORIOS no mesmo escopo
   const vinculosGestor = await db
     .select({
       v: schema.vinculosFuncionais,
@@ -355,6 +378,20 @@ export async function eGestorRelatoriosAutorizadoParaEscopo(
   escopoId: string
 ): Promise<boolean> {
   if (!db || !membroId || !escopoTipo || !escopoId) return false
+
+  const contexto = await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) return true
+
+  if (
+    contexto.acessosAtivos.some(
+      acesso =>
+        acesso.perfilCodigo === 'GESTOR_RELATORIOS' &&
+        acesso.escopoTipo === escopoTipo &&
+        acesso.escopoId === escopoId
+    )
+  ) {
+    return true
+  }
 
   const vinculosGestor = await db
     .select({
