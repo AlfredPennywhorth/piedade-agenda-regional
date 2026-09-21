@@ -11,7 +11,6 @@ export const ativacaoSchema = z.object({
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Formato de celular inválido' })
     }
   }).transform(val => normalizarCelular(val) as string),
-  dataNascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data de nascimento deve estar no formato YYYY-MM-DD'),
   pin: pinSchema,
   confirmacaoPin: z.string()
 }).refine((data) => data.pin === data.confirmacaoPin, {

@@ -7,6 +7,7 @@ import { carregarContextoPermissoes, ContextoPermissoes } from '../security/perm
 export type Variables = {
   db: any
   membroId: string
+  contaAcessoId: string
   contextoPermissoes: ContextoPermissoes
 }
 
@@ -28,31 +29,34 @@ export async function authMiddleware(c: Context<{ Variables: Variables }>, next:
   }
 
   const hashedToken = await hashToken(token)
-
   const db = c.get('db')
+
   if (!db) {
     return c.json({ error: 'Banco de dados indisponível', code: 'INTERNAL_ERROR' }, 500)
   }
 
-  // Busca a sessão e o membro manualmente com JOIN
   const agora = new Date().toISOString()
 
   const [result] = await db
     .select({
       sessao: schema.sessoes,
+      conta: schema.contasAcesso,
       membro: schema.membros,
     })
     .from(schema.sessoes)
-    .innerJoin(schema.membros, eq(schema.sessoes.membroId, schema.membros.id))
+    .innerJoin(
+      schema.contasAcesso,
+      eq(schema.sessoes.contaAcessoId, schema.contasAcesso.id)
+    )
+    .innerJoin(schema.membros, eq(schema.contasAcesso.membroId, schema.membros.id))
     .where(and(eq(schema.sessoes.tokenHash, hashedToken), isNull(schema.sessoes.revogadoEm)))
     .limit(1)
 
-  if (!result || !result.membro) {
+  if (!result || !result.membro || !result.conta) {
     return c.json({ error: 'Sessão inválida ou expirada', code: 'UNAUTHORIZED' }, 401)
   }
 
-  const { sessao, membro } = result
-
+  const { sessao, conta, membro } = result
   const instanteAtual = Date.now()
   const criadaEm = new Date(sessao.createdAt).getTime()
   const ultimoAcessoEm = new Date(sessao.ultimoAcessoEm ?? sessao.createdAt).getTime()
@@ -64,8 +68,7 @@ export async function authMiddleware(c: Context<{ Variables: Variables }>, next:
     return c.json({ error: 'Sessão inválida ou expirada', code: 'UNAUTHORIZED' }, 401)
   }
 
-  // Verifica se membro está ativo e tem autenticação ativa
-  if (!membro.ativo || !membro.autenticacaoAtiva) {
+  if (!membro.ativo || conta.status !== 'ATIVA') {
     return c.json({ error: 'Acesso bloqueado', code: 'FORBIDDEN' }, 403)
   }
 
@@ -77,10 +80,10 @@ export async function authMiddleware(c: Context<{ Variables: Variables }>, next:
       .execute()
   }
 
-  // Carrega permissões
-  const contextoPermissoes = await carregarContextoPermissoes(db, sessao.membroId)
+  const contextoPermissoes = await carregarContextoPermissoes(db, membro.id)
 
-  c.set('membroId', sessao.membroId)
+  c.set('membroId', membro.id)
+  c.set('contaAcessoId', conta.id)
   c.set('contextoPermissoes', contextoPermissoes)
 
   await next()

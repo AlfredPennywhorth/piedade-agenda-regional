@@ -167,33 +167,27 @@ describe('Autenticação e Sessões S03', () => {
     expect(res.status).toBe(400)
   })
 
-  it('11. Ativação falha se dataNascimento não for enviada', async () => {
-    const res = await req('/api/v1/auth/ativar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        token: tokenAtivacaoPuro,
-        celular: '11999999999',
-        pin: '123456',
-        confirmacaoPin: '123456',
-      }),
+  it('11. Contrato de ativação não coleta data de nascimento', async () => {
+    const { ativacaoSchema } = await import('@piedade/shared')
+    const parsed = ativacaoSchema.safeParse({
+      token: tokenAtivacaoPuro,
+      celular: '11999999999',
+      pin: '123456',
+      confirmacaoPin: '123456',
     })
-    expect(res.status).toBe(400)
+    expect(parsed.success).toBe(true)
   })
 
-  it('12. Ativação falha se dataNascimento não bater com o cadastro', async () => {
-    const res = await req('/api/v1/auth/ativar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        token: tokenAtivacaoPuro,
-        celular: '11999999999',
-        dataNascimento: '2000-01-01',
-        pin: '123456',
-        confirmacaoPin: '123456',
-      }),
+  it('12. Data de nascimento enviada por cliente antigo é descartada', async () => {
+    const { ativacaoSchema } = await import('@piedade/shared')
+    const parsed = ativacaoSchema.parse({
+      token: tokenAtivacaoPuro,
+      celular: '11999999999',
+      dataNascimento: '2000-01-01',
+      pin: '123456',
+      confirmacaoPin: '123456',
     })
-    expect(res.status).toBe(400)
+    expect('dataNascimento' in parsed).toBe(false)
   })
 
   it('13. Ativação falha se PIN não for enviado', async () => {
@@ -330,38 +324,38 @@ describe('Autenticação e Sessões S03', () => {
     sessionTokenPuro = json.sessionToken
   })
 
-  it('21. Ativação bem-sucedida gera pin_hash e pin_salt para o membro', async () => {
+  it('21. Ativação bem-sucedida gera pin_hash e pin_salt para a conta', async () => {
     const membro = sqlite
-      .prepare('SELECT pin_hash, pin_salt FROM membros WHERE id = ?')
+      .prepare('SELECT pin_hash, pin_salt FROM contas_acesso WHERE membro_id = ?')
       .get(membroId) as any
     expect(membro.pin_hash).not.toBeNull()
     expect(membro.pin_salt).not.toBeNull()
   })
 
-  it('22. Ativação bem-sucedida marca autenticacao_ativa como true', async () => {
+  it('22. Ativação bem-sucedida marca a conta como ATIVA', async () => {
     const membro = sqlite
-      .prepare('SELECT autenticacao_ativa FROM membros WHERE id = ?')
+      .prepare('SELECT status FROM contas_acesso WHERE membro_id = ?')
       .get(membroId) as any
-    expect(membro.autenticacao_ativa).toBe(1)
+    expect(membro.status).toBe('ATIVA')
   })
 
   it('23. Ativação bem-sucedida zera as tentativas_pin', async () => {
     const membro = sqlite
-      .prepare('SELECT tentativas_pin FROM membros WHERE id = ?')
+      .prepare('SELECT tentativas_pin FROM contas_acesso WHERE membro_id = ?')
       .get(membroId) as any
     expect(membro.tentativas_pin).toBe(0)
   })
 
   it('24. Ativação bem-sucedida remove bloqueado_ate se existisse', async () => {
     const membro = sqlite
-      .prepare('SELECT bloqueado_ate FROM membros WHERE id = ?')
+      .prepare('SELECT bloqueado_ate FROM contas_acesso WHERE membro_id = ?')
       .get(membroId) as any
     expect(membro.bloqueado_ate).toBeNull()
   })
 
   it('25. Ativação bem-sucedida preenche ativado_em', async () => {
     const membro = sqlite
-      .prepare('SELECT ativado_em FROM membros WHERE id = ?')
+      .prepare('SELECT ativado_em FROM contas_acesso WHERE membro_id = ?')
       .get(membroId) as any
     expect(membro.ativado_em).not.toBeNull()
   })
@@ -427,14 +421,14 @@ describe('Autenticação e Sessões S03', () => {
   })
 
   it('32. Login falha genérica se membro não tiver autenticação ativa', async () => {
-    sqlite.exec(`UPDATE membros SET autenticacao_ativa = 0 WHERE id = '${membroId}'`)
+    sqlite.exec(`UPDATE contas_acesso SET status = 'PENDENTE_ATIVACAO' WHERE membro_id = '${membroId}'`)
     const res = await req('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identificador: '11999999999', pin: '123456' }),
     })
     expect(res.status).toBe(401)
-    sqlite.exec(`UPDATE membros SET autenticacao_ativa = 1 WHERE id = '${membroId}'`)
+    sqlite.exec(`UPDATE contas_acesso SET status = 'ATIVA' WHERE membro_id = '${membroId}'`)
   })
 
   it('33. Login falha com PIN incorreto', async () => {
@@ -449,7 +443,7 @@ describe('Autenticação e Sessões S03', () => {
 
   it('34. Login com PIN incorreto incrementa tentativas_pin no banco', async () => {
     const membro = sqlite
-      .prepare('SELECT tentativas_pin FROM membros WHERE id = ?')
+      .prepare('SELECT tentativas_pin FROM contas_acesso WHERE membro_id = ?')
       .get(membroId) as any
     expect(membro.tentativas_pin).toBe(1)
   })
@@ -463,7 +457,7 @@ describe('Autenticação e Sessões S03', () => {
       })
     }
     const membro = sqlite
-      .prepare('SELECT tentativas_pin, bloqueado_ate FROM membros WHERE id = ?')
+      .prepare('SELECT tentativas_pin, bloqueado_ate FROM contas_acesso WHERE membro_id = ?')
       .get(membroId) as any
     expect(membro.tentativas_pin).toBe(5)
     expect(membro.bloqueado_ate).not.toBeNull()
@@ -480,7 +474,7 @@ describe('Autenticação e Sessões S03', () => {
 
   it('37. Login bem-sucedido (após bloqueio expirado) zera contadores e gera token de sessão', async () => {
     sqlite.exec(
-      `UPDATE membros SET bloqueado_ate = '2000-01-01T00:00:00Z' WHERE id = '${membroId}'`
+      `UPDATE contas_acesso SET bloqueado_ate = '2000-01-01T00:00:00Z' WHERE membro_id = '${membroId}'`
     )
     sqlite.exec(`UPDATE rate_limits_autenticacao SET bloqueado_ate = '2000-01-01T00:00:00Z'`)
 
@@ -495,7 +489,7 @@ describe('Autenticação e Sessões S03', () => {
     sessionTokenPuro = json.sessionToken
 
     const membro = sqlite
-      .prepare('SELECT tentativas_pin, bloqueado_ate FROM membros WHERE id = ?')
+      .prepare('SELECT tentativas_pin, bloqueado_ate FROM contas_acesso WHERE membro_id = ?')
       .get(membroId) as any
     expect(membro.tentativas_pin).toBe(0)
     expect(membro.bloqueado_ate).toBeNull()
@@ -646,10 +640,10 @@ describe('Autenticação e Sessões S03', () => {
     expect(resReset.status).toBe(200)
 
     const membro = sqlite
-      .prepare('SELECT pin_hash, autenticacao_ativa FROM membros WHERE id = ?')
+      .prepare('SELECT pin_hash, status FROM contas_acesso WHERE membro_id = ?')
       .get(membroId) as any
     expect(membro.pin_hash).toBeNull()
-    expect(membro.autenticacao_ativa).toBe(0)
+    expect(membro.status).toBe('PENDENTE_ATIVACAO')
 
     const sessoesCount = sqlite
       .prepare('SELECT COUNT(*) as count FROM sessoes WHERE membro_id = ? AND revogado_em IS NULL')
@@ -701,11 +695,11 @@ describe('Autenticação e Sessões S03', () => {
       .get(membroId) as any
     expect(linkBanco.utilizado_em).toBeNull()
 
-    // 2. O membro NÃO deve ter recebido a autenticacao_ativa (pois deu erro no final)
+    // 2. A conta deve permanecer pendente e sem PIN após o rollback
     const membro = sqlite
-      .prepare('SELECT autenticacao_ativa, pin_hash FROM membros WHERE id = ?')
+      .prepare('SELECT status, pin_hash FROM contas_acesso WHERE membro_id = ?')
       .get(membroId) as any
-    expect(membro.autenticacao_ativa).toBe(0)
+    expect(membro.status).toBe('PENDENTE_ATIVACAO')
     expect(membro.pin_hash).toBeNull()
   })
 

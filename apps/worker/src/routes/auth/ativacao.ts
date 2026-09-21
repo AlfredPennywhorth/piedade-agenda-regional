@@ -17,24 +17,28 @@ ativacaoApp.post('/', async c => {
     return c.json({ error: 'Dados inválidos', details: result.error.flatten() }, 400)
   }
 
-  const { token, celular, dataNascimento, pin } = result.data
+  const { token, celular, pin } = result.data
   const hashedToken = await hashToken(token)
-
   const db = c.get('db')
+
   if (!db) {
     return c.json({ error: 'Banco de dados indisponível', code: 'INTERNAL_ERROR' }, 500)
   }
 
   const agora = new Date().toISOString()
 
-  // Buscar link de ativação válido e membro
   const [queryResult] = await db
     .select({
       link: schema.linksAtivacao,
+      conta: schema.contasAcesso,
       membro: schema.membros,
     })
     .from(schema.linksAtivacao)
-    .innerJoin(schema.membros, eq(schema.linksAtivacao.membroId, schema.membros.id))
+    .innerJoin(
+      schema.contasAcesso,
+      eq(schema.linksAtivacao.contaAcessoId, schema.contasAcesso.id)
+    )
+    .innerJoin(schema.membros, eq(schema.contasAcesso.membroId, schema.membros.id))
     .where(
       and(
         eq(schema.linksAtivacao.tokenHash, hashedToken),
@@ -45,10 +49,10 @@ ativacaoApp.post('/', async c => {
     )
     .limit(1)
 
-  if (!queryResult || !queryResult.membro) {
-    // Registrar tentativa falha sem expor erro específico de membro
+  if (!queryResult || !queryResult.membro || !queryResult.conta) {
     await db.insert(schema.tentativasAcesso).values({
       id: crypto.randomUUID(),
+      contaAcessoId: queryResult?.link?.contaAcessoId || null,
       membroId: queryResult?.link?.membroId || null,
       tipo: 'ATIVACAO',
       sucesso: false,
@@ -57,103 +61,86 @@ ativacaoApp.post('/', async c => {
     return c.json({ error: 'Link de ativação inválido ou expirado' }, 400)
   }
 
-  const { link, membro } = queryResult
+  const { link, conta, membro } = queryResult
 
-  if (!membro.ativo) {
+  if (!membro.ativo || conta.status === 'BLOQUEADA' || conta.status === 'DESATIVADA') {
     await db.insert(schema.tentativasAcesso).values({
       id: crypto.randomUUID(),
+      contaAcessoId: conta.id,
       membroId: membro.id,
       tipo: 'ATIVACAO',
       sucesso: false,
-      motivo: 'Membro inativo',
+      motivo: 'Pessoa inativa ou conta indisponível',
     })
     return c.json({ error: 'Link de ativação inválido ou expirado' }, 400)
   }
 
-  if (membro.celular !== celular || membro.dataNascimento !== dataNascimento) {
+  if (membro.celular !== celular) {
     await db.insert(schema.tentativasAcesso).values({
       id: crypto.randomUUID(),
+      contaAcessoId: conta.id,
       membroId: membro.id,
       tipo: 'ATIVACAO',
       sucesso: false,
-      motivo: 'Dados cadastrais não conferem',
+      motivo: 'Celular não confere',
     })
     return c.json({ error: 'Dados informados não conferem com o cadastro' }, 400)
   }
 
-  // Gera salt e hash do PIN
   const pepper = c.env?.PIN_PEPPER || 'test-pepper'
   const salt = gerarSalt()
   const hashedPin = await hashPin(pin, salt, pepper)
-
-  // 4. (Opcional - Requisito) Criar sessão automática
   const sessionToken = gerarTokenAleatorio()
   const hashedSessionToken = await hashToken(sessionToken)
-  const expiraEmSessao = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 dias
+  const expiraEmSessao = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
-  // Executa as operações
-  await executeAtomic(db, tx => {
-    const dbBatch = []
-
-    // 1. Marcar link como utilizado
-    dbBatch.push(
-      tx
-        .update(schema.linksAtivacao)
-        .set({ utilizadoEm: agora, updatedAt: agora })
-        .where(eq(schema.linksAtivacao.id, link.id))
-    )
-
-    // 2. Atualizar membro
-    dbBatch.push(
-      tx
-        .update(schema.membros)
-        .set({
-          autenticacaoAtiva: true,
-          pinHash: hashedPin,
-          pinSalt: salt,
-          tentativasPin: 0,
-          bloqueadoAte: null,
-          ativadoEm: agora,
-          updatedAt: agora,
-        })
-        .where(eq(schema.membros.id, membro.id))
-    )
-
-    dbBatch.push(
-      tx
-        .update(schema.sessoes)
-        .set({ revogadoEm: agora })
-        .where(and(eq(schema.sessoes.membroId, membro.id), isNull(schema.sessoes.revogadoEm)))
-    )
-
-    // 3. Registrar tentativa de sucesso
-    dbBatch.push(
-      tx.insert(schema.tentativasAcesso).values({
-        id: crypto.randomUUID(),
-        membroId: membro.id,
-        tipo: 'ATIVACAO',
-        sucesso: true,
+  await executeAtomic(db, tx => [
+    tx
+      .update(schema.linksAtivacao)
+      .set({ utilizadoEm: agora, updatedAt: agora })
+      .where(eq(schema.linksAtivacao.id, link.id)),
+    tx
+      .update(schema.contasAcesso)
+      .set({
+        status: 'ATIVA',
+        pinHash: hashedPin,
+        pinSalt: salt,
+        tentativasPin: 0,
+        bloqueadoAte: null,
+        ativadoEm: agora,
+        updatedAt: agora,
       })
-    )
-
-    // 4. (Opcional - Requisito) Criar sessão automática
-    dbBatch.push(
-      tx.insert(schema.sessoes).values({
-        id: crypto.randomUUID(),
-        membroId: membro.id,
-        tokenHash: hashedSessionToken,
-        expiraEm: expiraEmSessao,
-        userAgent: c.req.header('User-Agent') || null,
-      })
-    )
-
-    return dbBatch
-  })
+      .where(eq(schema.contasAcesso.id, conta.id)),
+    tx
+      .update(schema.sessoes)
+      .set({ revogadoEm: agora })
+      .where(
+        and(
+          eq(schema.sessoes.contaAcessoId, conta.id),
+          isNull(schema.sessoes.revogadoEm)
+        )
+      ),
+    tx.insert(schema.tentativasAcesso).values({
+      id: crypto.randomUUID(),
+      contaAcessoId: conta.id,
+      membroId: membro.id,
+      tipo: 'ATIVACAO',
+      sucesso: true,
+    }),
+    tx.insert(schema.sessoes).values({
+      id: crypto.randomUUID(),
+      contaAcessoId: conta.id,
+      membroId: membro.id,
+      tokenHash: hashedSessionToken,
+      expiraEm: expiraEmSessao,
+      userAgent: c.req.header('User-Agent') || null,
+    }),
+  ])
 
   return c.json(
     {
       message: 'Ativação concluída com sucesso',
-      sessionToken, // Token puro retornado 1 única vez
+      sessionToken,
     },
     200
   )

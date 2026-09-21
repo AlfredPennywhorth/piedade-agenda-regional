@@ -33,6 +33,7 @@ async function registrarFalha(
   db: any,
   rateLimit: typeof schema.rateLimitsAutenticacao.$inferSelect | undefined,
   chaveHash: string,
+  contaAcessoId: string | undefined,
   membroId: string | undefined,
   agora: Date
 ) {
@@ -49,24 +50,27 @@ async function registrarFalha(
     const queries = [
       tx.insert(schema.tentativasAcesso).values({
         id: crypto.randomUUID(),
+        contaAcessoId: contaAcessoId ?? null,
         membroId: membroId ?? null,
         tipo: 'LOGIN_PIN',
         sucesso: false,
         motivo: 'Credenciais inválidas',
       }),
     ]
-    if (membroId) {
+
+    if (contaAcessoId) {
       queries.push(
         tx
-          .update(schema.membros)
+          .update(schema.contasAcesso)
           .set({
             tentativasPin: falhasConsecutivas,
             bloqueadoAte,
             updatedAt: agora.toISOString(),
           })
-          .where(eq(schema.membros.id, membroId))
+          .where(eq(schema.contasAcesso.id, contaAcessoId))
       )
     }
+
     if (rateLimit && new Date(rateLimit.expiraEm) > agora) {
       queries.push(
         tx
@@ -91,6 +95,7 @@ async function registrarFalha(
         })
       )
     }
+
     return queries
   })
 
@@ -106,8 +111,8 @@ loginApp.post('/', async c => {
   }
 
   const { identificador, pin } = result.data
-
   const db = c.get('db')
+
   if (!db) {
     return c.json({ error: 'Banco de dados indisponível', code: 'INTERNAL_ERROR' }, 500)
   }
@@ -133,29 +138,44 @@ loginApp.post('/', async c => {
     }
   }
 
-  const [membro] = await db
-    .select()
+  const [identidade] = await db
+    .select({
+      membro: schema.membros,
+      conta: schema.contasAcesso,
+    })
     .from(schema.membros)
+    .innerJoin(schema.contasAcesso, eq(schema.contasAcesso.membroId, schema.membros.id))
     .where(eq(schema.membros.celular, identificador))
     .limit(1)
 
-  // Mensagem genérica para não enumerar usuários
   const errorMsg = 'Credenciais inválidas'
+  const membro = identidade?.membro
+  const conta = identidade?.conta
 
-  if (!membro || !membro.ativo || !membro.autenticacaoAtiva) {
-    const falha = await registrarFalha(db, rateLimit, chaveHash, membro?.id, agora)
+  if (!membro || !conta || !membro.ativo || conta.status !== 'ATIVA' || !conta.pinHash) {
+    const falha = await registrarFalha(
+      db,
+      rateLimit,
+      chaveHash,
+      conta?.id,
+      membro?.id,
+      agora
+    )
     if (falha.bloqueadoAte) {
       return respostaBloqueada(c, new Date(falha.bloqueadoAte), agora)
     }
     return c.json({ error: errorMsg }, 401)
   }
 
-  // Verificar PIN
+  if (conta.bloqueadoAte && agora < new Date(conta.bloqueadoAte)) {
+    return respostaBloqueada(c, new Date(conta.bloqueadoAte), agora)
+  }
+
   const pepper = c.env?.PIN_PEPPER || 'test-pepper'
-  const pinValido = await verifyPin(pin, pepper, membro.pinHash!)
+  const pinValido = await verifyPin(pin, pepper, conta.pinHash)
 
   if (!pinValido) {
-    const falha = await registrarFalha(db, rateLimit, chaveHash, membro.id, agora)
+    const falha = await registrarFalha(db, rateLimit, chaveHash, conta.id, membro.id, agora)
     if (falha.bloqueadoAte) {
       return respostaBloqueada(c, new Date(falha.bloqueadoAte), agora)
     }
@@ -168,14 +188,15 @@ loginApp.post('/', async c => {
 
   await executeAtomic(db, tx => [
     tx
-      .update(schema.membros)
+      .update(schema.contasAcesso)
       .set({ tentativasPin: 0, bloqueadoAte: null, updatedAt: agora.toISOString() })
-      .where(eq(schema.membros.id, membro.id)),
+      .where(eq(schema.contasAcesso.id, conta.id)),
     tx
       .delete(schema.rateLimitsAutenticacao)
       .where(eq(schema.rateLimitsAutenticacao.chaveHash, chaveHash)),
     tx.insert(schema.sessoes).values({
       id: crypto.randomUUID(),
+      contaAcessoId: conta.id,
       membroId: membro.id,
       tokenHash: hashedSessionToken,
       expiraEm,
@@ -183,6 +204,7 @@ loginApp.post('/', async c => {
     }),
     tx.insert(schema.tentativasAcesso).values({
       id: crypto.randomUUID(),
+      contaAcessoId: conta.id,
       membroId: membro.id,
       tipo: 'LOGIN_PIN',
       sucesso: true,
