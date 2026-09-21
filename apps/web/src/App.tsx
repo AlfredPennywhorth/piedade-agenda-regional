@@ -21,8 +21,12 @@ import { ConvocacoesView } from './components/convocacoes/ConvocacoesView'
 import { fetchWithAuth, limparTokenSessao, possuiTokenSessao, postWithAuth } from './api/apiClient'
 import { AuthView } from './components/auth/AuthView'
 import { ResponsabilidadeRegionalGate } from './components/governanca/ResponsabilidadeRegionalGate'
+import { CadastroConvidadoView } from './components/portaria/CadastroConvidadoView'
 
 function App() {
+  const paramsPublicos = new URLSearchParams(window.location.search)
+  const tokenPortariaPublica = paramsPublicos.get('p') || paramsPublicos.get('portaria')
+
   const [currentTab, setCurrentTab] = useState<'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes'>('agenda')
   const [capacidades, setCapacidades] = useState<CapacidadesFrontend>({})
   const [nomeUsuario, setNomeUsuario] = useState('')
@@ -93,6 +97,10 @@ function App() {
       setCurrentTab('agenda')
       setEstadoSessao('anonima')
     }
+  }
+
+  if ((window.location.pathname === '/c' || window.location.pathname === '/convidado') && tokenPortariaPublica) {
+    return <CadastroConvidadoView token={tokenPortariaPublica} />
   }
 
   if (estadoSessao === 'verificando') {

@@ -765,6 +765,73 @@ export const portariaOperadoresEvento = sqliteTable(
   })
 )
 
+export const convidadosEvento = sqliteTable(
+  'convidados_evento',
+  {
+    id: text('id').primaryKey(),
+    eventoId: text('evento_id').notNull().references(() => eventos.id),
+    nome: text('nome').notNull(),
+    localidade: text('localidade').notNull(),
+    referencia: text('referencia'),
+    observacoes: text('observacoes'),
+    status: text('status').notNull().default('PENDENTE'),
+    criadoPorMembroId: text('criado_por_membro_id').references(() => membros.id),
+    validadoPorMembroId: text('validado_por_membro_id').references(() => membros.id),
+    validadoEm: text('validado_em'),
+    ativo: ativoDefault,
+    ...timestampsS02,
+  },
+  table => ({
+    idxEvento: index('idx_convidados_evento').on(table.eventoId, table.ativo),
+    checkStatus: check(
+      'check_convidado_evento_status',
+      sql`${table.status} IN ('PENDENTE','VALIDADO')`
+    ),
+  })
+)
+
+export const credenciaisCadastroPortariaEvento = sqliteTable(
+  'credenciais_cadastro_portaria_evento',
+  {
+    id: text('id').primaryKey(),
+    eventoId: text('evento_id').notNull().references(() => eventos.id),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiraEm: text('expira_em').notNull(),
+    revogadoEm: text('revogado_em'),
+    criadoPorMembroId: text('criado_por_membro_id').references(() => membros.id),
+    ativo: ativoDefault,
+    ...timestampsS02,
+  },
+  table => ({
+    idxEvento: index('idx_credencial_cadastro_portaria_evento')
+      .on(table.eventoId, table.ativo),
+  })
+)
+
+export const presencasConvidadoEvento = sqliteTable(
+  'presencas_convidado_evento',
+  {
+    id: text('id').primaryKey(),
+    convidadoId: text('convidado_id').notNull().references(() => convidadosEvento.id),
+    eventoId: text('evento_id').notNull().references(() => eventos.id),
+    forma: text('forma').notNull(),
+    registradoPorMembroId: text('registrado_por_membro_id').references(() => membros.id),
+    registradoEm: text('registrado_em')
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+    ...timestampsS02,
+  },
+  table => ({
+    uniqueConvidado: uniqueIndex('idx_presenca_convidado_unica')
+      .on(table.eventoId, table.convidadoId),
+    checkForma: check(
+      'check_presenca_convidado_forma',
+      sql`${table.forma} IN ('VALIDACAO_PORTEIRO','MANUAL')`
+    ),
+    idxEvento: index('idx_presenca_convidado_evento').on(table.eventoId),
+  })
+)
+
 // ============================================================
 // Auditoria (S12)
 // ============================================================

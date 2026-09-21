@@ -44,6 +44,7 @@ import { rsvpRouter } from './routes/rsvp'
 import { notificacoesRouter } from './routes/notificacoes'
 import { checkinRouter } from './routes/checkin'
 import { portariaRouter } from './routes/portaria'
+import { portariaPublicaRouter } from './routes/portaria-publica'
 import { relatoriosRouter } from './routes/relatorios'
 import { auditoriaRouter } from './routes/auditoria'
 import { bootstrapMasterApp } from './routes/bootstrap/master'
@@ -98,6 +99,7 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.use('/api/v1/convocacoes/*', noStore)
   app.use('/api/v1/checkin/*', noStore)
   app.use('/api/v1/portaria/*', noStore)
+  app.use('/api/v1/portaria-publica/*', noStore)
   app.use('/api/v1/relatorios/*', noStore)
   app.use('/api/v1/auditoria/*', noStore)
   app.use('/api/v1/bootstrap/*', noStore)
@@ -178,6 +180,7 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   // ============================================================
   app.route('/api/v1/checkin', checkinRouter)
   app.route('/api/v1/portaria', portariaRouter)
+  app.route('/api/v1/portaria-publica', portariaPublicaRouter)
 
   // ============================================================
   // Rotas da API (S12 - Relatórios e Auditoria)

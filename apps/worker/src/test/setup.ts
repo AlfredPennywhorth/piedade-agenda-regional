@@ -415,6 +415,61 @@ export function setupDb(sqlite: any) {
     CREATE INDEX IF NOT EXISTS idx_portaria_operador_membro
       ON portaria_operadores_evento (membro_id, ativo);
 
+    CREATE TABLE IF NOT EXISTS convidados_evento (
+      id text PRIMARY KEY NOT NULL,
+      evento_id text NOT NULL,
+      nome text NOT NULL,
+      localidade text NOT NULL,
+      referencia text,
+      observacoes text,
+      status text DEFAULT 'PENDENTE' NOT NULL CHECK (status IN ('PENDENTE','VALIDADO')),
+      criado_por_membro_id text,
+      validado_por_membro_id text,
+      validado_em text,
+      ativo integer DEFAULT 1 NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (evento_id) REFERENCES eventos(id),
+      FOREIGN KEY (criado_por_membro_id) REFERENCES membros(id),
+      FOREIGN KEY (validado_por_membro_id) REFERENCES membros(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_convidados_evento
+      ON convidados_evento (evento_id, ativo);
+
+    CREATE TABLE IF NOT EXISTS credenciais_cadastro_portaria_evento (
+      id text PRIMARY KEY NOT NULL,
+      evento_id text NOT NULL,
+      token_hash text NOT NULL UNIQUE,
+      expira_em text NOT NULL,
+      revogado_em text,
+      criado_por_membro_id text,
+      ativo integer DEFAULT 1 NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (evento_id) REFERENCES eventos(id),
+      FOREIGN KEY (criado_por_membro_id) REFERENCES membros(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_credencial_cadastro_portaria_evento
+      ON credenciais_cadastro_portaria_evento (evento_id, ativo);
+
+    CREATE TABLE IF NOT EXISTS presencas_convidado_evento (
+      id text PRIMARY KEY NOT NULL,
+      convidado_id text NOT NULL,
+      evento_id text NOT NULL,
+      forma text NOT NULL CHECK (forma IN ('VALIDACAO_PORTEIRO','MANUAL')),
+      registrado_por_membro_id text,
+      registrado_em text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (convidado_id) REFERENCES convidados_evento(id),
+      FOREIGN KEY (evento_id) REFERENCES eventos(id),
+      FOREIGN KEY (registrado_por_membro_id) REFERENCES membros(id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_presenca_convidado_unica
+      ON presencas_convidado_evento (evento_id, convidado_id);
+    CREATE INDEX IF NOT EXISTS idx_presenca_convidado_evento
+      ON presencas_convidado_evento (evento_id);
+
     CREATE TABLE IF NOT EXISTS auditoria_logs (
       id text PRIMARY KEY NOT NULL,
       acao text NOT NULL,

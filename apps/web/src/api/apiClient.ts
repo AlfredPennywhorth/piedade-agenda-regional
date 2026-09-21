@@ -65,6 +65,19 @@ export async function patchWithAuth<T = any>(endpoint: string, body: any): Promi
 }
 
 
+
+export async function fetchPublic<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, options)
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}))
+    const message = errorBody.error || errorBody.message || `HTTP error! status: ${response.status}`
+    throw new ApiError(response.status, message, errorBody)
+  }
+
+  return response.json()
+}
+
 export async function postPublic<T = any>(endpoint: string, body: any): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: 'POST',
