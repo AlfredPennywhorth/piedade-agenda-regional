@@ -164,6 +164,13 @@ relatoriosRouter.get('/presencas/membros/:membroAlvoId', async c => {
 
   resultado.sort((a, b) => b.inicioEm.localeCompare(a.inicioEm))
 
+  if (itens.length > 0 && resultado.length === 0) {
+    return c.json(
+      { error: 'Acesso não autorizado ao histórico deste membro', code: 'FORBIDDEN' },
+      403
+    )
+  }
+
   const totalReunioes = resultado.length
   const totalPresentes = resultado.filter(item => item.situacao === 'PRESENTE').length
   const totalAusentes = resultado.filter(item => item.situacao === 'AUSENTE').length
