@@ -57,7 +57,7 @@ describe('PORT-01 — operadores temporários por evento', () => {
 
       INSERT INTO convocacao_destinatarios
         (id, convocacao_id, membro_id)
-      VALUES ('dest-1', 'conv-1', 'participante-1');
+      VALUES ('d8b5a83d-e350-4100-b615-562db4965df1', 'conv-1', 'participante-1');
     `)
   })
 
@@ -217,7 +217,7 @@ describe('PORT-01 — operadores temporários por evento', () => {
     const checkin = await app.request('/api/v1/checkin/manual', {
       method: 'POST',
       headers: auth('token-p1', true),
-      body: JSON.stringify({ convocacaoDestinatarioId: 'dest-1' }),
+      body: JSON.stringify({ convocacaoDestinatarioId: 'd8b5a83d-e350-4100-b615-562db4965df1' }),
     })
     expect(checkin.status).toBe(403)
   })
