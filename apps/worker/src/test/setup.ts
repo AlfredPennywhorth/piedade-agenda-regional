@@ -10,6 +10,8 @@ export function setupDb(sqlite: any) {
       id text PRIMARY KEY NOT NULL,
       nome text NOT NULL,
       data_nascimento text,
+      data_ordenacao text,
+      codigo_carteirinha text UNIQUE,
       celular text UNIQUE,
       casa_id text NOT NULL,
       ativo integer DEFAULT true NOT NULL,
@@ -55,8 +57,27 @@ export function setupDb(sqlite: any) {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_vinculo_unico_casa ON vinculos_funcionais (membro_id, funcao_id, casa_id) WHERE casa_id IS NOT NULL AND ativo = 1;
     CREATE UNIQUE INDEX IF NOT EXISTS idx_vinculo_unico_gt ON vinculos_funcionais (membro_id, funcao_id, grupo_trabalho_id) WHERE grupo_trabalho_id IS NOT NULL AND ativo = 1;
 
+    CREATE TABLE IF NOT EXISTS contas_acesso (
+      id text PRIMARY KEY NOT NULL,
+      membro_id text NOT NULL UNIQUE,
+      status text DEFAULT 'PENDENTE_ATIVACAO' NOT NULL,
+      pin_hash text,
+      pin_salt text,
+      bloqueado_ate text,
+      tentativas_pin integer DEFAULT 0 NOT NULL,
+      ativado_em text,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (membro_id) REFERENCES membros(id),
+      CONSTRAINT check_conta_acesso_status CHECK (
+        status IN ('PENDENTE_ATIVACAO', 'ATIVA', 'BLOQUEADA', 'DESATIVADA')
+      )
+    );
+    CREATE INDEX IF NOT EXISTS idx_contas_acesso_status ON contas_acesso (status);
+
     CREATE TABLE IF NOT EXISTS links_ativacao (
       id text PRIMARY KEY NOT NULL,
+      conta_acesso_id text,
       membro_id text NOT NULL,
       token_hash text NOT NULL UNIQUE,
       expira_em text NOT NULL,
@@ -64,11 +85,13 @@ export function setupDb(sqlite: any) {
       revogado_em text,
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (membro_id) REFERENCES membros(id)
+      FOREIGN KEY (membro_id) REFERENCES membros(id),
+      FOREIGN KEY (conta_acesso_id) REFERENCES contas_acesso(id)
     );
 
     CREATE TABLE IF NOT EXISTS sessoes (
       id text PRIMARY KEY NOT NULL,
+      conta_acesso_id text,
       membro_id text NOT NULL,
       token_hash text NOT NULL UNIQUE,
       expira_em text NOT NULL,
@@ -76,17 +99,20 @@ export function setupDb(sqlite: any) {
       ultimo_acesso_em text,
       user_agent text,
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (membro_id) REFERENCES membros(id)
+      FOREIGN KEY (membro_id) REFERENCES membros(id),
+      FOREIGN KEY (conta_acesso_id) REFERENCES contas_acesso(id)
     );
 
     CREATE TABLE IF NOT EXISTS tentativas_acesso (
       id text PRIMARY KEY NOT NULL,
+      conta_acesso_id text,
       membro_id text,
       tipo text NOT NULL,
       sucesso integer NOT NULL,
       motivo text,
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (membro_id) REFERENCES membros(id)
+      FOREIGN KEY (membro_id) REFERENCES membros(id),
+      FOREIGN KEY (conta_acesso_id) REFERENCES contas_acesso(id)
     );
 
     CREATE TABLE IF NOT EXISTS rate_limits_autenticacao (
