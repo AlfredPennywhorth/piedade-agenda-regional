@@ -2,8 +2,11 @@ import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { setores } from '../db/schema'
 import { CreateSetorSchema, UpdateSetorSchema } from '@piedade/shared'
+import { authMiddleware } from '../middleware/auth'
 
 export const setoresRouter = new Hono<any>()
+
+setoresRouter.use('*', authMiddleware)
 
 setoresRouter.get('/', async (c) => {
   const db = c.get('db')

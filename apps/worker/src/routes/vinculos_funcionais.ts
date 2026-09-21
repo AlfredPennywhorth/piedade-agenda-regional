@@ -2,8 +2,11 @@ import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { vinculosFuncionais } from '../db/schema'
 import { CreateVinculoFuncionalSchema, UpdateVinculoFuncionalSchema } from '@piedade/shared'
+import { authMiddleware } from '../middleware/auth'
 
 export const vinculosFuncionaisRouter = new Hono<any>()
+
+vinculosFuncionaisRouter.use('*', authMiddleware)
 
 vinculosFuncionaisRouter.get('/', async (c) => {
   const db = c.get('db')

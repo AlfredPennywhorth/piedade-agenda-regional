@@ -2,8 +2,11 @@ import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { regionais } from '../db/schema'
 import { CreateRegionalSchema, UpdateRegionalSchema } from '@piedade/shared'
+import { authMiddleware } from '../middleware/auth'
 
 export const regionaisRouter = new Hono<any>()
+
+regionaisRouter.use('*', authMiddleware)
 
 regionaisRouter.get('/', async (c) => {
   const db = c.get('db')

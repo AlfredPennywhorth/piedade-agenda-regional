@@ -3,6 +3,8 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import Database from 'better-sqlite3'
 import { createApp } from '../index'
 import * as schema from '../db/schema'
+import { setupDb } from './setup'
+import { criarSessaoAutenticadaTeste, mesclarAutorizacao } from './auth-test-helper'
 
 type FuncaoResponse = {
   id: string
@@ -14,16 +16,15 @@ const sqlite = new Database(':memory:')
 sqlite.pragma('foreign_keys = ON')
 const db = drizzle(sqlite, { schema })
 const app = createApp(db)
+let authToken = ''
 
-beforeAll(() => {
-  const setupSql = `
-    CREATE TABLE funcoes (id text PRIMARY KEY NOT NULL, nome text NOT NULL, codigo text, descricao text, ativo integer DEFAULT true NOT NULL, created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL);
-  `
-  sqlite.exec(setupSql)
+beforeAll(async () => {
+  setupDb(sqlite)
+  authToken = (await criarSessaoAutenticadaTeste(sqlite, 'funcoes-auth')).token
 })
 
 const req = async (path: string, options?: RequestInit) => {
-  const request = new Request(`http://localhost${path}`, options)
+  const request = new Request(`http://localhost${path}`, mesclarAutorizacao(authToken, options))
   return app.request(request)
 }
 

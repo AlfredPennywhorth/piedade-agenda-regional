@@ -2,8 +2,11 @@ import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { gruposTrabalho } from '../db/schema'
 import { CreateGrupoTrabalhoSchema, UpdateGrupoTrabalhoSchema } from '@piedade/shared'
+import { authMiddleware } from '../middleware/auth'
 
 export const gruposTrabalhoRouter = new Hono<any>()
+
+gruposTrabalhoRouter.use('*', authMiddleware)
 
 gruposTrabalhoRouter.get('/', async (c) => {
   const db = c.get('db')

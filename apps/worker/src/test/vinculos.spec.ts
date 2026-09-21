@@ -20,15 +20,18 @@ sqlite.pragma('foreign_keys = ON')
 
 const db = drizzle(sqlite, { schema })
 const app = createApp(db)
+let authToken = ''
 
 import { setupDb } from './setup'
+import { criarSessaoAutenticadaTeste, mesclarAutorizacao } from './auth-test-helper'
 
-beforeAll(() => {
+beforeAll(async () => {
   setupDb(sqlite)
+  authToken = (await criarSessaoAutenticadaTeste(sqlite, 'vinculos-auth')).token
 })
 
 const req = async (path: string, options?: RequestInit) => {
-  const request = new Request(`http://localhost${path}`, options)
+  const request = new Request(`http://localhost${path}`, mesclarAutorizacao(authToken, options))
   return app.request(request)
 }
 

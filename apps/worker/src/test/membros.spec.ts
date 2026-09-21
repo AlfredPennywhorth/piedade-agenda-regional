@@ -5,6 +5,7 @@ import { createApp } from '../index'
 import * as schema from '../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { setupDb } from './setup'
+import { criarSessaoAutenticadaTeste, mesclarAutorizacao } from './auth-test-helper'
 
 type MembroResponse = {
   id: string
@@ -21,9 +22,10 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
   let sqlite: any
   let db: ReturnType<typeof drizzle>
   let app: any
+  let authToken = ''
 
   const req = async (path: string, options?: RequestInit) => {
-    const request = new Request(`http://localhost${path}`, options)
+    const request = new Request(`http://localhost${path}`, mesclarAutorizacao(authToken, options))
     return app.request(request)
   }
 
@@ -35,7 +37,7 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
   const casaInexistenteId = '99999999-9999-4999-8999-999999999999'
   const membroId = '33333333-3333-4333-8333-333333333333'
 
-  beforeEach(() => {
+  beforeEach(async () => {
     sqlite = new Database(':memory:')
     sqlite.pragma('foreign_keys = ON')
     db = drizzle(sqlite, { schema })
@@ -61,6 +63,7 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
       INSERT INTO membros (id, nome, celular, data_ordenacao, codigo_carteirinha, casa_id, ativo)
       VALUES ('${membroId}', 'Pessoa Teste Base', '11999999999', '1990-01-01', 'BASE-001', '${casaId}', 1);
     `)
+    authToken = (await criarSessaoAutenticadaTeste(sqlite, 'membros-auth')).token
   })
 
   it('1. Deve criar membro válido', async () => {

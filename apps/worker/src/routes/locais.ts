@@ -2,8 +2,11 @@ import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { locais } from '../db/schema'
 import { LocalCreate, LocalUpdate } from '@piedade/shared'
+import { authMiddleware } from '../middleware/auth'
 
 export const locaisRouter = new Hono<any>()
+
+locaisRouter.use('*', authMiddleware)
 
 locaisRouter.get('/', async (c) => {
   const db = c.get('db')

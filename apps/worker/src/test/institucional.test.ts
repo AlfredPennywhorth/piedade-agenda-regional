@@ -3,6 +3,8 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import Database from 'better-sqlite3'
 import { createApp } from '../index'
 import * as schema from '../db/schema'
+import { setupDb } from './setup'
+import { criarSessaoAutenticadaTeste, mesclarAutorizacao } from './auth-test-helper'
 
 type EntidadeResponse = {
   id: string
@@ -31,76 +33,15 @@ const db = drizzle(sqlite, { schema })
 
 // Aplicação Hono com o DB injetado
 const app = createApp(db)
+let authToken = ''
 
-beforeAll(() => {
-  const setupSql = `
-    CREATE TABLE regionais (
-      id text PRIMARY KEY NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL
-    );
-
-    CREATE TABLE administracoes (
-      id text PRIMARY KEY NOT NULL,
-      regional_id text NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (regional_id) REFERENCES regionais(id)
-    );
-
-    CREATE TABLE setores (
-      id text PRIMARY KEY NOT NULL,
-      administracao_id text NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (administracao_id) REFERENCES administracoes(id)
-    );
-
-    CREATE TABLE casas (
-      id text PRIMARY KEY NOT NULL,
-      setor_id text NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (setor_id) REFERENCES setores(id)
-    );
-
-    CREATE TABLE grupos_trabalho (
-      id text PRIMARY KEY NOT NULL,
-      nome text NOT NULL,
-      ativo integer DEFAULT true NOT NULL,
-      regional_id text,
-      administracao_id text,
-      setor_id text,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (regional_id) REFERENCES regionais(id),
-      FOREIGN KEY (administracao_id) REFERENCES administracoes(id),
-      FOREIGN KEY (setor_id) REFERENCES setores(id),
-      CONSTRAINT check_escopo_unico CHECK(
-        (CASE WHEN regional_id IS NOT NULL THEN 1 ELSE 0 END) +
-        (CASE WHEN administracao_id IS NOT NULL THEN 1 ELSE 0 END) +
-        (CASE WHEN setor_id IS NOT NULL THEN 1 ELSE 0 END) = 1
-      )
-    );
-  `
-
-  sqlite.exec(setupSql)
+beforeAll(async () => {
+  setupDb(sqlite)
+  authToken = (await criarSessaoAutenticadaTeste(sqlite, 'institucional-auth')).token
 })
 
 const req = async (path: string, options?: RequestInit) => {
-  const request = new Request(`http://localhost${path}`, options)
+  const request = new Request(`http://localhost${path}`, mesclarAutorizacao(authToken, options))
   return app.request(request)
 }
 
