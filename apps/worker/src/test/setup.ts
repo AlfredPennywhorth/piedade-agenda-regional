@@ -470,6 +470,47 @@ export function setupDb(sqlite: any) {
     CREATE INDEX IF NOT EXISTS idx_presenca_convidado_evento
       ON presencas_convidado_evento (evento_id);
 
+    CREATE TABLE IF NOT EXISTS portaria_fechamentos (
+      id text PRIMARY KEY NOT NULL,
+      evento_id text NOT NULL UNIQUE,
+      fechado_por_membro_id text,
+      fechado_em text NOT NULL,
+      total_convocados integer DEFAULT 0 NOT NULL,
+      total_convocados_presentes integer DEFAULT 0 NOT NULL,
+      total_convocados_ausentes integer DEFAULT 0 NOT NULL,
+      total_convidados_validados integer DEFAULT 0 NOT NULL,
+      total_convidados_pendentes integer DEFAULT 0 NOT NULL,
+      total_presentes integer DEFAULT 0 NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (evento_id) REFERENCES eventos(id),
+      FOREIGN KEY (fechado_por_membro_id) REFERENCES membros(id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_portaria_fechamento_evento
+      ON portaria_fechamentos (evento_id);
+
+    CREATE TABLE IF NOT EXISTS portaria_fechamento_itens (
+      id text PRIMARY KEY NOT NULL,
+      fechamento_id text NOT NULL,
+      evento_id text NOT NULL,
+      tipo_pessoa text NOT NULL CHECK (tipo_pessoa IN ('MEMBRO','CONVIDADO')),
+      origem_id text NOT NULL,
+      nome text NOT NULL,
+      localidade text,
+      situacao text NOT NULL CHECK (situacao IN ('PRESENTE','AUSENTE','PENDENTE')),
+      resposta_rsvp text,
+      forma_presenca text,
+      registrado_em text,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (fechamento_id) REFERENCES portaria_fechamentos(id),
+      FOREIGN KEY (evento_id) REFERENCES eventos(id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_portaria_fechamento_origem_unica
+      ON portaria_fechamento_itens (fechamento_id, tipo_pessoa, origem_id);
+    CREATE INDEX IF NOT EXISTS idx_portaria_fechamento_itens_evento
+      ON portaria_fechamento_itens (evento_id);
+
     CREATE TABLE IF NOT EXISTS auditoria_logs (
       id text PRIMARY KEY NOT NULL,
       acao text NOT NULL,
