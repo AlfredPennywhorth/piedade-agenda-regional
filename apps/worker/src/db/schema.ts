@@ -765,6 +765,62 @@ export const portariaOperadoresEvento = sqliteTable(
   })
 )
 
+export const convidadosEvento = sqliteTable(
+  'convidados_evento',
+  {
+    id: text('id').primaryKey(),
+    eventoId: text('evento_id').notNull().references(() => eventos.id),
+    nome: text('nome').notNull(),
+    referencia: text('referencia'),
+    criadoPorMembroId: text('criado_por_membro_id').references(() => membros.id),
+    ativo: ativoDefault,
+    ...timestampsS02,
+  },
+  table => ({
+    idxEvento: index('idx_convidados_evento').on(table.eventoId, table.ativo),
+  })
+)
+
+export const credenciaisConvidadoEvento = sqliteTable(
+  'credenciais_convidado_evento',
+  {
+    id: text('id').primaryKey(),
+    convidadoId: text('convidado_id').notNull().references(() => convidadosEvento.id),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiraEm: text('expira_em').notNull(),
+    utilizadoEm: text('utilizado_em'),
+    revogadoEm: text('revogado_em'),
+    ...timestampsS02,
+  },
+  table => ({
+    idxConvidado: index('idx_credencial_convidado').on(table.convidadoId),
+  })
+)
+
+export const presencasConvidadoEvento = sqliteTable(
+  'presencas_convidado_evento',
+  {
+    id: text('id').primaryKey(),
+    convidadoId: text('convidado_id').notNull().references(() => convidadosEvento.id),
+    eventoId: text('evento_id').notNull().references(() => eventos.id),
+    forma: text('forma').notNull(),
+    registradoPorMembroId: text('registrado_por_membro_id').references(() => membros.id),
+    registradoEm: text('registrado_em')
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+    ...timestampsS02,
+  },
+  table => ({
+    uniqueConvidado: uniqueIndex('idx_presenca_convidado_unica')
+      .on(table.eventoId, table.convidadoId),
+    checkForma: check(
+      'check_presenca_convidado_forma',
+      sql`${table.forma} IN ('LINK','QR','MANUAL')`
+    ),
+    idxEvento: index('idx_presenca_convidado_evento').on(table.eventoId),
+  })
+)
+
 // ============================================================
 // Auditoria (S12)
 // ============================================================
