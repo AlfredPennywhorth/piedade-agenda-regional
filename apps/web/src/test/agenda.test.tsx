@@ -7,6 +7,9 @@ import * as apiClient from '../api/apiClient'
 vi.mock('../api/apiClient', () => ({
   fetchWithAuth: vi.fn(),
   putWithAuth: vi.fn(),
+  postWithAuth: vi.fn(),
+  limparTokenSessao: vi.fn(() => localStorage.removeItem('session_token')),
+  possuiTokenSessao: vi.fn(() => Boolean(localStorage.getItem('session_token'))),
   API_BASE_URL: 'http://test'
 }))
 
@@ -72,20 +75,41 @@ const mockEventos = [
 
 describe('S07 - Minha Agenda e Calendário', () => {
   beforeEach(() => {
-    vi.resetAllMocks()
+    vi.clearAllMocks()
+    localStorage.setItem('session_token', 'sessao-teste')
   })
 
-  it('1. Renderiza o Layout Principal com Navegação', () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue([])
+  const mockAgenda = (dados: unknown) => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/auth/me') return { nome: 'Pessoa Teste', capacidades: {} }
+      if (endpoint === '/governanca/responsabilidade-regional') {
+        return { versao: 'teste', texto: 'Responsabilidades', acessos: [] }
+      }
+      return dados
+    })
+  }
+
+  const mockAgendaError = (erro: Error) => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/auth/me') return { nome: 'Pessoa Teste', capacidades: {} }
+      if (endpoint === '/governanca/responsabilidade-regional') {
+        return { versao: 'teste', texto: 'Responsabilidades', acessos: [] }
+      }
+      throw erro
+    })
+  }
+
+  it('1. Renderiza o Layout Principal com Navegação', async () => {
+    mockAgenda([])
     render(<App />)
     
-    expect(screen.getByText('Agenda Regional SP')).toBeInTheDocument()
+    expect(await screen.findByText('Agenda Regional SP')).toBeInTheDocument()
     expect(screen.getByText('Minha Agenda')).toBeInTheDocument()
     expect(screen.getByText('Calendário')).toBeInTheDocument()
   })
 
   it('2. Exibe estado de loading e vazio na Agenda', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue([])
+    mockAgenda([])
     render(<App />)
     
     // Test for empty state
@@ -95,7 +119,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('3. Renderiza lista de eventos (Minha Agenda) ordenados', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
     
     await waitFor(() => {
@@ -110,7 +134,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('4. Navega para Calendário e exibe grid mensal', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
     
     const calTab = screen.getByText('Calendário')
@@ -128,7 +152,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('5. Cenário de Erro da API', async () => {
-    ;(apiClient.fetchWithAuth as any).mockRejectedValue(new Error('Sessão expirada'))
+    mockAgendaError(new Error('Sessão expirada'))
     render(<App />)
     
     await waitFor(() => {
@@ -137,7 +161,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('6. Seleciona dia com evento no calendário e exibe lista', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
     
     // Go to calendar
@@ -156,7 +180,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('7. Seleciona dia sem evento no calendário', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
     
     // Go to calendar
@@ -176,7 +200,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('8. Abre detalhe pela Minha Agenda e verifica conteúdo (HIBRIDO/PRESENCIAL)', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
 
     // Aguarda o botão do card aparecer e clica semanticamente no elemento interativo
@@ -201,7 +225,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('9. Abre detalhe pelo Calendário e verifica conteúdo ONLINE', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
     
     // Go to calendar
@@ -228,7 +252,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('10. Exibe seção de RSVP no detalhe', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
 
     await waitFor(() => {
@@ -248,7 +272,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('11. Confirma participação', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     ;(apiClient.putWithAuth as any).mockResolvedValue({})
     render(<App />)
 
@@ -276,7 +300,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('12. Persiste estado visual ao fechar e reabrir evento', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     ;(apiClient.putWithAuth as any).mockResolvedValue({})
     render(<App />)
 
@@ -318,7 +342,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('13. Selecionar ausência sem salvar não altera o badge', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
 
     await waitFor(() => {
@@ -347,7 +371,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   // ============================================================
 
   it('31. evento false/false não mostra seletor de período', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
     await waitFor(() => screen.getByText('Reunião de Setor'))
     fireEvent.click(screen.getByText('Reunião de Setor'))
@@ -357,7 +381,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('32. somente manhã não pergunta período', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
     await waitFor(() => screen.getByText('Evento S09 Manhã'))
     fireEvent.click(screen.getByText('Evento S09 Manhã'))
@@ -370,7 +394,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     const mockTarde = JSON.parse(JSON.stringify(mockEventos))
     mockTarde[3].evento.possuiManha = false
     mockTarde[3].evento.possuiTarde = true
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockTarde)
+    mockAgenda(mockTarde)
     render(<App />)
     await waitFor(() => screen.getByText('Evento S09 Manhã'))
     fireEvent.click(screen.getByText('Evento S09 Manhã'))
@@ -380,7 +404,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('34. manhã+tarde mostra: Manhã, Tarde, Manhã e tarde', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
     await waitFor(() => screen.getByText('Evento S09 Integral'))
     fireEvent.click(screen.getByText('Evento S09 Integral'))
@@ -393,7 +417,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('35. clicar Vou participar em manhã+tarde não mostra badge Confirmado antes do PUT', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
     await waitFor(() => screen.getByText('Evento S09 Integral'))
     fireEvent.click(screen.getByText('Evento S09 Integral'))
@@ -403,7 +427,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('36. confirmar sem escolher período mostra validação e não chama PUT', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
     await waitFor(() => screen.getByText('Evento S09 Integral'))
     fireEvent.click(screen.getByText('Evento S09 Integral'))
@@ -417,7 +441,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('37. refeições oferecidas aparecem', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
     await waitFor(() => screen.getByText('Evento S09 Integral'))
     fireEvent.click(screen.getByText('Evento S09 Integral'))
@@ -430,7 +454,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('38. refeição não oferecida não aparece', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
     await waitFor(() => screen.getByText('Evento S09 Integral'))
     fireEvent.click(screen.getByText('Evento S09 Integral'))
@@ -441,7 +465,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('39. evento com alimentação permite confirmação com nenhuma refeição', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     ;(apiClient.putWithAuth as any).mockResolvedValue({})
     render(<App />)
     await waitFor(() => screen.getByText('Evento S09 Integral'))
@@ -470,7 +494,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('40. NAO_SEI fecha/oculta formulário S09', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
     await waitFor(() => screen.getByText('Evento S09 Integral'))
     fireEvent.click(screen.getByText('Evento S09 Integral'))
@@ -489,7 +513,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   })
 
   it('41. NAO_PARTICIPAREI fecha/oculta formulário S09', async () => {
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     render(<App />)
     await waitFor(() => screen.getByText('Evento S09 Integral'))
     fireEvent.click(screen.getByText('Evento S09 Integral'))
@@ -506,7 +530,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
   it('42. salvar + fechar + reabrir preserva: RSVP, período, refeições', async () => {
     // Fluxo real: RSVP nulo → salvar → fechar → reabrir → editar → verificar persistência
     // O estado é mantido via handleRsvpUpdated no AgendaView (não via mock injetado)
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockEventos)
+    mockAgenda(mockEventos)
     ;(apiClient.putWithAuth as any).mockResolvedValue({})
     render(<App />)
 
@@ -571,7 +595,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
       periodosParticipacao: ['TARDE']
     }
     
-    ;(apiClient.fetchWithAuth as any).mockResolvedValue(mockComRsvp)
+    mockAgenda(mockComRsvp)
     ;(apiClient.putWithAuth as any).mockClear()
     
     render(<App />)
