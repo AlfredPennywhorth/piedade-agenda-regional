@@ -78,6 +78,47 @@ describe('ACC-11 — capacidades consolidadas da conta', () => {
     expect(capacidades.podeOperarPortaria).toBe(true)
   })
 
+  it('operador temporário ativo visualiza Portaria enquanto a reunião está aberta', async () => {
+    sqlite.exec(`
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, setor_id, ativo)
+      VALUES
+        ('evento-portaria', 'Reunião Portaria', 'PRESENCIAL',
+         '2099-01-01T10:00:00.000Z', '2099-01-01T12:00:00.000Z', 'setor-1', 1);
+
+      INSERT INTO portaria_operadores_evento
+        (id, evento_id, membro_id, concedido_por_membro_id, ativo)
+      VALUES
+        ('op-temp-1', 'evento-portaria', 'membro-1', 'membro-1', 1);
+    `)
+
+    const capacidades = await obterCapacidadesMembro(db, 'membro-1', 'conta-1')
+    expect(capacidades.podeOperarPortaria).toBe(true)
+  })
+
+  it('operador temporário perde capacidade quando a Portaria está fechada', async () => {
+    sqlite.exec(`
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, setor_id, ativo)
+      VALUES
+        ('evento-fechado', 'Reunião Fechada', 'PRESENCIAL',
+         '2099-01-01T10:00:00.000Z', '2099-01-01T12:00:00.000Z', 'setor-1', 1);
+
+      INSERT INTO portarias_evento
+        (evento_id, status, fechada_em, fechada_por_membro_id)
+      VALUES
+        ('evento-fechado', 'FECHADA', CURRENT_TIMESTAMP, 'membro-1');
+
+      INSERT INTO portaria_operadores_evento
+        (id, evento_id, membro_id, concedido_por_membro_id, ativo)
+      VALUES
+        ('op-temp-fechado', 'evento-fechado', 'membro-1', 'membro-1', 1);
+    `)
+
+    const capacidades = await obterCapacidadesMembro(db, 'membro-1', 'conta-1')
+    expect(capacidades.podeOperarPortaria).toBe(false)
+  })
+
   it('Administrador Regional pode administrar acessos', async () => {
     sqlite.exec(`
       INSERT INTO acessos_conta
