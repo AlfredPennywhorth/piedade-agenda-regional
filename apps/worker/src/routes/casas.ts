@@ -3,10 +3,12 @@ import { eq } from 'drizzle-orm'
 import { casas } from '../db/schema'
 import { CreateCasaSchema, UpdateCasaSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
+import { exigirMasterParaEscrita } from '../middleware/master-write'
 
 export const casasRouter = new Hono<any>()
 
 casasRouter.use('*', authMiddleware)
+casasRouter.use('*', exigirMasterParaEscrita)
 
 casasRouter.get('/', async (c) => {
   const db = c.get('db')
