@@ -3,10 +3,12 @@ import { eq } from 'drizzle-orm'
 import { vinculosFuncionais } from '../db/schema'
 import { CreateVinculoFuncionalSchema, UpdateVinculoFuncionalSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
+import { exigirMasterParaEscrita } from '../middleware/master-write'
 
 export const vinculosFuncionaisRouter = new Hono<any>()
 
 vinculosFuncionaisRouter.use('*', authMiddleware)
+vinculosFuncionaisRouter.use('*', exigirMasterParaEscrita)
 
 vinculosFuncionaisRouter.get('/', async (c) => {
   const db = c.get('db')
