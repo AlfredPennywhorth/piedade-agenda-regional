@@ -1,12 +1,51 @@
 import { Hono } from 'hono'
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { hashToken } from '../security/tokens'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
 
 export const portariaPublicaRouter = new Hono<any>()
 
-portariaPublicaRouter.post('/convidados/:token/presenca', async c => {
+async function carregarCredencial(db: any, token: string) {
+  const tokenHash = await hashToken(token)
+
+  return db
+    .select({
+      credencial: schema.credenciaisCadastroPortariaEvento,
+      evento: schema.eventos,
+      portaria: schema.portariasEvento,
+    })
+    .from(schema.credenciaisCadastroPortariaEvento)
+    .innerJoin(schema.eventos, eq(schema.credenciaisCadastroPortariaEvento.eventoId, schema.eventos.id))
+    .leftJoin(schema.portariasEvento, eq(schema.eventos.id, schema.portariasEvento.eventoId))
+    .where(eq(schema.credenciaisCadastroPortariaEvento.tokenHash, tokenHash))
+    .get()
+}
+
+function validarCredencial(credencial: any) {
+  if (!credencial) {
+    return { status: 404, body: { error: 'Credencial inválida', code: 'NOT_FOUND' } }
+  }
+  if (
+    credencial.credencial.revogadoEm ||
+    !credencial.credencial.ativo ||
+    !credencial.evento.ativo
+  ) {
+    return {
+      status: 409,
+      body: { error: 'Credencial indisponível', code: 'CREDENCIAL_INDISPONIVEL' },
+    }
+  }
+  if (Date.parse(credencial.credencial.expiraEm) <= Date.now()) {
+    return { status: 410, body: { error: 'Credencial expirada', code: 'CREDENCIAL_EXPIRADA' } }
+  }
+  if (credencial.portaria?.status === 'FECHADA') {
+    return { status: 409, body: { error: 'Portaria fechada', code: 'PORTARIA_FECHADA' } }
+  }
+  return null
+}
+
+portariaPublicaRouter.get('/cadastro/:token', async c => {
   const db = c.get('db')
   const token = c.req.param('token')
 
@@ -14,110 +53,107 @@ portariaPublicaRouter.post('/convidados/:token/presenca', async c => {
     return c.json({ error: 'Requisição inválida', code: 'VALIDATION_ERROR' }, 400)
   }
 
-  const tokenHash = await hashToken(token)
-  const credencial = await db
-    .select({
-      credencial: schema.credenciaisConvidadoEvento,
-      convidado: schema.convidadosEvento,
-      evento: schema.eventos,
-      portaria: schema.portariasEvento,
-    })
-    .from(schema.credenciaisConvidadoEvento)
-    .innerJoin(
-      schema.convidadosEvento,
-      eq(schema.credenciaisConvidadoEvento.convidadoId, schema.convidadosEvento.id)
-    )
-    .innerJoin(schema.eventos, eq(schema.convidadosEvento.eventoId, schema.eventos.id))
-    .leftJoin(schema.portariasEvento, eq(schema.eventos.id, schema.portariasEvento.eventoId))
-    .where(eq(schema.credenciaisConvidadoEvento.tokenHash, tokenHash))
-    .get()
+  const credencial = await carregarCredencial(db, token)
+  const erro = validarCredencial(credencial)
+  if (erro) return c.json(erro.body, erro.status as 404 | 409 | 410)
 
-  if (!credencial) {
-    return c.json({ error: 'Credencial inválida', code: 'NOT_FOUND' }, 404)
+  return c.json({
+    evento: {
+      id: credencial.evento.id,
+      titulo: credencial.evento.titulo,
+      inicioEm: credencial.evento.inicioEm,
+      fimEm: credencial.evento.fimEm,
+    },
+    campos: {
+      nome: { obrigatorio: true, maximo: 120 },
+      localidade: { obrigatorio: true, maximo: 120 },
+      referencia: { obrigatorio: false, maximo: 120 },
+      observacoes: { obrigatorio: false, maximo: 300 },
+    },
+  }, 200)
+})
+
+portariaPublicaRouter.post('/cadastro/:token', async c => {
+  const db = c.get('db')
+  const token = c.req.param('token')
+
+  if (!db || !token) {
+    return c.json({ error: 'Requisição inválida', code: 'VALIDATION_ERROR' }, 400)
   }
+
+  const credencial = await carregarCredencial(db, token)
+  const erro = validarCredencial(credencial)
+  if (erro) return c.json(erro.body, erro.status as 404 | 409 | 410)
+
+  let body: {
+    nome?: string
+    localidade?: string
+    referencia?: string | null
+    observacoes?: string | null
+  }
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Requisição inválida', code: 'VALIDATION_ERROR' }, 400)
+  }
+
+  const nome = body.nome?.trim()
+  const localidade = body.localidade?.trim()
+  const referencia = body.referencia?.trim() || null
+  const observacoes = body.observacoes?.trim() || null
 
   if (
-    credencial.credencial.revogadoEm ||
-    credencial.credencial.utilizadoEm ||
-    !credencial.convidado.ativo ||
-    !credencial.evento.ativo
+    !nome ||
+    nome.length < 2 ||
+    nome.length > 120 ||
+    !localidade ||
+    localidade.length > 120 ||
+    (referencia && referencia.length > 120) ||
+    (observacoes && observacoes.length > 300)
   ) {
-    return c.json({ error: 'Credencial indisponível', code: 'CREDENCIAL_INDISPONIVEL' }, 409)
-  }
-
-  if (Date.parse(credencial.credencial.expiraEm) <= Date.now()) {
-    return c.json({ error: 'Credencial expirada', code: 'CREDENCIAL_EXPIRADA' }, 410)
-  }
-
-  if (credencial.portaria?.status === 'FECHADA') {
-    return c.json({ error: 'Portaria fechada', code: 'PORTARIA_FECHADA' }, 409)
-  }
-
-  const existente = await db
-    .select({ id: schema.presencasConvidadoEvento.id })
-    .from(schema.presencasConvidadoEvento)
-    .where(
-      and(
-        eq(schema.presencasConvidadoEvento.eventoId, credencial.evento.id),
-        eq(schema.presencasConvidadoEvento.convidadoId, credencial.convidado.id)
-      )
-    )
-    .get()
-
-  if (existente) {
-    return c.json({ error: 'Presença já registrada', code: 'PRESENCA_DUPLICADA' }, 409)
+    return c.json({ error: 'Dados do convidado inválidos', code: 'VALIDATION_ERROR' }, 400)
   }
 
   const agora = new Date().toISOString()
-  const presencaId = crypto.randomUUID()
+  const convidadoId = crypto.randomUUID()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(credencial.evento)
 
   await executarOperacaoComAudit(
     db,
     qdb => [
-      qdb.insert(schema.presencasConvidadoEvento).values({
-        id: presencaId,
-        convidadoId: credencial.convidado.id,
+      qdb.insert(schema.convidadosEvento).values({
+        id: convidadoId,
         eventoId: credencial.evento.id,
-        forma: 'LINK',
-        registradoPorMembroId: null,
-        registradoEm: agora,
+        nome,
+        localidade,
+        referencia,
+        observacoes,
+        status: 'PENDENTE',
+        criadoPorMembroId: null,
+        ativo: true,
         createdAt: agora,
         updatedAt: agora,
       }),
-      qdb
-        .update(schema.credenciaisConvidadoEvento)
-        .set({ utilizadoEm: agora, updatedAt: agora })
-        .where(eq(schema.credenciaisConvidadoEvento.id, credencial.credencial.id)),
     ],
     {
-      acao: 'PORTARIA_PRESENCA_CONVIDADO_LINK',
+      acao: 'PORTARIA_CONVIDADO_AUTOCADASTRADO',
       atorMembroId: null,
-      recursoTipo: 'PRESENCA_CONVIDADO_EVENTO',
-      recursoId: presencaId,
+      recursoTipo: 'CONVIDADO_EVENTO',
+      recursoId: convidadoId,
       escopoTipo,
       escopoId,
-      contexto: {
-        eventoId: credencial.evento.id,
-        convidadoId: credencial.convidado.id,
-        forma: 'LINK',
-      },
+      contexto: { eventoId: credencial.evento.id },
     }
   )
 
-  return c.json(
-    {
-      registrado: true,
-      evento: {
-        id: credencial.evento.id,
-        titulo: credencial.evento.titulo,
-      },
-      convidado: {
-        id: credencial.convidado.id,
-        nome: credencial.convidado.nome,
-      },
-      registradoEm: agora,
+  return c.json({
+    cadastrado: true,
+    convidado: {
+      id: convidadoId,
+      nome,
+      localidade,
+      status: 'PENDENTE',
     },
-    201
-  )
+    mensagem: 'Cadastro enviado. Aguarde a validação do porteiro para confirmar a presença.',
+  }, 201)
 })
