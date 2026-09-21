@@ -388,19 +388,99 @@ export function setupDb(sqlite: any) {
       id text PRIMARY KEY NOT NULL,
       acao text NOT NULL,
       ator_membro_id text,
+      ator_conta_acesso_id text,
       recurso_tipo text NOT NULL,
       recurso_id text NOT NULL,
       escopo_tipo text,
       escopo_id text,
       contexto text,
       criado_em text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
-      FOREIGN KEY (ator_membro_id) REFERENCES membros(id)
+      FOREIGN KEY (ator_membro_id) REFERENCES membros(id),
+      FOREIGN KEY (ator_conta_acesso_id) REFERENCES contas_acesso(id)
     );
     CREATE INDEX IF NOT EXISTS idx_auditoria_acao ON auditoria_logs (acao);
     CREATE INDEX IF NOT EXISTS idx_auditoria_ator ON auditoria_logs (ator_membro_id);
     CREATE INDEX IF NOT EXISTS idx_auditoria_recurso ON auditoria_logs (recurso_tipo, recurso_id);
     CREATE INDEX IF NOT EXISTS idx_auditoria_escopo ON auditoria_logs (escopo_tipo, escopo_id);
     CREATE INDEX IF NOT EXISTS idx_auditoria_criado_em ON auditoria_logs (criado_em);
+    CREATE INDEX IF NOT EXISTS idx_auditoria_ator_conta ON auditoria_logs (ator_conta_acesso_id);
+
+    CREATE TABLE IF NOT EXISTS perfis_acesso (
+      codigo text PRIMARY KEY NOT NULL,
+      nome text NOT NULL,
+      descricao text NOT NULL,
+      ativo integer DEFAULT 1 NOT NULL CHECK (ativo IN (0, 1)),
+      created_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+      updated_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL
+    );
+
+    INSERT OR IGNORE INTO perfis_acesso (codigo, nome, descricao) VALUES
+      ('MASTER_SISTEMA', 'Master do Sistema', 'Governança global e contingência.'),
+      ('ADMINISTRADOR_SISTEMA', 'Administrador do Sistema', 'Administração de uma Regional.'),
+      ('GESTOR_AGENDA', 'Gestor de Agenda', 'Gestão de agenda autorizada.'),
+      ('OPERADOR_PORTARIA_PERMANENTE', 'Operador de Portaria permanente', 'Operação permanente de Portaria.'),
+      ('GESTOR_RELATORIOS', 'Gestor de Relatórios', 'Consulta de relatórios autorizados.'),
+      ('AUDITOR', 'Auditor', 'Consulta de auditoria autorizada.'),
+      ('USUARIO_COMUM', 'Usuário comum', 'Agenda e ações pessoais.');
+
+    CREATE TABLE IF NOT EXISTS acessos_conta (
+      id text PRIMARY KEY NOT NULL,
+      conta_acesso_id text NOT NULL,
+      perfil_codigo text NOT NULL,
+      escopo_tipo text NOT NULL,
+      escopo_id text,
+      concedido_por_conta_id text,
+      revogado_por_conta_id text,
+      revogado_em text,
+      ativo integer DEFAULT 1 NOT NULL CHECK (ativo IN (0, 1)),
+      created_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+      updated_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+      FOREIGN KEY (conta_acesso_id) REFERENCES contas_acesso(id),
+      FOREIGN KEY (perfil_codigo) REFERENCES perfis_acesso(codigo),
+      FOREIGN KEY (concedido_por_conta_id) REFERENCES contas_acesso(id),
+      FOREIGN KEY (revogado_por_conta_id) REFERENCES contas_acesso(id),
+      CHECK (
+        (escopo_tipo = 'GLOBAL' AND escopo_id IS NULL)
+        OR (escopo_tipo IN ('REGIONAL','ADMINISTRACAO','SETOR','CASA','GRUPO_TRABALHO')
+          AND escopo_id IS NOT NULL)
+      ),
+      CHECK (
+        (perfil_codigo = 'MASTER_SISTEMA' AND escopo_tipo = 'GLOBAL' AND escopo_id IS NULL)
+        OR (perfil_codigo <> 'MASTER_SISTEMA' AND escopo_tipo <> 'GLOBAL')
+      ),
+      CHECK (perfil_codigo <> 'ADMINISTRADOR_SISTEMA' OR escopo_tipo = 'REGIONAL'),
+      CHECK (perfil_codigo <> 'AUDITOR' OR escopo_tipo IN ('REGIONAL','ADMINISTRACAO'))
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_acesso_conta_ativo_unico
+      ON acessos_conta (conta_acesso_id, perfil_codigo, escopo_tipo, ifnull(escopo_id, ''))
+      WHERE ativo = 1;
+    CREATE INDEX IF NOT EXISTS idx_acessos_conta_conta
+      ON acessos_conta (conta_acesso_id, ativo);
+    CREATE INDEX IF NOT EXISTS idx_acessos_conta_escopo
+      ON acessos_conta (escopo_tipo, escopo_id, ativo);
+
+    CREATE TABLE IF NOT EXISTS ciencias_responsabilidade (
+      id text PRIMARY KEY NOT NULL,
+      conta_acesso_id text NOT NULL,
+      acesso_conta_id text NOT NULL,
+      tipo text NOT NULL CHECK (tipo IN ('RESPONSAVEL_REGIONAL_PMO','AVISO_PRIVACIDADE')),
+      versao_texto text NOT NULL,
+      texto_hash text NOT NULL,
+      ciente_em text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+      FOREIGN KEY (conta_acesso_id) REFERENCES contas_acesso(id),
+      FOREIGN KEY (acesso_conta_id) REFERENCES acessos_conta(id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ciencia_responsabilidade_unica
+      ON ciencias_responsabilidade
+      (conta_acesso_id, acesso_conta_id, tipo, versao_texto);
+
+    CREATE TABLE IF NOT EXISTS bootstrap_master (
+      id text PRIMARY KEY NOT NULL CHECK (id = 'PRIMEIRO_MASTER'),
+      conta_acesso_id text NOT NULL,
+      concluido_em text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+      FOREIGN KEY (conta_acesso_id) REFERENCES contas_acesso(id)
+    );
+
   `
   sqlite.exec(setupSql)
 }

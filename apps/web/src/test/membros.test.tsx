@@ -29,7 +29,8 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
       id: MEMBRO_1_ID, 
       casaId: CASA_1_ID, 
       nome: 'João da Silva', 
-      dataNascimento: '1990-05-10T00:00:00.000Z',
+      dataOrdenacao: '1990-05-10',
+      codigoCarteirinha: 'CARTEIRA-001',
       celular: '11988887777',
       ativo: true, 
       createdAt: '2026-01-01T00:00:00.000Z' 
@@ -38,7 +39,8 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
       id: MEMBRO_2_ID, 
       casaId: CASA_2_ID, 
       nome: 'Maria Souza', 
-      dataNascimento: null,
+      dataOrdenacao: '2000-06-15',
+      codigoCarteirinha: 'CARTEIRA-002',
       celular: null,
       ativo: false, 
       createdAt: '2026-01-02T00:00:00.000Z' 
@@ -125,7 +127,7 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
 
   it('5. Criar: deve cadastrar um novo membro', async () => {
     const NEW_MEMBRO_ID = '77777777-7777-7777-8777-777777777777'
-    const novoMembro = { id: NEW_MEMBRO_ID, casaId: CASA_1_ID, nome: 'Pedro Henrique', dataNascimento: null, celular: null, ativo: true }
+    const novoMembro = { id: NEW_MEMBRO_ID, casaId: CASA_1_ID, nome: 'Pedro Henrique', dataOrdenacao: '2010-01-20', codigoCarteirinha: 'CARTEIRA-003', celular: null, ativo: true }
 
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
       if (endpoint === '/membros') return []
@@ -145,9 +147,13 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
 
     const selectCasa = screen.getByLabelText(/^Casa de Oração \*/i)
     const inputNome = screen.getByLabelText(/Nome Completo \*/i)
+    const inputCarteirinha = screen.getByLabelText(/Código da Carteirinha \*/i)
+    const inputOrdenacao = screen.getByLabelText(/Data de Ordenação \*/i)
 
     fireEvent.change(selectCasa, { target: { value: CASA_1_ID } })
     fireEvent.change(inputNome, { target: { value: 'Pedro Henrique' } })
+    fireEvent.change(inputCarteirinha, { target: { value: 'CARTEIRA-003' } })
+    fireEvent.change(inputOrdenacao, { target: { value: '2010-01-20' } })
 
     const btnSalvar = screen.getByText('Salvar Membro')
     fireEvent.click(btnSalvar)
@@ -156,7 +162,8 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
       expect(apiClient.postWithAuth).toHaveBeenCalledWith('/membros', {
         casaId: CASA_1_ID,
         nome: 'Pedro Henrique',
-        dataNascimento: null,
+        dataOrdenacao: '2010-01-20',
+        codigoCarteirinha: 'CARTEIRA-003',
         celular: null,
         ativo: true
       })
@@ -181,7 +188,11 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
     fireEvent.change(selectCasa, { target: { value: CASA_1_ID } })
 
     const inputNome = screen.getByLabelText(/Nome Completo \*/i)
-    fireEvent.change(inputNome, { target: { value: 'A' } }) // < 3 chars
+    const inputCarteirinha = screen.getByLabelText(/Código da Carteirinha \*/i)
+    const inputOrdenacao = screen.getByLabelText(/Data de Ordenação \*/i)
+    fireEvent.change(inputNome, { target: { value: 'A' } })
+    fireEvent.change(inputCarteirinha, { target: { value: 'CARTEIRA-VALIDACAO' } })
+    fireEvent.change(inputOrdenacao, { target: { value: '2010-01-20' } }) // < 3 chars
 
     const inputCelular = screen.getByLabelText(/Celular/i)
     fireEvent.change(inputCelular, { target: { value: '119' } }) // celular inválido
@@ -228,7 +239,8 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
       expect(apiClient.patchWithAuth).toHaveBeenCalledWith(`/membros/${MEMBRO_1_ID}`, {
         casaId: CASA_1_ID,
         nome: 'João da Silva Silva',
-        dataNascimento: '1990-05-10',
+        dataOrdenacao: '1990-05-10',
+        codigoCarteirinha: 'CARTEIRA-001',
         celular: '11988887777',
         ativo: false
       })

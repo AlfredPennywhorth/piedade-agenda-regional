@@ -6,7 +6,8 @@ import type { Casa } from '../casas/CasasView'
 export interface Membro {
   id: string
   nome: string
-  dataNascimento: string | null
+  dataOrdenacao: string
+  codigoCarteirinha: string
   celular: string | null
   casaId: string
   ativo: boolean
@@ -36,7 +37,8 @@ export function MembrosView() {
   // Form fields
   const [casaId, setCasaId] = useState<string>('')
   const [nome, setNome] = useState<string>('')
-  const [dataNascimento, setDataNascimento] = useState<string>('')
+  const [dataOrdenacao, setDataOrdenacao] = useState<string>('')
+  const [codigoCarteirinha, setCodigoCarteirinha] = useState<string>('')
   const [celular, setCelular] = useState<string>('')
   const [ativo, setAtivo] = useState<boolean>(true)
   
@@ -69,7 +71,8 @@ export function MembrosView() {
     setMembroEditandoId(null)
     setCasaId(filtroCasaId || (casas.length > 0 ? casas[0].id : ''))
     setNome('')
-    setDataNascimento('')
+    setDataOrdenacao('')
+    setCodigoCarteirinha('')
     setCelular('')
     setAtivo(true)
     setErrosForm({})
@@ -89,7 +92,8 @@ export function MembrosView() {
       const item = await fetchWithAuth<Membro>(`/membros/${id}`)
       setCasaId(item.casaId || '')
       setNome(item.nome || '')
-      setDataNascimento(item.dataNascimento ? item.dataNascimento.substring(0, 10) : '')
+      setDataOrdenacao(item.dataOrdenacao ? item.dataOrdenacao.substring(0, 10) : '')
+      setCodigoCarteirinha(item.codigoCarteirinha || '')
       setCelular(item.celular || '')
       setAtivo(item.ativo ?? true)
     } catch (err: any) {
@@ -128,7 +132,8 @@ export function MembrosView() {
     const payload = {
       casaId,
       nome: nome.trim(),
-      dataNascimento: dataNascimento.trim() ? dataNascimento.trim() : null,
+      dataOrdenacao: dataOrdenacao.trim(),
+      codigoCarteirinha: codigoCarteirinha.trim(),
       celular: celular.trim() ? celular.trim() : null,
       ativo,
     }
@@ -318,23 +323,43 @@ export function MembrosView() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="input-nascimento">
-                    Data de Nascimento (Opcional)
+                  <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="input-carteirinha">
+                    Código da Carteirinha <span className="text-red-500">*</span>
                   </label>
                   <input
-                    id="input-nascimento"
-                    type="date"
-                    value={dataNascimento}
-                    onChange={(e) => setDataNascimento(e.target.value)}
+                    id="input-carteirinha"
+                    type="text"
+                    value={codigoCarteirinha}
+                    onChange={(e) => setCodigoCarteirinha(e.target.value)}
+                    autoComplete="off"
                     className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
-                      errosForm.dataNascimento ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-brand-200'
+                      errosForm.codigoCarteirinha ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-brand-200'
                     }`}
                     disabled={salvando}
                   />
-                  {errosForm.dataNascimento && (
-                    <p className="text-xs text-red-600 mt-1">{errosForm.dataNascimento}</p>
+                  {errosForm.codigoCarteirinha && (
+                    <p className="text-xs text-red-600 mt-1">{errosForm.codigoCarteirinha}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="input-ordenacao">
+                    Data de Ordenação <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="input-ordenacao"
+                    type="date"
+                    value={dataOrdenacao}
+                    onChange={(e) => setDataOrdenacao(e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                      errosForm.dataOrdenacao ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-brand-200'
+                    }`}
+                    disabled={salvando}
+                  />
+                  {errosForm.dataOrdenacao && (
+                    <p className="text-xs text-red-600 mt-1">{errosForm.dataOrdenacao}</p>
                   )}
                 </div>
 
@@ -494,11 +519,15 @@ export function MembrosView() {
                   <span className="text-xs font-semibold text-slate-500 block">Casa de Oração:</span>
                   <span className="text-slate-700 font-medium">{getCasaNome(membroDetalhe.casaId)}</span>
                 </div>
-                {membroDetalhe.dataNascimento && (
+                <div>
+                  <span className="text-xs font-semibold text-slate-500 block">Código da Carteirinha:</span>
+                  <span className="text-slate-700">{membroDetalhe.codigoCarteirinha}</span>
+                </div>
+                {membroDetalhe.dataOrdenacao && (
                   <div>
-                    <span className="text-xs font-semibold text-slate-500 block">Data de Nascimento:</span>
+                    <span className="text-xs font-semibold text-slate-500 block">Data de Ordenação:</span>
                     <span className="text-slate-700">
-                      {new Date(membroDetalhe.dataNascimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                      {new Date(membroDetalhe.dataOrdenacao).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
                     </span>
                   </div>
                 )}
