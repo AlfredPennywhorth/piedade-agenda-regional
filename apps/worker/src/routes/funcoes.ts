@@ -2,8 +2,11 @@ import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { funcoes } from '../db/schema'
 import { CreateFuncaoSchema, UpdateFuncaoSchema } from '@piedade/shared'
+import { authMiddleware } from '../middleware/auth'
 
 export const funcoesRouter = new Hono<any>()
+
+funcoesRouter.use('*', authMiddleware)
 
 funcoesRouter.get('/', async (c) => {
   const db = c.get('db')
