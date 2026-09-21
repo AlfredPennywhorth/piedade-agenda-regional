@@ -20,6 +20,7 @@ import { LocaisView } from './components/locais/LocaisView'
 import { ConvocacoesView } from './components/convocacoes/ConvocacoesView'
 import { fetchWithAuth, limparTokenSessao, possuiTokenSessao, postWithAuth } from './api/apiClient'
 import { AuthView } from './components/auth/AuthView'
+import { ResponsabilidadeRegionalGate } from './components/governanca/ResponsabilidadeRegionalGate'
 
 function App() {
   const [currentTab, setCurrentTab] = useState<'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes'>('agenda')
@@ -102,6 +103,7 @@ function App() {
   }
 
   return (
+    <ResponsabilidadeRegionalGate>
     <MainLayout
       currentTab={currentTab}
       onTabChange={setCurrentTab}
@@ -142,6 +144,7 @@ function App() {
         </div>
       )}
     </MainLayout>
+    </ResponsabilidadeRegionalGate>
   )
 }
 
