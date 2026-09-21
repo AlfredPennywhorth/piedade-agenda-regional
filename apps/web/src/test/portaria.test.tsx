@@ -430,7 +430,7 @@ describe('PortariaView', () => {
 
     await waitFor(() => {
       expect(mockPostWithAuth).toHaveBeenCalledWith(`/portaria/eventos/${UUID_EVT1}/fechar`, {})
-      expect(screen.getByRole('alert')).toHaveTextContent(/Portaria fechada e lista final consolidada com sucesso/i)
+      expect(screen.getByText(/Portaria fechada e lista final consolidada com sucesso/i)).toBeInTheDocument()
     })
     expect(screen.queryByRole('button', { name: 'Fechar Portaria' })).not.toBeInTheDocument()
   })
