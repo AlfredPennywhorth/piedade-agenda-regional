@@ -1,13 +1,274 @@
 import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
-import { eOperadorPortariaAutorizado } from '../security/permissoes'
+import { eMasterSistema, eOperadorPortariaAutorizado } from '../security/permissoes'
+import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
 import { PortariaEventosQuerySchema, getSaoPauloDateString } from '@piedade/shared'
 
 export const portariaRouter = new Hono<{ Variables: Variables }>()
 
 portariaRouter.use('*', authMiddleware)
+
+// POST /api/v1/portaria/eventos/:eventoId/operadores
+// Concessão temporária: somente Master até homologação de quem mais pode nomear porteiros.
+portariaRouter.post('/eventos/:eventoId/operadores', async c => {
+  const db = c.get('db')
+  const atorMembroId = c.get('membroId')
+  const contexto = c.get('contextoPermissoes')
+  const eventoId = c.req.param('eventoId')
+
+  if (!db || !atorMembroId) {
+    return c.json({ error: 'Sessão ou banco indisponível', code: 'INTERNAL_ERROR' }, 500)
+  }
+
+  if (!eMasterSistema(contexto)) {
+    return c.json({ error: 'Somente Master pode nomear porteiro temporário', code: 'FORBIDDEN' }, 403)
+  }
+
+  let body: { membroId?: string }
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Requisição inválida', code: 'VALIDATION_ERROR' }, 400)
+  }
+
+  if (!body.membroId) {
+    return c.json({ error: 'membroId é obrigatório', code: 'VALIDATION_ERROR' }, 400)
+  }
+
+  const evento = await db.select().from(eventos)
+    .where(and(eq(eventos.id, eventoId), eq(eventos.ativo, true))).get()
+  if (!evento) {
+    return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
+  }
+
+  const operador = await db
+    .select({ membroId: membros.id, contaId: contasAcesso.id, status: contasAcesso.status })
+    .from(membros)
+    .innerJoin(contasAcesso, eq(contasAcesso.membroId, membros.id))
+    .where(and(eq(membros.id, body.membroId), eq(membros.ativo, true)))
+    .get()
+
+  if (!operador || operador.status !== 'ATIVA') {
+    return c.json(
+      { error: 'O porteiro temporário precisa possuir conta de acesso ativa', code: 'CONTA_INDISPONIVEL' },
+      409
+    )
+  }
+
+  const estado = await db.select().from(portariasEvento)
+    .where(eq(portariasEvento.eventoId, eventoId)).get()
+  if (estado?.status === 'FECHADA') {
+    return c.json({ error: 'A Portaria deste evento já foi fechada', code: 'PORTARIA_FECHADA' }, 409)
+  }
+
+  const existente = await db.select({ id: portariaOperadoresEvento.id })
+    .from(portariaOperadoresEvento)
+    .where(and(
+      eq(portariaOperadoresEvento.eventoId, eventoId),
+      eq(portariaOperadoresEvento.membroId, body.membroId),
+      eq(portariaOperadoresEvento.ativo, true)
+    )).get()
+  if (existente) {
+    return c.json({ error: 'Porteiro já autorizado neste evento', code: 'OPERADOR_DUPLICADO' }, 409)
+  }
+
+  const agora = new Date().toISOString()
+  const autorizacaoId = crypto.randomUUID()
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+
+  await executarOperacaoComAudit(
+    db,
+    qdb => {
+      const queries = []
+      if (!estado) {
+        queries.push(qdb.insert(portariasEvento).values({
+          eventoId,
+          status: 'ABERTA',
+          createdAt: agora,
+          updatedAt: agora,
+        }))
+      }
+      queries.push(qdb.insert(portariaOperadoresEvento).values({
+        id: autorizacaoId,
+        eventoId,
+        membroId: body.membroId!,
+        concedidoPorMembroId: atorMembroId,
+        ativo: true,
+        createdAt: agora,
+        updatedAt: agora,
+      }))
+      return queries
+    },
+    {
+      acao: 'PORTARIA_OPERADOR_TEMPORARIO_CONCEDIDO',
+      atorMembroId,
+      recursoTipo: 'PORTARIA_OPERADOR_EVENTO',
+      recursoId: autorizacaoId,
+      escopoTipo,
+      escopoId,
+      contexto: { eventoId, operadorMembroId: body.membroId },
+    }
+  )
+
+  return c.json({
+    id: autorizacaoId,
+    eventoId,
+    membroId: body.membroId,
+    ativo: true,
+    temporario: true,
+  }, 201)
+})
+
+// GET /api/v1/portaria/eventos/:eventoId/operadores
+portariaRouter.get('/eventos/:eventoId/operadores', async c => {
+  const db = c.get('db')
+  const contexto = c.get('contextoPermissoes')
+  const eventoId = c.req.param('eventoId')
+
+  if (!eMasterSistema(contexto)) {
+    return c.json({ error: 'Acesso não autorizado', code: 'FORBIDDEN' }, 403)
+  }
+
+  const operadores = await db
+    .select({
+      id: portariaOperadoresEvento.id,
+      membroId: portariaOperadoresEvento.membroId,
+      nome: membros.nome,
+      ativo: portariaOperadoresEvento.ativo,
+      revogadoEm: portariaOperadoresEvento.revogadoEm,
+    })
+    .from(portariaOperadoresEvento)
+    .innerJoin(membros, eq(portariaOperadoresEvento.membroId, membros.id))
+    .where(eq(portariaOperadoresEvento.eventoId, eventoId))
+    .all()
+
+  return c.json({ data: operadores }, 200)
+})
+
+// DELETE /api/v1/portaria/eventos/:eventoId/operadores/:membroId
+portariaRouter.delete('/eventos/:eventoId/operadores/:membroId', async c => {
+  const db = c.get('db')
+  const atorMembroId = c.get('membroId')
+  const contexto = c.get('contextoPermissoes')
+  const eventoId = c.req.param('eventoId')
+  const operadorMembroId = c.req.param('membroId')
+
+  if (!eMasterSistema(contexto)) {
+    return c.json({ error: 'Acesso não autorizado', code: 'FORBIDDEN' }, 403)
+  }
+
+  const autorizacao = await db.select().from(portariaOperadoresEvento)
+    .where(and(
+      eq(portariaOperadoresEvento.eventoId, eventoId),
+      eq(portariaOperadoresEvento.membroId, operadorMembroId),
+      eq(portariaOperadoresEvento.ativo, true)
+    )).get()
+
+  if (!autorizacao) {
+    return c.json({ error: 'Autorização temporária não encontrada', code: 'NOT_FOUND' }, 404)
+  }
+
+  const evento = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
+  const agora = new Date().toISOString()
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+
+  await executarOperacaoComAudit(
+    db,
+    qdb => [
+      qdb.update(portariaOperadoresEvento).set({
+        ativo: false,
+        revogadoEm: agora,
+        updatedAt: agora,
+      }).where(eq(portariaOperadoresEvento.id, autorizacao.id)),
+    ],
+    {
+      acao: 'PORTARIA_OPERADOR_TEMPORARIO_REVOGADO',
+      atorMembroId,
+      recursoTipo: 'PORTARIA_OPERADOR_EVENTO',
+      recursoId: autorizacao.id,
+      escopoTipo,
+      escopoId,
+      contexto: { eventoId, operadorMembroId },
+    }
+  )
+
+  return c.json({ message: 'Autorização temporária revogada' }, 200)
+})
+
+// POST /api/v1/portaria/eventos/:eventoId/fechar
+portariaRouter.post('/eventos/:eventoId/fechar', async c => {
+  const db = c.get('db')
+  const atorMembroId = c.get('membroId')
+  const eventoId = c.req.param('eventoId')
+
+  const evento = await db.select().from(eventos)
+    .where(and(eq(eventos.id, eventoId), eq(eventos.ativo, true))).get()
+  if (!evento) {
+    return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
+  }
+
+  const autorizado = await eOperadorPortariaAutorizado(db, atorMembroId, evento)
+  if (!autorizado) {
+    return c.json({ error: 'Operador não autorizado para fechar esta Portaria', code: 'FORBIDDEN' }, 403)
+  }
+
+  const estado = await db.select().from(portariasEvento)
+    .where(eq(portariasEvento.eventoId, eventoId)).get()
+  if (estado?.status === 'FECHADA') {
+    return c.json({ error: 'A Portaria já está fechada', code: 'PORTARIA_FECHADA' }, 409)
+  }
+
+  const agora = new Date().toISOString()
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+
+  await executarOperacaoComAudit(
+    db,
+    qdb => {
+      const queries = []
+      if (estado) {
+        queries.push(qdb.update(portariasEvento).set({
+          status: 'FECHADA',
+          fechadaEm: agora,
+          fechadaPorMembroId: atorMembroId,
+          updatedAt: agora,
+        }).where(eq(portariasEvento.eventoId, eventoId)))
+      } else {
+        queries.push(qdb.insert(portariasEvento).values({
+          eventoId,
+          status: 'FECHADA',
+          fechadaEm: agora,
+          fechadaPorMembroId: atorMembroId,
+          createdAt: agora,
+          updatedAt: agora,
+        }))
+      }
+
+      queries.push(qdb.update(portariaOperadoresEvento).set({
+        ativo: false,
+        revogadoEm: agora,
+        updatedAt: agora,
+      }).where(and(
+        eq(portariaOperadoresEvento.eventoId, eventoId),
+        eq(portariaOperadoresEvento.ativo, true)
+      )))
+
+      return queries
+    },
+    {
+      acao: 'PORTARIA_FECHADA',
+      atorMembroId,
+      recursoTipo: 'PORTARIA_EVENTO',
+      recursoId: eventoId,
+      escopoTipo,
+      escopoId,
+      contexto: { eventoId },
+    }
+  )
+
+  return c.json({ eventoId, status: 'FECHADA', fechadaEm: agora }, 200)
+})
 
 // GET /api/v1/portaria/eventos
 portariaRouter.get('/eventos', async (c) => {
