@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento, convidadosEvento, credenciaisConvidadoEvento, presencasConvidadoEvento } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento, convidadosEvento, credenciaisCadastroPortariaEvento, presencasConvidadoEvento } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eMasterSistema, eOperadorPortariaAutorizado } from '../security/permissoes'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
@@ -271,7 +271,67 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
   return c.json({ eventoId, status: 'FECHADA', fechadaEm: agora }, 200)
 })
 
+// POST /api/v1/portaria/eventos/:eventoId/cadastro-convidados/credencial
+portariaRouter.post('/eventos/:eventoId/cadastro-convidados/credencial', async c => {
+  const db = c.get('db')
+  const atorMembroId = c.get('membroId')
+  const eventoId = c.req.param('eventoId')
+
+  const evento = await db.select().from(eventos)
+    .where(and(eq(eventos.id, eventoId), eq(eventos.ativo, true))).get()
+  if (!evento) {
+    return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
+  }
+
+  const autorizado = await eOperadorPortariaAutorizado(db, atorMembroId, evento)
+  if (!autorizado) {
+    return c.json({ error: 'Operador não autorizado para este evento', code: 'FORBIDDEN' }, 403)
+  }
+
+  const token = gerarTokenAleatorio(32)
+  const tokenHash = await hashToken(token)
+  const agora = new Date().toISOString()
+  const credencialId = crypto.randomUUID()
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+
+  await executarOperacaoComAudit(
+    db,
+    qdb => [
+      qdb.insert(credenciaisCadastroPortariaEvento).values({
+        id: credencialId,
+        eventoId,
+        tokenHash,
+        expiraEm: evento.fimEm,
+        criadoPorMembroId: atorMembroId,
+        ativo: true,
+        createdAt: agora,
+        updatedAt: agora,
+      }),
+    ],
+    {
+      acao: 'PORTARIA_CREDENCIAL_AUTOCADASTRO_CRIADA',
+      atorMembroId,
+      recursoTipo: 'CREDENCIAL_CADASTRO_PORTARIA',
+      recursoId: credencialId,
+      escopoTipo,
+      escopoId,
+      contexto: { eventoId },
+    }
+  )
+
+  return c.json({
+    eventoId,
+    credencial: {
+      token,
+      expiraEm: evento.fimEm,
+      caminhoCadastro: `/convidado?portaria=${encodeURIComponent(token)}`,
+      endpointCadastro: `/api/v1/portaria-publica/cadastro/${token}`,
+    },
+  }, 201)
+})
+
 // POST /api/v1/portaria/eventos/:eventoId/convidados
+// Contingência operacional: cadastro manual pelo porteiro.
 portariaRouter.post('/eventos/:eventoId/convidados', async c => {
   const db = c.get('db')
   const atorMembroId = c.get('membroId')
@@ -288,7 +348,12 @@ portariaRouter.post('/eventos/:eventoId/convidados', async c => {
     return c.json({ error: 'Operador não autorizado para este evento', code: 'FORBIDDEN' }, 403)
   }
 
-  let body: { nome?: string; referencia?: string | null }
+  let body: {
+    nome?: string
+    localidade?: string
+    referencia?: string | null
+    observacoes?: string | null
+  }
   try {
     body = await c.req.json()
   } catch {
@@ -296,15 +361,14 @@ portariaRouter.post('/eventos/:eventoId/convidados', async c => {
   }
 
   const nome = body.nome?.trim()
-  if (!nome || nome.length < 2 || nome.length > 120) {
-    return c.json({ error: 'Nome do convidado inválido', code: 'VALIDATION_ERROR' }, 400)
+  const localidade = body.localidade?.trim()
+  if (!nome || nome.length < 2 || nome.length > 120 || !localidade || localidade.length > 120) {
+    return c.json({ error: 'Nome ou localidade inválidos', code: 'VALIDATION_ERROR' }, 400)
   }
 
-  const token = gerarTokenAleatorio(32)
-  const tokenHash = await hashToken(token)
   const agora = new Date().toISOString()
   const convidadoId = crypto.randomUUID()
-  const credencialId = crypto.randomUUID()
+  const presencaId = crypto.randomUUID()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
   await executarOperacaoComAudit(
@@ -314,43 +378,40 @@ portariaRouter.post('/eventos/:eventoId/convidados', async c => {
         id: convidadoId,
         eventoId,
         nome,
+        localidade,
         referencia: body.referencia?.trim() || null,
+        observacoes: body.observacoes?.trim() || null,
+        status: 'VALIDADO',
         criadoPorMembroId: atorMembroId,
+        validadoPorMembroId: atorMembroId,
+        validadoEm: agora,
         ativo: true,
         createdAt: agora,
         updatedAt: agora,
       }),
-      qdb.insert(credenciaisConvidadoEvento).values({
-        id: credencialId,
+      qdb.insert(presencasConvidadoEvento).values({
+        id: presencaId,
         convidadoId,
-        tokenHash,
-        expiraEm: evento.fimEm,
+        eventoId,
+        forma: 'MANUAL',
+        registradoPorMembroId: atorMembroId,
+        registradoEm: agora,
         createdAt: agora,
         updatedAt: agora,
       }),
     ],
     {
-      acao: 'PORTARIA_CONVIDADO_CRIADO',
+      acao: 'PORTARIA_CONVIDADO_MANUAL_VALIDADO',
       atorMembroId,
       recursoTipo: 'CONVIDADO_EVENTO',
       recursoId: convidadoId,
       escopoTipo,
       escopoId,
-      contexto: { eventoId },
+      contexto: { eventoId, forma: 'MANUAL' },
     }
   )
 
-  return c.json({
-    id: convidadoId,
-    eventoId,
-    nome,
-    referencia: body.referencia?.trim() || null,
-    credencial: {
-      token,
-      expiraEm: evento.fimEm,
-      caminhoPresenca: `/api/v1/portaria-publica/convidados/${token}/presenca`,
-    },
-  }, 201)
+  return c.json({ id: convidadoId, eventoId, nome, localidade, status: 'VALIDADO' }, 201)
 })
 
 // GET /api/v1/portaria/eventos/:eventoId/convidados
@@ -374,8 +435,11 @@ portariaRouter.get('/eventos/:eventoId/convidados', async c => {
     .select({
       id: convidadosEvento.id,
       nome: convidadosEvento.nome,
+      localidade: convidadosEvento.localidade,
       referencia: convidadosEvento.referencia,
-      ativo: convidadosEvento.ativo,
+      observacoes: convidadosEvento.observacoes,
+      status: convidadosEvento.status,
+      validadoEm: convidadosEvento.validadoEm,
       presencaId: presencasConvidadoEvento.id,
       registradoEm: presencasConvidadoEvento.registradoEm,
       forma: presencasConvidadoEvento.forma,
@@ -388,14 +452,17 @@ portariaRouter.get('/eventos/:eventoId/convidados', async c => {
         eq(presencasConvidadoEvento.eventoId, eventoId)
       )
     )
-    .where(eq(convidadosEvento.eventoId, eventoId))
+    .where(and(
+      eq(convidadosEvento.eventoId, eventoId),
+      eq(convidadosEvento.ativo, true)
+    ))
     .all()
 
   return c.json({ data: convidados }, 200)
 })
 
-// POST /api/v1/portaria/eventos/:eventoId/convidados/:convidadoId/presenca
-portariaRouter.post('/eventos/:eventoId/convidados/:convidadoId/presenca', async c => {
+// POST /api/v1/portaria/eventos/:eventoId/convidados/:convidadoId/validar
+portariaRouter.post('/eventos/:eventoId/convidados/:convidadoId/validar', async c => {
   const db = c.get('db')
   const atorMembroId = c.get('membroId')
   const eventoId = c.req.param('eventoId')
@@ -418,17 +485,12 @@ portariaRouter.post('/eventos/:eventoId/convidados/:convidadoId/presenca', async
       eq(convidadosEvento.eventoId, eventoId),
       eq(convidadosEvento.ativo, true)
     )).get()
+
   if (!convidado) {
     return c.json({ error: 'Convidado não encontrado', code: 'NOT_FOUND' }, 404)
   }
-
-  const existente = await db.select().from(presencasConvidadoEvento)
-    .where(and(
-      eq(presencasConvidadoEvento.eventoId, eventoId),
-      eq(presencasConvidadoEvento.convidadoId, convidadoId)
-    )).get()
-  if (existente) {
-    return c.json({ error: 'Presença já registrada', code: 'PRESENCA_DUPLICADA' }, 409)
+  if (convidado.status === 'VALIDADO') {
+    return c.json({ error: 'Convidado já validado', code: 'PRESENCA_DUPLICADA' }, 409)
   }
 
   const agora = new Date().toISOString()
@@ -437,28 +499,42 @@ portariaRouter.post('/eventos/:eventoId/convidados/:convidadoId/presenca', async
 
   await executarOperacaoComAudit(
     db,
-    qdb => [qdb.insert(presencasConvidadoEvento).values({
-      id: presencaId,
-      convidadoId,
-      eventoId,
-      forma: 'MANUAL',
-      registradoPorMembroId: atorMembroId,
-      registradoEm: agora,
-      createdAt: agora,
-      updatedAt: agora,
-    })],
+    qdb => [
+      qdb.update(convidadosEvento).set({
+        status: 'VALIDADO',
+        validadoPorMembroId: atorMembroId,
+        validadoEm: agora,
+        updatedAt: agora,
+      }).where(eq(convidadosEvento.id, convidadoId)),
+      qdb.insert(presencasConvidadoEvento).values({
+        id: presencaId,
+        convidadoId,
+        eventoId,
+        forma: 'VALIDACAO_PORTEIRO',
+        registradoPorMembroId: atorMembroId,
+        registradoEm: agora,
+        createdAt: agora,
+        updatedAt: agora,
+      }),
+    ],
     {
-      acao: 'PORTARIA_PRESENCA_CONVIDADO',
+      acao: 'PORTARIA_CONVIDADO_VALIDADO',
       atorMembroId,
       recursoTipo: 'PRESENCA_CONVIDADO_EVENTO',
       recursoId: presencaId,
       escopoTipo,
       escopoId,
-      contexto: { eventoId, convidadoId, forma: 'MANUAL' },
+      contexto: { eventoId, convidadoId },
     }
   )
 
-  return c.json({ id: presencaId, eventoId, convidadoId, forma: 'MANUAL', registradoEm: agora }, 201)
+  return c.json({
+    convidadoId,
+    eventoId,
+    status: 'VALIDADO',
+    forma: 'VALIDACAO_PORTEIRO',
+    registradoEm: agora,
+  }, 201)
 })
 
 // GET /api/v1/portaria/eventos
