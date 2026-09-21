@@ -242,6 +242,32 @@ export function temVinculoEmTipoEscopo(contexto: ContextoPermissoes, tipo: 'regi
 export async function eOperadorPortariaAutorizado(db: any, membroId: string, evento: any): Promise<boolean> {
   if (!db || !membroId || !evento) return false
 
+  const estadoPortaria = await db
+    .select({ status: schema.portariasEvento.status })
+    .from(schema.portariasEvento)
+    .where(eq(schema.portariasEvento.eventoId, evento.id))
+    .get()
+
+  if (estadoPortaria?.status === 'FECHADA') {
+    return false
+  }
+
+  const autorizacaoTemporaria = await db
+    .select({ id: schema.portariaOperadoresEvento.id })
+    .from(schema.portariaOperadoresEvento)
+    .where(
+      and(
+        eq(schema.portariaOperadoresEvento.eventoId, evento.id),
+        eq(schema.portariaOperadoresEvento.membroId, membroId),
+        eq(schema.portariaOperadoresEvento.ativo, true)
+      )
+    )
+    .get()
+
+  if (autorizacaoTemporaria) {
+    return true
+  }
+
   const vinculosPortaria = await db
     .select({
       v: schema.vinculosFuncionais,

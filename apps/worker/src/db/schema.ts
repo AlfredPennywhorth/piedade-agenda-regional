@@ -731,6 +731,40 @@ export const checkins = sqliteTable(
   })
 )
 
+export const portariasEvento = sqliteTable(
+  'portarias_evento',
+  {
+    eventoId: text('evento_id').primaryKey().references(() => eventos.id),
+    status: text('status').notNull().default('ABERTA'),
+    fechadaEm: text('fechada_em'),
+    fechadaPorMembroId: text('fechada_por_membro_id').references(() => membros.id),
+    ...timestampsS02,
+  },
+  table => ({
+    checkStatus: check('check_portaria_evento_status', sql`${table.status} IN ('ABERTA','FECHADA')`),
+  })
+)
+
+export const portariaOperadoresEvento = sqliteTable(
+  'portaria_operadores_evento',
+  {
+    id: text('id').primaryKey(),
+    eventoId: text('evento_id').notNull().references(() => eventos.id),
+    membroId: text('membro_id').notNull().references(() => membros.id),
+    concedidoPorMembroId: text('concedido_por_membro_id').references(() => membros.id),
+    revogadoEm: text('revogado_em'),
+    ativo: ativoDefault,
+    ...timestampsS02,
+  },
+  table => ({
+    uniqueAtivo: uniqueIndex('idx_portaria_operador_evento_ativo')
+      .on(table.eventoId, table.membroId)
+      .where(sql`${table.ativo} = 1`),
+    idxEvento: index('idx_portaria_operador_evento').on(table.eventoId, table.ativo),
+    idxMembro: index('idx_portaria_operador_membro').on(table.membroId, table.ativo),
+  })
+)
+
 // ============================================================
 // Auditoria (S12)
 // ============================================================

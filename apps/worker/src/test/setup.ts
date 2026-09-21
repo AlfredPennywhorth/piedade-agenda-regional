@@ -384,6 +384,37 @@ export function setupDb(sqlite: any) {
     CREATE INDEX IF NOT EXISTS idx_checkin_destinatario ON checkins (convocacao_destinatario_id);
     CREATE INDEX IF NOT EXISTS idx_checkin_membro ON checkins (membro_id);
 
+    CREATE TABLE IF NOT EXISTS portarias_evento (
+      evento_id text PRIMARY KEY NOT NULL,
+      status text DEFAULT 'ABERTA' NOT NULL CHECK (status IN ('ABERTA','FECHADA')),
+      fechada_em text,
+      fechada_por_membro_id text,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (evento_id) REFERENCES eventos(id),
+      FOREIGN KEY (fechada_por_membro_id) REFERENCES membros(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS portaria_operadores_evento (
+      id text PRIMARY KEY NOT NULL,
+      evento_id text NOT NULL,
+      membro_id text NOT NULL,
+      concedido_por_membro_id text,
+      revogado_em text,
+      ativo integer DEFAULT 1 NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (evento_id) REFERENCES eventos(id),
+      FOREIGN KEY (membro_id) REFERENCES membros(id),
+      FOREIGN KEY (concedido_por_membro_id) REFERENCES membros(id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_portaria_operador_evento_ativo
+      ON portaria_operadores_evento (evento_id, membro_id) WHERE ativo = 1;
+    CREATE INDEX IF NOT EXISTS idx_portaria_operador_evento
+      ON portaria_operadores_evento (evento_id, ativo);
+    CREATE INDEX IF NOT EXISTS idx_portaria_operador_membro
+      ON portaria_operadores_evento (membro_id, ativo);
+
     CREATE TABLE IF NOT EXISTS auditoria_logs (
       id text PRIMARY KEY NOT NULL,
       acao text NOT NULL,
