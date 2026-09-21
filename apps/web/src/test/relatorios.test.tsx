@@ -16,8 +16,9 @@ describe('S12 — RelatoriosView (Frontend)', () => {
     vi.resetAllMocks()
   })
 
-  it('deve renderizar formulário de busca de relatório de evento por padrão', () => {
+  it('deve manter disponível o formulário legado de relatório do evento', () => {
     render(<RelatoriosView />)
+    fireEvent.click(screen.getByText('Relatório do Evento'))
     expect(screen.getByPlaceholderText(/Digite o ID do Evento/i)).toBeInTheDocument()
     expect(screen.getByText('Buscar Relatório')).toBeInTheDocument()
   })
@@ -69,6 +70,7 @@ describe('S12 — RelatoriosView (Frontend)', () => {
     })
 
     render(<RelatoriosView />)
+    fireEvent.click(screen.getByText('Relatório do Evento'))
 
     const input = screen.getByPlaceholderText(/Digite o ID do Evento/i)
     fireEvent.change(input, { target: { value: 'ev-123' } })
