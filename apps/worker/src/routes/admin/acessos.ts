@@ -3,7 +3,13 @@ import { and, count, eq, isNull } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { executeAtomic } from '../../db/batch'
 import { authMiddleware, Variables } from '../../middleware/auth'
-import type { AcessoTecnico, ContextoPermissoes } from '../../security/permissoes'
+import {
+  eMasterSistema,
+  obterRegionalDoEscopo,
+  regionaisAdministradas,
+  type AcessoTecnico,
+  type ContextoPermissoes,
+} from '../../security/permissoes'
 
 const PERFIS = new Set([
   'MASTER_SISTEMA',
@@ -30,107 +36,6 @@ export const adminAcessosApp = new Hono<{ Variables: Variables }>()
 
 adminAcessosApp.use('*', authMiddleware)
 
-function eMaster(contexto: ContextoPermissoes): boolean {
-  return contexto.acessosAtivos.some(
-    acesso =>
-      acesso.perfilCodigo === 'MASTER_SISTEMA' &&
-      acesso.escopoTipo === 'GLOBAL' &&
-      acesso.escopoId === null
-  )
-}
-
-function regionaisAdministradas(contexto: ContextoPermissoes): Set<string> {
-  return new Set(
-    contexto.acessosAtivos
-      .filter(
-        acesso =>
-          acesso.perfilCodigo === 'ADMINISTRADOR_SISTEMA' &&
-          acesso.escopoTipo === 'REGIONAL' &&
-          acesso.escopoId
-      )
-      .map(acesso => acesso.escopoId as string)
-  )
-}
-
-async function regionalDoEscopo(
-  db: any,
-  escopoTipo: EscopoTipo,
-  escopoId: string | null
-): Promise<string | null> {
-  if (escopoTipo === 'GLOBAL') return null
-  if (!escopoId) return null
-  if (escopoTipo === 'REGIONAL') {
-    const regional = await db
-      .select({ id: schema.regionais.id })
-      .from(schema.regionais)
-      .where(eq(schema.regionais.id, escopoId))
-      .get()
-    return regional?.id ?? null
-  }
-  if (escopoTipo === 'ADMINISTRACAO') {
-    const item = await db
-      .select({ regionalId: schema.administracoes.regionalId })
-      .from(schema.administracoes)
-      .where(eq(schema.administracoes.id, escopoId))
-      .get()
-    return item?.regionalId ?? null
-  }
-  if (escopoTipo === 'SETOR') {
-    const item = await db
-      .select({ regionalId: schema.administracoes.regionalId })
-      .from(schema.setores)
-      .innerJoin(
-        schema.administracoes,
-        eq(schema.setores.administracaoId, schema.administracoes.id)
-      )
-      .where(eq(schema.setores.id, escopoId))
-      .get()
-    return item?.regionalId ?? null
-  }
-  if (escopoTipo === 'CASA') {
-    const item = await db
-      .select({ regionalId: schema.administracoes.regionalId })
-      .from(schema.casas)
-      .innerJoin(schema.setores, eq(schema.casas.setorId, schema.setores.id))
-      .innerJoin(
-        schema.administracoes,
-        eq(schema.setores.administracaoId, schema.administracoes.id)
-      )
-      .where(eq(schema.casas.id, escopoId))
-      .get()
-    return item?.regionalId ?? null
-  }
-
-  const gt = await db
-    .select({
-      regionalId: schema.gruposTrabalho.regionalId,
-      regionalDaAdministracao: schema.administracoes.regionalId,
-    })
-    .from(schema.gruposTrabalho)
-    .leftJoin(
-      schema.administracoes,
-      eq(schema.gruposTrabalho.administracaoId, schema.administracoes.id)
-    )
-    .where(eq(schema.gruposTrabalho.id, escopoId))
-    .get()
-
-  if (gt?.regionalId) return gt.regionalId
-  if (gt?.regionalDaAdministracao) return gt.regionalDaAdministracao
-
-  const gtSetor = await db
-    .select({ regionalId: schema.administracoes.regionalId })
-    .from(schema.gruposTrabalho)
-    .innerJoin(schema.setores, eq(schema.gruposTrabalho.setorId, schema.setores.id))
-    .innerJoin(
-      schema.administracoes,
-      eq(schema.setores.administracaoId, schema.administracoes.id)
-    )
-    .where(eq(schema.gruposTrabalho.id, escopoId))
-    .get()
-
-  return gtSetor?.regionalId ?? null
-}
-
 async function podeAdministrarAcesso(
   db: any,
   contexto: ContextoPermissoes,
@@ -138,10 +43,15 @@ async function podeAdministrarAcesso(
   escopoTipo: EscopoTipo,
   escopoId: string | null
 ): Promise<boolean> {
-  if (eMaster(contexto)) return true
-  if (perfilCodigo === 'MASTER_SISTEMA' || escopoTipo === 'GLOBAL') return false
+  if (eMasterSistema(contexto)) return true
+  if (perfilCodigo === 'MASTER_SISTEMA' || escopoTipo === 'GLOBAL' || !escopoId) return false
 
-  const regionalId = await regionalDoEscopo(db, escopoTipo, escopoId)
+  const regionalId = await obterRegionalDoEscopo(
+    db,
+    escopoTipo as Exclude<EscopoTipo, 'GLOBAL'>,
+    escopoId
+  )
+
   return Boolean(regionalId && regionaisAdministradas(contexto).has(regionalId))
 }
 
@@ -174,7 +84,14 @@ adminAcessosApp.post('/', async c => {
   }
 
   const escopoId = body.escopoTipo === 'GLOBAL' ? null : body.escopoId ?? null
-  const regionalId = await regionalDoEscopo(db, body.escopoTipo, escopoId)
+  const regionalId =
+    body.escopoTipo === 'GLOBAL' || !escopoId
+      ? null
+      : await obterRegionalDoEscopo(
+          db,
+          body.escopoTipo as Exclude<EscopoTipo, 'GLOBAL'>,
+          escopoId
+        )
   if (body.escopoTipo !== 'GLOBAL' && !regionalId) {
     return c.json({ error: 'Escopo institucional não encontrado', code: 'ESCOPO_INVALIDO' }, 400)
   }
