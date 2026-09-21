@@ -17,3 +17,35 @@
     box-sizing: border-box;
   }
 }
+
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .relatorio-impressao,
+  .relatorio-impressao * {
+    visibility: visible !important;
+  }
+
+  .relatorio-impressao {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    background: white;
+  }
+
+  .relatorio-controles {
+    display: none !important;
+  }
+
+  table {
+    break-inside: auto;
+  }
+
+  tr {
+    break-inside: avoid;
+    break-after: auto;
+  }
+}
