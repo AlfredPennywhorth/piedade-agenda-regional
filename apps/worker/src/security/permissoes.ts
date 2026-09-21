@@ -81,6 +81,88 @@ export async function carregarContextoPermissoes(
 }
 
 
+export async function obterRegionalDoEscopo(
+  db: any,
+  escopoTipo: Exclude<AcessoTecnico['escopoTipo'], 'GLOBAL'>,
+  escopoId: string
+): Promise<string | null> {
+  if (!db || !escopoId) return null
+
+  if (escopoTipo === 'REGIONAL') {
+    const regional = await db
+      .select({ id: schema.regionais.id })
+      .from(schema.regionais)
+      .where(eq(schema.regionais.id, escopoId))
+      .get()
+    return regional?.id ?? null
+  }
+
+  if (escopoTipo === 'ADMINISTRACAO') {
+    const administracao = await db
+      .select({ regionalId: schema.administracoes.regionalId })
+      .from(schema.administracoes)
+      .where(eq(schema.administracoes.id, escopoId))
+      .get()
+    return administracao?.regionalId ?? null
+  }
+
+  if (escopoTipo === 'SETOR') {
+    const setor = await db
+      .select({ regionalId: schema.administracoes.regionalId })
+      .from(schema.setores)
+      .innerJoin(
+        schema.administracoes,
+        eq(schema.setores.administracaoId, schema.administracoes.id)
+      )
+      .where(eq(schema.setores.id, escopoId))
+      .get()
+    return setor?.regionalId ?? null
+  }
+
+  if (escopoTipo === 'CASA') {
+    const casa = await db
+      .select({ regionalId: schema.administracoes.regionalId })
+      .from(schema.casas)
+      .innerJoin(schema.setores, eq(schema.casas.setorId, schema.setores.id))
+      .innerJoin(
+        schema.administracoes,
+        eq(schema.setores.administracaoId, schema.administracoes.id)
+      )
+      .where(eq(schema.casas.id, escopoId))
+      .get()
+    return casa?.regionalId ?? null
+  }
+
+  const gtDireto = await db
+    .select({
+      regionalId: schema.gruposTrabalho.regionalId,
+      regionalAdministracao: schema.administracoes.regionalId,
+    })
+    .from(schema.gruposTrabalho)
+    .leftJoin(
+      schema.administracoes,
+      eq(schema.gruposTrabalho.administracaoId, schema.administracoes.id)
+    )
+    .where(eq(schema.gruposTrabalho.id, escopoId))
+    .get()
+
+  if (gtDireto?.regionalId) return gtDireto.regionalId
+  if (gtDireto?.regionalAdministracao) return gtDireto.regionalAdministracao
+
+  const gtSetor = await db
+    .select({ regionalId: schema.administracoes.regionalId })
+    .from(schema.gruposTrabalho)
+    .innerJoin(schema.setores, eq(schema.gruposTrabalho.setorId, schema.setores.id))
+    .innerJoin(
+      schema.administracoes,
+      eq(schema.setores.administracaoId, schema.administracoes.id)
+    )
+    .where(eq(schema.gruposTrabalho.id, escopoId))
+    .get()
+
+  return gtSetor?.regionalId ?? null
+}
+
 export function eMasterSistema(contexto: ContextoPermissoes): boolean {
   return contexto.acessosAtivos.some(
     acesso =>
