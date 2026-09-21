@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import * as apiClient from '../../api/apiClient'
+import { RelatoriosPresencaView } from './RelatoriosPresencaView'
 
 interface RelatorioEventoData {
   evento: {
@@ -56,7 +57,7 @@ interface RelatorioAgregadoData {
 }
 
 export function RelatoriosView() {
-  const [modo, setModo] = useState<'evento' | 'agregado'>('evento')
+  const [modo, setModo] = useState<'evento' | 'agregado' | 'presencas'>('presencas')
 
   // Estado Relatório do Evento
   const [eventoIdInput, setEventoIdInput] = useState('')
@@ -149,6 +150,14 @@ export function RelatoriosView() {
           Relatório do Evento
         </button>
         <button
+          onClick={() => setModo('presencas')}
+          className={`py-2 px-4 font-semibold text-sm border-b-2 transition-colors ${
+            modo === 'presencas' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Presenças
+        </button>
+        <button
           onClick={() => setModo('agregado')}
           className={`py-2 px-4 font-semibold text-sm border-b-2 transition-colors ${
             modo === 'agregado' ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -157,6 +166,8 @@ export function RelatoriosView() {
           Relatório Agregado
         </button>
       </div>
+
+      {modo === 'presencas' && <RelatoriosPresencaView />}
 
       {modo === 'evento' && (
         <div className="space-y-6">
