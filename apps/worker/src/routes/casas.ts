@@ -2,8 +2,11 @@ import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { casas } from '../db/schema'
 import { CreateCasaSchema, UpdateCasaSchema } from '@piedade/shared'
+import { authMiddleware } from '../middleware/auth'
 
 export const casasRouter = new Hono<any>()
+
+casasRouter.use('*', authMiddleware)
 
 casasRouter.get('/', async (c) => {
   const db = c.get('db')
