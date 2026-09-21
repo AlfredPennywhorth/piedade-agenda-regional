@@ -1,11 +1,12 @@
 import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento, convidadosEvento, credenciaisCadastroPortariaEvento, presencasConvidadoEvento } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento, convidadosEvento, credenciaisCadastroPortariaEvento, presencasConvidadoEvento, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eMasterSistema, eOperadorPortariaAutorizado } from '../security/permissoes'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
 import { PortariaEventosQuerySchema, getSaoPauloDateString } from '@piedade/shared'
 import { gerarTokenAleatorio, hashToken } from '../security/tokens'
+import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
 
 export const portariaRouter = new Hono<{ Variables: Variables }>()
 
@@ -221,13 +222,23 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
     return c.json({ error: 'A Portaria já está fechada', code: 'PORTARIA_FECHADA' }, 409)
   }
 
+  const existente = await db.select({ id: portariaFechamentos.id })
+    .from(portariaFechamentos)
+    .where(eq(portariaFechamentos.eventoId, eventoId)).get()
+  if (existente) {
+    return c.json({ error: 'Fechamento final já materializado', code: 'FECHAMENTO_EXISTENTE' }, 409)
+  }
+
+  const snapshot = await montarSnapshotFechamentoPortaria(db, eventoId)
   const agora = new Date().toISOString()
+  const fechamentoId = crypto.randomUUID()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
   await executarOperacaoComAudit(
     db,
     qdb => {
       const queries = []
+
       if (estado) {
         queries.push(qdb.update(portariasEvento).set({
           status: 'FECHADA',
@@ -246,29 +257,144 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
         }))
       }
 
-      queries.push(qdb.update(portariaOperadoresEvento).set({
-        ativo: false,
-        revogadoEm: agora,
+      queries.push(
+        qdb.update(portariaOperadoresEvento).set({
+          ativo: false,
+          revogadoEm: agora,
+          updatedAt: agora,
+        }).where(and(
+          eq(portariaOperadoresEvento.eventoId, eventoId),
+          eq(portariaOperadoresEvento.ativo, true)
+        ))
+      )
+
+      queries.push(
+        qdb.update(credenciaisCadastroPortariaEvento).set({
+          ativo: false,
+          revogadoEm: agora,
+          updatedAt: agora,
+        }).where(and(
+          eq(credenciaisCadastroPortariaEvento.eventoId, eventoId),
+          eq(credenciaisCadastroPortariaEvento.ativo, true)
+        ))
+      )
+
+      queries.push(qdb.insert(portariaFechamentos).values({
+        id: fechamentoId,
+        eventoId,
+        fechadoPorMembroId: atorMembroId,
+        fechadoEm: agora,
+        ...snapshot.resumo,
+        createdAt: agora,
         updatedAt: agora,
-      }).where(and(
-        eq(portariaOperadoresEvento.eventoId, eventoId),
-        eq(portariaOperadoresEvento.ativo, true)
-      )))
+      }))
+
+      for (const item of snapshot.itens) {
+        queries.push(qdb.insert(portariaFechamentoItens).values({
+          id: crypto.randomUUID(),
+          fechamentoId,
+          eventoId,
+          tipoPessoa: item.tipoPessoa,
+          origemId: item.origemId,
+          nome: item.nome,
+          localidade: item.localidade,
+          situacao: item.situacao,
+          respostaRsvp: item.respostaRsvp,
+          formaPresenca: item.formaPresenca,
+          registradoEm: item.registradoEm,
+          createdAt: agora,
+          updatedAt: agora,
+        }))
+      }
 
       return queries
     },
     {
-      acao: 'PORTARIA_FECHADA',
+      acao: 'PORTARIA_FECHADA_COM_SNAPSHOT',
       atorMembroId,
-      recursoTipo: 'PORTARIA_EVENTO',
-      recursoId: eventoId,
+      recursoTipo: 'PORTARIA_FECHAMENTO',
+      recursoId: fechamentoId,
       escopoTipo,
       escopoId,
-      contexto: { eventoId },
+      contexto: {
+        eventoId,
+        ...snapshot.resumo,
+      },
     }
   )
 
-  return c.json({ eventoId, status: 'FECHADA', fechadaEm: agora }, 200)
+  return c.json({
+    status: 'FECHADA',
+    fechamento: {
+      id: fechamentoId,
+      eventoId,
+      fechadoEm: agora,
+      fechadoPorMembroId: atorMembroId,
+    },
+    resumo: snapshot.resumo,
+    itens: snapshot.itens,
+  }, 200)
+})
+
+// GET /api/v1/portaria/eventos/:eventoId/fechamento
+portariaRouter.get('/eventos/:eventoId/fechamento', async c => {
+  const db = c.get('db')
+  const atorMembroId = c.get('membroId')
+  const contexto = c.get('contextoPermissoes')
+  const eventoId = c.req.param('eventoId')
+
+  const fechamento = await db.select().from(portariaFechamentos)
+    .where(eq(portariaFechamentos.eventoId, eventoId)).get()
+
+  if (!fechamento) {
+    return c.json({ error: 'Fechamento final ainda não disponível', code: 'NOT_FOUND' }, 404)
+  }
+
+  const podeConsultar =
+    eMasterSistema(contexto) ||
+    fechamento.fechadoPorMembroId === atorMembroId
+
+  if (!podeConsultar) {
+    return c.json({ error: 'Acesso não autorizado ao fechamento', code: 'FORBIDDEN' }, 403)
+  }
+
+  const itens = await db.select().from(portariaFechamentoItens)
+    .where(eq(portariaFechamentoItens.fechamentoId, fechamento.id)).all()
+
+  itens.sort((a: typeof itens[number], b: typeof itens[number]) => {
+    const ordem = { PRESENTE: 0, PENDENTE: 1, AUSENTE: 2 } as const
+    const situacaoA = a.situacao as keyof typeof ordem
+    const situacaoB = b.situacao as keyof typeof ordem
+    if (situacaoA !== situacaoB) return ordem[situacaoA] - ordem[situacaoB]
+    return a.nome.localeCompare(b.nome, 'pt-BR')
+  })
+
+  return c.json({
+    fechamento: {
+      id: fechamento.id,
+      eventoId: fechamento.eventoId,
+      fechadoEm: fechamento.fechadoEm,
+      fechadoPorMembroId: fechamento.fechadoPorMembroId,
+    },
+    resumo: {
+      totalConvocados: fechamento.totalConvocados,
+      totalConvocadosPresentes: fechamento.totalConvocadosPresentes,
+      totalConvocadosAusentes: fechamento.totalConvocadosAusentes,
+      totalConvidadosValidados: fechamento.totalConvidadosValidados,
+      totalConvidadosPendentes: fechamento.totalConvidadosPendentes,
+      totalPresentes: fechamento.totalPresentes,
+    },
+    itens: itens.map((item: typeof itens[number]) => ({
+      tipoPessoa: item.tipoPessoa,
+      origemId: item.origemId,
+      nome: item.nome,
+      localidade: item.localidade,
+      situacao: item.situacao,
+      respostaRsvp: item.respostaRsvp,
+      formaPresenca: item.formaPresenca,
+      registradoEm: item.registradoEm,
+    })),
+  }, 200)
 })
 
 // POST /api/v1/portaria/eventos/:eventoId/cadastro-convidados/credencial
