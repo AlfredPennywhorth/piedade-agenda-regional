@@ -37,7 +37,8 @@ export function MembrosView() {
   // Form fields
   const [casaId, setCasaId] = useState<string>('')
   const [nome, setNome] = useState<string>('')
-  const [dataOrdenacao, setDataNascimento] = useState<string>('')
+  const [dataOrdenacao, setDataOrdenacao] = useState<string>('')
+  const [codigoCarteirinha, setCodigoCarteirinha] = useState<string>('')
   const [celular, setCelular] = useState<string>('')
   const [ativo, setAtivo] = useState<boolean>(true)
   
@@ -70,7 +71,7 @@ export function MembrosView() {
     setMembroEditandoId(null)
     setCasaId(filtroCasaId || (casas.length > 0 ? casas[0].id : ''))
     setNome('')
-    setDataNascimento('')
+    setDataOrdenacao('')
     setCelular('')
     setAtivo(true)
     setErrosForm({})
@@ -90,7 +91,7 @@ export function MembrosView() {
       const item = await fetchWithAuth<Membro>(`/membros/${id}`)
       setCasaId(item.casaId || '')
       setNome(item.nome || '')
-      setDataNascimento(item.dataOrdenacao ? item.dataOrdenacao.substring(0, 10) : '')
+      setDataOrdenacao(item.dataOrdenacao ? item.dataOrdenacao.substring(0, 10) : '')
       setCelular(item.celular || '')
       setAtivo(item.ativo ?? true)
     } catch (err: any) {
@@ -349,7 +350,7 @@ export function MembrosView() {
                     id="input-ordenacao"
                     type="date"
                     value={dataOrdenacao}
-                    onChange={(e) => setDataNascimento(e.target.value)}
+                    onChange={(e) => setDataOrdenacao(e.target.value)}
                     className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
                       errosForm.dataOrdenacao ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-brand-200'
                     }`}
