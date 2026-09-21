@@ -3,7 +3,7 @@ import { normalizarCelular } from '../utils/celular'
 
 export const CreateMembroSchema = z.object({
   nome: z.string().min(2, "Nome deve ter no mínimo 2 caracteres").max(255),
-  dataOrdenacao: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/, 'Data de ordenação deve usar o formato AAAA-MM-DD'),
+  dataOrdenacao: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data de ordenação deve usar o formato AAAA-MM-DD'),
   codigoCarteirinha: z.string().trim().min(1, 'Código da carteirinha é obrigatório').max(100),
   celular: z.string().optional().nullable().superRefine((val, ctx) => {
     if (val) {
@@ -22,7 +22,7 @@ export const CreateMembroSchema = z.object({
 
 export const UpdateMembroSchema = z.object({
   nome: z.string().min(2, "Nome deve ter no mínimo 2 caracteres").max(255).optional(),
-  dataOrdenacao: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/, 'Data de ordenação deve usar o formato AAAA-MM-DD').optional(),
+  dataOrdenacao: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data de ordenação deve usar o formato AAAA-MM-DD').optional(),
   codigoCarteirinha: z.string().trim().min(1, 'Código da carteirinha não pode ser vazio').max(100).optional(),
   celular: z.string().optional().nullable().superRefine((val, ctx) => {
     if (val) {
