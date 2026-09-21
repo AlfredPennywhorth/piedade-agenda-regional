@@ -11,9 +11,11 @@ interface MainLayoutProps {
   currentTab: 'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes'
   onTabChange: (tab: 'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes') => void
   capacidades?: CapacidadesFrontend
+  nomeUsuario?: string
+  onLogout?: () => void | Promise<void>
 }
 
-export function MainLayout({ children, currentTab, onTabChange, capacidades }: MainLayoutProps) {
+export function MainLayout({ children, currentTab, onTabChange, capacidades, nomeUsuario, onLogout }: MainLayoutProps) {
   const mostrarPortaria = capacidades?.podeOperarPortaria === true
   const mostrarRelatorios = capacidades?.podeVisualizarRelatorios === true
   const mostrarAuditoria = capacidades?.podeVisualizarAuditoria === true
@@ -21,8 +23,22 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades }: M
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 pb-16">
       {/* Header */}
-      <header className="bg-brand-900 text-white p-4 shadow-md sticky top-0 z-10 flex justify-center items-center">
-        <h1 className="text-xl font-semibold">Agenda Regional SP</h1>
+      <header className="bg-brand-900 text-white p-4 shadow-md sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold">Agenda Regional SP</h1>
+            {nomeUsuario && <p className="text-xs text-brand-100">{nomeUsuario}</p>}
+          </div>
+          {onLogout && (
+            <button
+              type="button"
+              onClick={() => void onLogout()}
+              className="rounded-lg border border-white/30 px-3 py-2 text-xs font-semibold hover:bg-white/10"
+            >
+              Sair
+            </button>
+          )}
+        </div>
       </header>
 
       {/* Main Content Area */}
