@@ -360,7 +360,7 @@ portariaRouter.get('/eventos/:eventoId/fechamento', async c => {
   const itens = await db.select().from(portariaFechamentoItens)
     .where(eq(portariaFechamentoItens.fechamentoId, fechamento.id)).all()
 
-  itens.sort((a, b) => {
+  itens.sort((a: typeof itens[number], b: typeof itens[number]) => {
     const ordem = { PRESENTE: 0, PENDENTE: 1, AUSENTE: 2 } as const
     const situacaoA = a.situacao as keyof typeof ordem
     const situacaoB = b.situacao as keyof typeof ordem
@@ -383,7 +383,7 @@ portariaRouter.get('/eventos/:eventoId/fechamento', async c => {
       totalConvidadosPendentes: fechamento.totalConvidadosPendentes,
       totalPresentes: fechamento.totalPresentes,
     },
-    itens: itens.map(item => ({
+    itens: itens.map((item: typeof itens[number]) => ({
       tipoPessoa: item.tipoPessoa,
       origemId: item.origemId,
       nome: item.nome,
