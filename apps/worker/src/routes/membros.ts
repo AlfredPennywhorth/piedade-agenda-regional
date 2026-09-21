@@ -2,8 +2,11 @@ import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { membros, vinculosFuncionais, tentativasAcesso } from '../db/schema'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
+import { authMiddleware } from '../middleware/auth'
 
 export const membrosRouter = new Hono<any>()
+
+membrosRouter.use('*', authMiddleware)
 
 const membroPublico = {
   id: membros.id,
