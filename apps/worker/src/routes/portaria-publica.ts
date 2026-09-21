@@ -26,6 +26,9 @@ function validarCredencial(credencial: any) {
   if (!credencial) {
     return { status: 404, body: { error: 'Credencial inválida', code: 'NOT_FOUND' } }
   }
+  if (credencial.portaria?.status === 'FECHADA') {
+    return { status: 409, body: { error: 'Portaria fechada', code: 'PORTARIA_FECHADA' } }
+  }
   if (
     credencial.credencial.revogadoEm ||
     !credencial.credencial.ativo ||
@@ -38,9 +41,6 @@ function validarCredencial(credencial: any) {
   }
   if (Date.parse(credencial.credencial.expiraEm) <= Date.now()) {
     return { status: 410, body: { error: 'Credencial expirada', code: 'CREDENCIAL_EXPIRADA' } }
-  }
-  if (credencial.portaria?.status === 'FECHADA') {
-    return { status: 409, body: { error: 'Portaria fechada', code: 'PORTARIA_FECHADA' } }
   }
   return null
 }
