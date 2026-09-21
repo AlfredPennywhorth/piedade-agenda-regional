@@ -254,8 +254,31 @@ relatoriosRouter.get('/presencas/periodo', async c => {
     .where(and(...condicoes))
     .all()
 
-  const eventosResumo = fechamentos
-    .map((registro: typeof fechamentos[number]) => ({
+  type EventoResumoPresenca = {
+    eventoId: string
+    titulo: string
+    inicioEm: string
+    fechadoEm: string
+    totalConvocados: number
+    totalConvocadosPresentes: number
+    totalConvocadosAusentes: number
+    totalConvidadosValidados: number
+    totalConvidadosPendentes: number
+    totalPresentes: number
+  }
+
+  type TotaisPeriodoPresenca = {
+    totalEventos: number
+    totalConvocados: number
+    totalConvocadosPresentes: number
+    totalConvocadosAusentes: number
+    totalConvidadosValidados: number
+    totalConvidadosPendentes: number
+    totalPresentes: number
+  }
+
+  const eventosResumo: EventoResumoPresenca[] = fechamentos
+    .map((registro: typeof fechamentos[number]): EventoResumoPresenca => ({
       eventoId: registro.evento.id,
       titulo: registro.evento.titulo,
       inicioEm: registro.evento.inicioEm,
@@ -267,10 +290,10 @@ relatoriosRouter.get('/presencas/periodo', async c => {
       totalConvidadosPendentes: registro.fechamento.totalConvidadosPendentes,
       totalPresentes: registro.fechamento.totalPresentes,
     }))
-    .sort((a, b) => a.inicioEm.localeCompare(b.inicioEm))
+    .sort((a: EventoResumoPresenca, b: EventoResumoPresenca) => a.inicioEm.localeCompare(b.inicioEm))
 
-  const totais = eventosResumo.reduce(
-    (acc, item) => {
+  const totais = eventosResumo.reduce<TotaisPeriodoPresenca>(
+    (acc: TotaisPeriodoPresenca, item: EventoResumoPresenca) => {
       acc.totalConvocados += item.totalConvocados
       acc.totalConvocadosPresentes += item.totalConvocadosPresentes
       acc.totalConvocadosAusentes += item.totalConvocadosAusentes
