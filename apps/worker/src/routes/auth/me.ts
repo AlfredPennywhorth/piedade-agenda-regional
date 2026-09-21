@@ -32,7 +32,7 @@ meApp.get('/', async c => {
   }
 
   const { membro, conta } = identidade
-  const capacidades = await obterCapacidadesMembro(db, membroId)
+  const capacidades = await obterCapacidadesMembro(db, membroId, contaAcessoId)
 
   return c.json(
     {

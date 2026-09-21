@@ -398,14 +398,20 @@ export interface CapacidadesMembro {
   podeVisualizarRelatorios: boolean
   podeVisualizarAuditoria: boolean
   podeOperarPortaria: boolean
+  podeAdministrarAcessos: boolean
 }
 
-export async function obterCapacidadesMembro(db: any, membroId: string): Promise<CapacidadesMembro> {
+export async function obterCapacidadesMembro(
+  db: any,
+  membroId: string,
+  contaAcessoId?: string
+): Promise<CapacidadesMembro> {
   if (!db || !membroId) {
     return {
       podeVisualizarRelatorios: false,
       podeVisualizarAuditoria: false,
-      podeOperarPortaria: false
+      podeOperarPortaria: false,
+      podeAdministrarAcessos: false
     }
   }
 
@@ -432,14 +438,27 @@ export async function obterCapacidadesMembro(db: any, membroId: string): Promise
     .where(and(eq(schema.eventos.organizadorMembroId, membroId), eq(schema.eventos.ativo, true)))
     .get()
 
-  const podeVisualizarRelatorios = codigos.has('GESTOR_RELATORIOS') || !!eventoOrganizado
-  const podeVisualizarAuditoria = await eAuditorSistemaAutorizado(db, membroId)
-  const podeOperarPortaria = codigos.has('OPERADOR_PORTARIA')
+  const contexto = await carregarContextoPermissoes(db, membroId, contaAcessoId)
+  const perfisTecnicos = new Set(contexto.acessosAtivos.map(acesso => acesso.perfilCodigo))
+
+  const podeVisualizarRelatorios =
+    perfisTecnicos.has('GESTOR_RELATORIOS') ||
+    codigos.has('GESTOR_RELATORIOS') ||
+    !!eventoOrganizado
+  const podeVisualizarAuditoria =
+    perfisTecnicos.has('AUDITOR') ||
+    (await eAuditorSistemaAutorizado(db, membroId))
+  const podeOperarPortaria =
+    perfisTecnicos.has('OPERADOR_PORTARIA_PERMANENTE') ||
+    codigos.has('OPERADOR_PORTARIA')
+  const podeAdministrarAcessos =
+    eMasterSistema(contexto) || regionaisAdministradas(contexto).size > 0
 
   return {
     podeVisualizarRelatorios,
     podeVisualizarAuditoria,
-    podeOperarPortaria
+    podeOperarPortaria,
+    podeAdministrarAcessos
   }
 }
 

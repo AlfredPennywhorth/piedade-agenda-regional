@@ -49,6 +49,44 @@ describe('App — S07 Minha Agenda', () => {
     expect(screen.getByText('Calendário')).toBeDefined()
   })
 
+  it('oculta módulos restritos sem capacidades', async () => {
+    render(<App />)
+    expect(await screen.findByText('Minha Agenda')).toBeDefined()
+    expect(screen.queryByText('Portaria')).toBeNull()
+    expect(screen.queryByText('Relatórios')).toBeNull()
+    expect(screen.queryByText('Auditoria')).toBeNull()
+  })
+
+  it('exibe módulos restritos quando as capacidades são concedidas', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/auth/me') {
+        return {
+          nome: 'Pessoa Teste',
+          capacidades: {
+            podeOperarPortaria: true,
+            podeVisualizarRelatorios: true,
+            podeVisualizarAuditoria: true,
+          },
+        }
+      }
+      if (endpoint === '/governanca/responsabilidade-regional') {
+        return {
+          tipo: 'RESPONSAVEL_REGIONAL_PMO',
+          natureza: 'CIENCIA_DE_RESPONSABILIDADE',
+          versao: 'teste',
+          texto: 'Responsabilidades',
+          acessos: [],
+        }
+      }
+      return []
+    })
+
+    render(<App />)
+    expect(await screen.findByText('Portaria')).toBeDefined()
+    expect(screen.getByText('Relatórios')).toBeDefined()
+    expect(screen.getByText('Auditoria')).toBeDefined()
+  })
+
   it('exibe login quando não existe sessão local', async () => {
     localStorage.removeItem('session_token')
     render(<App />)
