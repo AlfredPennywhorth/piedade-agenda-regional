@@ -58,6 +58,17 @@ function App() {
     carregarIdentidade()
   }, [])
 
+  const podeAcessarAba = (tab: typeof currentTab) => {
+    if (tab === 'portaria') return capacidades.podeOperarPortaria === true
+    if (tab === 'relatorios') return capacidades.podeVisualizarRelatorios === true
+    if (tab === 'auditoria') return capacidades.podeVisualizarAuditoria === true
+    return true
+  }
+
+  const alterarAba = (tab: typeof currentTab) => {
+    setCurrentTab(podeAcessarAba(tab) ? tab : 'agenda')
+  }
+
   const concluirAutenticacao = async () => {
     setTokenAtivacao(null)
     window.history.replaceState({}, document.title, window.location.pathname)
@@ -106,7 +117,7 @@ function App() {
     <ResponsabilidadeRegionalGate>
     <MainLayout
       currentTab={currentTab}
-      onTabChange={setCurrentTab}
+      onTabChange={alterarAba}
       capacidades={capacidades}
       nomeUsuario={nomeUsuario}
       onLogout={sair}
@@ -116,9 +127,9 @@ function App() {
       {currentTab === 'series' && <SeriesView />}
       {currentTab === 'convocacoes' && <ConvocacoesView />}
       {currentTab === 'calendario' && <CalendarioView />}
-      {currentTab === 'portaria' && <PortariaView />}
-      {currentTab === 'relatorios' && <RelatoriosView />}
-      {currentTab === 'auditoria' && <AuditoriaView />}
+      {currentTab === 'portaria' && capacidades.podeOperarPortaria === true && <PortariaView />}
+      {currentTab === 'relatorios' && capacidades.podeVisualizarRelatorios === true && <RelatoriosView />}
+      {currentTab === 'auditoria' && capacidades.podeVisualizarAuditoria === true && <AuditoriaView />}
       {currentTab === 'regionais' && <RegionaisView />}
       {currentTab === 'administracoes' && <AdministracoesView />}
       {currentTab === 'setores' && <SetoresView />}
