@@ -4,6 +4,7 @@ export interface CapacidadesFrontend {
   podeVisualizarRelatorios?: boolean
   podeVisualizarAuditoria?: boolean
   podeOperarPortaria?: boolean
+  podeAdministrarAcessos?: boolean
 }
 
 interface MainLayoutProps {
