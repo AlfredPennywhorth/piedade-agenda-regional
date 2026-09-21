@@ -3,10 +3,12 @@ import { eq } from 'drizzle-orm'
 import { regionais } from '../db/schema'
 import { CreateRegionalSchema, UpdateRegionalSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
+import { exigirMasterParaEscrita } from '../middleware/master-write'
 
 export const regionaisRouter = new Hono<any>()
 
 regionaisRouter.use('*', authMiddleware)
+regionaisRouter.use('*', exigirMasterParaEscrita)
 
 regionaisRouter.get('/', async (c) => {
   const db = c.get('db')
