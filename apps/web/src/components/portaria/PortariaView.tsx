@@ -153,7 +153,7 @@ export function PortariaView() {
     if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
 
     if (evId) {
-      void Promise.all([carregarParticipantes(evId), carregarConvidados(evId)])
+      void carregarParticipantes(evId).then(() => carregarConvidados(evId))
     }
   }
 
