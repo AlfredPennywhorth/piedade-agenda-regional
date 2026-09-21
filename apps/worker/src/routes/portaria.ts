@@ -324,6 +324,7 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
   )
 
   return c.json({
+    status: 'FECHADA',
     fechamento: {
       id: fechamentoId,
       eventoId,
