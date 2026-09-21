@@ -288,7 +288,7 @@ portariaRouter.post('/eventos/:eventoId/cadastro-convidados/credencial', async c
     return c.json({ error: 'Operador não autorizado para este evento', code: 'FORBIDDEN' }, 403)
   }
 
-  const token = gerarTokenAleatorio(32)
+  const token = gerarTokenAleatorio(24)
   const tokenHash = await hashToken(token)
   const agora = new Date().toISOString()
   const credencialId = crypto.randomUUID()
@@ -324,7 +324,7 @@ portariaRouter.post('/eventos/:eventoId/cadastro-convidados/credencial', async c
     credencial: {
       token,
       expiraEm: evento.fimEm,
-      caminhoCadastro: `/convidado?portaria=${encodeURIComponent(token)}`,
+      caminhoCadastro: `/c?p=${encodeURIComponent(token)}`,
       endpointCadastro: `/api/v1/portaria-publica/cadastro/${token}`,
     },
   }, 201)
