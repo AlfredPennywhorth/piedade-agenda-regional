@@ -1,4 +1,4 @@
-import { eq, and, inArray, or } from 'drizzle-orm'
+import { eq, and, inArray, or, isNull } from 'drizzle-orm'
 import * as schema from '../db/schema'
 
 export interface AcessoTecnico {
@@ -511,9 +511,29 @@ export async function obterCapacidadesMembro(
   const podeVisualizarAuditoria =
     perfisTecnicos.has('AUDITOR') ||
     (await eAuditorSistemaAutorizado(db, membroId))
+  const autorizacaoTemporariaPortaria = await db
+    .select({ eventoId: schema.portariaOperadoresEvento.eventoId })
+    .from(schema.portariaOperadoresEvento)
+    .leftJoin(
+      schema.portariasEvento,
+      eq(schema.portariaOperadoresEvento.eventoId, schema.portariasEvento.eventoId)
+    )
+    .where(
+      and(
+        eq(schema.portariaOperadoresEvento.membroId, membroId),
+        eq(schema.portariaOperadoresEvento.ativo, true),
+        or(
+          eq(schema.portariasEvento.status, 'ABERTA'),
+          isNull(schema.portariasEvento.status)
+        )
+      )
+    )
+    .get()
+
   const podeOperarPortaria =
     perfisTecnicos.has('OPERADOR_PORTARIA_PERMANENTE') ||
-    codigos.has('OPERADOR_PORTARIA')
+    codigos.has('OPERADOR_PORTARIA') ||
+    !!autorizacaoTemporariaPortaria
   const podeAdministrarAcessos =
     eMasterSistema(contexto) || regionaisAdministradas(contexto).size > 0
 
