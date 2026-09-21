@@ -20,7 +20,7 @@ describe('PORT-01 — operadores temporários por evento', () => {
     db = drizzle(sqlite, { schema })
     app = createApp(db)
 
-    sqlite.exec(\`
+    sqlite.exec(`
       INSERT INTO regionais (id, nome) VALUES ('regional-1', 'Regional 1');
       INSERT INTO administracoes (id, regional_id, nome)
         VALUES ('adm-1', 'regional-1', 'Administração 1');
@@ -58,7 +58,7 @@ describe('PORT-01 — operadores temporários por evento', () => {
       INSERT INTO convocacao_destinatarios
         (id, convocacao_id, membro_id)
       VALUES ('dest-1', 'conv-1', 'participante-1');
-    \`)
+    `)
   })
 
   async function sessao(
@@ -69,12 +69,12 @@ describe('PORT-01 — operadores temporários por evento', () => {
   ) {
     const hash = await hashToken(token)
     const agora = new Date().toISOString()
-    sqlite.prepare(\`
+    sqlite.prepare(`
       INSERT INTO sessoes
         (id, conta_acesso_id, membro_id, token_hash, expira_em,
          ultimo_acesso_em, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    \`).run(
+    `).run(
       id,
       contaId,
       membroId,
@@ -86,7 +86,7 @@ describe('PORT-01 — operadores temporários por evento', () => {
   }
 
   const auth = (token: string, json = false) => ({
-    Authorization: \`Bearer \${token}\`,
+    Authorization: `Bearer ${token}`,
     ...(json ? { 'Content-Type': 'application/json' } : {}),
   })
 
@@ -94,7 +94,7 @@ describe('PORT-01 — operadores temporários por evento', () => {
     await sessao('sessao-master', 'conta-master', 'membro-master', 'token-master')
 
     for (const membroId of ['porteiro-1', 'porteiro-2']) {
-      const res = await app.request(\`/api/v1/portaria/eventos/\${eventoId}/operadores\`, {
+      const res = await app.request(`/api/v1/portaria/eventos/${eventoId}/operadores`, {
         method: 'POST',
         headers: auth('token-master', true),
         body: JSON.stringify({ membroId }),
@@ -102,10 +102,10 @@ describe('PORT-01 — operadores temporários por evento', () => {
       expect(res.status).toBe(201)
     }
 
-    const ativos = sqlite.prepare(\`
+    const ativos = sqlite.prepare(`
       SELECT membro_id FROM portaria_operadores_evento
       WHERE evento_id = ? AND ativo = 1 ORDER BY membro_id
-    \`).all(eventoId) as Array<{ membro_id: string }>
+    `).all(eventoId) as Array<{ membro_id: string }>
 
     expect(ativos.map(item => item.membro_id)).toEqual(['porteiro-1', 'porteiro-2'])
   })
@@ -114,7 +114,7 @@ describe('PORT-01 — operadores temporários por evento', () => {
     await sessao('sessao-master', 'conta-master', 'membro-master', 'token-master')
     await sessao('sessao-p1', 'conta-p1', 'porteiro-1', 'token-p1')
 
-    const concessao = await app.request(\`/api/v1/portaria/eventos/\${eventoId}/operadores\`, {
+    const concessao = await app.request(`/api/v1/portaria/eventos/${eventoId}/operadores`, {
       method: 'POST',
       headers: auth('token-master', true),
       body: JSON.stringify({ membroId: 'porteiro-1' }),
@@ -122,7 +122,7 @@ describe('PORT-01 — operadores temporários por evento', () => {
     expect(concessao.status).toBe(201)
 
     const participantes = await app.request(
-      \`/api/v1/portaria/eventos/\${eventoId}/participantes\`,
+      `/api/v1/portaria/eventos/${eventoId}/participantes`,
       { headers: auth('token-p1') }
     )
 
@@ -132,7 +132,7 @@ describe('PORT-01 — operadores temporários por evento', () => {
   it('usuário comum não pode nomear porteiro temporário', async () => {
     await sessao('sessao-p1', 'conta-p1', 'porteiro-1', 'token-p1')
 
-    const res = await app.request(\`/api/v1/portaria/eventos/\${eventoId}/operadores\`, {
+    const res = await app.request(`/api/v1/portaria/eventos/${eventoId}/operadores`, {
       method: 'POST',
       headers: auth('token-p1', true),
       body: JSON.stringify({ membroId: 'porteiro-2' }),
@@ -144,12 +144,12 @@ describe('PORT-01 — operadores temporários por evento', () => {
   it('exige conta de acesso ativa para o porteiro temporário', async () => {
     await sessao('sessao-master', 'conta-master', 'membro-master', 'token-master')
 
-    sqlite.exec(\`
+    sqlite.exec(`
       INSERT INTO membros (id, nome, casa_id, ativo)
       VALUES ('sem-conta', 'Sem Conta', 'casa-1', 1);
-    \`)
+    `)
 
-    const res = await app.request(\`/api/v1/portaria/eventos/\${eventoId}/operadores\`, {
+    const res = await app.request(`/api/v1/portaria/eventos/${eventoId}/operadores`, {
       method: 'POST',
       headers: auth('token-master', true),
       body: JSON.stringify({ membroId: 'sem-conta' }),
@@ -164,7 +164,7 @@ describe('PORT-01 — operadores temporários por evento', () => {
     await sessao('sessao-p1', 'conta-p1', 'porteiro-1', 'token-p1')
 
     for (const membroId of ['porteiro-1', 'porteiro-2']) {
-      const res = await app.request(\`/api/v1/portaria/eventos/\${eventoId}/operadores\`, {
+      const res = await app.request(`/api/v1/portaria/eventos/${eventoId}/operadores`, {
         method: 'POST',
         headers: auth('token-master', true),
         body: JSON.stringify({ membroId }),
@@ -172,7 +172,7 @@ describe('PORT-01 — operadores temporários por evento', () => {
       expect(res.status).toBe(201)
     }
 
-    const fechar = await app.request(\`/api/v1/portaria/eventos/\${eventoId}/fechar\`, {
+    const fechar = await app.request(`/api/v1/portaria/eventos/${eventoId}/fechar`, {
       method: 'POST',
       headers: auth('token-p1'),
     })
@@ -196,20 +196,20 @@ describe('PORT-01 — operadores temporários por evento', () => {
     await sessao('sessao-master', 'conta-master', 'membro-master', 'token-master')
     await sessao('sessao-p1', 'conta-p1', 'porteiro-1', 'token-p1')
 
-    await app.request(\`/api/v1/portaria/eventos/\${eventoId}/operadores\`, {
+    await app.request(`/api/v1/portaria/eventos/${eventoId}/operadores`, {
       method: 'POST',
       headers: auth('token-master', true),
       body: JSON.stringify({ membroId: 'porteiro-1' }),
     })
 
-    const fechar = await app.request(\`/api/v1/portaria/eventos/\${eventoId}/fechar\`, {
+    const fechar = await app.request(`/api/v1/portaria/eventos/${eventoId}/fechar`, {
       method: 'POST',
       headers: auth('token-p1'),
     })
     expect(fechar.status).toBe(200)
 
     const participantes = await app.request(
-      \`/api/v1/portaria/eventos/\${eventoId}/participantes\`,
+      `/api/v1/portaria/eventos/${eventoId}/participantes`,
       { headers: auth('token-p1') }
     )
     expect(participantes.status).toBe(403)
