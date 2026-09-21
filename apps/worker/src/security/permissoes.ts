@@ -1,8 +1,17 @@
 import { eq, and, inArray, or } from 'drizzle-orm'
 import * as schema from '../db/schema'
 
+export interface AcessoTecnico {
+  id: string
+  perfilCodigo: string
+  escopoTipo: 'GLOBAL' | 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO'
+  escopoId: string | null
+}
+
 export interface ContextoPermissoes {
   membroId: string
+  contaAcessoId: string | null
+  acessosAtivos: AcessoTecnico[]
   vinculosAtivos: {
     funcaoId: string
     regionalId: string | null
@@ -13,7 +22,11 @@ export interface ContextoPermissoes {
   }[]
 }
 
-export async function carregarContextoPermissoes(db: any, membroId: string): Promise<ContextoPermissoes> {
+export async function carregarContextoPermissoes(
+  db: any,
+  membroId: string,
+  contaAcessoId?: string
+): Promise<ContextoPermissoes> {
   const vinculos = await db
     .select({
       funcaoId: schema.vinculosFuncionais.funcaoId,
@@ -31,10 +44,58 @@ export async function carregarContextoPermissoes(db: any, membroId: string): Pro
       )
     )
 
+  let contaId = contaAcessoId ?? null
+  if (!contaId) {
+    const conta = await db
+      .select({ id: schema.contasAcesso.id })
+      .from(schema.contasAcesso)
+      .where(eq(schema.contasAcesso.membroId, membroId))
+      .get()
+    contaId = conta?.id ?? null
+  }
+
+  const acessos = contaId
+    ? await db
+        .select({
+          id: schema.acessosConta.id,
+          perfilCodigo: schema.acessosConta.perfilCodigo,
+          escopoTipo: schema.acessosConta.escopoTipo,
+          escopoId: schema.acessosConta.escopoId,
+        })
+        .from(schema.acessosConta)
+        .where(
+          and(
+            eq(schema.acessosConta.contaAcessoId, contaId),
+            eq(schema.acessosConta.ativo, true)
+          )
+        )
+        .all()
+    : []
+
   return {
     membroId,
+    contaAcessoId: contaId,
+    acessosAtivos: acessos as AcessoTecnico[],
     vinculosAtivos: vinculos,
   }
+}
+
+export function temPerfil(contexto: ContextoPermissoes, perfilCodigo: string): boolean {
+  return contexto.acessosAtivos.some(acesso => acesso.perfilCodigo === perfilCodigo)
+}
+
+export function temPerfilNoEscopo(
+  contexto: ContextoPermissoes,
+  perfilCodigo: string,
+  escopoTipo: AcessoTecnico['escopoTipo'],
+  escopoId: string | null
+): boolean {
+  return contexto.acessosAtivos.some(
+    acesso =>
+      acesso.perfilCodigo === perfilCodigo &&
+      acesso.escopoTipo === escopoTipo &&
+      acesso.escopoId === escopoId
+  )
 }
 
 // Fundação (S03): funções auxiliares para verificar permissões futuras.
