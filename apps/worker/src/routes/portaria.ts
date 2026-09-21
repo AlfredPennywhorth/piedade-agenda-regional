@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento, convidadosEvento, credenciaisConvidadoEvento, presencasConvidadoEvento } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eMasterSistema, eOperadorPortariaAutorizado } from '../security/permissoes'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
 import { PortariaEventosQuerySchema, getSaoPauloDateString } from '@piedade/shared'
+import { gerarTokenAleatorio, hashToken } from '../security/tokens'
 
 export const portariaRouter = new Hono<{ Variables: Variables }>()
 
@@ -268,6 +269,195 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
   )
 
   return c.json({ eventoId, status: 'FECHADA', fechadaEm: agora }, 200)
+})
+
+// POST /api/v1/portaria/eventos/:eventoId/convidados
+portariaRouter.post('/eventos/:eventoId/convidados', async c => {
+  const db = c.get('db')
+  const atorMembroId = c.get('membroId')
+  const eventoId = c.req.param('eventoId')
+
+  const evento = await db.select().from(eventos)
+    .where(and(eq(eventos.id, eventoId), eq(eventos.ativo, true))).get()
+  if (!evento) {
+    return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
+  }
+
+  const autorizado = await eOperadorPortariaAutorizado(db, atorMembroId, evento)
+  if (!autorizado) {
+    return c.json({ error: 'Operador não autorizado para este evento', code: 'FORBIDDEN' }, 403)
+  }
+
+  let body: { nome?: string; referencia?: string | null }
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Requisição inválida', code: 'VALIDATION_ERROR' }, 400)
+  }
+
+  const nome = body.nome?.trim()
+  if (!nome || nome.length < 2 || nome.length > 120) {
+    return c.json({ error: 'Nome do convidado inválido', code: 'VALIDATION_ERROR' }, 400)
+  }
+
+  const token = gerarTokenAleatorio(32)
+  const tokenHash = await hashToken(token)
+  const agora = new Date().toISOString()
+  const convidadoId = crypto.randomUUID()
+  const credencialId = crypto.randomUUID()
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+
+  await executarOperacaoComAudit(
+    db,
+    qdb => [
+      qdb.insert(convidadosEvento).values({
+        id: convidadoId,
+        eventoId,
+        nome,
+        referencia: body.referencia?.trim() || null,
+        criadoPorMembroId: atorMembroId,
+        ativo: true,
+        createdAt: agora,
+        updatedAt: agora,
+      }),
+      qdb.insert(credenciaisConvidadoEvento).values({
+        id: credencialId,
+        convidadoId,
+        tokenHash,
+        expiraEm: evento.fimEm,
+        createdAt: agora,
+        updatedAt: agora,
+      }),
+    ],
+    {
+      acao: 'PORTARIA_CONVIDADO_CRIADO',
+      atorMembroId,
+      recursoTipo: 'CONVIDADO_EVENTO',
+      recursoId: convidadoId,
+      escopoTipo,
+      escopoId,
+      contexto: { eventoId },
+    }
+  )
+
+  return c.json({
+    id: convidadoId,
+    eventoId,
+    nome,
+    referencia: body.referencia?.trim() || null,
+    credencial: {
+      token,
+      expiraEm: evento.fimEm,
+    },
+  }, 201)
+})
+
+// GET /api/v1/portaria/eventos/:eventoId/convidados
+portariaRouter.get('/eventos/:eventoId/convidados', async c => {
+  const db = c.get('db')
+  const atorMembroId = c.get('membroId')
+  const eventoId = c.req.param('eventoId')
+
+  const evento = await db.select().from(eventos)
+    .where(and(eq(eventos.id, eventoId), eq(eventos.ativo, true))).get()
+  if (!evento) {
+    return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
+  }
+
+  const autorizado = await eOperadorPortariaAutorizado(db, atorMembroId, evento)
+  if (!autorizado) {
+    return c.json({ error: 'Operador não autorizado para este evento', code: 'FORBIDDEN' }, 403)
+  }
+
+  const convidados = await db
+    .select({
+      id: convidadosEvento.id,
+      nome: convidadosEvento.nome,
+      referencia: convidadosEvento.referencia,
+      ativo: convidadosEvento.ativo,
+      presencaId: presencasConvidadoEvento.id,
+      registradoEm: presencasConvidadoEvento.registradoEm,
+      forma: presencasConvidadoEvento.forma,
+    })
+    .from(convidadosEvento)
+    .leftJoin(
+      presencasConvidadoEvento,
+      and(
+        eq(presencasConvidadoEvento.convidadoId, convidadosEvento.id),
+        eq(presencasConvidadoEvento.eventoId, eventoId)
+      )
+    )
+    .where(eq(convidadosEvento.eventoId, eventoId))
+    .all()
+
+  return c.json({ data: convidados }, 200)
+})
+
+// POST /api/v1/portaria/eventos/:eventoId/convidados/:convidadoId/presenca
+portariaRouter.post('/eventos/:eventoId/convidados/:convidadoId/presenca', async c => {
+  const db = c.get('db')
+  const atorMembroId = c.get('membroId')
+  const eventoId = c.req.param('eventoId')
+  const convidadoId = c.req.param('convidadoId')
+
+  const evento = await db.select().from(eventos)
+    .where(and(eq(eventos.id, eventoId), eq(eventos.ativo, true))).get()
+  if (!evento) {
+    return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
+  }
+
+  const autorizado = await eOperadorPortariaAutorizado(db, atorMembroId, evento)
+  if (!autorizado) {
+    return c.json({ error: 'Operador não autorizado para este evento', code: 'FORBIDDEN' }, 403)
+  }
+
+  const convidado = await db.select().from(convidadosEvento)
+    .where(and(
+      eq(convidadosEvento.id, convidadoId),
+      eq(convidadosEvento.eventoId, eventoId),
+      eq(convidadosEvento.ativo, true)
+    )).get()
+  if (!convidado) {
+    return c.json({ error: 'Convidado não encontrado', code: 'NOT_FOUND' }, 404)
+  }
+
+  const existente = await db.select().from(presencasConvidadoEvento)
+    .where(and(
+      eq(presencasConvidadoEvento.eventoId, eventoId),
+      eq(presencasConvidadoEvento.convidadoId, convidadoId)
+    )).get()
+  if (existente) {
+    return c.json({ error: 'Presença já registrada', code: 'PRESENCA_DUPLICADA' }, 409)
+  }
+
+  const agora = new Date().toISOString()
+  const presencaId = crypto.randomUUID()
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+
+  await executarOperacaoComAudit(
+    db,
+    qdb => [qdb.insert(presencasConvidadoEvento).values({
+      id: presencaId,
+      convidadoId,
+      eventoId,
+      forma: 'MANUAL',
+      registradoPorMembroId: atorMembroId,
+      registradoEm: agora,
+      createdAt: agora,
+      updatedAt: agora,
+    })],
+    {
+      acao: 'PORTARIA_PRESENCA_CONVIDADO',
+      atorMembroId,
+      recursoTipo: 'PRESENCA_CONVIDADO_EVENTO',
+      recursoId: presencaId,
+      escopoTipo,
+      escopoId,
+      contexto: { eventoId, convidadoId, forma: 'MANUAL' },
+    }
+  )
+
+  return c.json({ id: presencaId, eventoId, convidadoId, forma: 'MANUAL', registradoEm: agora }, 201)
 })
 
 // GET /api/v1/portaria/eventos
