@@ -3,10 +3,12 @@ import { eq } from 'drizzle-orm'
 import { setores } from '../db/schema'
 import { CreateSetorSchema, UpdateSetorSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
+import { exigirMasterParaEscrita } from '../middleware/master-write'
 
 export const setoresRouter = new Hono<any>()
 
 setoresRouter.use('*', authMiddleware)
+setoresRouter.use('*', exigirMasterParaEscrita)
 
 setoresRouter.get('/', async (c) => {
   const db = c.get('db')

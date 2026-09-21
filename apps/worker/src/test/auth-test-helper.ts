@@ -18,6 +18,11 @@ export async function criarSessaoAutenticadaTeste(sqlite: any, prefixo = 'auth-t
   sqlite.prepare('INSERT OR IGNORE INTO membros (id, nome, casa_id, ativo) VALUES (?, ?, ?, 1)').run(membroId, 'Usuário Teste Auth', casaId)
   sqlite.prepare("INSERT OR IGNORE INTO contas_acesso (id, membro_id, status, ativado_em) VALUES (?, ?, 'ATIVA', CURRENT_TIMESTAMP)").run(contaId, membroId)
   sqlite.prepare(`
+    INSERT OR IGNORE INTO acessos_conta
+      (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id)
+    VALUES (?, ?, 'MASTER_SISTEMA', 'GLOBAL', NULL)
+  `).run(`${prefixo}-acesso-master`, contaId)
+  sqlite.prepare(`
     INSERT OR REPLACE INTO sessoes
       (id, conta_acesso_id, membro_id, token_hash, expira_em, revogado_em, ultimo_acesso_em, created_at)
     VALUES (?, ?, ?, ?, '2099-01-01T00:00:00.000Z', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)

@@ -3,10 +3,12 @@ import { eq } from 'drizzle-orm'
 import { administracoes } from '../db/schema'
 import { CreateAdministracaoSchema, UpdateAdministracaoSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
+import { exigirMasterParaEscrita } from '../middleware/master-write'
 
 export const administracoesRouter = new Hono<any>()
 
 administracoesRouter.use('*', authMiddleware)
+administracoesRouter.use('*', exigirMasterParaEscrita)
 
 administracoesRouter.get('/', async (c) => {
   const db = c.get('db')
