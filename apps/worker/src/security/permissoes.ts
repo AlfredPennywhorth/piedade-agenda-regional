@@ -1,4 +1,4 @@
-import { eq, and, inArray, or } from 'drizzle-orm'
+import { eq, and, inArray, or, isNull } from 'drizzle-orm'
 import * as schema from '../db/schema'
 
 export interface AcessoTecnico {
@@ -524,7 +524,7 @@ export async function obterCapacidadesMembro(
         eq(schema.portariaOperadoresEvento.ativo, true),
         or(
           eq(schema.portariasEvento.status, 'ABERTA'),
-          sql`${schema.portariasEvento.status} IS NULL`
+          isNull(schema.portariasEvento.status)
         )
       )
     )
