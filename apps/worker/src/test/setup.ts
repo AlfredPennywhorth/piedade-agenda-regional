@@ -103,6 +103,35 @@ export function setupDb(sqlite: any) {
       FOREIGN KEY (conta_acesso_id) REFERENCES contas_acesso(id)
     );
 
+    -- Compatibilidade explícita da infraestrutura de testes legados:
+    -- suítes antigas inserem sessões diretamente. O código de produção nunca usa este gatilho.
+    CREATE TRIGGER IF NOT EXISTS test_vincular_sessao_a_conta
+    AFTER INSERT ON sessoes
+    WHEN NEW.conta_acesso_id IS NULL
+    BEGIN
+      INSERT OR IGNORE INTO contas_acesso (
+        id, membro_id, status, pin_hash, pin_salt, bloqueado_ate,
+        tentativas_pin, ativado_em
+      )
+      SELECT
+        'test-conta-' || NEW.membro_id,
+        m.id,
+        CASE WHEN m.autenticacao_ativa = 1 THEN 'ATIVA' ELSE 'PENDENTE_ATIVACAO' END,
+        m.pin_hash,
+        m.pin_salt,
+        m.bloqueado_ate,
+        m.tentativas_pin,
+        m.ativado_em
+      FROM membros m
+      WHERE m.id = NEW.membro_id;
+
+      UPDATE sessoes
+      SET conta_acesso_id = (
+        SELECT id FROM contas_acesso WHERE membro_id = NEW.membro_id
+      )
+      WHERE id = NEW.id;
+    END;
+
     CREATE TABLE IF NOT EXISTS tentativas_acesso (
       id text PRIMARY KEY NOT NULL,
       conta_acesso_id text,
