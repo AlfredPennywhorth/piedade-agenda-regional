@@ -6,7 +6,7 @@ import * as schema from '../db/schema'
 import { hashToken } from '../security/tokens'
 import { setupDb } from './setup'
 
-describe('PORT-02 — convidados eventuais por evento', () => {
+describe('PORT-02 — autocadastro de convidados e validação pelo porteiro', () => {
   let sqlite: Database.Database
   let db: ReturnType<typeof drizzle>
   let app: ReturnType<typeof createApp>
@@ -48,12 +48,7 @@ describe('PORT-02 — convidados eventuais por evento', () => {
     `)
   })
 
-  async function criarSessao(
-    id: string,
-    contaId: string,
-    membroId: string,
-    token: string
-  ) {
+  async function criarSessao(id: string, contaId: string, membroId: string, token: string) {
     const tokenHash = await hashToken(token)
     const agora = new Date().toISOString()
 
@@ -62,15 +57,7 @@ describe('PORT-02 — convidados eventuais por evento', () => {
         (id, conta_acesso_id, membro_id, token_hash, expira_em,
          ultimo_acesso_em, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      contaId,
-      membroId,
-      tokenHash,
-      '2099-01-01T22:00:00.000Z',
-      agora,
-      agora
-    )
+    `).run(id, contaId, membroId, tokenHash, '2099-01-01T22:00:00.000Z', agora, agora)
   }
 
   const auth = (token: string, json = false) => ({
@@ -87,100 +74,156 @@ describe('PORT-02 — convidados eventuais por evento', () => {
       headers: auth('token-master', true),
       body: JSON.stringify({ membroId: 'porteiro-1' }),
     })
-
     expect(concessao.status).toBe(201)
   }
 
-  it('porteiro temporário cadastra convidado sem criar membro permanente', async () => {
-    await prepararPorteiro()
-
-    const antes = sqlite.prepare('SELECT COUNT(*) AS total FROM membros').get() as any
-
-    const response = await app.request('/api/v1/portaria/eventos/evento-1/convidados', {
+  async function gerarCredencial() {
+    const res = await app.request('/api/v1/portaria/eventos/evento-1/cadastro-convidados/credencial', {
       method: 'POST',
-      headers: auth('token-porteiro', true),
+      headers: auth('token-porteiro'),
+    })
+    expect(res.status).toBe(201)
+    return (await res.json()) as any
+  }
+
+  it('porteiro gera QR reutilizável do evento e token não fica em claro no banco', async () => {
+    await prepararPorteiro()
+    const gerada = await gerarCredencial()
+
+    expect(gerada.credencial.token).toBeTruthy()
+    expect(gerada.credencial.caminhoCadastro).toContain('/c?p=')
+
+    const row = sqlite.prepare(
+      'SELECT token_hash FROM credenciais_cadastro_portaria_evento WHERE evento_id = ?'
+    ).get('evento-1') as any
+
+    expect(row.token_hash).toBeTruthy()
+    expect(row.token_hash).not.toBe(gerada.credencial.token)
+  })
+
+  it('mesmo QR permite autocadastro de vários convidados sem criar membros', async () => {
+    await prepararPorteiro()
+    const gerada = await gerarCredencial()
+    const antes = (sqlite.prepare('SELECT COUNT(*) AS total FROM membros').get() as any).total
+
+    for (const [nome, localidade] of [
+      ['Convidado Um', 'Casa A'],
+      ['Convidado Dois', 'Casa B'],
+    ]) {
+      const res = await app.request(gerada.credencial.endpointCadastro, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome, localidade }),
+      })
+      expect(res.status).toBe(201)
+      expect(await res.json()).toMatchObject({
+        cadastrado: true,
+        convidado: { nome, localidade, status: 'PENDENTE' },
+      })
+    }
+
+    const depois = (sqlite.prepare('SELECT COUNT(*) AS total FROM membros').get() as any).total
+    expect(depois).toBe(antes)
+
+    const convidados = sqlite.prepare(
+      'SELECT nome, status FROM convidados_evento WHERE evento_id = ? ORDER BY nome'
+    ).all('evento-1') as Array<{ nome: string; status: string }>
+    expect(convidados).toEqual([
+      { nome: 'Convidado Dois', status: 'PENDENTE' },
+      { nome: 'Convidado Um', status: 'PENDENTE' },
+    ])
+  })
+
+  it('autocadastro não cria presença antes da validação do porteiro', async () => {
+    await prepararPorteiro()
+    const gerada = await gerarCredencial()
+
+    const cadastro = await app.request(gerada.credencial.endpointCadastro, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        nome: 'Convidado Externo',
+        nome: 'Convidado Pendente',
+        localidade: 'Casa Teste',
         referencia: 'Visitante',
       }),
     })
+    expect(cadastro.status).toBe(201)
 
-    expect(response.status).toBe(201)
-    const body = (await response.json()) as any
-    expect(body.nome).toBe('Convidado Externo')
-    expect(body.credencial.token).toBeTruthy()
-    expect(body.credencial.caminhoPresenca).toContain(body.credencial.token)
-
-    const depois = sqlite.prepare('SELECT COUNT(*) AS total FROM membros').get() as any
-    expect(depois.total).toBe(antes.total)
-
-    const credencial = sqlite.prepare(
-      'SELECT token_hash FROM credenciais_convidado_evento WHERE convidado_id = ?'
-    ).get(body.id) as any
-
-    expect(credencial.token_hash).toBeTruthy()
-    expect(credencial.token_hash).not.toBe(body.credencial.token)
+    const presencas = sqlite.prepare(
+      'SELECT COUNT(*) AS total FROM presencas_convidado_evento'
+    ).get() as any
+    expect(presencas.total).toBe(0)
   })
 
-  it('link público registra presença uma única vez', async () => {
+  it('porteiro valida convidado pendente e somente então registra presença', async () => {
     await prepararPorteiro()
+    const gerada = await gerarCredencial()
 
-    const criar = await app.request('/api/v1/portaria/eventos/evento-1/convidados', {
+    const cadastro = await app.request(gerada.credencial.endpointCadastro, {
       method: 'POST',
-      headers: auth('token-porteiro', true),
-      body: JSON.stringify({ nome: 'Convidado Link' }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nome: 'Convidado Validado', localidade: 'Casa Teste' }),
     })
-    const convidado = (await criar.json()) as any
+    const convidado = ((await cadastro.json()) as any).convidado
 
-    const primeira = await app.request(convidado.credencial.caminhoPresenca, {
-      method: 'POST',
-    })
-    expect(primeira.status).toBe(201)
-    expect(await primeira.json()).toMatchObject({
-      registrado: true,
-      convidado: { nome: 'Convidado Link' },
-    })
-
-    const segunda = await app.request(convidado.credencial.caminhoPresenca, {
-      method: 'POST',
-    })
-    expect(segunda.status).toBe(409)
-  })
-
-  it('porteiro pode registrar presença manual de convidado', async () => {
-    await prepararPorteiro()
-
-    const criar = await app.request('/api/v1/portaria/eventos/evento-1/convidados', {
-      method: 'POST',
-      headers: auth('token-porteiro', true),
-      body: JSON.stringify({ nome: 'Convidado Manual' }),
-    })
-    const convidado = (await criar.json()) as any
-
-    const presenca = await app.request(
-      `/api/v1/portaria/eventos/evento-1/convidados/${convidado.id}/presenca`,
-      {
-        method: 'POST',
-        headers: auth('token-porteiro'),
-      }
+    const validar = await app.request(
+      `/api/v1/portaria/eventos/evento-1/convidados/${convidado.id}/validar`,
+      { method: 'POST', headers: auth('token-porteiro') }
     )
 
-    expect(presenca.status).toBe(201)
-    expect(await presenca.json()).toMatchObject({
+    expect(validar.status).toBe(201)
+    expect(await validar.json()).toMatchObject({
       convidadoId: convidado.id,
-      forma: 'MANUAL',
+      status: 'VALIDADO',
+      forma: 'VALIDACAO_PORTEIRO',
     })
+
+    const row = sqlite.prepare(
+      'SELECT status, validado_por_membro_id FROM convidados_evento WHERE id = ?'
+    ).get(convidado.id) as any
+    expect(row.status).toBe('VALIDADO')
+    expect(row.validado_por_membro_id).toBe('porteiro-1')
+
+    const presenca = sqlite.prepare(
+      'SELECT forma, registrado_por_membro_id FROM presencas_convidado_evento WHERE convidado_id = ?'
+    ).get(convidado.id) as any
+    expect(presenca.forma).toBe('VALIDACAO_PORTEIRO')
+    expect(presenca.registrado_por_membro_id).toBe('porteiro-1')
   })
 
-  it('portaria fechada bloqueia presença pública do convidado', async () => {
+  it('lista pendentes para validação sem expor token', async () => {
     await prepararPorteiro()
+    const gerada = await gerarCredencial()
 
-    const criar = await app.request('/api/v1/portaria/eventos/evento-1/convidados', {
+    await app.request(gerada.credencial.endpointCadastro, {
       method: 'POST',
-      headers: auth('token-porteiro', true),
-      body: JSON.stringify({ nome: 'Convidado Tardio' }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome: 'Convidado na Fila',
+        localidade: 'Localidade X',
+        observacoes: 'Primeira visita',
+      }),
     })
-    const convidado = (await criar.json()) as any
+
+    const lista = await app.request('/api/v1/portaria/eventos/evento-1/convidados', {
+      headers: auth('token-porteiro'),
+    })
+    expect(lista.status).toBe(200)
+
+    const body = (await lista.json()) as any
+    expect(body.data).toHaveLength(1)
+    expect(body.data[0]).toMatchObject({
+      nome: 'Convidado na Fila',
+      localidade: 'Localidade X',
+      status: 'PENDENTE',
+      presencaId: null,
+    })
+    expect(JSON.stringify(body)).not.toContain('token')
+  })
+
+  it('portaria fechada bloqueia novos autocadastros', async () => {
+    await prepararPorteiro()
+    const gerada = await gerarCredencial()
 
     const fechar = await app.request('/api/v1/portaria/eventos/evento-1/fechar', {
       method: 'POST',
@@ -188,42 +231,33 @@ describe('PORT-02 — convidados eventuais por evento', () => {
     })
     expect(fechar.status).toBe(200)
 
-    const presenca = await app.request(convidado.credencial.caminhoPresenca, {
+    const cadastro = await app.request(gerada.credencial.endpointCadastro, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nome: 'Chegou Tarde', localidade: 'Casa Y' }),
     })
-    expect(presenca.status).toBe(409)
-    expect(await presenca.json()).toMatchObject({ code: 'PORTARIA_FECHADA' })
+    expect(cadastro.status).toBe(409)
+    expect(await cadastro.json()).toMatchObject({ code: 'PORTARIA_FECHADA' })
   })
 
-  it('lista convidados com informação de presença sem expor a credencial', async () => {
+  it('cadastro manual permanece disponível como contingência e já registra presença', async () => {
     await prepararPorteiro()
 
-    const criar = await app.request('/api/v1/portaria/eventos/evento-1/convidados', {
+    const res = await app.request('/api/v1/portaria/eventos/evento-1/convidados', {
       method: 'POST',
       headers: auth('token-porteiro', true),
-      body: JSON.stringify({ nome: 'Convidado Listado' }),
-    })
-    const convidado = (await criar.json()) as any
-
-    await app.request(
-      `/api/v1/portaria/eventos/evento-1/convidados/${convidado.id}/presenca`,
-      {
-        method: 'POST',
-        headers: auth('token-porteiro'),
-      }
-    )
-
-    const lista = await app.request('/api/v1/portaria/eventos/evento-1/convidados', {
-      headers: auth('token-porteiro'),
+      body: JSON.stringify({
+        nome: 'Sem Celular',
+        localidade: 'Casa Z',
+      }),
     })
 
-    expect(lista.status).toBe(200)
-    const body = (await lista.json()) as any
-    expect(body.data).toHaveLength(1)
-    expect(body.data[0]).toMatchObject({
-      nome: 'Convidado Listado',
-      forma: 'MANUAL',
-    })
-    expect(JSON.stringify(body)).not.toContain('token')
+    expect(res.status).toBe(201)
+    expect(await res.json()).toMatchObject({ status: 'VALIDADO' })
+
+    const presenca = sqlite.prepare(
+      'SELECT forma FROM presencas_convidado_evento'
+    ).get() as any
+    expect(presenca.forma).toBe('MANUAL')
   })
 })
