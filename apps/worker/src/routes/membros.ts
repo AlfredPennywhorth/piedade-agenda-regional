@@ -5,16 +5,42 @@ import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 
 export const membrosRouter = new Hono<any>()
 
+const membroPublico = {
+  id: membros.id,
+  nome: membros.nome,
+  dataOrdenacao: membros.dataOrdenacao,
+  codigoCarteirinha: membros.codigoCarteirinha,
+  celular: membros.celular,
+  casaId: membros.casaId,
+  ativo: membros.ativo,
+  createdAt: membros.createdAt,
+  updatedAt: membros.updatedAt,
+}
+
+function somenteCadastroInstitucional(membro: any) {
+  return {
+    id: membro.id,
+    nome: membro.nome,
+    dataOrdenacao: membro.dataOrdenacao,
+    codigoCarteirinha: membro.codigoCarteirinha,
+    celular: membro.celular,
+    casaId: membro.casaId,
+    ativo: membro.ativo,
+    createdAt: membro.createdAt,
+    updatedAt: membro.updatedAt,
+  }
+}
+
 membrosRouter.get('/', async (c) => {
   const db = c.get('db')
-  const data = await db.select().from(membros).all()
+  const data = await db.select(membroPublico).from(membros).all()
   return c.json(data)
 })
 
 membrosRouter.get('/:id', async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')
-  const data = await db.select().from(membros).where(eq(membros.id, id)).get()
+  const data = await db.select(membroPublico).from(membros).where(eq(membros.id, id)).get()
   
   if (!data) return c.json({ error: 'Membro não encontrado' }, 404)
   return c.json(data)
@@ -37,6 +63,18 @@ membrosRouter.post('/', async (c) => {
     const body = await c.req.json()
     const parsed = CreateMembroSchema.parse(body)
     
+    const conflitoCarteirinha = await db
+      .select({ id: membros.id })
+      .from(membros)
+      .where(eq(membros.codigoCarteirinha, parsed.codigoCarteirinha))
+      .get()
+    if (conflitoCarteirinha) {
+      return c.json(
+        { error: 'Código da carteirinha já vinculado', code: 'CARTEIRINHA_JA_VINCULADA' },
+        409
+      )
+    }
+
     if (parsed.celular) {
       const conflito = await db.select().from(membros).where(eq(membros.celular, parsed.celular)).get()
       if (conflito) {
@@ -54,7 +92,7 @@ membrosRouter.post('/', async (c) => {
 
     const id = crypto.randomUUID()
     const result = await db.insert(membros).values({ id, ...parsed }).returning().get()
-    return c.json(result, 201)
+    return c.json(somenteCadastroInstitucional(result), 201)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
       return c.json({ error: 'Casa vinculada não existe' }, 400)
@@ -72,6 +110,23 @@ membrosRouter.patch('/:id', async (c) => {
     
     const existing = await db.select().from(membros).where(eq(membros.id, id)).get()
     if (!existing) return c.json({ error: 'Membro não encontrado' }, 404)
+
+    if (
+      parsed.codigoCarteirinha &&
+      parsed.codigoCarteirinha !== existing.codigoCarteirinha
+    ) {
+      const conflitoCarteirinha = await db
+        .select({ id: membros.id })
+        .from(membros)
+        .where(eq(membros.codigoCarteirinha, parsed.codigoCarteirinha))
+        .get()
+      if (conflitoCarteirinha) {
+        return c.json(
+          { error: 'Código da carteirinha já vinculado', code: 'CARTEIRINHA_JA_VINCULADA' },
+          409
+        )
+      }
+    }
 
     if (parsed.celular && parsed.celular !== existing.celular) {
       const conflito = await db.select().from(membros).where(eq(membros.celular, parsed.celular)).get()
@@ -92,7 +147,7 @@ membrosRouter.patch('/:id', async (c) => {
       .where(eq(membros.id, id))
       .returning().get()
       
-    return c.json(updated)
+    return c.json(somenteCadastroInstitucional(updated))
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
       return c.json({ error: 'Casa vinculada não existe' }, 400)
