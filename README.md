@@ -94,6 +94,14 @@ npm, npx ou pnpm localmente.
 
 Ver detalhes em [docs/09-homologacao/s12-checkpoint-homologacao.md](./docs/09-homologacao/s12-checkpoint-homologacao.md) e [docs/09-homologacao/s12-checklist-encerramento.md](./docs/09-homologacao/s12-checklist-encerramento.md).
 
+### Checkpoint de preparação da Beta — 2026-09-21
+
+- Portaria e Recepção concluídas no escopo do ciclo atual.
+- Relatórios de Presença concluídos no escopo do ciclo atual.
+- ACC-05 sincronizada e com CI verde.
+- Único blocker operacional do ciclo: homologação integrada e merge da PR #54.
+- Critérios de GO/NO-GO e smoke test: [docs/09-homologacao/beta-readiness-2026-09-21.md](./docs/09-homologacao/beta-readiness-2026-09-21.md).
+
 ### Dívida técnica conhecida
 
 - Wrangler `3.114.17` → `4.x`: atualização controlada, planejada para execução futura.
