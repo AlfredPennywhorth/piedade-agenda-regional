@@ -119,7 +119,10 @@ const timestampsS02 = {
 export const membros = sqliteTable('membros', {
   id: text('id').primaryKey(), // UUID
   nome: text('nome').notNull(),
+  // Legado: será removido após a regularização dos dados institucionais.
   dataNascimento: text('data_nascimento'),
+  dataOrdenacao: text('data_ordenacao'),
+  codigoCarteirinha: text('codigo_carteirinha').unique(),
   celular: text('celular').unique(),
   casaId: text('casa_id')
     .notNull()
@@ -193,11 +196,41 @@ export const vinculosFuncionais = sqliteTable(
 )
 
 // ============================================================
+// Contas de Acesso (PR-ACC-01)
+// ============================================================
+
+export const contasAcesso = sqliteTable(
+  'contas_acesso',
+  {
+    id: text('id').primaryKey(),
+    membroId: text('membro_id')
+      .notNull()
+      .unique()
+      .references(() => membros.id),
+    status: text('status').notNull().default('PENDENTE_ATIVACAO'),
+    pinHash: text('pin_hash'),
+    pinSalt: text('pin_salt'),
+    bloqueadoAte: text('bloqueado_ate'),
+    tentativasPin: integer('tentativas_pin').notNull().default(0),
+    ativadoEm: text('ativado_em'),
+    ...timestampsS02,
+  },
+  table => ({
+    checkStatus: check(
+      'check_conta_acesso_status',
+      sql`${table.status} IN ('PENDENTE_ATIVACAO','ATIVA','BLOQUEADA','DESATIVADA')`
+    ),
+    idxStatus: index('idx_contas_acesso_status').on(table.status),
+  })
+)
+
+// ============================================================
 // Autenticação e Permissões (S03)
 // ============================================================
 
 export const linksAtivacao = sqliteTable('links_ativacao', {
   id: text('id').primaryKey(), // UUID
+  contaAcessoId: text('conta_acesso_id').references(() => contasAcesso.id),
   membroId: text('membro_id')
     .notNull()
     .references(() => membros.id),
@@ -210,6 +243,7 @@ export const linksAtivacao = sqliteTable('links_ativacao', {
 
 export const sessoes = sqliteTable('sessoes', {
   id: text('id').primaryKey(), // UUID
+  contaAcessoId: text('conta_acesso_id').references(() => contasAcesso.id),
   membroId: text('membro_id')
     .notNull()
     .references(() => membros.id),
@@ -225,6 +259,7 @@ export const sessoes = sqliteTable('sessoes', {
 
 export const tentativasAcesso = sqliteTable('tentativas_acesso', {
   id: text('id').primaryKey(), // UUID
+  contaAcessoId: text('conta_acesso_id').references(() => contasAcesso.id),
   membroId: text('membro_id').references(() => membros.id),
   tipo: text('tipo').notNull(), // ATIVACAO, LOGIN_PIN, RECUPERACAO_ADMIN, LOGOUT
   sucesso: integer('sucesso', { mode: 'boolean' }).notNull(),
