@@ -348,6 +348,7 @@ portariaRouter.post('/eventos/:eventoId/convidados', async c => {
     credencial: {
       token,
       expiraEm: evento.fimEm,
+      caminhoPresenca: `/api/v1/portaria-publica/convidados/${token}/presenca`,
     },
   }, 201)
 })
