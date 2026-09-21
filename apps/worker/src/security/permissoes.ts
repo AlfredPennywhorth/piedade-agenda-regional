@@ -80,6 +80,37 @@ export async function carregarContextoPermissoes(
   }
 }
 
+
+export function eMasterSistema(contexto: ContextoPermissoes): boolean {
+  return contexto.acessosAtivos.some(
+    acesso =>
+      acesso.perfilCodigo === 'MASTER_SISTEMA' &&
+      acesso.escopoTipo === 'GLOBAL' &&
+      acesso.escopoId === null
+  )
+}
+
+export function regionaisAdministradas(contexto: ContextoPermissoes): Set<string> {
+  return new Set(
+    contexto.acessosAtivos
+      .filter(
+        acesso =>
+          acesso.perfilCodigo === 'ADMINISTRADOR_SISTEMA' &&
+          acesso.escopoTipo === 'REGIONAL' &&
+          acesso.escopoId !== null
+      )
+      .map(acesso => acesso.escopoId as string)
+  )
+}
+
+export function podeAdministrarRegional(
+  contexto: ContextoPermissoes,
+  regionalId: string
+): boolean {
+  if (eMasterSistema(contexto)) return true
+  return regionaisAdministradas(contexto).has(regionalId)
+}
+
 export function temPerfil(contexto: ContextoPermissoes, perfilCodigo: string): boolean {
   return contexto.acessosAtivos.some(acesso => acesso.perfilCodigo === perfilCodigo)
 }
