@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, eq, inArray, like } from 'drizzle-orm'
+import { and, eq, inArray, like, sql } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { CreateMembroSchema } from '@piedade/shared'
 import { executeAtomic } from '../../db/batch'
@@ -173,6 +173,13 @@ adminPreCadastrosMinisteriaisApp.post('/:id/finalizar', async c => {
     return c.json({ error: 'Requisição inválida', code: 'VALIDATION_ERROR' }, 400)
   }
 
+  if (!body.celular?.trim()) {
+    return c.json(
+      { error: 'Celular é obrigatório para finalizar o cadastro', code: 'VALIDATION_ERROR' },
+      400
+    )
+  }
+
   const casaId = body.casaId?.trim() || preCadastro.casaId
   if (!casaId) {
     return c.json(
@@ -253,7 +260,14 @@ adminPreCadastrosMinisteriaisApp.post('/:id/finalizar', async c => {
       }),
       tx
         .update(schema.preCadastrosMinisteriais)
-        .set({ membroId, updatedAt: agora })
+        .set({
+          membroId: sql`CASE
+            WHEN ${schema.preCadastrosMinisteriais.membroId} IS NULL
+            THEN ${membroId}
+            ELSE 'PRE_CADASTRO_CONCORRENCIA_ABORT'
+          END` as any,
+          updatedAt: agora,
+        })
         .where(
           and(
             eq(schema.preCadastrosMinisteriais.id, preCadastro.id),
