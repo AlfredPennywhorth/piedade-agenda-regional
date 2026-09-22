@@ -19,42 +19,42 @@ describe('QA-MVP-01 — smoke test API ponta a ponta do fluxo principal', () => 
     app = createApp(db)
 
     sqlite.exec(`
-      INSERT INTO regionais (id, nome) VALUES ('regional-mvp', 'Regional MVP');
+      INSERT INTO regionais (id, nome) VALUES ('00000000-0000-4000-8000-000000000001', 'Regional MVP');
       INSERT INTO administracoes (id, regional_id, nome)
-        VALUES ('adm-mvp', 'regional-mvp', 'Administração MVP');
+        VALUES ('00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000001', 'Administração MVP');
       INSERT INTO setores (id, administracao_id, nome)
-        VALUES ('setor-mvp', 'adm-mvp', 'Setor MVP');
+        VALUES ('00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000002', 'Setor MVP');
       INSERT INTO casas (id, setor_id, nome)
-        VALUES ('casa-mvp', 'setor-mvp', 'Casa MVP');
+        VALUES ('00000000-0000-4000-8000-000000000004', '00000000-0000-4000-8000-000000000003', 'Casa MVP');
 
       INSERT INTO locais
         (id, nome, endereco, numero, cidade, uf, ativo)
       VALUES
-        ('local-mvp', 'Local MVP', 'Rua Teste', '100', 'São Paulo', 'SP', 1);
+        ('00000000-0000-4000-8000-000000000005', 'Local MVP', 'Rua Teste', '100', 'São Paulo', 'SP', 1);
 
       INSERT INTO membros (id, nome, celular, casa_id, ativo) VALUES
-        ('master-mvp', 'Master MVP', '11900001001', 'casa-mvp', 1),
-        ('participante-mvp', 'Participante MVP', '11900001002', 'casa-mvp', 1),
-        ('porteiro-mvp', 'Porteiro MVP', '11900001003', 'casa-mvp', 1);
+        ('00000000-0000-4000-8000-000000000006', 'Master MVP', '11900001001', '00000000-0000-4000-8000-000000000004', 1),
+        ('00000000-0000-4000-8000-000000000007', 'Participante MVP', '11900001002', '00000000-0000-4000-8000-000000000004', 1),
+        ('00000000-0000-4000-8000-000000000008', 'Porteiro MVP', '11900001003', '00000000-0000-4000-8000-000000000004', 1);
 
       INSERT INTO contas_acesso (id, membro_id, status, ativado_em) VALUES
-        ('conta-master-mvp', 'master-mvp', 'ATIVA', CURRENT_TIMESTAMP),
-        ('conta-participante-mvp', 'participante-mvp', 'ATIVA', CURRENT_TIMESTAMP),
-        ('conta-porteiro-mvp', 'porteiro-mvp', 'ATIVA', CURRENT_TIMESTAMP);
+        ('conta-00000000-0000-4000-8000-000000000006', '00000000-0000-4000-8000-000000000006', 'ATIVA', CURRENT_TIMESTAMP),
+        ('conta-00000000-0000-4000-8000-000000000007', '00000000-0000-4000-8000-000000000007', 'ATIVA', CURRENT_TIMESTAMP),
+        ('conta-00000000-0000-4000-8000-000000000008', '00000000-0000-4000-8000-000000000008', 'ATIVA', CURRENT_TIMESTAMP);
 
       INSERT INTO acessos_conta
         (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id)
       VALUES
-        ('acesso-master-mvp', 'conta-master-mvp', 'MASTER_SISTEMA', 'GLOBAL', NULL),
-        ('acesso-participante-mvp', 'conta-participante-mvp', 'USUARIO_COMUM', 'CASA', 'casa-mvp');
+        ('acesso-00000000-0000-4000-8000-000000000006', 'conta-00000000-0000-4000-8000-000000000006', 'MASTER_SISTEMA', 'GLOBAL', NULL),
+        ('acesso-00000000-0000-4000-8000-000000000007', 'conta-00000000-0000-4000-8000-000000000007', 'USUARIO_COMUM', 'CASA', '00000000-0000-4000-8000-000000000004');
 
       INSERT INTO funcoes (id, nome, codigo, ativo)
-      VALUES ('funcao-convocada-mvp', 'Função Convocada MVP', 'FUNCAO_MVP', 1);
+      VALUES ('00000000-0000-4000-8000-000000000014', 'Função Convocada MVP', 'FUNCAO_MVP', 1);
 
       INSERT INTO vinculos_funcionais
         (id, membro_id, funcao_id, setor_id, ativo)
       VALUES
-        ('vinculo-participante-mvp', 'participante-mvp', 'funcao-convocada-mvp', 'setor-mvp', 1);
+        ('vinculo-00000000-0000-4000-8000-000000000007', '00000000-0000-4000-8000-000000000007', '00000000-0000-4000-8000-000000000014', '00000000-0000-4000-8000-000000000003', 1);
     `)
   })
 
@@ -90,45 +90,45 @@ describe('QA-MVP-01 — smoke test API ponta a ponta do fluxo principal', () => 
 
   it('percorre criação, convocação, RSVP, Portaria, fechamento e relatório final', async () => {
     await criarSessao(
-      'sessao-master-mvp',
-      'conta-master-mvp',
-      'master-mvp',
-      'token-master-mvp'
+      'sessao-00000000-0000-4000-8000-000000000006',
+      'conta-00000000-0000-4000-8000-000000000006',
+      '00000000-0000-4000-8000-000000000006',
+      'token-00000000-0000-4000-8000-000000000006'
     )
     await criarSessao(
-      'sessao-participante-mvp',
-      'conta-participante-mvp',
-      'participante-mvp',
-      'token-participante-mvp'
+      'sessao-00000000-0000-4000-8000-000000000007',
+      'conta-00000000-0000-4000-8000-000000000007',
+      '00000000-0000-4000-8000-000000000007',
+      'token-00000000-0000-4000-8000-000000000007'
     )
     await criarSessao(
-      'sessao-porteiro-mvp',
-      'conta-porteiro-mvp',
-      'porteiro-mvp',
-      'token-porteiro-mvp'
+      'sessao-00000000-0000-4000-8000-000000000008',
+      'conta-00000000-0000-4000-8000-000000000008',
+      '00000000-0000-4000-8000-000000000008',
+      'token-00000000-0000-4000-8000-000000000008'
     )
 
     const me = await app.request('/api/v1/auth/me', {
-      headers: headers('token-master-mvp'),
+      headers: headers('token-00000000-0000-4000-8000-000000000006'),
     })
     expect(me.status).toBe(200)
     expect(await me.json()).toMatchObject({
-      id: 'master-mvp',
+      id: '00000000-0000-4000-8000-000000000006',
       conta: { status: 'ATIVA' },
       capacidades: { podeAdministrarAcessos: true },
     })
 
     const criarEvento = await app.request('/api/v1/eventos', {
       method: 'POST',
-      headers: headers('token-master-mvp', true),
+      headers: headers('token-00000000-0000-4000-8000-000000000006', true),
       body: JSON.stringify({
         titulo: 'Reunião Smoke MVP',
         modalidade: 'PRESENCIAL',
         inicioEm: '2099-01-15T12:00:00.000Z',
         fimEm: '2099-01-15T15:00:00.000Z',
-        localId: 'local-mvp',
-        organizadorMembroId: 'master-mvp',
-        setorId: 'setor-mvp',
+        localId: '00000000-0000-4000-8000-000000000005',
+        organizadorMembroId: '00000000-0000-4000-8000-000000000006',
+        setorId: '00000000-0000-4000-8000-000000000003',
       }),
     })
     expect(criarEvento.status).toBe(201)
@@ -137,7 +137,7 @@ describe('QA-MVP-01 — smoke test API ponta a ponta do fluxo principal', () => 
 
     const criarConvocacao = await app.request('/api/v1/convocacoes', {
       method: 'POST',
-      headers: headers('token-master-mvp', true),
+      headers: headers('token-00000000-0000-4000-8000-000000000006', true),
       body: JSON.stringify({ eventoId: evento.id }),
     })
     expect(criarConvocacao.status).toBe(201)
@@ -147,8 +147,8 @@ describe('QA-MVP-01 — smoke test API ponta a ponta do fluxo principal', () => 
       `/api/v1/convocacoes/${convocacao.id}/funcoes`,
       {
         method: 'POST',
-        headers: headers('token-master-mvp', true),
-        body: JSON.stringify({ funcaoId: 'funcao-convocada-mvp' }),
+        headers: headers('token-00000000-0000-4000-8000-000000000006', true),
+        body: JSON.stringify({ funcaoId: '00000000-0000-4000-8000-000000000014' }),
       }
     )
     expect(adicionarFuncao.status).toBe(201)
@@ -157,7 +157,7 @@ describe('QA-MVP-01 — smoke test API ponta a ponta do fluxo principal', () => 
       `/api/v1/convocacoes/${convocacao.id}/publicar`,
       {
         method: 'POST',
-        headers: headers('token-master-mvp'),
+        headers: headers('token-00000000-0000-4000-8000-000000000006'),
       }
     )
     expect(publicar.status).toBe(200)
@@ -168,14 +168,14 @@ describe('QA-MVP-01 — smoke test API ponta a ponta do fluxo principal', () => 
 
     const destinatario = sqlite.prepare(
       'SELECT id FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
-    ).get(convocacao.id, 'participante-mvp') as { id: string } | undefined
+    ).get(convocacao.id, '00000000-0000-4000-8000-000000000007') as { id: string } | undefined
     expect(destinatario?.id).toBeTruthy()
 
     const responderRsvp = await app.request(
       `/api/v1/rsvp/${destinatario!.id}`,
       {
         method: 'PUT',
-        headers: headers('token-participante-mvp', true),
+        headers: headers('token-00000000-0000-4000-8000-000000000007', true),
         body: JSON.stringify({ resposta: 'PARTICIPAREI' }),
       }
     )
@@ -189,21 +189,21 @@ describe('QA-MVP-01 — smoke test API ponta a ponta do fluxo principal', () => 
       `/api/v1/portaria/eventos/${evento.id}/operadores`,
       {
         method: 'POST',
-        headers: headers('token-master-mvp', true),
-        body: JSON.stringify({ membroId: 'porteiro-mvp' }),
+        headers: headers('token-00000000-0000-4000-8000-000000000006', true),
+        body: JSON.stringify({ membroId: '00000000-0000-4000-8000-000000000008' }),
       }
     )
     expect(autorizarPorteiro.status).toBe(201)
 
     const checkin = await app.request('/api/v1/checkin/qr', {
       method: 'POST',
-      headers: headers('token-porteiro-mvp', true),
+      headers: headers('token-00000000-0000-4000-8000-000000000008', true),
       body: JSON.stringify({ qrToken: destinatario!.id }),
     })
     expect(checkin.status).toBe(201)
     expect(await checkin.json()).toMatchObject({
       eventoId: evento.id,
-      membroId: 'participante-mvp',
+      membroId: '00000000-0000-4000-8000-000000000007',
       forma: 'QR',
     })
 
@@ -211,7 +211,7 @@ describe('QA-MVP-01 — smoke test API ponta a ponta do fluxo principal', () => 
       `/api/v1/portaria/eventos/${evento.id}/fechar`,
       {
         method: 'POST',
-        headers: headers('token-porteiro-mvp'),
+        headers: headers('token-00000000-0000-4000-8000-000000000008'),
       }
     )
     expect(fechar.status).toBe(200)
@@ -227,7 +227,7 @@ describe('QA-MVP-01 — smoke test API ponta a ponta do fluxo principal', () => 
     const relatorio = await app.request(
       `/api/v1/relatorios/presencas/eventos/${evento.id}/final`,
       {
-        headers: headers('token-master-mvp'),
+        headers: headers('token-00000000-0000-4000-8000-000000000006'),
       }
     )
     expect(relatorio.status).toBe(200)
@@ -243,7 +243,7 @@ describe('QA-MVP-01 — smoke test API ponta a ponta do fluxo principal', () => 
       expect.arrayContaining([
         expect.objectContaining({
           tipoPessoa: 'MEMBRO',
-          origemId: 'participante-mvp',
+          origemId: '00000000-0000-4000-8000-000000000007',
           situacao: 'PRESENTE',
           respostaRsvp: 'PARTICIPAREI',
           formaPresenca: 'QR',
