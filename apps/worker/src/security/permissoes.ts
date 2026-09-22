@@ -211,6 +211,118 @@ export function temPerfilNoEscopo(
   )
 }
 
+export async function podeGerenciarAgendaNoEscopo(
+  db: any,
+  membroId: string,
+  escopoTipo: Exclude<AcessoTecnico['escopoTipo'], 'GLOBAL'>,
+  escopoId: string
+): Promise<boolean> {
+  if (!db || !membroId || !escopoId) return false
+
+  const contexto = await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) return true
+
+  // Regra institucional: todo membro pode gerir automaticamente a Agenda da própria Casa.
+  if (escopoTipo === 'CASA') {
+    const membro = await db
+      .select({ casaId: schema.membros.casaId })
+      .from(schema.membros)
+      .where(and(eq(schema.membros.id, membroId), eq(schema.membros.ativo, true)))
+      .get()
+    if (membro?.casaId === escopoId) return true
+  }
+
+  const acessosAgenda = contexto.acessosAtivos.filter(
+    acesso =>
+      acesso.perfilCodigo === 'GESTOR_AGENDA' &&
+      acesso.escopoTipo !== 'GLOBAL' &&
+      acesso.escopoId !== null
+  )
+  if (acessosAgenda.length === 0) return false
+
+  const regionalAlvo = await obterRegionalDoEscopo(db, escopoTipo, escopoId)
+  if (!regionalAlvo) return false
+
+  // Gestor Regional herda todos os escopos descendentes da Regional, inclusive GT Regional.
+  if (
+    acessosAgenda.some(
+      acesso =>
+        acesso.escopoTipo === 'REGIONAL' &&
+        acesso.escopoId === regionalAlvo
+    )
+  ) {
+    return true
+  }
+
+  // Correspondência direta continua válida em qualquer escopo configurável.
+  if (
+    acessosAgenda.some(
+      acesso => acesso.escopoTipo === escopoTipo && acesso.escopoId === escopoId
+    )
+  ) {
+    return true
+  }
+
+  if (escopoTipo === 'SETOR' || escopoTipo === 'CASA') {
+    const alvo = await db
+      .select({
+        setorId: schema.setores.id,
+        administracaoId: schema.setores.administracaoId,
+      })
+      .from(schema.setores)
+      .where(
+        eq(
+          schema.setores.id,
+          escopoTipo === 'SETOR'
+            ? escopoId
+            : db.select({ setorId: schema.casas.setorId })
+                .from(schema.casas)
+                .where(eq(schema.casas.id, escopoId))
+        )
+      )
+      .get()
+    if (alvo) {
+      if (
+        acessosAgenda.some(
+          acesso =>
+            acesso.escopoTipo === 'ADMINISTRACAO' &&
+            acesso.escopoId === alvo.administracaoId
+        )
+      ) return true
+      if (
+        acessosAgenda.some(
+          acesso =>
+            acesso.escopoTipo === 'SETOR' &&
+            acesso.escopoId === alvo.setorId
+        )
+      ) return true
+    }
+  }
+
+  if (escopoTipo === 'ADMINISTRACAO') {
+    return acessosAgenda.some(
+      acesso =>
+        acesso.escopoTipo === 'ADMINISTRACAO' &&
+        acesso.escopoId === escopoId
+    )
+  }
+
+  return false
+}
+
+export function regionaisGeridasNaAgenda(contexto: ContextoPermissoes): Set<string> {
+  return new Set(
+    contexto.acessosAtivos
+      .filter(
+        acesso =>
+          acesso.perfilCodigo === 'GESTOR_AGENDA' &&
+          acesso.escopoTipo === 'REGIONAL' &&
+          acesso.escopoId !== null
+      )
+      .map(acesso => acesso.escopoId as string)
+  )
+}
+
 // Fundação (S03): funções auxiliares para verificar permissões futuras.
 
 export function temFuncao(contexto: ContextoPermissoes, funcaoId: string): boolean {
