@@ -31,6 +31,14 @@ describe('Eventos API (S04)', () => {
     await db.insert(setores).values({ id: setId, nome: 'Set', administracaoId: admId })
     await db.insert(casas).values({ id: casId, nome: 'Cas', setorId: setId })
     await db.insert(membros).values({ id: memId, nome: 'Mem Test', casaId: casId, ativo: true, autenticacaoAtiva: true })
+    const contaId = crypto.randomUUID()
+    sqlite.prepare(
+      'INSERT INTO contas_acesso (id, membro_id, status, ativado_em) VALUES (?, ?, \'ATIVA\', CURRENT_TIMESTAMP)'
+    ).run(contaId, memId)
+    sqlite.prepare(
+      'INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, \'MASTER_SISTEMA\', \'GLOBAL\', NULL)'
+    ).run(crypto.randomUUID(), contaId)
+
     const rawToken = crypto.randomUUID()
     const tokenHash = await hashToken(rawToken)
     await db.insert(sessoes).values({
