@@ -101,6 +101,14 @@ describe('S12 - Auditoria, Anti-Spoofing, Escopos e Fail-Closed', () => {
     // Membro 1: Auditor Regional A
     memAuditorRegAId = crypto.randomUUID()
     await db.insert(membros).values({ id: memAuditorRegAId, nome: 'Auditor Reg A', casaId: casAId, ativo: true, autenticacaoAtiva: true })
+    const contaAuditorAgendaId = crypto.randomUUID()
+    sqlite.prepare(
+      'INSERT INTO contas_acesso (id, membro_id, status, ativado_em) VALUES (?, ?, \'ATIVA\', CURRENT_TIMESTAMP)'
+    ).run(contaAuditorAgendaId, memAuditorRegAId)
+    sqlite.prepare(
+      'INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, \'GESTOR_AGENDA\', \'REGIONAL\', ?)'
+    ).run(crypto.randomUUID(), contaAuditorAgendaId, regAId)
+
     tokenAuditorRegA = await criarSessao(memAuditorRegAId)
     await db.insert(vinculosFuncionais).values({
       id: crypto.randomUUID(),
