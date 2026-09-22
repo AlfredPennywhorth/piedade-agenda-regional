@@ -78,6 +78,14 @@ describe('S06 - Convocações', () => {
     const f2Id = crypto.randomUUID()
     await db.insert(funcoes).values({ id: f2Id, nome: 'F2', ativo: true })
 
+    const contaAgendaId = crypto.randomUUID()
+    sqlite.prepare(
+      'INSERT INTO contas_acesso (id, membro_id, status, ativado_em) VALUES (?, ?, \'ATIVA\', CURRENT_TIMESTAMP)'
+    ).run(contaAgendaId, mem1Id)
+    sqlite.prepare(
+      'INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, \'GESTOR_AGENDA\', \'SETOR\', ?)'
+    ).run(crypto.randomUUID(), contaAgendaId, setId)
+
     tokenSessaoAtual = crypto.randomUUID()
     await db.insert(sessoes).values({
       id: crypto.randomUUID(),
