@@ -115,9 +115,10 @@ describe('MVP-AGENDA-02 — governança de escrita da Agenda', () => {
   function eventoPayload(casaId: string) {
     return {
       titulo: 'Reunião de teste',
-      modalidade: 'PRESENCIAL',
+      modalidade: 'ONLINE',
       inicioEm: '2099-01-15T12:00:00.000Z',
       fimEm: '2099-01-15T14:00:00.000Z',
+      urlOnline: 'https://meet.example.com/agenda',
       casaId,
     }
   }
