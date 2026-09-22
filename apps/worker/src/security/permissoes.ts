@@ -264,36 +264,37 @@ export async function podeGerenciarAgendaNoEscopo(
   }
 
   if (escopoTipo === 'SETOR' || escopoTipo === 'CASA') {
-    const alvo = await db
-      .select({
-        setorId: schema.setores.id,
-        administracaoId: schema.setores.administracaoId,
-      })
-      .from(schema.setores)
-      .where(
-        eq(
-          schema.setores.id,
-          escopoTipo === 'SETOR'
-            ? escopoId
-            : db.select({ setorId: schema.casas.setorId })
-                .from(schema.casas)
-                .where(eq(schema.casas.id, escopoId))
-        )
-      )
-      .get()
-    if (alvo) {
+    let setorId = escopoTipo === 'SETOR' ? escopoId : null
+    if (escopoTipo === 'CASA') {
+      const casa = await db
+        .select({ setorId: schema.casas.setorId })
+        .from(schema.casas)
+        .where(eq(schema.casas.id, escopoId))
+        .get()
+      setorId = casa?.setorId ?? null
+    }
+
+    if (setorId) {
+      const setor = await db
+        .select({ administracaoId: schema.setores.administracaoId })
+        .from(schema.setores)
+        .where(eq(schema.setores.id, setorId))
+        .get()
+
       if (
+        setor?.administracaoId &&
         acessosAgenda.some(
           acesso =>
             acesso.escopoTipo === 'ADMINISTRACAO' &&
-            acesso.escopoId === alvo.administracaoId
+            acesso.escopoId === setor.administracaoId
         )
       ) return true
+
       if (
         acessosAgenda.some(
           acesso =>
             acesso.escopoTipo === 'SETOR' &&
-            acesso.escopoId === alvo.setorId
+            acesso.escopoId === setorId
         )
       ) return true
     }
