@@ -168,6 +168,19 @@ describe('DATA-04B — finalização do pré-cadastro ministerial', () => {
     expect(response.status).toBe(201)
   })
 
+  it('exige celular para finalizar o cadastro', async () => {
+    await sessao('s-master', 'c-master', 'm-master', 'token-master')
+
+    const response = await app.request('/api/v1/admin/pre-cadastros-ministeriais/pre-a/finalizar', {
+      method: 'POST',
+      headers: headers('token-master'),
+      body: JSON.stringify({ codigoCarteirinha: 'CARD-SEM-CELULAR' }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ code: 'VALIDATION_ERROR' })
+  })
+
   it('rejeita carteirinha já vinculada', async () => {
     await sessao('s-master', 'c-master', 'm-master', 'token-master')
 
