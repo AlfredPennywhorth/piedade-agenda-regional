@@ -107,15 +107,6 @@ relatoriosRouter.get('/presencas/membros/:membroAlvoId', async c => {
     return c.json({ error: 'Sessão ou banco indisponível' }, 500)
   }
 
-  const alvo = await db.select({ id: membros.id, nome: membros.nome })
-    .from(membros)
-    .where(eq(membros.id, membroAlvoId))
-    .get()
-
-  if (!alvo) {
-    return c.json({ error: 'Membro não encontrado', code: 'NOT_FOUND' }, 404)
-  }
-
   const itens = await db
     .select({
       item: portariaFechamentoItens,
@@ -164,11 +155,28 @@ relatoriosRouter.get('/presencas/membros/:membroAlvoId', async c => {
 
   resultado.sort((a, b) => b.inicioEm.localeCompare(a.inicioEm))
 
-  if (itens.length > 0 && resultado.length === 0) {
+  // Privacidade: não consultar nem expor a identidade do alvo antes de comprovar
+  // que o solicitante possui acesso a ao menos um item do histórico.
+  // Quando não há histórico materializado, respondemos NOT_FOUND de forma
+  // indistinguível entre membro inexistente e membro existente sem histórico.
+  if (itens.length === 0) {
+    return c.json({ error: 'Histórico não encontrado', code: 'NOT_FOUND' }, 404)
+  }
+
+  if (resultado.length === 0) {
     return c.json(
       { error: 'Acesso não autorizado ao histórico deste membro', code: 'FORBIDDEN' },
       403
     )
+  }
+
+  const alvo = await db.select({ id: membros.id, nome: membros.nome })
+    .from(membros)
+    .where(eq(membros.id, membroAlvoId))
+    .get()
+
+  if (!alvo) {
+    return c.json({ error: 'Histórico não encontrado', code: 'NOT_FOUND' }, 404)
   }
 
   const totalReunioes = resultado.length
