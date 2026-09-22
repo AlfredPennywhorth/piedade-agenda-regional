@@ -505,6 +505,7 @@ export async function obterCapacidadesMembro(
   const perfisTecnicos = new Set(contexto.acessosAtivos.map(acesso => acesso.perfilCodigo))
 
   const podeVisualizarRelatorios =
+    eMasterSistema(contexto) ||
     perfisTecnicos.has('GESTOR_RELATORIOS') ||
     codigos.has('GESTOR_RELATORIOS') ||
     !!eventoOrganizado
