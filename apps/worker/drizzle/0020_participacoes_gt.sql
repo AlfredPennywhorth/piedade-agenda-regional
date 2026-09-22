@@ -45,7 +45,7 @@ CREATE INDEX `idx_participacao_gt_pre_cadastro`
 CREATE TRIGGER `trg_participacao_gt_regional_insert`
 BEFORE INSERT ON `participacoes_grupos_trabalho`
 BEGIN
-  SELECT CASE
+  SELECT (CASE
     WHEN NOT EXISTS (
       SELECT 1
       FROM `grupos_trabalho` g
@@ -55,9 +55,9 @@ BEGIN
         AND g.setor_id IS NULL
     )
     THEN RAISE(ABORT, 'GT_DEVE_SER_REGIONAL')
-  END;
+  END);
 
-  SELECT CASE
+  SELECT (CASE
     WHEN NOT EXISTS (
       SELECT 1
       FROM `grupos_trabalho` g
@@ -67,14 +67,14 @@ BEGIN
         AND g.regional_id = a.regional_id
     )
     THEN RAISE(ABORT, 'SETOR_FORA_DA_REGIONAL_DO_GT')
-  END;
+  END);
 END;
 --> statement-breakpoint
 CREATE TRIGGER `trg_participacao_gt_regional_update`
 BEFORE UPDATE OF `grupo_trabalho_id`, `setor_representado_id`
 ON `participacoes_grupos_trabalho`
 BEGIN
-  SELECT CASE
+  SELECT (CASE
     WHEN NOT EXISTS (
       SELECT 1
       FROM `grupos_trabalho` g
@@ -84,9 +84,9 @@ BEGIN
         AND g.setor_id IS NULL
     )
     THEN RAISE(ABORT, 'GT_DEVE_SER_REGIONAL')
-  END;
+  END);
 
-  SELECT CASE
+  SELECT (CASE
     WHEN NOT EXISTS (
       SELECT 1
       FROM `grupos_trabalho` g
@@ -96,5 +96,5 @@ BEGIN
         AND g.regional_id = a.regional_id
     )
     THEN RAISE(ABORT, 'SETOR_FORA_DA_REGIONAL_DO_GT')
-  END;
+  END);
 END;
