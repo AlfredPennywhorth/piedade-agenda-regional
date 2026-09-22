@@ -172,7 +172,7 @@ describe('QA-MVP-01 — smoke test API ponta a ponta do fluxo principal', () => 
     expect(destinatario?.id).toBeTruthy()
 
     const responderRsvp = await app.request(
-      `/api/v1/rsvp/${destinatario!.id}`,
+      `/api/v1/minha-agenda/rsvp/${destinatario!.id}`,
       {
         method: 'PUT',
         headers: headers('token-00000000-0000-4000-8000-000000000007', true),
