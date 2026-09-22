@@ -151,6 +151,8 @@ export const preCadastrosMinisteriais = sqliteTable(
     casaId: text('casa_id').references(() => casas.id),
     dataOrdenacao: text('data_ordenacao'),
     statusOrigem: text('status_origem'),
+    celularReferencia: text('celular_referencia'),
+    fonteCelular: text('fonte_celular'),
     membroId: text('membro_id').unique().references(() => membros.id),
     fonte: text('fonte').notNull().default('EXPORTACAO_CONSULTA_SERVOS_MINISTERIO'),
     ativo: ativoDefault,
@@ -166,6 +168,50 @@ export const preCadastrosMinisteriais = sqliteTable(
     idxMembro: uniqueIndex('idx_pre_cadastro_ministerial_membro')
       .on(table.membroId)
       .where(sql`${table.membroId} IS NOT NULL`),
+  })
+)
+
+export const participacoesGruposTrabalho = sqliteTable(
+  'participacoes_grupos_trabalho',
+  {
+    id: text('id').primaryKey(),
+    grupoTrabalhoId: text('grupo_trabalho_id')
+      .notNull()
+      .references(() => gruposTrabalho.id),
+    setorRepresentadoId: text('setor_representado_id')
+      .notNull()
+      .references(() => setores.id),
+    preCadastroMinisterialId: text('pre_cadastro_ministerial_id')
+      .notNull()
+      .references(() => preCadastrosMinisteriais.id),
+    papel: text('papel').notNull(),
+    statusMensageria: text('status_mensageria'),
+    justificativa: text('justificativa'),
+    ativo: ativoDefault,
+    ...timestampsS02,
+  },
+  table => ({
+    checkPapel: check(
+      'check_participacao_gt_papel',
+      sql`${table.papel} IN ('RESPONSAVEL','SUPLENTE')`
+    ),
+    uniqueParticipacao: uniqueIndex('idx_participacao_gt_unica')
+      .on(
+        table.grupoTrabalhoId,
+        table.setorRepresentadoId,
+        table.preCadastroMinisterialId,
+        table.papel
+      )
+      .where(sql`${table.ativo} = 1`),
+    idxGtSetor: index('idx_participacao_gt_setor').on(
+      table.grupoTrabalhoId,
+      table.setorRepresentadoId,
+      table.ativo
+    ),
+    idxPreCadastro: index('idx_participacao_gt_pre_cadastro').on(
+      table.preCadastroMinisterialId,
+      table.ativo
+    ),
   })
 )
 
