@@ -26,6 +26,24 @@ database_id = "local"
 migrations_dir = "drizzle"
 
 # ============================================================
+# Ambiente Beta / Homologação
+# ============================================================
+
+[env.beta]
+name = "piedade-agenda-worker-beta"
+
+[env.beta.vars]
+APP_ENV = "beta"
+APP_VERSION = "0.0.1-beta"
+CORS_ORIGIN = "https://beta.piedade-agenda-regional.pages.dev"
+
+[[env.beta.d1_databases]]
+binding = "DB"
+database_name = "piedade-agenda-db-beta"
+database_id = "__D1_BETA_DATABASE_ID__"
+migrations_dir = "drizzle"
+
+# ============================================================
 # Ambiente de Produção
 # ============================================================
 
