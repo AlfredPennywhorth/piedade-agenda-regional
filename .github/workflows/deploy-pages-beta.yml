@@ -37,7 +37,7 @@ jobs:
       - name: Validate Beta API URL
         shell: bash
         env:
-          BETA_API_URL: ${{ vars.BETA_API_URL }}
+          BETA_API_URL: https://piedade-agenda-worker-beta.aws311274.workers.dev/api/v1
         run: |
           test -n "$BETA_API_URL"
           case "$BETA_API_URL" in
@@ -47,7 +47,7 @@ jobs:
 
       - name: Build frontend for Beta
         env:
-          VITE_API_URL: ${{ vars.BETA_API_URL }}
+          VITE_API_URL: https://piedade-agenda-worker-beta.aws311274.workers.dev/api/v1
         run: pnpm --filter @piedade/web build
 
       - name: Deploy Pages Beta preview
@@ -64,7 +64,7 @@ jobs:
       - name: Show Beta URLs
         shell: bash
         env:
-          BETA_API_URL: ${{ vars.BETA_API_URL }}
+          BETA_API_URL: https://piedade-agenda-worker-beta.aws311274.workers.dev/api/v1
         run: |
           echo "Frontend: https://beta.piedade-agenda-regional.pages.dev"
           echo "API: $BETA_API_URL"
