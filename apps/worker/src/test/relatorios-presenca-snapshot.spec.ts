@@ -189,6 +189,30 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
     expect(res.status).toBe(403)
   })
 
+  it('não revela existência de membro sem histórico materializado', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+
+    const existenteSemHistorico = await app.request(
+      '/api/v1/relatorios/presencas/membros/gestor-tecnico',
+      { headers: auth('token-gestor') }
+    )
+    const inexistente = await app.request(
+      '/api/v1/relatorios/presencas/membros/membro-inexistente',
+      { headers: auth('token-gestor') }
+    )
+
+    expect(existenteSemHistorico.status).toBe(404)
+    expect(inexistente.status).toBe(404)
+    expect(await existenteSemHistorico.json()).toEqual({
+      error: 'Histórico não encontrado',
+      code: 'NOT_FOUND',
+    })
+    expect(await inexistente.json()).toEqual({
+      error: 'Histórico não encontrado',
+      code: 'NOT_FOUND',
+    })
+  })
+
   it('histórico de membro respeita filtro de período', async () => {
     await sessao(gestorId, 'token-gestor', 'conta-gestor')
 
