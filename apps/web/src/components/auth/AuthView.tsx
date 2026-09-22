@@ -1,5 +1,9 @@
 import { FormEvent, useState } from 'react'
-import { ativacaoSchema, loginSchema } from '@piedade/shared'
+import {
+  ativacaoSchema,
+  loginSchema,
+  solicitarRecuperacaoPinSchema,
+} from '@piedade/shared'
 import { ApiError, postPublic, salvarTokenSessao } from '../../api/apiClient'
 
 interface AuthViewProps {
@@ -16,15 +20,45 @@ export function AuthView({
   onCancelarAtivacao,
 }: AuthViewProps) {
   const ativando = Boolean(tokenAtivacao)
+  const [recuperando, setRecuperando] = useState(false)
   const [celular, setCelular] = useState('')
   const [pin, setPin] = useState('')
   const [confirmacaoPin, setConfirmacaoPin] = useState('')
   const [erro, setErro] = useState<string | null>(null)
+  const [mensagem, setMensagem] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
+
+  const submitRecuperacao = async (event: FormEvent) => {
+    event.preventDefault()
+    setErro(null)
+    setMensagem(null)
+
+    const validacao = solicitarRecuperacaoPinSchema.safeParse({ celular })
+    if (!validacao.success) {
+      setErro(validacao.error.issues[0]?.message ?? 'Confira o celular informado.')
+      return
+    }
+
+    setEnviando(true)
+    try {
+      const resposta = await postPublic<{ message: string }>(
+        '/auth/recuperacao-pin',
+        validacao.data
+      )
+      setMensagem(resposta.message)
+    } catch {
+      setMensagem(
+        'Se os dados estiverem cadastrados, a solicitação será encaminhada ao responsável pelo acesso.'
+      )
+    } finally {
+      setEnviando(false)
+    }
+  }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setErro(null)
+    setMensagem(null)
 
     const validacao = ativando
       ? ativacaoSchema.safeParse({
@@ -61,6 +95,80 @@ export function AuthView({
     } finally {
       setEnviando(false)
     }
+  }
+
+  if (recuperando && !ativando) {
+    return (
+      <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <section className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-lg p-6 space-y-6">
+          <header className="space-y-2 text-center">
+            <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">
+              Agenda Regional São Paulo
+            </p>
+            <h1 className="text-2xl font-bold text-slate-900">Recuperar PIN</h1>
+            <p className="text-sm text-slate-600">
+              Informe seu celular cadastrado. A solicitação será encaminhada para redefinição do acesso.
+            </p>
+          </header>
+
+          {erro && (
+            <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {erro}
+            </div>
+          )}
+
+          {mensagem && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+              {mensagem}
+            </div>
+          )}
+
+          <form onSubmit={submitRecuperacao} className="space-y-4">
+            <div>
+              <label htmlFor="recuperacao-celular" className="block text-sm font-semibold text-slate-700 mb-1">
+                Celular
+              </label>
+              <input
+                id="recuperacao-celular"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={celular}
+                onChange={event => setCelular(event.target.value)}
+                placeholder="(11) 99999-9999"
+                disabled={enviando}
+                className="w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand-300"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={enviando}
+              className="w-full rounded-lg bg-brand-700 px-4 py-3 font-semibold text-white hover:bg-brand-800 disabled:opacity-60"
+            >
+              {enviando ? 'Enviando...' : 'Solicitar redefinição'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setRecuperando(false)
+                setErro(null)
+                setMensagem(null)
+              }}
+              disabled={enviando}
+              className="w-full rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+            >
+              Voltar para o login
+            </button>
+          </form>
+
+          <p className="text-xs text-slate-500 text-center">
+            Por segurança, a tela não informa se o celular está ou não cadastrado.
+          </p>
+        </section>
+      </main>
+    )
   }
 
   return (
@@ -149,6 +257,20 @@ export function AuthView({
           >
             {enviando ? 'Processando...' : ativando ? 'Ativar e entrar' : 'Entrar'}
           </button>
+
+          {!ativando && (
+            <button
+              type="button"
+              onClick={() => {
+                setRecuperando(true)
+                setErro(null)
+              }}
+              disabled={enviando}
+              className="w-full rounded-lg px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50"
+            >
+              Esqueci meu PIN
+            </button>
+          )}
 
           {ativando && onCancelarAtivacao && (
             <button
