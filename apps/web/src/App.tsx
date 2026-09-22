@@ -22,6 +22,7 @@ import { fetchWithAuth, limparTokenSessao, possuiTokenSessao, postWithAuth } fro
 import { AuthView } from './components/auth/AuthView'
 import { ResponsabilidadeRegionalGate } from './components/governanca/ResponsabilidadeRegionalGate'
 import { CadastroConvidadoView } from './components/portaria/CadastroConvidadoView'
+import { PerfilView } from './components/perfil/PerfilView'
 
 function App() {
   const paramsPublicos = new URLSearchParams(window.location.search)
@@ -157,11 +158,7 @@ function App() {
         </div>
       )}
       
-      {currentTab === 'cadastro' && (
-        <div className="p-8 text-center text-slate-500">
-          <p>Módulo de Perfil em desenvolvimento.</p>
-        </div>
-      )}
+      {currentTab === 'cadastro' && <PerfilView />}
     </MainLayout>
     </ResponsabilidadeRegionalGate>
   )
