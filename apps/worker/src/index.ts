@@ -34,6 +34,7 @@ import { logoutApp } from './routes/auth/logout'
 import { meApp } from './routes/auth/me'
 import { adminMembrosApp } from './routes/admin/membros'
 import { adminAcessosApp } from './routes/admin/acessos'
+import { adminPreCadastrosMinisteriaisApp } from './routes/admin/pre-cadastros-ministeriais'
 import { locaisRouter } from './routes/locais'
 import { eventosRouter } from './routes/eventos'
 import { eventoRefeicoesRouter } from './routes/evento-refeicoes'
@@ -105,6 +106,7 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.use('/api/v1/bootstrap/*', noStore)
   app.use('/api/v1/governanca/*', noStore)
   app.use('/api/v1/admin/acessos/*', noStore)
+  app.use('/api/v1/admin/pre-cadastros-ministeriais/*', noStore)
 
   // ============================================================
   // Rotas de infraestrutura — S00
@@ -198,6 +200,7 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.route('/api/v1/bootstrap/master', bootstrapMasterApp)
   app.route('/api/v1/governanca/responsabilidade-regional', responsabilidadeRegionalApp)
   app.route('/api/v1/admin/acessos', adminAcessosApp)
+  app.route('/api/v1/admin/pre-cadastros-ministeriais', adminPreCadastrosMinisteriaisApp)
 
   if (options?.enableAdminRoutes) {
     app.route('/api/v1/admin/membros', adminMembrosApp)
