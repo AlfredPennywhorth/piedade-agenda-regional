@@ -38,6 +38,8 @@ export function setupDb(sqlite: any) {
       casa_id text,
       data_ordenacao text,
       status_origem text,
+      celular_referencia text,
+      fonte_celular text,
       membro_id text UNIQUE,
       fonte text DEFAULT 'EXPORTACAO_CONSULTA_SERVOS_MINISTERIO' NOT NULL,
       ativo integer DEFAULT 1 NOT NULL CHECK (ativo IN (0, 1)),
@@ -55,6 +57,57 @@ export function setupDb(sqlite: any) {
       ON pre_cadastros_ministeriais (casa_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_pre_cadastro_ministerial_membro
       ON pre_cadastros_ministeriais (membro_id) WHERE membro_id IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS participacoes_grupos_trabalho (
+      id text PRIMARY KEY NOT NULL,
+      grupo_trabalho_id text NOT NULL,
+      setor_representado_id text NOT NULL,
+      pre_cadastro_ministerial_id text NOT NULL,
+      papel text NOT NULL CHECK (papel IN ('RESPONSAVEL','SUPLENTE')),
+      status_mensageria text,
+      justificativa text,
+      ativo integer DEFAULT 1 NOT NULL CHECK (ativo IN (0, 1)),
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (grupo_trabalho_id) REFERENCES grupos_trabalho(id),
+      FOREIGN KEY (setor_representado_id) REFERENCES setores(id),
+      FOREIGN KEY (pre_cadastro_ministerial_id) REFERENCES pre_cadastros_ministeriais(id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_participacao_gt_unica
+      ON participacoes_grupos_trabalho
+        (grupo_trabalho_id, setor_representado_id, pre_cadastro_ministerial_id, papel)
+      WHERE ativo = 1;
+    CREATE INDEX IF NOT EXISTS idx_participacao_gt_setor
+      ON participacoes_grupos_trabalho (grupo_trabalho_id, setor_representado_id, ativo);
+    CREATE INDEX IF NOT EXISTS idx_participacao_gt_pre_cadastro
+      ON participacoes_grupos_trabalho (pre_cadastro_ministerial_id, ativo);
+
+    CREATE TRIGGER IF NOT EXISTS trg_participacao_gt_regional_insert
+    BEFORE INSERT ON participacoes_grupos_trabalho
+    BEGIN
+      SELECT CASE
+        WHEN NOT EXISTS (
+          SELECT 1 FROM grupos_trabalho g
+          WHERE g.id = NEW.grupo_trabalho_id
+            AND g.regional_id IS NOT NULL
+            AND g.administracao_id IS NULL
+            AND g.setor_id IS NULL
+        )
+        THEN RAISE(ABORT, 'GT_DEVE_SER_REGIONAL')
+      END;
+
+      SELECT CASE
+        WHEN NOT EXISTS (
+          SELECT 1
+          FROM grupos_trabalho g
+          JOIN setores s ON s.id = NEW.setor_representado_id
+          JOIN administracoes a ON a.id = s.administracao_id
+          WHERE g.id = NEW.grupo_trabalho_id
+            AND g.regional_id = a.regional_id
+        )
+        THEN RAISE(ABORT, 'SETOR_FORA_DA_REGIONAL_DO_GT')
+      END;
+    END;
 
     CREATE TABLE IF NOT EXISTS funcoes (id text PRIMARY KEY NOT NULL, nome text NOT NULL, codigo text, descricao text, ativo integer DEFAULT true NOT NULL, created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL);
     
