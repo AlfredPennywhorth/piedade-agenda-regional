@@ -562,7 +562,13 @@ adminAcessosApp.post('/', async c => {
 
   if (!eMasterSistema(contexto)) {
     const regionalAlvo = await regionalDaConta(db, conta.id)
-    if (!regionalAlvo || !regionaisAdministradas(contexto).has(regionalAlvo)) {
+    const administraConta =
+      Boolean(regionalAlvo && regionaisAdministradas(contexto).has(regionalAlvo))
+    const delegaAgendaNaRegional =
+      body.perfilCodigo === 'GESTOR_AGENDA' &&
+      Boolean(regionalAlvo && regionaisGeridasNaAgenda(contexto).has(regionalAlvo))
+
+    if (!administraConta && !delegaAgendaNaRegional) {
       return c.json({ error: 'Conta fora do escopo administrativo', code: 'FORBIDDEN' }, 403)
     }
   }
