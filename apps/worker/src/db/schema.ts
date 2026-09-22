@@ -137,6 +137,38 @@ export const membros = sqliteTable('membros', {
   ...timestampsS02,
 })
 
+export const preCadastrosMinisteriais = sqliteTable(
+  'pre_cadastros_ministeriais',
+  {
+    id: text('id').primaryKey(),
+    nome: text('nome').notNull(),
+    ministerio: text('ministerio'),
+    rrm: text('rrm').notNull(),
+    regionalId: text('regional_id').references(() => regionais.id),
+    administracaoOrigem: text('administracao_origem'),
+    localidadeOrigem: text('localidade_origem'),
+    codigoCasaReferencia: text('codigo_casa_referencia'),
+    casaId: text('casa_id').references(() => casas.id),
+    dataOrdenacao: text('data_ordenacao'),
+    statusOrigem: text('status_origem'),
+    membroId: text('membro_id').unique().references(() => membros.id),
+    fonte: text('fonte').notNull().default('EXPORTACAO_CONSULTA_SERVOS_MINISTERIO'),
+    ativo: ativoDefault,
+    ...timestampsS02,
+  },
+  table => ({
+    idxNome: index('idx_pre_cadastro_ministerial_nome').on(table.nome),
+    idxRegional: index('idx_pre_cadastro_ministerial_regional').on(
+      table.regionalId,
+      table.ativo
+    ),
+    idxCasa: index('idx_pre_cadastro_ministerial_casa').on(table.casaId),
+    idxMembro: uniqueIndex('idx_pre_cadastro_ministerial_membro')
+      .on(table.membroId)
+      .where(sql`${table.membroId} IS NOT NULL`),
+  })
+)
+
 export const funcoes = sqliteTable('funcoes', {
   id: text('id').primaryKey(),
   nome: text('nome').notNull(),

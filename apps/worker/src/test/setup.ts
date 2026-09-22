@@ -26,6 +26,36 @@ export function setupDb(sqlite: any) {
       FOREIGN KEY (casa_id) REFERENCES casas(id)
     );
 
+    CREATE TABLE IF NOT EXISTS pre_cadastros_ministeriais (
+      id text PRIMARY KEY NOT NULL,
+      nome text NOT NULL,
+      ministerio text,
+      rrm text NOT NULL,
+      regional_id text,
+      administracao_origem text,
+      localidade_origem text,
+      codigo_casa_referencia text,
+      casa_id text,
+      data_ordenacao text,
+      status_origem text,
+      membro_id text UNIQUE,
+      fonte text DEFAULT 'EXPORTACAO_CONSULTA_SERVOS_MINISTERIO' NOT NULL,
+      ativo integer DEFAULT 1 NOT NULL CHECK (ativo IN (0, 1)),
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (regional_id) REFERENCES regionais(id),
+      FOREIGN KEY (casa_id) REFERENCES casas(id),
+      FOREIGN KEY (membro_id) REFERENCES membros(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_pre_cadastro_ministerial_nome
+      ON pre_cadastros_ministeriais (nome);
+    CREATE INDEX IF NOT EXISTS idx_pre_cadastro_ministerial_regional
+      ON pre_cadastros_ministeriais (regional_id, ativo);
+    CREATE INDEX IF NOT EXISTS idx_pre_cadastro_ministerial_casa
+      ON pre_cadastros_ministeriais (casa_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_pre_cadastro_ministerial_membro
+      ON pre_cadastros_ministeriais (membro_id) WHERE membro_id IS NOT NULL;
+
     CREATE TABLE IF NOT EXISTS funcoes (id text PRIMARY KEY NOT NULL, nome text NOT NULL, codigo text, descricao text, ativo integer DEFAULT true NOT NULL, created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL);
     
     CREATE TABLE IF NOT EXISTS vinculos_funcionais (
