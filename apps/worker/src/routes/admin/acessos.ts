@@ -7,6 +7,7 @@ import {
   eMasterSistema,
   obterRegionalDoEscopo,
   regionaisAdministradas,
+  regionaisGeridasNaAgenda,
   type AcessoTecnico,
   type ContextoPermissoes,
 } from '../../security/permissoes'
@@ -51,8 +52,17 @@ async function podeAdministrarAcesso(
     escopoTipo as Exclude<EscopoTipo, 'GLOBAL'>,
     escopoId
   )
+  if (!regionalId) return false
 
-  return Boolean(regionalId && regionaisAdministradas(contexto).has(regionalId))
+  if (regionaisAdministradas(contexto).has(regionalId)) return true
+
+  // Regra da Agenda: somente o GESTOR_AGENDA em escopo REGIONAL pode
+  // conceder/revogar permissões GESTOR_AGENDA dentro da própria Regional.
+  if (perfilCodigo === 'GESTOR_AGENDA') {
+    return regionaisGeridasNaAgenda(contexto).has(regionalId)
+  }
+
+  return false
 }
 
 adminAcessosApp.post('/', async c => {

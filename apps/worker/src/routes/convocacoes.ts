@@ -18,12 +18,26 @@ import {
   extrairEscopoDoEvento,
   executarOperacaoComAudit,
 } from '../services/auditoria'
-import { eGestorRelatoriosAutorizadoParaEvento } from '../security/permissoes'
+import {
+  eGestorRelatoriosAutorizadoParaEvento,
+  podeGerenciarAgendaNoEscopo,
+} from '../security/permissoes'
 import { authMiddleware, Variables } from '../middleware/auth'
 
 export const convocacoesRouter = new Hono<{ Variables: Variables }>()
 
 convocacoesRouter.use('*', authMiddleware)
+
+async function podeGerirConvocacao(db: any, membroId: string, evento: any): Promise<boolean> {
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+  if (!escopoTipo || !escopoId) return false
+  return podeGerenciarAgendaNoEscopo(
+    db,
+    membroId,
+    escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+    escopoId
+  )
+}
 
 convocacoesRouter.get('/', async c => {
   const db = c.get('db')
@@ -49,6 +63,11 @@ convocacoesRouter.post('/', async c => {
     // Validate if evento exists
     const evento = await db.select().from(eventos).where(eq(eventos.id, parsed.eventoId)).get()
     if (!evento) return c.json({ error: 'Evento não encontrado' }, 404)
+
+    const membroId = c.get('membroId')
+    if (!membroId || !(await podeGerirConvocacao(db, membroId, evento))) {
+      return c.json({ error: 'Acesso não autorizado para gerir a convocação', code: 'FORBIDDEN' }, 403)
+    }
 
     const convocacaoId = crypto.randomUUID()
     const nowIso = new Date().toISOString()
@@ -83,6 +102,11 @@ convocacoesRouter.patch('/:id', async c => {
 
     const convocacao = await db.select().from(convocacoes).where(eq(convocacoes.id, id)).get()
     if (!convocacao) return c.json({ error: 'Convocação não encontrada' }, 404)
+    const evento = await db.select().from(eventos).where(eq(eventos.id, convocacao.eventoId)).get()
+    const membroId = c.get('membroId')
+    if (!evento || !membroId || !(await podeGerirConvocacao(db, membroId, evento))) {
+      return c.json({ error: 'Acesso não autorizado para gerir a convocação', code: 'FORBIDDEN' }, 403)
+    }
     if (convocacao.status !== 'RASCUNHO')
       return c.json({ error: 'Apenas convocações em RASCUNHO podem ser alteradas' }, 400)
 
@@ -124,6 +148,11 @@ convocacoesRouter.post('/:id/funcoes', async c => {
 
     const convocacao = await db.select().from(convocacoes).where(eq(convocacoes.id, id)).get()
     if (!convocacao) return c.json({ error: 'Convocação não encontrada' }, 404)
+    const evento = await db.select().from(eventos).where(eq(eventos.id, convocacao.eventoId)).get()
+    const membroId = c.get('membroId')
+    if (!evento || !membroId || !(await podeGerirConvocacao(db, membroId, evento))) {
+      return c.json({ error: 'Acesso não autorizado para gerir a convocação', code: 'FORBIDDEN' }, 403)
+    }
     if (convocacao.status !== 'RASCUNHO')
       return c.json({ error: 'Não é possível alterar funções fora do status RASCUNHO' }, 400)
 
@@ -160,6 +189,11 @@ convocacoesRouter.delete('/:id/funcoes/:funcaoId', async c => {
 
   const convocacao = await db.select().from(convocacoes).where(eq(convocacoes.id, id)).get()
   if (!convocacao) return c.json({ error: 'Convocação não encontrada' }, 404)
+  const evento = await db.select().from(eventos).where(eq(eventos.id, convocacao.eventoId)).get()
+  const membroId = c.get('membroId')
+  if (!evento || !membroId || !(await podeGerirConvocacao(db, membroId, evento))) {
+    return c.json({ error: 'Acesso não autorizado para gerir a convocação', code: 'FORBIDDEN' }, 403)
+  }
   if (convocacao.status !== 'RASCUNHO')
     return c.json({ error: 'Não é possível remover funções fora do status RASCUNHO' }, 400)
 
@@ -188,6 +222,11 @@ convocacoesRouter.post('/:id/publicar', async c => {
   const evento = await db.select().from(eventos).where(eq(eventos.id, convocacao.eventoId)).get()
   if (!evento || !evento.ativo)
     return c.json({ error: 'Evento associado não existe ou inativo' }, 400)
+
+  const membroId = c.get('membroId')
+  if (!membroId || !(await podeGerirConvocacao(db, membroId, evento))) {
+    return c.json({ error: 'Acesso não autorizado para gerir a convocação', code: 'FORBIDDEN' }, 403)
+  }
 
   const funcoesConvocadas = await db
     .select()
@@ -364,8 +403,11 @@ convocacoesRouter.post('/:id/cancelar', async c => {
     return c.json({ error: 'Convocação já está cancelada' }, 400)
 
   const evento = await db.select().from(eventos).where(eq(eventos.id, convocacao.eventoId)).get()
-  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
   const atorMembroId = c.get('membroId') || null
+  if (!evento || !atorMembroId || !(await podeGerirConvocacao(db, atorMembroId, evento))) {
+    return c.json({ error: 'Acesso não autorizado para gerir a convocação', code: 'FORBIDDEN' }, 403)
+  }
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
   const nowIso = new Date().toISOString()
   await executarOperacaoComAudit(

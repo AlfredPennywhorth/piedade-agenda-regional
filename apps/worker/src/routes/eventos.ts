@@ -4,6 +4,7 @@ import { eventos } from '../db/schema'
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
+import { podeGerenciarAgendaNoEscopo } from '../security/permissoes'
 
 export const eventosRouter = new Hono<any>()
 
@@ -50,6 +51,19 @@ eventosRouter.post('/', async (c) => {
 
     const { escopoTipo, escopoId } = extrairEscopoDoEvento(parsed)
     const atorMembroId = c.get('membroId') || null
+
+    if (!atorMembroId || !escopoTipo || !escopoId) {
+      return c.json({ error: 'Escopo da Agenda indisponível', code: 'FORBIDDEN' }, 403)
+    }
+    const autorizado = await podeGerenciarAgendaNoEscopo(
+      db,
+      atorMembroId,
+      escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+      escopoId
+    )
+    if (!autorizado) {
+      return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
+    }
 
     const auditData: AuditLogData = {
       acao: 'EVENTO_CRIADO',
@@ -98,6 +112,21 @@ eventosRouter.patch('/:id', async (c) => {
     // Validar estado final mesclado (existente + patch) com EventoCreate
     const merged = { ...existing, ...parsed }
     EventoCreate.parse(merged)
+
+    const escopoFinal = extrairEscopoDoEvento(merged)
+    const membroId = c.get('membroId')
+    if (!membroId || !escopoFinal.escopoTipo || !escopoFinal.escopoId) {
+      return c.json({ error: 'Escopo da Agenda indisponível', code: 'FORBIDDEN' }, 403)
+    }
+    const autorizado = await podeGerenciarAgendaNoEscopo(
+      db,
+      membroId,
+      escopoFinal.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+      escopoFinal.escopoId
+    )
+    if (!autorizado) {
+      return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
+    }
 
     // PMO Rule: Ao alterar uma ocorrência individual, preservar serie_recorrencia_id e marcar recorrencia_excecao = true.
     const isExcecao = existing.serieRecorrenciaId !== null ? true : existing.recorrenciaExcecao

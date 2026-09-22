@@ -56,6 +56,12 @@ describe('S09 - Eventos e Refeicoes', () => {
     }
 
     sessionToken = await genSession(membroId, '11999999999', '1990-01-01')
+    const conta = sqlite.prepare(
+      'SELECT id FROM contas_acesso WHERE membro_id = ?'
+    ).get(membroId) as { id: string }
+    sqlite.prepare(
+      'INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, \'GESTOR_AGENDA\', \'REGIONAL\', ?)'
+    ).run(crypto.randomUUID(), conta.id, regionalId)
   })
 
   let eventoA = ''

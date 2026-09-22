@@ -89,6 +89,12 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
 
     sessionToken = await genSession(membroId, '11999999999', '1990-01-01')
     sessionTokenOutro = await genSession(membroIdOutro, '11888888888', '1990-01-02')
+    const conta = sqlite.prepare(
+      'SELECT id FROM contas_acesso WHERE membro_id = ?'
+    ).get(membroId) as { id: string }
+    sqlite.prepare(
+      'INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, \'GESTOR_AGENDA\', \'REGIONAL\', ?)'
+    ).run(crypto.randomUUID(), conta.id, regionalId)
 
     // Prepara evento S09 via API (passa pelo EventoCreate — exige UUIDs válidos)
     const resEv = await req('/api/v1/eventos', {
