@@ -1,0 +1,70 @@
+name: Deploy Pages — Beta
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: pages-beta
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build · Deploy Pages Beta
+    runs-on: ubuntu-latest
+    environment: beta
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate Beta API URL
+        shell: bash
+        env:
+          BETA_API_URL: ${{ vars.BETA_API_URL }}
+        run: |
+          test -n "$BETA_API_URL"
+          case "$BETA_API_URL" in
+            https://*/api/v1) ;;
+            *) echo "BETA_API_URL deve usar HTTPS e terminar em /api/v1"; exit 1 ;;
+          esac
+
+      - name: Build frontend for Beta
+        env:
+          VITE_API_URL: ${{ vars.BETA_API_URL }}
+        run: pnpm --filter @piedade/web build
+
+      - name: Deploy Pages Beta preview
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: >
+          pnpm --filter @piedade/worker exec wrangler pages deploy ../web/dist
+          --project-name=piedade-agenda-regional
+          --branch=beta
+          --commit-hash=${{ github.sha }}
+          --commit-message="Beta ${{ github.sha }}"
+
+      - name: Show Beta URLs
+        shell: bash
+        env:
+          BETA_API_URL: ${{ vars.BETA_API_URL }}
+        run: |
+          echo "Frontend: https://beta.piedade-agenda-regional.pages.dev"
+          echo "API: $BETA_API_URL"

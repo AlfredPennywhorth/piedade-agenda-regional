@@ -1,0 +1,91 @@
+name: Deploy Worker — Beta
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply_migrations:
+        description: 'Aplicar migrations no D1 Beta antes do deploy'
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: worker-beta
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Validate · Migrate Beta · Deploy Worker
+    runs-on: ubuntu-latest
+    environment: beta
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate Beta configuration
+        shell: bash
+        env:
+          D1_BETA_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_BETA_DATABASE_ID }}
+          PIN_PEPPER_BETA: ${{ secrets.PIN_PEPPER_BETA }}
+          MASTER_BOOTSTRAP_SECRET_BETA: ${{ secrets.MASTER_BOOTSTRAP_SECRET_BETA }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          test -n "$D1_BETA_DATABASE_ID"
+          test -n "$PIN_PEPPER_BETA"
+          test -n "$MASTER_BOOTSTRAP_SECRET_BETA"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+
+      - name: Materialize D1 Beta configuration
+        shell: bash
+        env:
+          D1_BETA_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_BETA_DATABASE_ID }}
+        run: |
+          sed -i "s|__D1_BETA_DATABASE_ID__|$D1_BETA_DATABASE_ID|" apps/worker/wrangler.toml
+          grep -q "$D1_BETA_DATABASE_ID" apps/worker/wrangler.toml
+
+      - name: Apply D1 Beta migrations
+        if: ${{ inputs.apply_migrations }}
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm --filter @piedade/worker exec wrangler d1 migrations apply piedade-agenda-db-beta --remote --env beta
+
+      - name: Deploy Worker Beta
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm --filter @piedade/worker exec wrangler deploy --env beta
+
+      - name: Configure PIN_PEPPER Beta
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PIN_PEPPER_BETA: ${{ secrets.PIN_PEPPER_BETA }}
+        run: printf '%s' "$PIN_PEPPER_BETA" | pnpm --filter @piedade/worker exec wrangler secret put PIN_PEPPER --env beta
+
+      - name: Configure MASTER_BOOTSTRAP_SECRET Beta
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          MASTER_BOOTSTRAP_SECRET_BETA: ${{ secrets.MASTER_BOOTSTRAP_SECRET_BETA }}
+        run: printf '%s' "$MASTER_BOOTSTRAP_SECRET_BETA" | pnpm --filter @piedade/worker exec wrangler secret put MASTER_BOOTSTRAP_SECRET --env beta

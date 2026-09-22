@@ -75,7 +75,7 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
     '/api/*',
     cors({
       origin: (origin, c) => {
-        const allowed = c.env?.APP_ENV === 'production' ? [] : ['http://localhost:5173']
+        const allowed = c.env?.APP_ENV === 'development' ? ['http://localhost:5173'] : []
         const customOrigin = c.env?.CORS_ORIGIN
         if (customOrigin) {
           const origins = customOrigin
