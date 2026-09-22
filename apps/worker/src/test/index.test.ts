@@ -62,7 +62,7 @@ describe('Worker — Rotas de infraestrutura', () => {
             'Access-Control-Request-Method': 'GET',
           },
         },
-        env
+        { ...env, APP_ENV: 'development' }
       )
 
       expect(res.headers.get('access-control-allow-origin')).toBe('http://localhost:5173')
@@ -106,6 +106,42 @@ describe('Worker — Rotas de infraestrutura', () => {
       )
 
       expect(res.headers.get('access-control-allow-origin')).toBeNull()
+    })
+
+    it('Beta aceita apenas a origem configurada e não localhost', async () => {
+      const betaEnv = {
+        ...env,
+        APP_ENV: 'beta',
+        CORS_ORIGIN: 'https://beta.piedade-agenda-regional.pages.dev',
+      }
+
+      const permitido = await app.request(
+        '/api/v1/health',
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: 'https://beta.piedade-agenda-regional.pages.dev',
+            'Access-Control-Request-Method': 'GET',
+          },
+        },
+        betaEnv
+      )
+      expect(permitido.headers.get('access-control-allow-origin')).toBe(
+        'https://beta.piedade-agenda-regional.pages.dev'
+      )
+
+      const localhost = await app.request(
+        '/api/v1/health',
+        {
+          method: 'OPTIONS',
+          headers: {
+            Origin: 'http://localhost:5173',
+            'Access-Control-Request-Method': 'GET',
+          },
+        },
+        betaEnv
+      )
+      expect(localhost.headers.get('access-control-allow-origin')).toBeNull()
     })
 
     it('não permite localhost em produção sem CORS_ORIGIN explícita', async () => {
