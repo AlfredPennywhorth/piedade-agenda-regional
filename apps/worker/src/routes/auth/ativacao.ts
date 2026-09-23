@@ -5,6 +5,7 @@ import * as schema from '../../db/schema'
 import { hashToken, gerarTokenAleatorio } from '../../security/tokens'
 import { gerarSalt, hashPin } from '../../security/pin'
 import { executeAtomic } from '../../db/batch'
+import { obterPinPepper } from '../../security/pin-pepper'
 
 import { Env } from '../../index'
 export const ativacaoApp = new Hono<{ Bindings: Env; Variables: { db: any } }>()
@@ -87,11 +88,12 @@ ativacaoApp.post('/', async c => {
     return c.json({ error: 'Dados informados não conferem com o cadastro' }, 400)
   }
 
-  const pepper = c.env?.PIN_PEPPER || 'test-pepper'
+  const pepper = obterPinPepper(c.env)
   const salt = gerarSalt()
   const hashedPin = await hashPin(pin, salt, pepper)
   const sessionToken = gerarTokenAleatorio()
   const hashedSessionToken = await hashToken(sessionToken)
+  const loginRateLimitKey = await hashToken(celular)
   const expiraEmSessao = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
   await executeAtomic(db, tx => [
@@ -120,6 +122,9 @@ ativacaoApp.post('/', async c => {
           isNull(schema.sessoes.revogadoEm)
         )
       ),
+    tx
+      .delete(schema.rateLimitsAutenticacao)
+      .where(eq(schema.rateLimitsAutenticacao.chaveHash, loginRateLimitKey)),
     tx.insert(schema.tentativasAcesso).values({
       id: crypto.randomUUID(),
       contaAcessoId: conta.id,
