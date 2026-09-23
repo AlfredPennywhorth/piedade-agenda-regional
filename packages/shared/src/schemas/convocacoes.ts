@@ -53,13 +53,22 @@ export const ConvocacaoFuncaoCreate = z.object({
 
 export type ConvocacaoFuncaoCreatePayload = z.infer<typeof ConvocacaoFuncaoCreate>
 
+export const ConvocacaoDestinatarioEvidenciaSchema = z.object({
+  id: z.string().uuid(),
+  convocacaoDestinatarioId: z.string().uuid(),
+  funcaoId: z.string().uuid(),
+  vinculoFuncionalId: z.string().uuid(),
+  createdAt: z.string()
+}).strict()
+
+export type ConvocacaoDestinatarioEvidencia = z.infer<typeof ConvocacaoDestinatarioEvidenciaSchema>
+
 export const ConvocacaoDestinatarioSchema = z.object({
   id: z.string().uuid(),
   convocacaoId: z.string().uuid(),
   membroId: z.string().uuid(),
-  funcaoId: z.string().uuid(),
-  vinculoFuncionalId: z.string().uuid(),
-  createdAt: z.string()
+  createdAt: z.string(),
+  evidencias: z.array(ConvocacaoDestinatarioEvidenciaSchema).optional()
 }).strict()
 
 export type ConvocacaoDestinatario = z.infer<typeof ConvocacaoDestinatarioSchema>
