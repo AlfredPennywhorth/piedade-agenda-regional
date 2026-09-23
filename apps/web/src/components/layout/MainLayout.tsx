@@ -9,8 +9,8 @@ export interface CapacidadesFrontend {
 
 interface MainLayoutProps {
   children: ReactNode
-  currentTab: 'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes'
-  onTabChange: (tab: 'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes') => void
+  currentTab: 'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes' | 'acessos'
+  onTabChange: (tab: 'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes' | 'acessos') => void
   capacidades?: CapacidadesFrontend
   nomeUsuario?: string
   onLogout?: () => void | Promise<void>
@@ -20,6 +20,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
   const mostrarPortaria = capacidades?.podeOperarPortaria === true
   const mostrarRelatorios = capacidades?.podeVisualizarRelatorios === true
   const mostrarAuditoria = capacidades?.podeVisualizarAuditoria === true
+  const mostrarAdministracaoAcessos = capacidades?.podeAdministrarAcessos === true
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 pb-16">
@@ -108,6 +109,18 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
             >
               <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
               <span className="text-[10px] font-medium">Relatórios</span>
+            </button>
+          )}
+
+          {mostrarAdministracaoAcessos && (
+            <button
+              onClick={() => onTabChange('acessos')}
+              className={`flex flex-col items-center flex-1 p-2 rounded-lg transition-colors ${currentTab === 'acessos' ? 'text-brand-600' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11c1.657 0 3-1.343 3-3S13.657 5 12 5 9 6.343 9 8s1.343 3 3 3zm-6 8a6 6 0 0112 0H6z" />
+              </svg>
+              <span className="text-[10px] font-medium">Acessos</span>
             </button>
           )}
 

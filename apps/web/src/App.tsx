@@ -22,13 +22,14 @@ import { fetchWithAuth, limparTokenSessao, possuiTokenSessao, postWithAuth } fro
 import { AuthView } from './components/auth/AuthView'
 import { ResponsabilidadeRegionalGate } from './components/governanca/ResponsabilidadeRegionalGate'
 import { CadastroConvidadoView } from './components/portaria/CadastroConvidadoView'
+import { ContasAcessoView } from './components/acessos/ContasAcessoView'
 import { PerfilView } from './components/perfil/PerfilView'
 
 function App() {
   const paramsPublicos = new URLSearchParams(window.location.search)
   const tokenPortariaPublica = paramsPublicos.get('p') || paramsPublicos.get('portaria')
 
-  const [currentTab, setCurrentTab] = useState<'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes'>('agenda')
+  const [currentTab, setCurrentTab] = useState<'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes' | 'acessos'>('agenda')
   const [capacidades, setCapacidades] = useState<CapacidadesFrontend>({})
   const [nomeUsuario, setNomeUsuario] = useState('')
   const [estadoSessao, setEstadoSessao] = useState<'verificando' | 'autenticada' | 'anonima'>('verificando')
@@ -67,6 +68,7 @@ function App() {
     if (tab === 'portaria') return capacidades.podeOperarPortaria === true
     if (tab === 'relatorios') return capacidades.podeVisualizarRelatorios === true
     if (tab === 'auditoria') return capacidades.podeVisualizarAuditoria === true
+    if (tab === 'acessos') return capacidades.podeAdministrarAcessos === true
     return true
   }
 
@@ -148,6 +150,7 @@ function App() {
       {currentTab === 'funcoes' && <FuncoesView />}
       {currentTab === 'vinculos-funcionais' && <VinculosFuncionaisView />}
       {currentTab === 'locais' && <LocaisView />}
+      {currentTab === 'acessos' && capacidades.podeAdministrarAcessos === true && <ContasAcessoView />}
       
       {currentTab === 'avisos' && (
         <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
