@@ -102,7 +102,13 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
                 <h2 className="font-semibold text-slate-900">Mais opções</h2>
                 <p className="text-xs text-slate-500">Acesse os demais módulos do sistema.</p>
               </div>
-              <button type="button" onClick={() => setMostrarMais(false)} className="p-2 text-slate-500" aria-label="Fechar menu">
+              <button
+                ref={(element) => element?.focus()}
+                type="button"
+                onClick={fecharMais}
+                className="p-2 text-slate-500"
+                aria-label="Fechar menu"
+              >
                 ✕
               </button>
             </div>
