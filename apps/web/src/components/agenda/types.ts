@@ -20,6 +20,8 @@ export interface AgendaItem {
   local: {
     nome: string
     endereco: string
+    urlMaps?: string | null
+    urlWaze?: string | null
   } | null
   destinatarioId: string
   rsvp: {
