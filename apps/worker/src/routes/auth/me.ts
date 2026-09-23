@@ -30,32 +30,48 @@ async function registrarFalhaPinAtual(
   const agoraIso = agora.toISOString()
   const bloqueioIso = new Date(agora.getTime() + BLOQUEIO_PIN_ATUAL_MS).toISOString()
 
-  const atualizada = await db
-    .update(schema.contasAcesso)
-    .set({
-      tentativasPin: sql`${schema.contasAcesso.tentativasPin} + 1`,
-      bloqueadoAte: sql`CASE
-        WHEN ${schema.contasAcesso.tentativasPin} + 1 >= ${LIMITE_FALHAS_PIN_ATUAL}
-        THEN ${bloqueioIso}
-        ELSE ${schema.contasAcesso.bloqueadoAte}
-      END`,
-      updatedAt: agoraIso,
-    })
-    .where(eq(schema.contasAcesso.id, conta.id))
-    .returning({
-      tentativasPin: schema.contasAcesso.tentativasPin,
-      bloqueadoAte: schema.contasAcesso.bloqueadoAte,
-    })
-    .get()
+  const montarUpdate = (qdb: any) =>
+    qdb
+      .update(schema.contasAcesso)
+      .set({
+        tentativasPin: sql`${schema.contasAcesso.tentativasPin} + 1`,
+        bloqueadoAte: sql`CASE
+          WHEN ${schema.contasAcesso.tentativasPin} + 1 >= ${LIMITE_FALHAS_PIN_ATUAL}
+          THEN ${bloqueioIso}
+          ELSE ${schema.contasAcesso.bloqueadoAte}
+        END`,
+        updatedAt: agoraIso,
+      })
+      .where(eq(schema.contasAcesso.id, conta.id))
+      .returning({
+        tentativasPin: schema.contasAcesso.tentativasPin,
+        bloqueadoAte: schema.contasAcesso.bloqueadoAte,
+      })
 
-  await db.insert(schema.tentativasAcesso).values({
-    id: crypto.randomUUID(),
-    contaAcessoId: conta.id,
-    membroId,
-    tipo: 'VERIFICACAO_PIN_ATUAL',
-    sucesso: false,
-    motivo: 'PIN atual inválido',
-  })
+  const montarAuditoria = (qdb: any) =>
+    qdb.insert(schema.tentativasAcesso).values({
+      id: crypto.randomUUID(),
+      contaAcessoId: conta.id,
+      membroId,
+      tipo: 'VERIFICACAO_PIN_ATUAL',
+      sucesso: false,
+      motivo: 'PIN atual inválido',
+    })
+
+  let atualizada: { tentativasPin: number; bloqueadoAte: string | null } | undefined
+
+  if (db && 'batch' in db && typeof db.batch === 'function') {
+    const resultados = await db.batch([montarUpdate(db), montarAuditoria(db)])
+    atualizada = Array.isArray(resultados?.[0]) ? resultados[0][0] : resultados?.[0]
+  } else if (db && 'transaction' in db && typeof db.transaction === 'function') {
+    atualizada = await db.transaction((tx: any) => {
+      const contaAtualizada = montarUpdate(tx).get()
+      montarAuditoria(tx).run()
+      return contaAtualizada
+    })
+  } else {
+    throw new Error('Nenhum mecanismo atômico disponível para registrar falha de PIN.')
+  }
 
   return atualizada?.bloqueadoAte ?? null
 }
