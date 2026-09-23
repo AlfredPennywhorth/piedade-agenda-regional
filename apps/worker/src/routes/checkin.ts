@@ -107,6 +107,9 @@ checkinRouter.post('/qr', async (c) => {
 
     return c.json(newCheckin, 201)
   } catch (err: any) {
+    if (err instanceof SyntaxError) {
+      return c.json({ error: 'JSON inválido', code: 'VALIDATION_ERROR' }, 400)
+    }
     if (err.issues) {
       return c.json({ error: 'Payload inválido', details: err.issues }, 400)
     }
