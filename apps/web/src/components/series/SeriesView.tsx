@@ -102,11 +102,10 @@ export function SeriesView() {
     setLoading(true)
     setErro(null)
     try {
-      const [
-        seriesData, locaisData, membrosData, regionaisData,
-        administracoesData, setoresData, casasData, gruposData
-      ] = await Promise.all([
-        fetchWithAuth<SerieRecorrencia[]>('/series-recorrencia'),
+      const seriesData = await fetchWithAuth<SerieRecorrencia[]>('/series-recorrencia')
+      setSeries(seriesData || [])
+
+      const resultados = await Promise.allSettled([
         fetchWithAuth<Local[]>('/locais'),
         fetchWithAuth<Membro[]>('/membros'),
         fetchWithAuth<Regional[]>('/regionais'),
@@ -115,17 +114,31 @@ export function SeriesView() {
         fetchWithAuth<Casa[]>('/casas'),
         fetchWithAuth<GrupoTrabalho[]>('/grupos-trabalho'),
       ])
-      
-      setSeries(seriesData || [])
-      setLocais(locaisData || [])
-      setMembros(membrosData || [])
-      setRegionais(regionaisData || [])
-      setAdministracoes(administracoesData || [])
-      setSetores(setoresData || [])
-      setCasas(casasData || [])
-      setGruposTrabalho(gruposData || [])
+
+      const setters = [
+        (valor: unknown) => setLocais(valor as Local[]),
+        (valor: unknown) => setMembros(valor as Membro[]),
+        (valor: unknown) => setRegionais(valor as Regional[]),
+        (valor: unknown) => setAdministracoes(valor as Administracao[]),
+        (valor: unknown) => setSetores(valor as Setor[]),
+        (valor: unknown) => setCasas(valor as Casa[]),
+        (valor: unknown) => setGruposTrabalho(valor as GrupoTrabalho[]),
+      ]
+
+      let lookupFalhou = false
+      resultados.forEach((resultado, indice) => {
+        if (resultado.status === 'fulfilled') {
+          setters[indice](resultado.value || [])
+        } else {
+          lookupFalhou = true
+        }
+      })
+
+      if (lookupFalhou) {
+        setErro('A lista de séries foi carregada, mas alguns dados auxiliares estão indisponíveis. Tente atualizar antes de criar ou editar.')
+      }
     } catch (err: unknown) {
-      setErro(err instanceof Error ? err.message : 'Erro ao carregar os dados.')
+      setErro(err instanceof Error ? err.message : 'Erro ao carregar as séries.')
     } finally {
       setLoading(false)
     }
@@ -359,6 +372,7 @@ export function SeriesView() {
         initialData={formData}
         initialTipoEscopo={tipoEscopo}
         lookups={{ locais, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
+        externalError={formOpen ? erro : null}
         onSubmit={async (data) => {
           if (serieEditandoId) {
             setConfirmacaoEditar(data)
