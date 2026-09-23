@@ -23,7 +23,6 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
   const mostrarAdministracaoAcessos = capacidades?.podeAdministrarAcessos === true
   const [mostrarMais, setMostrarMais] = useState(false)
   const botaoMaisRef = useRef<HTMLButtonElement>(null)
-  const fecharMaisRef = useRef<HTMLButtonElement>(null)
 
   const maisAtivo = mostrarMais || !['agenda', 'eventos', 'calendario', 'convocacoes'].includes(currentTab)
 
