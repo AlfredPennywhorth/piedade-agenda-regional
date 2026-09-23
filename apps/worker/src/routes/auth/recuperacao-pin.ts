@@ -16,7 +16,7 @@ async function aplicarThrottleRecuperacao(c: any, db: any) {
   const agoraIso = agora.toISOString()
   const novaExpiracao = new Date(agora.getTime() + JANELA_RECUPERACAO_MS).toISOString()
 
-  await db
+  const persistido = await db
     .insert(schema.rateLimitsAutenticacao)
     .values({
       chaveHash,
@@ -43,12 +43,10 @@ async function aplicarThrottleRecuperacao(c: any, db: any) {
         updatedAt: agoraIso,
       },
     })
-    .execute()
-
-  const persistido = await db
-    .select()
-    .from(schema.rateLimitsAutenticacao)
-    .where(eq(schema.rateLimitsAutenticacao.chaveHash, chaveHash))
+    .returning({
+      falhasConsecutivas: schema.rateLimitsAutenticacao.falhasConsecutivas,
+      expiraEm: schema.rateLimitsAutenticacao.expiraEm,
+    })
     .get()
 
   if (!persistido) return false
