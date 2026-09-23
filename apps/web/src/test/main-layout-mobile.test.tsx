@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { MainLayout } from '../components/layout/MainLayout'
 
@@ -22,12 +22,14 @@ describe('MainLayout — navegação móvel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /mais/i }))
 
-    expect(screen.getByRole('dialog', { name: /mais opções/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Locais' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Membros' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Meu Cadastro' })).toBeInTheDocument()
+    const dialog = screen.getByRole('dialog', { name: /mais opções/i })
+    const menu = within(dialog)
+    expect(dialog).toBeInTheDocument()
+    expect(menu.getByRole('button', { name: 'Locais' })).toBeInTheDocument()
+    expect(menu.getByRole('button', { name: 'Membros' })).toBeInTheDocument()
+    expect(menu.getByRole('button', { name: 'Meu Cadastro' })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Locais' }))
+    fireEvent.click(menu.getByRole('button', { name: 'Locais' }))
     expect(onTabChange).toHaveBeenCalledWith('locais')
     expect(screen.queryByRole('dialog', { name: /mais opções/i })).not.toBeInTheDocument()
   })
@@ -41,8 +43,9 @@ describe('MainLayout — navegação móvel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /mais/i }))
 
-    expect(screen.queryByRole('button', { name: 'Relatórios' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Acessos' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Portaria' })).not.toBeInTheDocument()
+    const menu = within(screen.getByRole('dialog', { name: /mais opções/i }))
+    expect(menu.queryByRole('button', { name: 'Relatórios' })).not.toBeInTheDocument()
+    expect(menu.queryByRole('button', { name: 'Acessos' })).not.toBeInTheDocument()
+    expect(menu.queryByRole('button', { name: 'Portaria' })).not.toBeInTheDocument()
   })
 })
