@@ -514,6 +514,142 @@ describe('Series Recorrencia API (S05)', () => {
     }).toThrow(/FOREIGN KEY constraint failed/)
   })
   
+  it('24.1 rejeita data inexistente no calendário', async () => {
+    const regionalId = await createRegional()
+    const res = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        regionalId,
+        dataInicio: '2026-02-30',
+        dataFim: '2026-03-05',
+      }),
+    })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('24.2 ALL com ativo=false preserva outras alterações enviadas', async () => {
+    const regionalId = await createRegional()
+    const createRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        titulo: 'Título Original',
+        regionalId,
+        dataInicio: '2099-01-01',
+        dataFim: '2099-01-03',
+      }),
+    })
+    const { serie } = await createRes.json()
+
+    const patchRes = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'ALL',
+        changes: { ativo: false, titulo: 'Título Atualizado' },
+      }),
+    })
+    expect(patchRes.status).toBe(200)
+
+    const persistida = db.select().from(seriesRecorrencia)
+      .where(eq(seriesRecorrencia.id, serie.id)).get()
+    expect(persistida.ativo).toBe(false)
+    expect(persistida.titulo).toBe('Título Atualizado')
+  })
+
+  it('24.3 ALL não recria o slot original de exceção movida', async () => {
+    const regionalId = await createRegional()
+    const createRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        regionalId,
+        dataInicio: '2099-09-01',
+        dataFim: '2099-09-05',
+      }),
+    })
+    const { serie } = await createRes.json()
+
+    const ocorrencias = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id)).all()
+    const original = ocorrencias[2]
+    const slotOriginal = original.inicioEm
+    const novoInicio = '2099-09-10T12:00:00.000Z'
+    const novoFim = '2099-09-10T13:00:00.000Z'
+
+    const mover = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'THIS',
+        fromEventId: original.id,
+        changes: { inicioEm: novoInicio, fimEm: novoFim },
+      }),
+    })
+    expect(mover.status).toBe(200)
+
+    const movida = db.select().from(eventos).where(eq(eventos.id, original.id)).get()
+    expect(movida.recorrenciaExcecao).toBe(true)
+    expect(movida.recorrenciaOrigemInicioEm).toBe(slotOriginal)
+    expect(movida.inicioEm).toBe(novoInicio)
+
+    const atualizar = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'ALL',
+        changes: { titulo: 'Série atualizada' },
+      }),
+    })
+    expect(atualizar.status).toBe(200)
+
+    const ativos = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id)).all()
+      .filter((item: any) => item.ativo)
+
+    expect(ativos.filter((item: any) => item.inicioEm === slotOriginal)).toHaveLength(0)
+    expect(ativos.find((item: any) => item.id === original.id)?.inicioEm).toBe(novoInicio)
+  })
+
+  it('24.4 dividir na primeira ocorrência inativa a série antiga sem intervalo inválido', async () => {
+    const regionalId = await createRegional()
+    const createRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        regionalId,
+        dataInicio: '2099-10-01',
+        dataFim: '2099-10-05',
+      }),
+    })
+    const { serie } = await createRes.json()
+
+    const primeira = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id)).all()[0]
+
+    const split = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'THIS_AND_FUTURE',
+        fromEventId: primeira.id,
+        changes: { titulo: 'Nova série desde o início' },
+      }),
+    })
+    expect(split.status).toBe(200)
+
+    const antiga = db.select().from(seriesRecorrencia)
+      .where(eq(seriesRecorrencia.id, serie.id)).get()
+    expect(antiga.ativo).toBe(false)
+    expect(antiga.dataFim >= antiga.dataInicio).toBe(true)
+  })
+
   it('25. ALL com ativo=false inativa série e eventos futuros sem apagar ou regenerar', async () => {
     // 1. Criar série futura distante para isolar do relógio (2099)
     const regionalId = await createRegional()
