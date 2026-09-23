@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MainLayout } from '../components/layout/MainLayout'
 
 describe('Navegação e Visibilidade de Permissões — S12 Frontend', () => {
@@ -14,14 +14,17 @@ describe('Navegação e Visibilidade de Permissões — S12 Frontend', () => {
       </MainLayout>
     )
 
-    expect(screen.getByRole('button', { name: /Minha Agenda/i })).toBeDefined()
-    expect(screen.getByRole('button', { name: /Calendário/i })).toBeDefined()
-    expect(screen.getByRole('button', { name: /Avisos/i })).toBeDefined()
-    expect(screen.getByRole('button', { name: /Meu Cadastro/i })).toBeDefined()
+    const nav = within(screen.getByRole('navigation', { name: /navegação móvel principal/i }))
+    expect(nav.getByRole('button', { name: /Minha Agenda/i })).toBeDefined()
+    expect(nav.getByRole('button', { name: /Calendário/i })).toBeDefined()
 
-    expect(screen.queryByRole('button', { name: /Portaria/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /Relatórios/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /Auditoria/i })).toBeNull()
+    fireEvent.click(nav.getByRole('button', { name: /Mais/i }))
+    const menu = within(screen.getByRole('dialog', { name: /mais opções/i }))
+    expect(menu.getByRole('button', { name: /Avisos/i })).toBeDefined()
+    expect(menu.getByRole('button', { name: /Meu Cadastro/i })).toBeDefined()
+    expect(menu.queryByRole('button', { name: /Portaria/i })).toBeNull()
+    expect(menu.queryByRole('button', { name: /Relatórios/i })).toBeNull()
+    expect(menu.queryByRole('button', { name: /Auditoria/i })).toBeNull()
   })
 
   it('2. OPERADOR_PORTARIA vê Portaria, mas NÃO vê Relatórios nem Auditoria', () => {
@@ -35,9 +38,12 @@ describe('Navegação e Visibilidade de Permissões — S12 Frontend', () => {
       </MainLayout>
     )
 
-    expect(screen.getByRole('button', { name: /Portaria/i })).toBeDefined()
-    expect(screen.queryByRole('button', { name: /Relatórios/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /Auditoria/i })).toBeNull()
+    const nav = within(screen.getByRole('navigation', { name: /navegação móvel principal/i }))
+    fireEvent.click(nav.getByRole('button', { name: /Mais/i }))
+    const menu = within(screen.getByRole('dialog', { name: /mais opções/i }))
+    expect(menu.getByRole('button', { name: /Portaria/i })).toBeDefined()
+    expect(menu.queryByRole('button', { name: /Relatórios/i })).toBeNull()
+    expect(menu.queryByRole('button', { name: /Auditoria/i })).toBeNull()
   })
 
   it('3. GESTOR_RELATORIOS isolado vê Relatórios, mas NÃO vê Portaria nem Auditoria', () => {
@@ -51,9 +57,12 @@ describe('Navegação e Visibilidade de Permissões — S12 Frontend', () => {
       </MainLayout>
     )
 
-    expect(screen.getByRole('button', { name: /Relatórios/i })).toBeDefined()
-    expect(screen.queryByRole('button', { name: /Portaria/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /Auditoria/i })).toBeNull()
+    const nav = within(screen.getByRole('navigation', { name: /navegação móvel principal/i }))
+    fireEvent.click(nav.getByRole('button', { name: /Mais/i }))
+    const menu = within(screen.getByRole('dialog', { name: /mais opções/i }))
+    expect(menu.getByRole('button', { name: /Relatórios/i })).toBeDefined()
+    expect(menu.queryByRole('button', { name: /Portaria/i })).toBeNull()
+    expect(menu.queryByRole('button', { name: /Auditoria/i })).toBeNull()
   })
 
   it('4. AUDITOR_SISTEMA isolado vê Auditoria, mas NÃO vê Portaria nem Relatórios', () => {
@@ -67,9 +76,12 @@ describe('Navegação e Visibilidade de Permissões — S12 Frontend', () => {
       </MainLayout>
     )
 
-    expect(screen.getByRole('button', { name: /Auditoria/i })).toBeDefined()
-    expect(screen.queryByRole('button', { name: /Portaria/i })).toBeNull()
-    expect(screen.queryByRole('button', { name: /Relatórios/i })).toBeNull()
+    const nav = within(screen.getByRole('navigation', { name: /navegação móvel principal/i }))
+    fireEvent.click(nav.getByRole('button', { name: /Mais/i }))
+    const menu = within(screen.getByRole('dialog', { name: /mais opções/i }))
+    expect(menu.getByRole('button', { name: /Auditoria/i })).toBeDefined()
+    expect(menu.queryByRole('button', { name: /Portaria/i })).toBeNull()
+    expect(menu.queryByRole('button', { name: /Relatórios/i })).toBeNull()
   })
 
   it('5. Membro com múltiplas funções (Portaria + Relatórios) vê Portaria e Relatórios, mas NÃO vê Auditoria', () => {
@@ -83,8 +95,11 @@ describe('Navegação e Visibilidade de Permissões — S12 Frontend', () => {
       </MainLayout>
     )
 
-    expect(screen.getByRole('button', { name: /Portaria/i })).toBeDefined()
-    expect(screen.getByRole('button', { name: /Relatórios/i })).toBeDefined()
-    expect(screen.queryByRole('button', { name: /Auditoria/i })).toBeNull()
+    const nav = within(screen.getByRole('navigation', { name: /navegação móvel principal/i }))
+    fireEvent.click(nav.getByRole('button', { name: /Mais/i }))
+    const menu = within(screen.getByRole('dialog', { name: /mais opções/i }))
+    expect(menu.getByRole('button', { name: /Portaria/i })).toBeDefined()
+    expect(menu.getByRole('button', { name: /Relatórios/i })).toBeDefined()
+    expect(menu.queryByRole('button', { name: /Auditoria/i })).toBeNull()
   })
 })

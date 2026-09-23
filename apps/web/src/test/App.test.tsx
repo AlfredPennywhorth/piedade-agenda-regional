@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import App from '../App'
 import * as apiClient from '../api/apiClient'
 
@@ -45,16 +45,20 @@ describe('App — S07 Minha Agenda', () => {
 
   it('exibe a navegação principal da S07', async () => {
     render(<App />)
-    expect(await screen.findByText('Minha Agenda')).toBeDefined()
-    expect(screen.getByText('Calendário')).toBeDefined()
+    const nav = within(await screen.findByRole('navigation', { name: /navegação móvel principal/i }))
+    expect(nav.getByText('Minha Agenda')).toBeDefined()
+    expect(nav.getByText('Calendário')).toBeDefined()
   })
 
   it('oculta módulos restritos sem capacidades', async () => {
     render(<App />)
-    expect(await screen.findByText('Minha Agenda')).toBeDefined()
-    expect(screen.queryByText('Portaria')).toBeNull()
-    expect(screen.queryByText('Relatórios')).toBeNull()
-    expect(screen.queryByText('Auditoria')).toBeNull()
+    const nav = within(await screen.findByRole('navigation', { name: /navegação móvel principal/i }))
+    expect(nav.getByText('Minha Agenda')).toBeDefined()
+    fireEvent.click(nav.getByRole('button', { name: /Mais/i }))
+    const menu = within(screen.getByRole('dialog', { name: /mais opções/i }))
+    expect(menu.queryByText('Portaria')).toBeNull()
+    expect(menu.queryByText('Relatórios')).toBeNull()
+    expect(menu.queryByText('Auditoria')).toBeNull()
   })
 
   it('exibe módulos restritos quando as capacidades são concedidas', async () => {
@@ -82,15 +86,18 @@ describe('App — S07 Minha Agenda', () => {
     })
 
     render(<App />)
-    expect(await screen.findByText('Portaria')).toBeDefined()
-    expect(screen.getByText('Relatórios')).toBeDefined()
-    expect(screen.getByText('Auditoria')).toBeDefined()
+    const nav = within(await screen.findByRole('navigation', { name: /navegação móvel principal/i }))
+    fireEvent.click(nav.getByRole('button', { name: /Mais/i }))
+    const menu = within(screen.getByRole('dialog', { name: /mais opções/i }))
+    expect(menu.getByText('Portaria')).toBeDefined()
+    expect(menu.getByText('Relatórios')).toBeDefined()
+    expect(menu.getByText('Auditoria')).toBeDefined()
   })
 
   it('exibe login quando não existe sessão local', async () => {
     localStorage.removeItem('session_token')
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeDefined()
-    expect(screen.queryByText('Minha Agenda')).toBeNull()
+    expect(screen.queryByRole('navigation', { name: /navegação móvel principal/i })).toBeNull()
   })
 })
