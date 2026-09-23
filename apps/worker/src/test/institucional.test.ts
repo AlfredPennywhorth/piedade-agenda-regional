@@ -166,7 +166,7 @@ describe('Testes do Modelo Institucional S01', () => {
     expect(res.status).toBe(201)
   })
 
-  it('7. Criar GT de Administração', async () => {
+  it('7. Rejeitar GT de Administração', async () => {
     const res = await req('/api/v1/grupos-trabalho', {
       method: 'POST',
       body: JSON.stringify({
@@ -175,10 +175,10 @@ describe('Testes do Modelo Institucional S01', () => {
       }),
     })
 
-    expect(res.status).toBe(201)
+    expect(res.status).toBe(400)
   })
 
-  it('8. Criar GT de Setor', async () => {
+  it('8. Rejeitar GT de Setor', async () => {
     const res = await req('/api/v1/grupos-trabalho', {
       method: 'POST',
       body: JSON.stringify({
@@ -187,7 +187,7 @@ describe('Testes do Modelo Institucional S01', () => {
       }),
     })
 
-    expect(res.status).toBe(201)
+    expect(res.status).toBe(400)
   })
 
   it('9. Rejeitar vínculos institucionais inexistentes', async () => {
@@ -232,7 +232,7 @@ describe('Testes do Modelo Institucional S01', () => {
 
     const erroDois = (await resDois.json()) as ErroResponse
 
-    expect(erroDois.error[0].message).toContain('exatamente um escopo')
+    expect(erroDois.error[0].message).toContain('exclusivamente a uma Regional')
 
     const resZero = await req('/api/v1/grupos-trabalho', {
       method: 'POST',
@@ -245,7 +245,7 @@ describe('Testes do Modelo Institucional S01', () => {
 
     const erroZero = (await resZero.json()) as ErroResponse
 
-    expect(erroZero.error[0].message).toContain('exatamente um escopo')
+    expect(erroZero.error[0].message).toContain('exclusivamente a uma Regional')
   })
 
   it('12. Respostas HTTP adequadas para dados inválidos', async () => {
