@@ -567,6 +567,9 @@ export const eventos = sqliteTable(
 
     observacoes: text('observacoes'),
     serieRecorrenciaId: text('serie_recorrencia_id').references(() => seriesRecorrencia.id),
+    // Slot originalmente materializado pela série. Permanece estável quando uma
+    // ocorrência é movida individualmente, evitando regeneração duplicada em ALL.
+    recorrenciaOrigemInicioEm: text('recorrencia_origem_inicio_em'),
     recorrenciaExcecao: integer('recorrencia_excecao', { mode: 'boolean' })
       .notNull()
       .default(false),
