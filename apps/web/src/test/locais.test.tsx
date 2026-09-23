@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { LocaisView } from '../components/locais/LocaisView'
 import * as apiClient from '../api/apiClient'
@@ -148,6 +148,96 @@ describe('LocaisView', () => {
     })
 
     expect(screen.getByText('Endereço preenchido automaticamente pelo CEP.')).toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+
+  it('deve ignorar resposta antiga do ViaCEP quando uma nova consulta já foi iniciada', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValueOnce([])
+
+    let resolverPrimeira: ((value: any) => void) | undefined
+    const primeira = new Promise<any>(resolve => {
+      resolverPrimeira = resolve
+    })
+    const fetchMock = vi.fn()
+      .mockReturnValueOnce(primeira)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          cep: '01001-000',
+          logradouro: 'Praça da Sé',
+          bairro: 'Sé',
+          localidade: 'São Paulo',
+          uf: 'SP',
+        }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<LocaisView />)
+    await waitFor(() => expect(screen.getByText('Cadastrar primeiro local')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Cadastrar primeiro local'))
+
+    const dialog = screen.getByRole('dialog', { name: /novo local/i })
+    const cep = within(dialog).getByLabelText(/CEP/i)
+    fireEvent.change(cep, { target: { value: '03127001' } })
+    fireEvent.change(cep, { target: { value: '01001000' } })
+
+    await waitFor(() => {
+      expect((within(dialog).getByLabelText(/endereço/i) as HTMLInputElement).value).toBe('Praça da Sé')
+    })
+
+    await act(async () => {
+      resolverPrimeira?.({
+        ok: true,
+        json: async () => ({
+          cep: '03127-001',
+          logradouro: 'Rua Antiga',
+          bairro: 'Bairro Antigo',
+          localidade: 'Cidade Antiga',
+          uf: 'SP',
+        }),
+      })
+      await primeira
+    })
+
+    expect((within(dialog).getByLabelText(/endereço/i) as HTMLInputElement).value).toBe('Praça da Sé')
+    vi.unstubAllGlobals()
+  })
+
+  it('deve impedir salvar enquanto a consulta do CEP estiver pendente', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValueOnce([])
+
+    let resolver: ((value: any) => void) | undefined
+    const pendente = new Promise<any>(resolve => {
+      resolver = resolve
+    })
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(pendente))
+
+    render(<LocaisView />)
+    await waitFor(() => expect(screen.getByText('Cadastrar primeiro local')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Cadastrar primeiro local'))
+
+    const dialog = screen.getByRole('dialog', { name: /novo local/i })
+    fireEvent.change(within(dialog).getByLabelText(/CEP/i), { target: { value: '03127001' } })
+
+    expect(within(dialog).getByRole('button', { name: /consultando cep/i })).toBeDisabled()
+
+    await act(async () => {
+      resolver?.({
+        ok: true,
+        json: async () => ({
+          cep: '03127-001',
+          logradouro: 'Rua Ibitirama',
+          bairro: 'Vila Prudente',
+          localidade: 'São Paulo',
+          uf: 'SP',
+        }),
+      })
+      await pendente
+    })
+
+    await waitFor(() => {
+      expect(within(dialog).getByRole('button', { name: /salvar local/i })).not.toBeDisabled()
+    })
     vi.unstubAllGlobals()
   })
 
