@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 export interface CapacidadesFrontend {
   podeVisualizarRelatorios?: boolean
@@ -22,10 +22,49 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
   const mostrarAuditoria = capacidades?.podeVisualizarAuditoria === true
   const mostrarAdministracaoAcessos = capacidades?.podeAdministrarAcessos === true
   const [mostrarMais, setMostrarMais] = useState(false)
+  const botaoMaisRef = useRef<HTMLButtonElement>(null)
+  const fecharMaisRef = useRef<HTMLButtonElement>(null)
+
+  const maisAtivo = mostrarMais || !['agenda', 'eventos', 'calendario', 'convocacoes'].includes(currentTab)
+
+  const fecharMais = () => {
+    setMostrarMais(false)
+    window.setTimeout(() => botaoMaisRef.current?.focus(), 0)
+  }
+
+  useEffect(() => {
+    if (mostrarMais) {
+      window.setTimeout(() => fecharMaisRef.current?.focus(), 0)
+    }
+  }, [mostrarMais])
 
   const navegar = (tab: MainLayoutProps['currentTab']) => {
     onTabChange(tab)
-    setMostrarMais(false)
+    if (mostrarMais) fecharMais()
+  }
+
+  const conterFocoNoMais = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      fecharMais()
+      return
+    }
+    if (event.key !== 'Tab') return
+
+    const foco = event.currentTarget.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    if (!foco.length) return
+    const primeiro = foco[0]
+    const ultimo = foco[foco.length - 1]
+
+    if (event.shiftKey && document.activeElement === primeiro) {
+      event.preventDefault()
+      ultimo.focus()
+    } else if (!event.shiftKey && document.activeElement === ultimo) {
+      event.preventDefault()
+      primeiro.focus()
+    }
   }
 
   return (
@@ -56,13 +95,14 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
 
       {/* Navegação principal única */}
       {mostrarMais && (
-        <div className="fixed inset-0 z-20 bg-slate-900/40" onClick={() => setMostrarMais(false)}>
+        <div className="fixed inset-0 z-20 bg-slate-900/40" onClick={fecharMais}>
           <section
             className="absolute bottom-16 left-0 right-0 mx-auto max-h-[72vh] max-w-2xl overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl"
             role="dialog"
             aria-modal="true"
             aria-label="Mais opções"
             onClick={(event) => event.stopPropagation()}
+            onKeyDown={conterFocoNoMais}
           >
             <div className="mb-4 flex items-center justify-between">
               <div>
@@ -131,7 +171,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
           <button onClick={() => navegar('convocacoes')} className={`flex flex-col items-center p-2 text-[10px] ${currentTab === 'convocacoes' ? 'text-brand-600' : 'text-slate-400'}`}>
             <span className="text-base">♧</span><span>Convocações</span>
           </button>
-          <button onClick={() => setMostrarMais(true)} className={`flex flex-col items-center p-2 text-[10px] ${mostrarMais ? 'text-brand-600' : 'text-slate-400'}`}>
+          <button ref={botaoMaisRef} onClick={() => setMostrarMais(true)} className={`flex flex-col items-center p-2 text-[10px] ${maisAtivo ? 'text-brand-600' : 'text-slate-400'}`}>
             <span className="text-base">•••</span><span>Mais</span>
           </button>
         </div>
