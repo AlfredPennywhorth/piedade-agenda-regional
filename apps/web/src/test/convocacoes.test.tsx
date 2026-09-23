@@ -125,7 +125,7 @@ describe('ConvocacoesView', () => {
     fireEvent.click(screen.getByRole('button', { name: /novo rascunho/i }))
 
     const select = await screen.findByRole('combobox')
-    expect(select).toHaveTextContent('Reunião Presencial Teste — 10/10/2026 07:00')
+    expect(select).toHaveTextContent('Reunião Presencial Teste — 10/10/2026, 07:00')
     expect(select).not.toHaveTextContent('Reunião Antiga')
   })
 
