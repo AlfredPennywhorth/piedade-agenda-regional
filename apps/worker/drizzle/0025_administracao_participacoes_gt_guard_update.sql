@@ -4,7 +4,7 @@ BEFORE UPDATE OF `regional_id`
 ON `administracoes`
 WHEN NEW.regional_id <> OLD.regional_id
 BEGIN
-  SELECT CASE
+  SELECT (CASE
     WHEN EXISTS (
       SELECT 1
       FROM `setores` s
@@ -15,5 +15,5 @@ BEGIN
         AND g.regional_id <> NEW.regional_id
     )
     THEN RAISE(ABORT, 'GT_PARTICIPACOES_INCOMPATIVEIS')
-  END;
+  END);
 END;
