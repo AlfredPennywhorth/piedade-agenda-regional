@@ -74,6 +74,8 @@ const mockEventos = [
 ]
 
 describe('S07 - Minha Agenda e Calendário', () => {
+  const mobileNav = () => within(screen.getByRole('navigation', { name: /navegação móvel principal/i }))
+
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.setItem('session_token', 'sessao-teste')
@@ -104,8 +106,8 @@ describe('S07 - Minha Agenda e Calendário', () => {
     render(<App />)
     
     expect(await screen.findByText('Agenda Regional SP')).toBeInTheDocument()
-    expect(screen.getByText('Minha Agenda')).toBeInTheDocument()
-    expect(screen.getByText('Calendário')).toBeInTheDocument()
+    expect(mobileNav().getByText('Minha Agenda')).toBeInTheDocument()
+    expect(mobileNav().getByText('Calendário')).toBeInTheDocument()
   })
 
   it('2. Exibe estado de loading e vazio na Agenda', async () => {
@@ -137,7 +139,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     mockAgenda(mockEventos)
     render(<App />)
     
-    const calTab = await screen.findByText('Calendário')
+    const calTab = await Promise.resolve(mobileNav().getByText('Calendário'))
     fireEvent.click(calTab)
     
     await waitFor(() => {
@@ -165,7 +167,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     render(<App />)
     
     // Go to calendar
-    fireEvent.click(await screen.findByText('Calendário'))
+    fireEvent.click(await Promise.resolve(mobileNav().getByText('Calendário')))
     await waitFor(() => expect(screen.getByText('Dom')).toBeInTheDocument())
     
     // Find the day button (tomorrow)
@@ -184,7 +186,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     render(<App />)
     
     // Go to calendar
-    fireEvent.click(await screen.findByText('Calendário'))
+    fireEvent.click(await Promise.resolve(mobileNav().getByText('Calendário')))
     await waitFor(() => expect(screen.getByText('Dom')).toBeInTheDocument())
     
     // Find a day without event (assuming day 1 has no events in mock)
@@ -229,7 +231,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     render(<App />)
     
     // Go to calendar
-    fireEvent.click(await screen.findByText('Calendário'))
+    fireEvent.click(await Promise.resolve(mobileNav().getByText('Calendário')))
     await waitFor(() => expect(screen.getByText('Dom')).toBeInTheDocument())
     
     // Click day
@@ -256,7 +258,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByText('Minha Agenda')).toBeInTheDocument()
+      expect(mobileNav().getByText('Minha Agenda')).toBeInTheDocument()
     })
 
     const evt = await screen.findByText('Reunião de Setor')
@@ -277,7 +279,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByText('Minha Agenda')).toBeInTheDocument()
+      expect(mobileNav().getByText('Minha Agenda')).toBeInTheDocument()
     })
 
     const evt = await screen.findByText('Reunião de Setor')
@@ -305,7 +307,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByText('Minha Agenda')).toBeInTheDocument()
+      expect(mobileNav().getByText('Minha Agenda')).toBeInTheDocument()
     })
 
     let evt = await screen.findByText('Reunião de Setor')
@@ -346,7 +348,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByText('Minha Agenda')).toBeInTheDocument()
+      expect(mobileNav().getByText('Minha Agenda')).toBeInTheDocument()
     })
 
     const evt = await screen.findByText('Reunião de Setor')
