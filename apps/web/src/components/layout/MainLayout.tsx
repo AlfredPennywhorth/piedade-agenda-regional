@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 export interface CapacidadesFrontend {
   podeVisualizarRelatorios?: boolean
@@ -21,6 +21,12 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
   const mostrarRelatorios = capacidades?.podeVisualizarRelatorios === true
   const mostrarAuditoria = capacidades?.podeVisualizarAuditoria === true
   const mostrarAdministracaoAcessos = capacidades?.podeAdministrarAcessos === true
+  const [mostrarMais, setMostrarMais] = useState(false)
+
+  const navegar = (tab: MainLayoutProps['currentTab']) => {
+    onTabChange(tab)
+    setMostrarMais(false)
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 pb-16">
@@ -48,7 +54,90 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
         {children}
       </main>
 
-      {/* Bottom Navigation */}
+      {/* Navegação móvel principal */}
+      {mostrarMais && (
+        <div className="md:hidden fixed inset-0 z-20 bg-slate-900/40" onClick={() => setMostrarMais(false)}>
+          <section
+            className="absolute bottom-16 left-0 right-0 max-h-[72vh] overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Mais opções"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-slate-900">Mais opções</h2>
+                <p className="text-xs text-slate-500">Acesse os demais módulos do sistema.</p>
+              </div>
+              <button type="button" onClick={() => setMostrarMais(false)} className="p-2 text-slate-500" aria-label="Fechar menu">
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-5 text-sm">
+              <div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Agenda e gestão</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => navegar('series')} className="rounded-lg bg-slate-50 p-3 text-left">Séries</button>
+                  {mostrarRelatorios && <button onClick={() => navegar('relatorios')} className="rounded-lg bg-slate-50 p-3 text-left">Relatórios</button>}
+                  <button onClick={() => navegar('avisos')} className="rounded-lg bg-slate-50 p-3 text-left">Avisos</button>
+                  {mostrarPortaria && <button onClick={() => navegar('portaria')} className="rounded-lg bg-slate-50 p-3 text-left">Portaria</button>}
+                  {mostrarAuditoria && <button onClick={() => navegar('auditoria')} className="rounded-lg bg-slate-50 p-3 text-left">Auditoria</button>}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Administração</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => navegar('regionais')} className="rounded-lg bg-slate-50 p-3 text-left">Regionais</button>
+                  <button onClick={() => navegar('administracoes')} className="rounded-lg bg-slate-50 p-3 text-left">Administrações</button>
+                  <button onClick={() => navegar('setores')} className="rounded-lg bg-slate-50 p-3 text-left">Setores</button>
+                  <button onClick={() => navegar('casas')} className="rounded-lg bg-slate-50 p-3 text-left">Casas</button>
+                  <button onClick={() => navegar('grupos-trabalho')} className="rounded-lg bg-slate-50 p-3 text-left">Grupos de Trabalho</button>
+                  <button onClick={() => navegar('locais')} className="rounded-lg bg-slate-50 p-3 text-left">Locais</button>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Pessoas e acessos</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => navegar('membros')} className="rounded-lg bg-slate-50 p-3 text-left">Membros</button>
+                  <button onClick={() => navegar('funcoes')} className="rounded-lg bg-slate-50 p-3 text-left">Funções</button>
+                  <button onClick={() => navegar('vinculos-funcionais')} className="rounded-lg bg-slate-50 p-3 text-left">Vínculos</button>
+                  {mostrarAdministracaoAcessos && <button onClick={() => navegar('acessos')} className="rounded-lg bg-slate-50 p-3 text-left">Acessos</button>}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Conta</h3>
+                <button onClick={() => navegar('cadastro')} className="w-full rounded-lg bg-slate-50 p-3 text-left">Meu Cadastro</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      <nav className="md:hidden bg-white border-t border-slate-200 fixed bottom-0 w-full z-30 safe-area-bottom">
+        <div className="grid grid-cols-5 items-stretch">
+          <button onClick={() => navegar('agenda')} className={`flex flex-col items-center p-2 text-[10px] ${currentTab === 'agenda' ? 'text-brand-600' : 'text-slate-400'}`}>
+            <span className="text-base">☰</span><span>Minha Agenda</span>
+          </button>
+          <button onClick={() => navegar('eventos')} className={`flex flex-col items-center p-2 text-[10px] ${currentTab === 'eventos' ? 'text-brand-600' : 'text-slate-400'}`}>
+            <span className="text-base">▣</span><span>Eventos</span>
+          </button>
+          <button onClick={() => navegar('calendario')} className={`flex flex-col items-center p-2 text-[10px] ${currentTab === 'calendario' ? 'text-brand-600' : 'text-slate-400'}`}>
+            <span className="text-base">□</span><span>Calendário</span>
+          </button>
+          <button onClick={() => navegar('convocacoes')} className={`flex flex-col items-center p-2 text-[10px] ${currentTab === 'convocacoes' ? 'text-brand-600' : 'text-slate-400'}`}>
+            <span className="text-base">♧</span><span>Convocações</span>
+          </button>
+          <button onClick={() => setMostrarMais(true)} className={`flex flex-col items-center p-2 text-[10px] ${mostrarMais ? 'text-brand-600' : 'text-slate-400'}`}>
+            <span className="text-base">•••</span><span>Mais</span>
+          </button>
+        </div>
+      </nav>
+
+      <div className="hidden md:block">
       <nav className="bg-white border-t border-slate-200 fixed bottom-0 w-full z-10 safe-area-bottom">
         <div
           className="max-w-2xl mx-auto overflow-x-scroll overscroll-x-contain [touch-action:pan-x] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -229,6 +318,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
           </div>
         </div>
       </nav>
+      </div>
     </div>
   )
 }
