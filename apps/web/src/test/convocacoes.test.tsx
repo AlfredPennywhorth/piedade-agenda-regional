@@ -16,6 +16,8 @@ vi.mock('../api/apiClient', async (importOriginal) => {
 const EVENTO_ID = '33333333-3333-3333-3333-333333333333'
 const CONVOCACAO_ID = '44444444-4444-4444-4444-444444444444'
 
+const EVENTO_PASSADO_ID = '22222222-2222-2222-2222-222222222222'
+
 const mockEventos = [
   {
     id: EVENTO_ID,
@@ -25,6 +27,25 @@ const mockEventos = [
     modalidade: 'PRESENCIAL',
     inicioEm: '2026-10-10T10:00:00.000Z',
     fimEm: '2026-10-10T12:00:00.000Z',
+    localId: null,
+    urlOnline: null,
+    organizadorMembroId: null,
+    regionalId: null,
+    administracaoId: null,
+    setorId: null,
+    casaId: null,
+    grupoTrabalhoId: null,
+    observacoes: null,
+    ativo: true,
+  },
+  {
+    id: EVENTO_PASSADO_ID,
+    titulo: 'Reunião Antiga',
+    descricao: null,
+    pauta: null,
+    modalidade: 'PRESENCIAL',
+    inicioEm: '2026-01-10T10:00:00.000Z',
+    fimEm: '2026-01-10T12:00:00.000Z',
     localId: null,
     urlOnline: null,
     organizadorMembroId: null,
@@ -92,6 +113,20 @@ describe('ConvocacoesView', () => {
     await waitFor(() => {
       expect(screen.getByText('Nenhuma convocação encontrada.')).toBeInTheDocument()
     })
+  })
+
+  it('deve mostrar data/hora no seletor e ocultar eventos já encerrados', async () => {
+    render(<ConvocacoesView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Minha observação rascunho')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /novo rascunho/i }))
+
+    const select = await screen.findByRole('combobox')
+    expect(select).toHaveTextContent('Reunião Presencial Teste — 10/10/2026, 07:00')
+    expect(select).not.toHaveTextContent('Reunião Antiga')
   })
 
   it('deve permitir criar um rascunho', async () => {
