@@ -57,6 +57,15 @@ export function ContasAcessoView() {
   }, [])
 
   const gerarLink = async (conta: ContaAdministrada, redefinicao: boolean) => {
+    if (
+      redefinicao &&
+      !window.confirm(
+        `Redefinir o PIN de ${conta.nome}? As sessões atuais serão encerradas e a conta só poderá acessar novamente após concluir o novo link.`
+      )
+    ) {
+      return
+    }
+
     setProcessando(conta.membroId)
     setErro(null)
     setLinkTemporario(null)
