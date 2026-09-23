@@ -129,9 +129,9 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
 
   const dateObjInicio = new Date(item.evento.inicioEm)
   const dateObjFim = new Date(item.evento.fimEm)
-  const dateStr = dateObjInicio.toLocaleDateString('pt-BR')
-  const timeInicio = dateObjInicio.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-  const timeFim = dateObjFim.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  const dateStr = dateObjInicio.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+  const timeInicio = dateObjInicio.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })
+  const timeFim = dateObjFim.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })
 
   const isOnlineOrHybrid = item.evento.modalidade === 'ONLINE' || item.evento.modalidade === 'HIBRIDO'
   const isPresentialOrHybrid = item.evento.modalidade === 'PRESENCIAL' || item.evento.modalidade === 'HIBRIDO'
@@ -202,13 +202,13 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
               <p className="text-slate-600 text-sm mt-1">{item.local.endereco}</p>
               
               <div className="flex gap-2 mt-3 flex-wrap">
-                {item.evento.urlMaps && (
-                  <a href={item.evento.urlMaps} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
+                {item.local?.urlMaps && (
+                  <a href={item.local?.urlMaps} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
                     Google Maps
                   </a>
                 )}
-                {item.evento.urlWaze && (
-                  <a href={item.evento.urlWaze} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
+                {item.local?.urlWaze && (
+                  <a href={item.local?.urlWaze} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
                     Waze
                   </a>
                 )}
