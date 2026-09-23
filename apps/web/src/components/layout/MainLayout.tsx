@@ -51,9 +51,10 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
       {/* Bottom Navigation */}
       <nav className="bg-white border-t border-slate-200 fixed bottom-0 w-full z-10 safe-area-bottom">
         <div
-          className="max-w-2xl mx-auto flex items-center gap-1 overflow-x-auto px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>button]:flex-none [&>button]:min-w-[76px]"
+          className="max-w-2xl mx-auto overflow-x-scroll overscroll-x-contain [touch-action:pan-x] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           aria-label="Navegação principal com rolagem horizontal"
         >
+          <div className="flex w-max min-w-full items-center gap-1 px-2 py-2">
           
           <button 
             onClick={() => onTabChange('agenda')} 
@@ -225,7 +226,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
             <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
             <span className="text-[10px] font-medium">Meu Cadastro</span>
           </button>
-
+          </div>
         </div>
       </nav>
     </div>
