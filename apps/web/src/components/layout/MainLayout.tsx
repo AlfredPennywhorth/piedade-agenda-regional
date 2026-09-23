@@ -117,7 +117,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
         </div>
       )}
 
-      <nav className="md:hidden bg-white border-t border-slate-200 fixed bottom-0 w-full z-30 safe-area-bottom">
+      <nav aria-label="Navegação móvel principal" className="md:hidden bg-white border-t border-slate-200 fixed bottom-0 w-full z-30 safe-area-bottom">
         <div className="grid grid-cols-5 items-stretch">
           <button onClick={() => navegar('agenda')} className={`flex flex-col items-center p-2 text-[10px] ${currentTab === 'agenda' ? 'text-brand-600' : 'text-slate-400'}`}>
             <span className="text-base">☰</span><span>Minha Agenda</span>
@@ -138,7 +138,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
       </nav>
 
       <div className="hidden md:block">
-      <nav className="bg-white border-t border-slate-200 fixed bottom-0 w-full z-10 safe-area-bottom">
+      <nav aria-label="Navegação desktop principal" className="bg-white border-t border-slate-200 fixed bottom-0 w-full z-10 safe-area-bottom">
         <div
           className="max-w-2xl mx-auto overflow-x-scroll overscroll-x-contain [touch-action:pan-x] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           aria-label="Navegação principal com rolagem horizontal"
