@@ -79,6 +79,11 @@ describe('Series Recorrencia API (S05)', () => {
     intervalo: 1
   }
 
+  it('0. exige autenticação nas rotas de séries recorrentes', async () => {
+    const response = await app.request('/api/v1/series-recorrencia')
+    expect(response.status).toBe(401)
+  })
+
   it('1. criar série diária', async () => {
     const regionalId = await createRegional()
     const res = await req('/api/v1/series-recorrencia', {

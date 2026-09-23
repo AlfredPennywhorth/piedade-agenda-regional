@@ -113,18 +113,35 @@ eventosRouter.patch('/:id', async (c) => {
     const merged = { ...existing, ...parsed }
     EventoCreate.parse(merged)
 
+    const escopoOriginal = extrairEscopoDoEvento(existing)
     const escopoFinal = extrairEscopoDoEvento(merged)
     const membroId = c.get('membroId')
-    if (!membroId || !escopoFinal.escopoTipo || !escopoFinal.escopoId) {
+    if (
+      !membroId ||
+      !escopoOriginal.escopoTipo ||
+      !escopoOriginal.escopoId ||
+      !escopoFinal.escopoTipo ||
+      !escopoFinal.escopoId
+    ) {
       return c.json({ error: 'Escopo da Agenda indisponível', code: 'FORBIDDEN' }, 403)
     }
-    const autorizado = await podeGerenciarAgendaNoEscopo(
-      db,
-      membroId,
-      escopoFinal.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-      escopoFinal.escopoId
-    )
-    if (!autorizado) {
+
+    const [autorizadoOriginal, autorizadoFinal] = await Promise.all([
+      podeGerenciarAgendaNoEscopo(
+        db,
+        membroId,
+        escopoOriginal.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+        escopoOriginal.escopoId
+      ),
+      podeGerenciarAgendaNoEscopo(
+        db,
+        membroId,
+        escopoFinal.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+        escopoFinal.escopoId
+      ),
+    ])
+
+    if (!autorizadoOriginal || !autorizadoFinal) {
       return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
     }
 
