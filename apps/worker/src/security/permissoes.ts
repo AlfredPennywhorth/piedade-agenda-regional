@@ -219,7 +219,7 @@ export async function podeGerenciarAgendaNoEscopo(
 ): Promise<boolean> {
   if (!db || !membroId || !escopoId) return false
 
-  const contexto = await carregarContextoPermissoes(db, membroId)
+  const contexto = contextoPermissoes ?? await carregarContextoPermissoes(db, membroId)
   if (eMasterSistema(contexto)) return true
 
   // Regra institucional: todo membro pode gerir automaticamente a Agenda da própria Casa.
@@ -352,7 +352,12 @@ export function temVinculoEmTipoEscopo(contexto: ContextoPermissoes, tipo: 'regi
 /**
  * Valida se o membro possui vínculo ativo estritamente com a função de código OPERADOR_PORTARIA no mesmo escopo do evento.
  */
-export async function eOperadorPortariaAutorizado(db: any, membroId: string, evento: any): Promise<boolean> {
+export async function eOperadorPortariaAutorizado(
+  db: any,
+  membroId: string,
+  evento: any,
+  contextoPermissoes?: ContextoPermissoes
+): Promise<boolean> {
   if (!db || !membroId || !evento) return false
 
   const estadoPortaria = await db
