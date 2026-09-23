@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, count, eq, isNull } from 'drizzle-orm'
+import { and, count, eq, inArray, isNull } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { executeAtomic } from '../../db/batch'
 import { gerarTokenAleatorio, hashToken } from '../../security/tokens'
@@ -159,6 +159,11 @@ adminAcessosApp.get('/', async c => {
     return c.json({ error: 'Acesso não autorizado', code: 'FORBIDDEN' }, 403)
   }
 
+  const regionaisPermitidasIds = Array.from(regionaisPermitidas)
+  const filtroRegional = master
+    ? undefined
+    : inArray(schema.administracoes.regionalId, regionaisPermitidasIds)
+
   const pessoas = await db
     .select({
       membroId: schema.membros.id,
@@ -177,12 +182,10 @@ adminAcessosApp.get('/', async c => {
     .innerJoin(schema.setores, eq(schema.casas.setorId, schema.setores.id))
     .innerJoin(schema.administracoes, eq(schema.setores.administracaoId, schema.administracoes.id))
     .leftJoin(schema.contasAcesso, eq(schema.contasAcesso.membroId, schema.membros.id))
-    .where(eq(schema.membros.ativo, true))
+    .where(and(eq(schema.membros.ativo, true), filtroRegional))
     .all()
 
-  const visiveis = pessoas.filter(
-    (pessoa: any) => master || regionaisPermitidas.has(pessoa.regionalId)
-  )
+  const visiveis = pessoas
   const acessos = await db
     .select({
       id: schema.acessosConta.id,
@@ -201,14 +204,13 @@ adminAcessosApp.get('/', async c => {
     .where(
       and(
         eq(schema.acessosConta.ativo, true),
-        eq(schema.membros.ativo, true)
+        eq(schema.membros.ativo, true),
+        filtroRegional
       )
     )
     .all()
 
-  const acessosVisiveis = acessos.filter(
-    (acesso: any) => master || regionaisPermitidas.has(acesso.regionalId)
-  )
+  const acessosVisiveis = acessos
 
   const acessosPorConta = new Map<string, typeof acessosVisiveis>()
   for (const acesso of acessosVisiveis) {
