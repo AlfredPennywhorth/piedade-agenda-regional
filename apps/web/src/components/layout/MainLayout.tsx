@@ -29,12 +29,12 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
 
   const fecharMais = () => {
     setMostrarMais(false)
-    window.setTimeout(() => botaoMaisRef.current?.focus(), 0)
+    botaoMaisRef.current?.focus()
   }
 
   useEffect(() => {
     if (mostrarMais) {
-      window.setTimeout(() => fecharMaisRef.current?.focus(), 0)
+      fecharMaisRef.current?.focus()
     }
   }, [mostrarMais])
 
