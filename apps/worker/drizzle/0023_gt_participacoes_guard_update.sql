@@ -9,7 +9,7 @@ WHEN EXISTS (
     AND p.ativo = 1
 )
 BEGIN
-  SELECT CASE
+  SELECT (CASE
     WHEN NEW.regional_id IS NULL
       OR NEW.administracao_id IS NOT NULL
       OR NEW.setor_id IS NOT NULL
@@ -23,5 +23,5 @@ BEGIN
           AND a.regional_id <> NEW.regional_id
       )
     THEN RAISE(ABORT, 'GT_PARTICIPACOES_INCOMPATIVEIS')
-  END;
+  END);
 END;
