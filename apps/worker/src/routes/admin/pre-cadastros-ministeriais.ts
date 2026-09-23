@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, eq, inArray, like, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { CreateMembroSchema } from '@piedade/shared'
 import { executeAtomic } from '../../db/batch'
@@ -11,6 +11,10 @@ import {
 } from '../../security/permissoes'
 
 export const adminPreCadastrosMinisteriaisApp = new Hono<{ Variables: Variables }>()
+
+function escaparPadraoLike(valor: string) {
+  return valor.replace(/[\\%_]/g, caractere => `\\${caractere}`)
+}
 
 adminPreCadastrosMinisteriaisApp.use('*', authMiddleware)
 
@@ -54,9 +58,10 @@ adminPreCadastrosMinisteriaisApp.get('/', async c => {
     )
   }
 
+  const buscaLiteral = escaparPadraoLike(busca)
   const conditions = [
     eq(schema.preCadastrosMinisteriais.ativo, true),
-    like(schema.preCadastrosMinisteriais.nome, `%${busca}%`),
+    sql`${schema.preCadastrosMinisteriais.nome} LIKE ${`%${buscaLiteral}%`} ESCAPE '\\'`,
   ]
 
   if (master) {

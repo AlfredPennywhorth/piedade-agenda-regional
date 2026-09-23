@@ -179,6 +179,19 @@ describe('DATA-04A — pré-cadastro ministerial', () => {
     expect(response.status).toBe(400)
   })
 
+  it('trata % e _ como texto literal na busca', async () => {
+    await sessao('s-master-like', 'c-master', 'm-master', 'token-master-like')
+
+    const response = await app.request(
+      '/api/v1/admin/pre-cadastros-ministeriais?busca=%25_',
+      { headers: auth('token-master-like') }
+    )
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as any
+    expect(body.data).toEqual([])
+  })
+
   it('indica quando o pré-cadastro já foi vinculado a um membro', async () => {
     await sessao('s-master', 'c-master', 'm-master', 'token-master')
 
