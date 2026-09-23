@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { alterarPinSchema, atualizarPerfilSchema } from '@piedade/shared'
 import * as schema from '../../db/schema'
 import { authMiddleware, Variables } from '../../middleware/auth'
@@ -27,32 +27,37 @@ async function registrarFalhaPinAtual(
   membroId: string
 ) {
   const agora = new Date()
-  const falhas = (conta.tentativasPin ?? 0) + 1
-  const bloqueadoAte =
-    falhas >= LIMITE_FALHAS_PIN_ATUAL
-      ? new Date(agora.getTime() + BLOQUEIO_PIN_ATUAL_MS).toISOString()
-      : null
+  const agoraIso = agora.toISOString()
+  const bloqueioIso = new Date(agora.getTime() + BLOQUEIO_PIN_ATUAL_MS).toISOString()
 
-  await executeAtomic(db, tx => [
-    tx
-      .update(schema.contasAcesso)
-      .set({
-        tentativasPin: falhas,
-        bloqueadoAte,
-        updatedAt: agora.toISOString(),
-      })
-      .where(eq(schema.contasAcesso.id, conta.id)),
-    tx.insert(schema.tentativasAcesso).values({
-      id: crypto.randomUUID(),
-      contaAcessoId: conta.id,
-      membroId,
-      tipo: 'VERIFICACAO_PIN_ATUAL',
-      sucesso: false,
-      motivo: 'PIN atual inválido',
-    }),
-  ])
+  const atualizada = await db
+    .update(schema.contasAcesso)
+    .set({
+      tentativasPin: sql`${schema.contasAcesso.tentativasPin} + 1`,
+      bloqueadoAte: sql`CASE
+        WHEN ${schema.contasAcesso.tentativasPin} + 1 >= ${LIMITE_FALHAS_PIN_ATUAL}
+        THEN ${bloqueioIso}
+        ELSE ${schema.contasAcesso.bloqueadoAte}
+      END`,
+      updatedAt: agoraIso,
+    })
+    .where(eq(schema.contasAcesso.id, conta.id))
+    .returning({
+      tentativasPin: schema.contasAcesso.tentativasPin,
+      bloqueadoAte: schema.contasAcesso.bloqueadoAte,
+    })
+    .get()
 
-  return bloqueadoAte
+  await db.insert(schema.tentativasAcesso).values({
+    id: crypto.randomUUID(),
+    contaAcessoId: conta.id,
+    membroId,
+    tipo: 'VERIFICACAO_PIN_ATUAL',
+    sucesso: false,
+    motivo: 'PIN atual inválido',
+  })
+
+  return atualizada?.bloqueadoAte ?? null
 }
 
 meApp.use('*', authMiddleware)

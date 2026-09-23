@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { solicitarRecuperacaoPinSchema } from '@piedade/shared'
 import * as schema from '../../db/schema'
 import { hashToken } from '../../security/tokens'
@@ -13,48 +13,54 @@ async function aplicarThrottleRecuperacao(c: any, db: any) {
   const origem = c.req.header('CF-Connecting-IP') || 'origem-local'
   const chaveHash = await hashToken(`recuperacao-pin:${origem}`)
   const agora = new Date()
-  const existente = await db
+  const agoraIso = agora.toISOString()
+  const novaExpiracao = new Date(agora.getTime() + JANELA_RECUPERACAO_MS).toISOString()
+
+  await db
+    .insert(schema.rateLimitsAutenticacao)
+    .values({
+      chaveHash,
+      falhasConsecutivas: 1,
+      bloqueadoAte: null,
+      expiraEm: novaExpiracao,
+      createdAt: agoraIso,
+      updatedAt: agoraIso,
+    })
+    .onConflictDoUpdate({
+      target: schema.rateLimitsAutenticacao.chaveHash,
+      set: {
+        falhasConsecutivas: sql`CASE
+          WHEN ${schema.rateLimitsAutenticacao.expiraEm} <= ${agoraIso}
+          THEN 1
+          ELSE ${schema.rateLimitsAutenticacao.falhasConsecutivas} + 1
+        END`,
+        expiraEm: sql`CASE
+          WHEN ${schema.rateLimitsAutenticacao.expiraEm} <= ${agoraIso}
+          THEN ${novaExpiracao}
+          ELSE ${schema.rateLimitsAutenticacao.expiraEm}
+        END`,
+        bloqueadoAte: null,
+        updatedAt: agoraIso,
+      },
+    })
+    .execute()
+
+  const persistido = await db
     .select()
     .from(schema.rateLimitsAutenticacao)
     .where(eq(schema.rateLimitsAutenticacao.chaveHash, chaveHash))
     .get()
 
-  if (existente && new Date(existente.expiraEm) > agora) {
-    if (existente.falhasConsecutivas >= LIMITE_RECUPERACOES_POR_JANELA) {
-      const retryAfter = Math.max(
-        1,
-        Math.ceil((new Date(existente.expiraEm).getTime() - agora.getTime()) / 1000)
-      )
-      c.header('Retry-After', String(retryAfter))
-      return false
-    }
+  if (!persistido) return false
 
-    await db
-      .update(schema.rateLimitsAutenticacao)
-      .set({
-        falhasConsecutivas: existente.falhasConsecutivas + 1,
-        updatedAt: agora.toISOString(),
-      })
-      .where(eq(schema.rateLimitsAutenticacao.chaveHash, chaveHash))
-      .execute()
-    return true
+  if (persistido.falhasConsecutivas > LIMITE_RECUPERACOES_POR_JANELA) {
+    const retryAfter = Math.max(
+      1,
+      Math.ceil((new Date(persistido.expiraEm).getTime() - agora.getTime()) / 1000)
+    )
+    c.header('Retry-After', String(retryAfter))
+    return false
   }
-
-  if (existente) {
-    await db
-      .delete(schema.rateLimitsAutenticacao)
-      .where(eq(schema.rateLimitsAutenticacao.chaveHash, chaveHash))
-      .execute()
-  }
-
-  await db.insert(schema.rateLimitsAutenticacao).values({
-    chaveHash,
-    falhasConsecutivas: 1,
-    bloqueadoAte: null,
-    expiraEm: new Date(agora.getTime() + JANELA_RECUPERACAO_MS).toISOString(),
-    createdAt: agora.toISOString(),
-    updatedAt: agora.toISOString(),
-  })
 
   return true
 }
