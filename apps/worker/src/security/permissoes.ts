@@ -355,6 +355,9 @@ export function temVinculoEmTipoEscopo(contexto: ContextoPermissoes, tipo: 'regi
 export async function eOperadorPortariaAutorizado(db: any, membroId: string, evento: any): Promise<boolean> {
   if (!db || !membroId || !evento) return false
 
+  const contexto = await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) return true
+
   const estadoPortaria = await db
     .select({ status: schema.portariasEvento.status })
     .from(schema.portariasEvento)
@@ -645,6 +648,7 @@ export async function obterCapacidadesMembro(
     .get()
 
   const podeOperarPortaria =
+    eMasterSistema(contexto) ||
     perfisTecnicos.has('OPERADOR_PORTARIA_PERMANENTE') ||
     codigos.has('OPERADOR_PORTARIA') ||
     !!autorizacaoTemporariaPortaria
