@@ -57,6 +57,7 @@ export function SeriesView() {
 
   const [loading, setLoading] = useState<boolean>(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [lookupAviso, setLookupAviso] = useState<string | null>(null)
   
   // Form State
   const [formOpen, setFormOpen] = useState(false)
@@ -101,6 +102,7 @@ export function SeriesView() {
   const carregarDados = async () => {
     setLoading(true)
     setErro(null)
+    setLookupAviso(null)
     try {
       const seriesData = await fetchWithAuth<SerieRecorrencia[]>('/series-recorrencia')
       setSeries(seriesData || [])
@@ -135,7 +137,7 @@ export function SeriesView() {
       })
 
       if (lookupFalhou) {
-        setErro('A lista de séries foi carregada, mas alguns dados auxiliares estão indisponíveis. Tente atualizar antes de criar ou editar.')
+        setLookupAviso('A lista de séries foi carregada, mas alguns dados auxiliares estão indisponíveis. Tente atualizar antes de criar ou editar.')
       }
     } catch (err: unknown) {
       setErro(err instanceof Error ? err.message : 'Erro ao carregar as séries.')
@@ -300,9 +302,15 @@ export function SeriesView() {
         </button>
       </div>
 
-      {erro && (
+      {erro && !formOpen && (
         <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm animate-in fade-in">
           {erro}
+        </div>
+      )}
+
+      {lookupAviso && !formOpen && (
+        <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-sm animate-in fade-in">
+          {lookupAviso}
         </div>
       )}
 
@@ -372,7 +380,7 @@ export function SeriesView() {
         initialData={formData}
         initialTipoEscopo={tipoEscopo}
         lookups={{ locais, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
-        externalError={formOpen ? erro : null}
+        externalError={formOpen ? (erro ?? lookupAviso) : null}
         onSubmit={async (data) => {
           if (serieEditandoId) {
             setConfirmacaoEditar(data)
