@@ -542,7 +542,7 @@ export function EventosView() {
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 font-medium text-slate-900">{item.titulo}</td>
                     <td className="px-6 py-4 text-slate-600">
-                      {new Date(item.inicioEm).toLocaleString('pt-BR')}
+                      {new Date(item.inicioEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                     </td>
                     <td className="px-6 py-4 text-slate-600">{item.modalidade}</td>
                     <td className="px-6 py-4 text-center">
@@ -878,11 +878,11 @@ export function EventosView() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Início</span>
-                  <p className="text-slate-900">{new Date(eventoDetalhe.inicioEm).toLocaleString('pt-BR')}</p>
+                  <p className="text-slate-900">{new Date(eventoDetalhe.inicioEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
                 </div>
                 <div>
                   <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Fim</span>
-                  <p className="text-slate-900">{new Date(eventoDetalhe.fimEm).toLocaleString('pt-BR')}</p>
+                  <p className="text-slate-900">{new Date(eventoDetalhe.fimEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
