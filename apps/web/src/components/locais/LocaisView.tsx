@@ -76,6 +76,7 @@ export function LocaisView() {
   const [cepMensagem, setCepMensagem] = useState<string | null>(null)
   const [cepErro, setCepErro] = useState(false)
   const cepConsultaSeq = useRef(0)
+  const cepAbortControllerRef = useRef<AbortController | null>(null)
   
   const [detailOpen, setDetailOpen] = useState(false)
   const [selectedLocal, setSelectedLocal] = useState<Local | null>(null)
@@ -98,6 +99,8 @@ export function LocaisView() {
   }, [])
 
   const handleOpenCreate = () => {
+    cepAbortControllerRef.current?.abort()
+    cepAbortControllerRef.current = null
     cepConsultaSeq.current += 1
     setConsultandoCep(false)
     setEditingId(null)
@@ -124,6 +127,8 @@ export function LocaisView() {
   }
 
   const handleOpenEdit = async (id: string) => {
+    cepAbortControllerRef.current?.abort()
+    cepAbortControllerRef.current = null
     cepConsultaSeq.current += 1
     setConsultandoCep(false)
     try {
@@ -179,13 +184,20 @@ export function LocaisView() {
     const cep = cepInformado.replace(/\D/g, '')
     if (cep.length !== 8) return
 
+    cepAbortControllerRef.current?.abort()
+    const controller = new AbortController()
+    cepAbortControllerRef.current = controller
     const seq = ++cepConsultaSeq.current
+    const timeout = window.setTimeout(() => controller.abort(), 8000)
+
     setConsultandoCep(true)
     setCepMensagem(null)
     setCepErro(false)
 
     try {
-      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`)
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, {
+        signal: controller.signal,
+      })
       if (!response.ok) {
         throw new Error('Falha ao consultar CEP')
       }
@@ -216,13 +228,26 @@ export function LocaisView() {
       setCepMensagem('Endereço preenchido automaticamente pelo CEP.')
     } catch {
       if (seq !== cepConsultaSeq.current) return
-      setCepMensagem('Não foi possível consultar o CEP agora. Preencha o endereço manualmente.')
-      setCepErro(true)
+      setCepMensagem('Consulta de CEP encerrada. Você pode preencher o endereço manualmente.')
+      setCepErro(false)
     } finally {
+      window.clearTimeout(timeout)
+      if (cepAbortControllerRef.current === controller) {
+        cepAbortControllerRef.current = null
+      }
       if (seq === cepConsultaSeq.current) {
         setConsultandoCep(false)
       }
     }
+  }
+
+  const cancelarConsultaCep = () => {
+    cepAbortControllerRef.current?.abort()
+    cepAbortControllerRef.current = null
+    cepConsultaSeq.current += 1
+    setConsultandoCep(false)
+    setCepMensagem('Consulta de CEP cancelada. Preencha o endereço manualmente.')
+    setCepErro(false)
   }
 
   const handleCepChange = (valor: string) => {
@@ -234,12 +259,16 @@ export function LocaisView() {
     if (cepFormatado.replace(/\D/g, '').length === 8) {
       void buscarCep(cepFormatado)
     } else {
+      cepAbortControllerRef.current?.abort()
+      cepAbortControllerRef.current = null
       cepConsultaSeq.current += 1
       setConsultandoCep(false)
     }
   }
 
   const fecharFormulario = () => {
+    cepAbortControllerRef.current?.abort()
+    cepAbortControllerRef.current = null
     cepConsultaSeq.current += 1
     setConsultandoCep(false)
     setFormOpen(false)
@@ -441,6 +470,15 @@ export function LocaisView() {
                     <div id="cep-feedback" className={`text-xs mt-1 min-h-4 ${cepErro ? 'text-red-600' : 'text-slate-500'}`}>
                       {consultandoCep ? 'Consultando CEP...' : cepMensagem}
                     </div>
+                    {consultandoCep && (
+                      <button
+                        type="button"
+                        onClick={cancelarConsultaCep}
+                        className="mt-1 text-xs font-medium text-brand-700 hover:underline"
+                      >
+                        Usar endereço manualmente
+                      </button>
+                    )}
                   </div>
                   <div>
                     <label htmlFor="bairro" className="block text-sm font-medium text-slate-700 mb-1">Bairro</label>

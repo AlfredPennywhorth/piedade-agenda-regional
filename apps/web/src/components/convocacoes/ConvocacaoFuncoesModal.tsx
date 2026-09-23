@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { fetchWithAuth, postWithAuth } from '../../api/apiClient'
 import { ConvocacaoFuncaoCreate, ConvocacaoFuncaoCreatePayload } from '@piedade/shared'
 
@@ -23,6 +23,11 @@ interface ConvocacaoFuncoesModalProps {
 }
 
 export function ConvocacaoFuncoesModal({ convocacaoId, onClose }: ConvocacaoFuncoesModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const triggerRef = useRef<HTMLElement | null>(
+    typeof document !== 'undefined' ? document.activeElement as HTMLElement | null : null
+  )
   const [funcoesCatalogo, setFuncoesCatalogo] = useState<Funcao[]>([])
   const [funcoesVinculadas, setFuncoesVinculadas] = useState<ConvocacaoFuncao[]>([])
   const [loading, setLoading] = useState(true)
@@ -54,6 +59,37 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose }: ConvocacaoFunc
   useEffect(() => {
     carregarDados()
   }, [convocacaoId])
+
+  useEffect(() => {
+    closeButtonRef.current?.focus()
+    return () => triggerRef.current?.focus()
+  }, [])
+
+  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape' && !salvando) {
+      event.preventDefault()
+      onClose()
+      return
+    }
+    if (event.key !== 'Tab' || !dialogRef.current) return
+
+    const focusaveis = Array.from(
+      dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    )
+    if (focusaveis.length === 0) return
+
+    const primeiro = focusaveis[0]
+    const ultimo = focusaveis[focusaveis.length - 1]
+    if (event.shiftKey && document.activeElement === primeiro) {
+      event.preventDefault()
+      ultimo.focus()
+    } else if (!event.shiftKey && document.activeElement === ultimo) {
+      event.preventDefault()
+      primeiro.focus()
+    }
+  }
 
   const recarregarVinculadas = async () => {
     try {
@@ -123,9 +159,11 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose }: ConvocacaoFunc
 
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-funcoes-title"
+      onKeyDown={handleDialogKeyDown}
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
     >
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
@@ -134,6 +172,7 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose }: ConvocacaoFunc
             Gerenciar Funções do Rascunho
           </h2>
           <button
+            ref={closeButtonRef}
             onClick={onClose}
             disabled={salvando}
             className="text-slate-400 hover:text-slate-600 transition-colors"
@@ -188,7 +227,10 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose }: ConvocacaoFunc
                   </p>
                 ) : (
                   <div className="flex gap-2">
+                    <label htmlFor="funcao-convocacao" className="sr-only">Função para adicionar</label>
                     <select
+                      id="funcao-convocacao"
+                      aria-label="Função para adicionar"
                       value={funcaoSelecionadaId}
                       onChange={(e) => setFuncaoSelecionadaId(e.target.value)}
                       disabled={salvando}
