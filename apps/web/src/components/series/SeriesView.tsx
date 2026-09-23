@@ -267,6 +267,11 @@ export function SeriesView() {
     }
   }
 
+  const formatarData = (data: string) => {
+    const [ano, mes, dia] = data.split('-')
+    return ano && mes && dia ? `${dia}/${mes}/${ano}` : data
+  }
+
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
       <div className="bg-brand-900 text-white p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -317,7 +322,7 @@ export function SeriesView() {
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 font-medium text-slate-900">{item.titulo}</td>
                     <td className="px-6 py-4 text-slate-600">{getFrequenciaLabel(item.frequencia)}</td>
-                    <td className="px-6 py-4 text-slate-600">{item.dataInicio}</td>
+                    <td className="px-6 py-4 text-slate-600">{formatarData(item.dataInicio)}</td>
                     <td className="px-6 py-4 text-center">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         item.ativo ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-800'
@@ -400,11 +405,11 @@ export function SeriesView() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Início</span>
-                  <p className="text-slate-900">{serieDetalhe.dataInicio} {serieDetalhe.horarioInicio}</p>
+                  <p className="text-slate-900">{formatarData(serieDetalhe.dataInicio)} {serieDetalhe.horarioInicio}</p>
                 </div>
                 <div>
                   <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Fim</span>
-                  <p className="text-slate-900">{serieDetalhe.dataFim} {serieDetalhe.horarioFim}</p>
+                  <p className="text-slate-900">{formatarData(serieDetalhe.dataFim)} {serieDetalhe.horarioFim}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
