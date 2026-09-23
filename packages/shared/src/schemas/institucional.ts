@@ -57,58 +57,23 @@ export type UpdateCasa = z.infer<typeof UpdateCasaSchema>
 // ---------------------------------------------
 // Grupo de Trabalho
 // ---------------------------------------------
+// Regra vigente: GT é exclusivamente Regional. Os campos legados
+// administracaoId/setorId são aceitos apenas como null para permitir
+// saneamento de clientes antigos sem reintroduzir escopos inválidos.
 export const CreateGrupoTrabalhoSchema = z.object({
   nome: z.string().min(2, "Nome deve ter no mínimo 2 caracteres").max(255),
   ativo: z.boolean().optional().default(true),
-  regionalId: z.string().uuid().optional().nullable(),
-  administracaoId: z.string().uuid().optional().nullable(),
-  setorId: z.string().uuid().optional().nullable(),
-}).refine((data) => {
-  let escoposPreenchidos = 0;
-  if (data.regionalId) escoposPreenchidos++;
-  if (data.administracaoId) escoposPreenchidos++;
-  if (data.setorId) escoposPreenchidos++;
-
-  return escoposPreenchidos === 1;
-}, {
-  message: "O Grupo de Trabalho deve pertencer a exatamente um escopo (Regional, Administração ou Setor).",
-  path: ["escopo"] // Indica que o erro ocorreu na combinação dos escopos
+  regionalId: z.string().uuid("regionalId deve ser um UUID válido"),
+  administracaoId: z.null().optional(),
+  setorId: z.null().optional(),
 })
 
 export const UpdateGrupoTrabalhoSchema = z.object({
   nome: z.string().min(2).max(255).optional(),
   ativo: z.boolean().optional(),
-  regionalId: z.string().uuid().optional().nullable(),
-  administracaoId: z.string().uuid().optional().nullable(),
-  setorId: z.string().uuid().optional().nullable(),
-}).refine((data) => {
-  // Para update parcial, se nenhuma FK for enviada, consideramos válido (apenas atualizando nome/ativo).
-  // Mas se for enviada alguma FK, precisamos garantir que o conjunto final enviado seja válido?
-  // O PATCH não envia o objeto todo. Vamos assumir que se ele enviar campos de escopo, deve estar correto 
-  // Ou delegamos a validação de FKs pro banco.
-  // Como Zod só tem os dados da requisição, se ele passar { regionalId: '...', administracaoId: null, setorId: null } seria bom validar
-  
-  const hasRegional = data.regionalId !== undefined;
-  const hasAdm = data.administracaoId !== undefined;
-  const hasSetor = data.setorId !== undefined;
-
-  // Se nenhum escopo foi enviado na request de PATCH, a atualização é livre
-  if (!hasRegional && !hasAdm && !hasSetor) return true;
-
-  // Se enviou, pelo menos um deve ser truthy (visto que estamos substituindo), e os outros falsy
-  // Para ser seguro na reatribuição, o client DEVE mandar null pros outros se for mudar
-  let preenchidos = 0;
-  if (data.regionalId) preenchidos++;
-  if (data.administracaoId) preenchidos++;
-  if (data.setorId) preenchidos++;
-  
-  // Isso requer que a interface envie o objeto de escopos por completo se for alterar.
-  // Caso envie parcial (ex: só regionalId), isso quebraria a validação se no banco já houvesse outro.
-  // Por ora, vamos restringir que se for alterar escopo, deve mandar exatamente 1 não nulo e no max 1.
-  return preenchidos <= 1; // Pode ser 0 se enviou nulos, o banco bloqueia
-}, {
-  message: "Ao alterar o escopo, forneça exatamente o novo ID de escopo e anule (null) os demais.",
-  path: ["escopo"]
+  regionalId: z.string().uuid("regionalId deve ser um UUID válido").optional(),
+  administracaoId: z.null().optional(),
+  setorId: z.null().optional(),
 })
 
 export type CreateGrupoTrabalho = z.infer<typeof CreateGrupoTrabalhoSchema>
