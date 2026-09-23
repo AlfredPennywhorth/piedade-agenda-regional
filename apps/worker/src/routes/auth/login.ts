@@ -11,18 +11,7 @@ import { Env } from '../../index'
 export const loginApp = new Hono<{ Bindings: Env; Variables: { db: any } }>()
 
 const RETENCAO_RATE_LIMIT_MS = 24 * 60 * 60 * 1000
-const BLOQUEIOS_PROGRESSIVOS_MS: Record<number, number> = {
-  5: 30 * 1000,
-  6: 60 * 1000,
-  7: 2 * 60 * 1000,
-  8: 5 * 60 * 1000,
-  9: 10 * 60 * 1000,
-}
 const BLOQUEIO_MAXIMO_MS = 15 * 60 * 1000
-
-function obterDuracaoBloqueio(falhas: number) {
-  return BLOQUEIOS_PROGRESSIVOS_MS[falhas] ?? (falhas >= 10 ? BLOQUEIO_MAXIMO_MS : 0)
-}
 
 function respostaBloqueada(c: Context, bloqueadoAte: Date, agora: Date) {
   const retryAfter = Math.max(1, Math.ceil((bloqueadoAte.getTime() - agora.getTime()) / 1000))
