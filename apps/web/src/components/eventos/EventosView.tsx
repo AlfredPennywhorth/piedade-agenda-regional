@@ -507,7 +507,7 @@ export function EventosView() {
         </button>
       </div>
 
-      {erro && (
+      {erro && !formOpen && (
         <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm animate-in fade-in">
           {erro}
         </div>
@@ -580,6 +580,11 @@ export function EventosView() {
             </div>
             
             <form onSubmit={handleSubmit} noValidate className="p-6 overflow-y-auto space-y-6">
+              {erro && (
+                <div role="alert" className="p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
+                  {erro}
+                </div>
+              )}
               {carregandoDetalhes ? (
                 <div className="flex justify-center items-center h-32">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>

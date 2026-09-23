@@ -57,6 +57,7 @@ export function SeriesView() {
 
   const [loading, setLoading] = useState<boolean>(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [lookupAviso, setLookupAviso] = useState<string | null>(null)
   
   // Form State
   const [formOpen, setFormOpen] = useState(false)
@@ -101,12 +102,10 @@ export function SeriesView() {
   const carregarDados = async () => {
     setLoading(true)
     setErro(null)
+    setLookupAviso(null)
     try {
-      const [
-        seriesData, locaisData, membrosData, regionaisData,
-        administracoesData, setoresData, casasData, gruposData
-      ] = await Promise.all([
-        fetchWithAuth<SerieRecorrencia[]>('/series-recorrencia'),
+      const seriesPromise = fetchWithAuth<SerieRecorrencia[]>('/series-recorrencia')
+      const lookupsPromise = Promise.allSettled([
         fetchWithAuth<Local[]>('/locais'),
         fetchWithAuth<Membro[]>('/membros'),
         fetchWithAuth<Regional[]>('/regionais'),
@@ -115,17 +114,36 @@ export function SeriesView() {
         fetchWithAuth<Casa[]>('/casas'),
         fetchWithAuth<GrupoTrabalho[]>('/grupos-trabalho'),
       ])
-      
+
+      const seriesData = await seriesPromise
       setSeries(seriesData || [])
-      setLocais(locaisData || [])
-      setMembros(membrosData || [])
-      setRegionais(regionaisData || [])
-      setAdministracoes(administracoesData || [])
-      setSetores(setoresData || [])
-      setCasas(casasData || [])
-      setGruposTrabalho(gruposData || [])
+
+      const resultados = await lookupsPromise
+
+      const setters = [
+        (valor: unknown) => setLocais(valor as Local[]),
+        (valor: unknown) => setMembros(valor as Membro[]),
+        (valor: unknown) => setRegionais(valor as Regional[]),
+        (valor: unknown) => setAdministracoes(valor as Administracao[]),
+        (valor: unknown) => setSetores(valor as Setor[]),
+        (valor: unknown) => setCasas(valor as Casa[]),
+        (valor: unknown) => setGruposTrabalho(valor as GrupoTrabalho[]),
+      ]
+
+      let lookupFalhou = false
+      resultados.forEach((resultado, indice) => {
+        if (resultado.status === 'fulfilled') {
+          setters[indice](resultado.value || [])
+        } else {
+          lookupFalhou = true
+        }
+      })
+
+      if (lookupFalhou) {
+        setLookupAviso('A lista de séries foi carregada, mas alguns dados auxiliares estão indisponíveis. Tente atualizar antes de criar ou editar.')
+      }
     } catch (err: unknown) {
-      setErro(err instanceof Error ? err.message : 'Erro ao carregar os dados.')
+      setErro(err instanceof Error ? err.message : 'Erro ao carregar as séries.')
     } finally {
       setLoading(false)
     }
@@ -287,9 +305,15 @@ export function SeriesView() {
         </button>
       </div>
 
-      {erro && (
+      {erro && !formOpen && (
         <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm animate-in fade-in">
           {erro}
+        </div>
+      )}
+
+      {lookupAviso && !formOpen && (
+        <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-sm animate-in fade-in">
+          {lookupAviso}
         </div>
       )}
 
@@ -359,6 +383,7 @@ export function SeriesView() {
         initialData={formData}
         initialTipoEscopo={tipoEscopo}
         lookups={{ locais, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
+        externalError={formOpen ? (erro ?? lookupAviso) : null}
         onSubmit={async (data) => {
           if (serieEditandoId) {
             setConfirmacaoEditar(data)
