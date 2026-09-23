@@ -11,6 +11,50 @@ import type { Env } from '../../index'
 
 export const meApp = new Hono<{ Bindings: Env; Variables: Variables }>()
 
+const LIMITE_FALHAS_PIN_ATUAL = 5
+const BLOQUEIO_PIN_ATUAL_MS = 15 * 60 * 1000
+
+function respostaPinAtualBloqueado(c: any, bloqueadoAte: Date) {
+  const agora = new Date()
+  const retryAfter = Math.max(1, Math.ceil((bloqueadoAte.getTime() - agora.getTime()) / 1000))
+  c.header('Retry-After', String(retryAfter))
+  return c.json({ error: 'PIN temporariamente bloqueado', code: 'PIN_BLOQUEADO' }, 429)
+}
+
+async function registrarFalhaPinAtual(
+  db: any,
+  conta: typeof schema.contasAcesso.$inferSelect,
+  membroId: string
+) {
+  const agora = new Date()
+  const falhas = (conta.tentativasPin ?? 0) + 1
+  const bloqueadoAte =
+    falhas >= LIMITE_FALHAS_PIN_ATUAL
+      ? new Date(agora.getTime() + BLOQUEIO_PIN_ATUAL_MS).toISOString()
+      : null
+
+  await executeAtomic(db, tx => [
+    tx
+      .update(schema.contasAcesso)
+      .set({
+        tentativasPin: falhas,
+        bloqueadoAte,
+        updatedAt: agora.toISOString(),
+      })
+      .where(eq(schema.contasAcesso.id, conta.id)),
+    tx.insert(schema.tentativasAcesso).values({
+      id: crypto.randomUUID(),
+      contaAcessoId: conta.id,
+      membroId,
+      tipo: 'VERIFICACAO_PIN_ATUAL',
+      sucesso: false,
+      motivo: 'PIN atual inválido',
+    }),
+  ])
+
+  return bloqueadoAte
+}
+
 meApp.use('*', authMiddleware)
 
 meApp.get('/', async c => {
@@ -107,9 +151,24 @@ meApp.patch('/', async c => {
     return c.json({ error: 'Conta indisponível', code: 'CONTA_INDISPONIVEL' }, 409)
   }
 
+  if (
+    identidade.conta.bloqueadoAte &&
+    new Date() < new Date(identidade.conta.bloqueadoAte)
+  ) {
+    return respostaPinAtualBloqueado(c, new Date(identidade.conta.bloqueadoAte))
+  }
+
   const pepper = c.env?.PIN_PEPPER || 'test-pepper'
   const pinValido = await verifyPin(parsed.data.pinAtual, pepper, identidade.conta.pinHash)
   if (!pinValido) {
+    const bloqueadoAte = await registrarFalhaPinAtual(
+      db,
+      identidade.conta,
+      membroId
+    )
+    if (bloqueadoAte) {
+      return respostaPinAtualBloqueado(c, new Date(bloqueadoAte))
+    }
     return c.json({ error: 'PIN atual inválido', code: 'CREDENCIAIS_INVALIDAS' }, 401)
   }
 
@@ -127,6 +186,10 @@ meApp.patch('/', async c => {
 
   const agora = new Date().toISOString()
   await executeAtomic(db, tx => [
+    tx
+      .update(schema.contasAcesso)
+      .set({ tentativasPin: 0, bloqueadoAte: null, updatedAt: agora })
+      .where(eq(schema.contasAcesso.id, contaAcessoId)),
     tx
       .update(schema.membros)
       .set({ celular: parsed.data.celular, updatedAt: agora })
@@ -175,9 +238,17 @@ meApp.post('/alterar-pin', async c => {
     return c.json({ error: 'Conta indisponível', code: 'CONTA_INDISPONIVEL' }, 409)
   }
 
+  if (conta.bloqueadoAte && new Date() < new Date(conta.bloqueadoAte)) {
+    return respostaPinAtualBloqueado(c, new Date(conta.bloqueadoAte))
+  }
+
   const pepper = c.env?.PIN_PEPPER || 'test-pepper'
   const pinValido = await verifyPin(parsed.data.pinAtual, pepper, conta.pinHash)
   if (!pinValido) {
+    const bloqueadoAte = await registrarFalhaPinAtual(db, conta, membroId)
+    if (bloqueadoAte) {
+      return respostaPinAtualBloqueado(c, new Date(bloqueadoAte))
+    }
     return c.json({ error: 'PIN atual inválido', code: 'CREDENCIAIS_INVALIDAS' }, 401)
   }
 
