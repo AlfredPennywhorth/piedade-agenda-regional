@@ -145,8 +145,8 @@ export function LocaisView() {
         uf: data.uf,
         cep: data.cep || '',
         referencia: data.referencia || '',
-        latitude: data.latitude || null,
-        longitude: data.longitude || null,
+        latitude: data.latitude ?? null,
+        longitude: data.longitude ?? null,
         urlMaps: data.urlMaps || '',
         urlWaze: data.urlWaze || '',
         ativo: data.ativo,
@@ -356,7 +356,7 @@ export function LocaisView() {
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
         </div>
-      ) : (locais || []).length === 0 ? (
+      ) : !error && (locais || []).length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-slate-200 shadow-sm">
           <p className="text-slate-500 mb-4">Nenhum local cadastrado.</p>
           <button
@@ -434,6 +434,11 @@ export function LocaisView() {
             </div>
             
             <form onSubmit={handleSubmit} noValidate className="p-6 overflow-y-auto space-y-6">
+              {error && (
+                <div role="alert" className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
               <div className="space-y-4">
                 <h4 className="font-medium text-slate-900 border-b pb-2">Informações Básicas</h4>
                 <div>
