@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, gte, lte, inArray } from 'drizzle-orm'
+import { eq, and, gte, lt, lte, inArray } from 'drizzle-orm'
 import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, membros, casas, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo } from '../security/permissoes'
@@ -257,7 +257,15 @@ relatoriosRouter.get('/presencas/periodo', async c => {
   }
 
   if (dataInicio) condicoes.push(gte(eventos.inicioEm, dataInicio))
-  if (dataFim) condicoes.push(lte(eventos.inicioEm, dataFim))
+  if (dataFim) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) {
+      const fimExclusivo = new Date(`${dataFim}T00:00:00.000Z`)
+      fimExclusivo.setUTCDate(fimExclusivo.getUTCDate() + 1)
+      condicoes.push(lt(eventos.inicioEm, fimExclusivo.toISOString()))
+    } else {
+      condicoes.push(lte(eventos.inicioEm, dataFim))
+    }
+  }
 
   const fechamentos = await db
     .select({
@@ -365,14 +373,15 @@ relatoriosRouter.get('/eventos/:eventoId', async (c) => {
     return c.json({ error: 'Acesso não autorizado para visualizar relatórios deste evento' }, 403)
   }
 
-  // Convocados materializados
-  const convocacao = await db.select()
+  // Convocados materializados de todas as convocações publicadas ativas do evento.
+  const convocacoesPublicadas = await db.select({ id: convocacoes.id })
     .from(convocacoes)
     .where(and(eq(convocacoes.eventoId, eventoId), eq(convocacoes.status, 'PUBLICADA'), eq(convocacoes.ativo, true)))
-    .get()
+    .all()
 
-  const destinatarios = convocacao
-    ? await db.select().from(convocacaoDestinatarios).where(eq(convocacaoDestinatarios.convocacaoId, convocacao.id)).all()
+  const convocacaoIds = convocacoesPublicadas.map((item: any) => item.id)
+  const destinatarios = convocacaoIds.length > 0
+    ? await db.select().from(convocacaoDestinatarios).where(inArray(convocacaoDestinatarios.convocacaoId, convocacaoIds)).all()
     : []
 
   const totalConvocados = destinatarios.length
@@ -389,7 +398,7 @@ relatoriosRouter.get('/eventos/:eventoId', async (c) => {
   const totalSemResposta = Math.max(0, totalConvocados - rsvpList.length)
 
   // Checkins records
-  const checkinList = await db.select().from(checkins).where(eq(checkins.eventoId, eventoId)).all()
+  const checkinList = await db.select().from(checkins).where(and(eq(checkins.eventoId, eventoId), eq(checkins.status, 'ATIVO'))).all()
   const totalPresencas = checkinList.length
 
   // Presenças dos confirmados
@@ -446,12 +455,13 @@ relatoriosRouter.get('/eventos/:eventoId/presencas', async (c) => {
     return c.json({ error: 'Acesso não autorizado para visualizar relatórios deste evento' }, 403)
   }
 
-  const convocacao = await db.select()
+  const convocacoesPublicadas = await db.select({ id: convocacoes.id })
     .from(convocacoes)
     .where(and(eq(convocacoes.eventoId, eventoId), eq(convocacoes.status, 'PUBLICADA'), eq(convocacoes.ativo, true)))
-    .get()
+    .all()
 
-  if (!convocacao) {
+  const convocacaoIds = convocacoesPublicadas.map((item: any) => item.id)
+  if (convocacaoIds.length === 0) {
     return c.json([])
   }
 
@@ -471,8 +481,8 @@ relatoriosRouter.get('/eventos/:eventoId/presencas', async (c) => {
   .innerJoin(membros, eq(convocacaoDestinatarios.membroId, membros.id))
   .leftJoin(casas, eq(membros.casaId, casas.id))
   .leftJoin(rsvp, eq(rsvp.convocacaoDestinatarioId, convocacaoDestinatarios.id))
-  .leftJoin(checkins, and(eq(checkins.eventoId, eventoId), eq(checkins.membroId, membros.id)))
-  .where(eq(convocacaoDestinatarios.convocacaoId, convocacao.id))
+  .leftJoin(checkins, and(eq(checkins.eventoId, eventoId), eq(checkins.membroId, membros.id), eq(checkins.status, 'ATIVO')))
+  .where(inArray(convocacaoDestinatarios.convocacaoId, convocacaoIds))
   .all()
 
   let result = rows.map((r: any) => ({
@@ -543,7 +553,13 @@ relatoriosRouter.get('/agregado', async (c) => {
     conditions.push(gte(eventos.inicioEm, dataInicio))
   }
   if (dataFim) {
-    conditions.push(lte(eventos.inicioEm, dataFim))
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) {
+      const fimExclusivo = new Date(`${dataFim}T00:00:00.000Z`)
+      fimExclusivo.setUTCDate(fimExclusivo.getUTCDate() + 1)
+      conditions.push(lt(eventos.inicioEm, fimExclusivo.toISOString()))
+    } else {
+      conditions.push(lte(eventos.inicioEm, dataFim))
+    }
   }
 
   const listaEventos = await db.select().from(eventos).where(and(...conditions)).all()
@@ -556,17 +572,20 @@ relatoriosRouter.get('/agregado', async (c) => {
   const eventosResumo = []
 
   for (const ev of listaEventos) {
-    const convocacao = await db.select()
+    const convocacoesEvento = await db.select({ id: convocacoes.id })
       .from(convocacoes)
       .where(and(eq(convocacoes.eventoId, ev.id), eq(convocacoes.status, 'PUBLICADA'), eq(convocacoes.ativo, true)))
-      .get()
+      .all()
 
     let evConvocados = 0
     let evConfirmados = 0
 
-    if (convocacao) {
-      totalConvocacoesMaterializadas++
-      const dests = await db.select().from(convocacaoDestinatarios).where(eq(convocacaoDestinatarios.convocacaoId, convocacao.id)).all()
+    const idsConvocacoesEvento = convocacoesEvento.map((item: any) => item.id)
+    if (idsConvocacoesEvento.length > 0) {
+      totalConvocacoesMaterializadas += idsConvocacoesEvento.length
+      const dests = await db.select().from(convocacaoDestinatarios)
+        .where(inArray(convocacaoDestinatarios.convocacaoId, idsConvocacoesEvento))
+        .all()
       evConvocados = dests.length
       const destIds = dests.map((d: any) => d.id)
 
@@ -576,7 +595,7 @@ relatoriosRouter.get('/agregado', async (c) => {
       }
     }
 
-    const evCheckins = await db.select().from(checkins).where(eq(checkins.eventoId, ev.id)).all()
+    const evCheckins = await db.select().from(checkins).where(and(eq(checkins.eventoId, ev.id), eq(checkins.status, 'ATIVO'))).all()
     const evPresencas = evCheckins.length
 
     totalConvocados += evConvocados

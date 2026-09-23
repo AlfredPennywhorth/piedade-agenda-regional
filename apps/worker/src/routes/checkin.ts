@@ -110,7 +110,17 @@ checkinRouter.post('/qr', async (c) => {
     if (err.issues) {
       return c.json({ error: 'Payload inválido', details: err.issues }, 400)
     }
-    return c.json({ error: err.message || 'Erro ao registrar check-in QR' }, 400)
+    const mensagem = err instanceof Error ? err.message : String(err)
+    if (
+      mensagem.includes('UNIQUE constraint failed') ||
+      mensagem.includes('idx_checkin_evento_membro_unico')
+    ) {
+      return c.json({
+        message: 'Presença já registrada previamente',
+        jaRegistrado: true,
+      }, 409)
+    }
+    return c.json({ error: 'Erro ao registrar check-in QR' }, 500)
   }
 })
 
@@ -209,7 +219,17 @@ checkinRouter.post('/manual', async (c) => {
     if (err.issues) {
       return c.json({ error: 'Payload inválido', details: err.issues }, 400)
     }
-    return c.json({ error: err.message || 'Erro ao registrar check-in manual' }, 400)
+    const mensagem = err instanceof Error ? err.message : String(err)
+    if (
+      mensagem.includes('UNIQUE constraint failed') ||
+      mensagem.includes('idx_checkin_evento_membro_unico')
+    ) {
+      return c.json({
+        message: 'Presença já registrada previamente',
+        jaRegistrado: true,
+      }, 409)
+    }
+    return c.json({ error: 'Erro ao registrar check-in manual' }, 500)
   }
 })
 
@@ -336,7 +356,8 @@ checkinRouter.get('/destinatarios/:destinatarioId/presenca', async (c) => {
     .where(
       and(
         eq(checkins.eventoId, dest.evento.id),
-        eq(checkins.membroId, dest.destinatario.membroId)
+        eq(checkins.membroId, dest.destinatario.membroId),
+        eq(checkins.status, 'ATIVO')
       )
     )
     .get()
