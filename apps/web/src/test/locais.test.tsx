@@ -112,6 +112,67 @@ describe('LocaisView', () => {
     })
   })
 
+  it('deve consultar o ViaCEP e preencher o endereço automaticamente', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValueOnce([])
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        cep: '03127-001',
+        logradouro: 'Rua Ibitirama',
+        bairro: 'Vila Prudente',
+        localidade: 'São Paulo',
+        uf: 'SP',
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<LocaisView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Cadastrar primeiro local')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText('Cadastrar primeiro local'))
+    const dialog = screen.getByRole('dialog', { name: /novo local/i })
+    const { getByLabelText } = within(dialog)
+
+    fireEvent.change(getByLabelText(/CEP/i), { target: { value: '03127001' } })
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('https://viacep.com.br/ws/03127001/json/')
+      expect((getByLabelText(/endereço/i) as HTMLInputElement).value).toBe('Rua Ibitirama')
+      expect((getByLabelText(/bairro/i) as HTMLInputElement).value).toBe('Vila Prudente')
+      expect((getByLabelText(/cidade/i) as HTMLInputElement).value).toBe('São Paulo')
+      expect((getByLabelText(/UF/i) as HTMLInputElement).value).toBe('SP')
+    })
+
+    expect(screen.getByText('Endereço preenchido automaticamente pelo CEP.')).toBeInTheDocument()
+    vi.unstubAllGlobals()
+  })
+
+  it('deve permitir preenchimento manual quando o CEP não for encontrado', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValueOnce([])
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ erro: true }),
+    }))
+
+    render(<LocaisView />)
+    await waitFor(() => expect(screen.getByText('Cadastrar primeiro local')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByText('Cadastrar primeiro local'))
+    const dialog = screen.getByRole('dialog', { name: /novo local/i })
+    const { getByLabelText } = within(dialog)
+
+    fireEvent.change(getByLabelText(/CEP/i), { target: { value: '00000000' } })
+
+    expect(await screen.findByText('CEP não encontrado. Preencha o endereço manualmente.')).toBeInTheDocument()
+    expect(getByLabelText(/endereço/i)).not.toBeDisabled()
+    vi.unstubAllGlobals()
+  })
+
   it('deve falhar validação Zod client-side para URL inválida', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockResolvedValueOnce([])
 

@@ -20,6 +20,16 @@ interface Local {
   ativo: boolean
 }
 
+interface ViaCepResponse {
+  cep?: string
+  logradouro?: string
+  complemento?: string
+  bairro?: string
+  localidade?: string
+  uf?: string
+  erro?: boolean
+}
+
 type LocalFormData = {
   nome: string
   endereco: string
@@ -62,6 +72,9 @@ export function LocaisView() {
   })
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof LocalFormData, string>>>({})
   const [saving, setSaving] = useState(false)
+  const [consultandoCep, setConsultandoCep] = useState(false)
+  const [cepMensagem, setCepMensagem] = useState<string | null>(null)
+  const [cepErro, setCepErro] = useState(false)
   
   const [detailOpen, setDetailOpen] = useState(false)
   const [selectedLocal, setSelectedLocal] = useState<Local | null>(null)
@@ -102,6 +115,8 @@ export function LocaisView() {
       ativo: true,
     })
     setFormErrors({})
+    setCepMensagem(null)
+    setCepErro(false)
     setFormOpen(true)
   }
 
@@ -127,6 +142,8 @@ export function LocaisView() {
         ativo: data.ativo,
       })
       setFormErrors({})
+      setCepMensagem(null)
+      setCepErro(false)
       setFormOpen(true)
     } catch (err: any) {
       setError(err.message || 'Erro ao carregar local para edição')
@@ -145,6 +162,66 @@ export function LocaisView() {
       setError(err.message || 'Erro ao carregar detalhes do local')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const formatarCep = (valor: string) => {
+    const digitos = valor.replace(/\D/g, '').slice(0, 8)
+    return digitos.length > 5 ? `${digitos.slice(0, 5)}-${digitos.slice(5)}` : digitos
+  }
+
+  const buscarCep = async (cepInformado: string) => {
+    const cep = cepInformado.replace(/\D/g, '')
+    if (cep.length !== 8) return
+
+    setConsultandoCep(true)
+    setCepMensagem(null)
+    setCepErro(false)
+
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`)
+      if (!response.ok) {
+        throw new Error('Falha ao consultar CEP')
+      }
+
+      const data = await response.json() as ViaCepResponse
+      if (data.erro) {
+        setCepMensagem('CEP não encontrado. Preencha o endereço manualmente.')
+        setCepErro(true)
+        return
+      }
+
+      setFormData(atual => ({
+        ...atual,
+        cep: data.cep || formatarCep(cep),
+        endereco: data.logradouro || atual.endereco,
+        bairro: data.bairro || atual.bairro,
+        cidade: data.localidade || atual.cidade,
+        uf: (data.uf || atual.uf).toUpperCase(),
+      }))
+      setFormErrors(errosAtuais => ({
+        ...errosAtuais,
+        endereco: undefined,
+        cidade: undefined,
+        uf: undefined,
+      }))
+      setCepMensagem('Endereço preenchido automaticamente pelo CEP.')
+    } catch {
+      setCepMensagem('Não foi possível consultar o CEP agora. Preencha o endereço manualmente.')
+      setCepErro(true)
+    } finally {
+      setConsultandoCep(false)
+    }
+  }
+
+  const handleCepChange = (valor: string) => {
+    const cepFormatado = formatarCep(valor)
+    setFormData(atual => ({ ...atual, cep: cepFormatado }))
+    setCepMensagem(null)
+    setCepErro(false)
+
+    if (cepFormatado.replace(/\D/g, '').length === 8) {
+      void buscarCep(cepFormatado)
     }
   }
 
@@ -328,11 +405,17 @@ export function LocaisView() {
                     <input
                       id="cep"
                       type="text"
+                      inputMode="numeric"
+                      autoComplete="postal-code"
                       value={formData.cep || ''}
-                      onChange={e => setFormData({ ...formData, cep: e.target.value })}
+                      onChange={e => handleCepChange(e.target.value)}
                       className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                       placeholder="00000-000"
+                      aria-describedby="cep-feedback"
                     />
+                    <div id="cep-feedback" className={`text-xs mt-1 min-h-4 ${cepErro ? 'text-red-600' : 'text-slate-500'}`}>
+                      {consultandoCep ? 'Consultando CEP...' : cepMensagem}
+                    </div>
                   </div>
                   <div>
                     <label htmlFor="bairro" className="block text-sm font-medium text-slate-700 mb-1">Bairro</label>
