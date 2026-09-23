@@ -498,7 +498,7 @@ export function EventosView() {
         </button>
       </div>
 
-      {erro && (
+      {erro && !formOpen && (
         <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm animate-in fade-in">
           {erro}
         </div>
