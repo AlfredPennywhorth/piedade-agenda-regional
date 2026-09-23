@@ -179,7 +179,7 @@ export function ConvocacoesView() {
 
   const getNomeEvento = (eventoId: string) => {
     const ev = eventosLookup.find(e => e.id === eventoId)
-    return ev ? formatarEvento(ev) : 'Evento não encontrado'
+    return ev ? ev.titulo : 'Evento não encontrado'
   }
 
   const eventosDisponiveis = eventosLookup
