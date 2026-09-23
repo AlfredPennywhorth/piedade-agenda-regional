@@ -12,6 +12,18 @@ export const FrequenciaSerie = z.enum([
 
 export type FrequenciaSerieEnum = z.infer<typeof FrequenciaSerie>
 
+const DataCalendario = z.string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato deve ser YYYY-MM-DD')
+  .refine((valor) => {
+    const [ano, mes, dia] = valor.split('-').map(Number)
+    const data = new Date(Date.UTC(ano, mes - 1, dia))
+    return (
+      data.getUTCFullYear() === ano &&
+      data.getUTCMonth() === mes - 1 &&
+      data.getUTCDate() === dia
+    )
+  }, 'Data inexistente no calendário')
+
 const HttpUrl = z.string().url('URL inválida').refine(
   val => val.startsWith('http://') || val.startsWith('https://'), 
   { message: 'URL deve usar protocolo http ou https' }
@@ -26,8 +38,8 @@ const baseSerie = {
   frequencia: FrequenciaSerie,
   intervalo: z.literal(1).default(1),
   
-  dataInicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato deve ser YYYY-MM-DD'),
-  dataFim: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato deve ser YYYY-MM-DD'),
+  dataInicio: DataCalendario,
+  dataFim: DataCalendario,
   horarioInicio: z.string().regex(/^([0-1]\d|2[0-3]):[0-5]\d$/, 'Formato deve ser HH:MM'),
   horarioFim: z.string().regex(/^([0-1]\d|2[0-3]):[0-5]\d$/, 'Formato deve ser HH:MM'),
   
