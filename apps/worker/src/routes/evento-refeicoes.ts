@@ -2,8 +2,27 @@ import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
 import { eventos, eventoRefeicoes } from '../db/schema'
 import { EventoRefeicaoCreate } from '@piedade/shared'
+import { authMiddleware } from '../middleware/auth'
+import { podeGerenciarAgendaNoEscopo } from '../security/permissoes'
+import { extrairEscopoDoEvento } from '../services/auditoria'
 
 export const eventoRefeicoesRouter = new Hono<any>()
+
+eventoRefeicoesRouter.use('*', authMiddleware)
+
+async function podeGerenciarEvento(c: any, evento: any) {
+  const db = c.get('db')
+  const membroId = c.get('membroId')
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+  if (!membroId || !escopoTipo || !escopoId) return false
+
+  return podeGerenciarAgendaNoEscopo(
+    db,
+    membroId,
+    escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+    escopoId
+  )
+}
 
 eventoRefeicoesRouter.get('/:eventoId/refeicoes', async (c) => {
   const db = c.get('db')
@@ -31,6 +50,9 @@ eventoRefeicoesRouter.post('/:eventoId/refeicoes', async (c) => {
     
     const evento = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
     if (!evento) return c.json({ error: 'Evento não encontrado' }, 404)
+    if (!(await podeGerenciarEvento(c, evento))) {
+      return c.json({ error: 'Acesso não autorizado para gerir refeições deste evento', code: 'FORBIDDEN' }, 403)
+    }
 
     // Validação de exclusividade (LANCHE x JANTAR)
     if (parsed.tipo === 'LANCHE' || parsed.tipo === 'JANTAR') {
@@ -93,6 +115,9 @@ eventoRefeicoesRouter.patch('/:eventoId/refeicoes/:refeicaoId', async (c) => {
     
     const evento = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
     if (!evento) return c.json({ error: 'Evento não encontrado' }, 404)
+    if (!(await podeGerenciarEvento(c, evento))) {
+      return c.json({ error: 'Acesso não autorizado para gerir refeições deste evento', code: 'FORBIDDEN' }, 403)
+    }
 
     const existing = await db.select().from(eventoRefeicoes)
       .where(and(

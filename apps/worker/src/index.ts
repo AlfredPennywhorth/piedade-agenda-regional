@@ -99,6 +99,7 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.use('/api/v1/auth/*', noStore)
   app.use('/api/v1/membros/*', noStore)
   app.use('/api/v1/convocacoes/*', noStore)
+  app.use('/api/v1/minha-agenda/*', noStore)
   app.use('/api/v1/checkin/*', noStore)
   app.use('/api/v1/portaria/*', noStore)
   app.use('/api/v1/portaria-publica/*', noStore)
