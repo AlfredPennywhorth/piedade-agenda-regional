@@ -32,6 +32,7 @@ import { ativacaoApp } from './routes/auth/ativacao'
 import { loginApp } from './routes/auth/login'
 import { logoutApp } from './routes/auth/logout'
 import { meApp } from './routes/auth/me'
+import { recuperacaoPinApp } from './routes/auth/recuperacao-pin'
 import { adminMembrosApp } from './routes/admin/membros'
 import { adminAcessosApp } from './routes/admin/acessos'
 import { adminPreCadastrosMinisteriaisApp } from './routes/admin/pre-cadastros-ministeriais'
@@ -197,6 +198,7 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.route('/api/v1/auth/login', loginApp)
   app.route('/api/v1/auth/logout', logoutApp)
   app.route('/api/v1/auth/me', meApp)
+  app.route('/api/v1/auth/recuperacao-pin', recuperacaoPinApp)
   app.route('/api/v1/bootstrap/master', bootstrapMasterApp)
   app.route('/api/v1/governanca/responsabilidade-regional', responsabilidadeRegionalApp)
   app.route('/api/v1/admin/acessos', adminAcessosApp)
