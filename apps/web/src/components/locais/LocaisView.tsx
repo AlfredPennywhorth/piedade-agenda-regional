@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { LocalCreate } from '@piedade/shared'
 import * as apiClient from '../../api/apiClient'
 
@@ -75,6 +75,7 @@ export function LocaisView() {
   const [consultandoCep, setConsultandoCep] = useState(false)
   const [cepMensagem, setCepMensagem] = useState<string | null>(null)
   const [cepErro, setCepErro] = useState(false)
+  const cepConsultaSeq = useRef(0)
   
   const [detailOpen, setDetailOpen] = useState(false)
   const [selectedLocal, setSelectedLocal] = useState<Local | null>(null)
@@ -97,6 +98,8 @@ export function LocaisView() {
   }, [])
 
   const handleOpenCreate = () => {
+    cepConsultaSeq.current += 1
+    setConsultandoCep(false)
     setEditingId(null)
     setFormData({
       nome: '',
@@ -121,6 +124,8 @@ export function LocaisView() {
   }
 
   const handleOpenEdit = async (id: string) => {
+    cepConsultaSeq.current += 1
+    setConsultandoCep(false)
     try {
       setLoading(true)
       const data = await apiClient.fetchWithAuth<Local>(`/locais/${id}`)
@@ -174,6 +179,7 @@ export function LocaisView() {
     const cep = cepInformado.replace(/\D/g, '')
     if (cep.length !== 8) return
 
+    const seq = ++cepConsultaSeq.current
     setConsultandoCep(true)
     setCepMensagem(null)
     setCepErro(false)
@@ -185,6 +191,8 @@ export function LocaisView() {
       }
 
       const data = await response.json() as ViaCepResponse
+      if (seq !== cepConsultaSeq.current) return
+
       if (data.erro) {
         setCepMensagem('CEP não encontrado. Preencha o endereço manualmente.')
         setCepErro(true)
@@ -207,10 +215,13 @@ export function LocaisView() {
       }))
       setCepMensagem('Endereço preenchido automaticamente pelo CEP.')
     } catch {
+      if (seq !== cepConsultaSeq.current) return
       setCepMensagem('Não foi possível consultar o CEP agora. Preencha o endereço manualmente.')
       setCepErro(true)
     } finally {
-      setConsultandoCep(false)
+      if (seq === cepConsultaSeq.current) {
+        setConsultandoCep(false)
+      }
     }
   }
 
@@ -222,11 +233,25 @@ export function LocaisView() {
 
     if (cepFormatado.replace(/\D/g, '').length === 8) {
       void buscarCep(cepFormatado)
+    } else {
+      cepConsultaSeq.current += 1
+      setConsultandoCep(false)
     }
+  }
+
+  const fecharFormulario = () => {
+    cepConsultaSeq.current += 1
+    setConsultandoCep(false)
+    setFormOpen(false)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (consultandoCep) {
+      setCepMensagem('Aguarde a consulta do CEP terminar antes de salvar.')
+      return
+    }
     
     // Tratamento de valores vazios/nulos antes da validação
     const payloadToValidate = {
@@ -264,7 +289,7 @@ export function LocaisView() {
         await apiClient.postWithAuth('/locais', parsed.data)
       }
 
-      setFormOpen(false)
+      fecharFormulario()
       fetchLocais()
     } catch (err: any) {
       if (err instanceof apiClient.ApiError && err.body?.error) {
@@ -372,7 +397,7 @@ export function LocaisView() {
                 {editingId ? 'Editar Local' : 'Novo Local'}
               </h3>
               <button
-                onClick={() => setFormOpen(false)}
+                onClick={fecharFormulario}
                 className="text-slate-400 hover:text-slate-600 transition-colors"
               >
                 ✕
@@ -577,17 +602,17 @@ export function LocaisView() {
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setFormOpen(false)}
+                  onClick={fecharFormulario}
                   className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors text-sm"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || consultandoCep}
                   className="px-6 py-2.5 bg-brand-600 text-white font-medium rounded-lg text-sm hover:bg-brand-700 transition-colors disabled:opacity-50"
                 >
-                  {saving ? 'Salvando...' : 'Salvar Local'}
+                  {saving ? 'Salvando...' : consultandoCep ? 'Consultando CEP...' : 'Salvar Local'}
                 </button>
               </div>
             </form>
