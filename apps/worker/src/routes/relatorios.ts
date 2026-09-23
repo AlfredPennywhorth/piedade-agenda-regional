@@ -7,6 +7,30 @@ import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechament
 
 export const relatoriosRouter = new Hono<{ Variables: Variables }>()
 
+function consolidarDestinatariosPorMembro(destinatarios: any[], rsvps: any[]) {
+  const rsvpPorDestinatario = new Map(
+    rsvps.map((item: any) => [item.convocacaoDestinatarioId, item])
+  )
+  const porMembro = new Map<string, { destinatario: any; rsvp: any | null }>()
+
+  for (const destinatario of destinatarios) {
+    const resposta = rsvpPorDestinatario.get(destinatario.id) ?? null
+    const atual = porMembro.get(destinatario.membroId)
+    if (!atual) {
+      porMembro.set(destinatario.membroId, { destinatario, rsvp: resposta })
+      continue
+    }
+
+    const atualEm = atual.rsvp?.atualizadoEm ?? atual.rsvp?.respondidoEm ?? ''
+    const novoEm = resposta?.atualizadoEm ?? resposta?.respondidoEm ?? ''
+    if (resposta && (!atual.rsvp || novoEm >= atualEm)) {
+      porMembro.set(destinatario.membroId, { destinatario, rsvp: resposta })
+    }
+  }
+
+  return Array.from(porMembro.values())
+}
+
 relatoriosRouter.use('*', authMiddleware)
 
 // GET /api/v1/relatorios/presencas/eventos/:eventoId/final
@@ -384,7 +408,6 @@ relatoriosRouter.get('/eventos/:eventoId', async (c) => {
     ? await db.select().from(convocacaoDestinatarios).where(inArray(convocacaoDestinatarios.convocacaoId, convocacaoIds)).all()
     : []
 
-  const totalConvocados = destinatarios.length
   const destIds = destinatarios.map((d: any) => d.id)
 
   // RSVP records
@@ -392,18 +415,24 @@ relatoriosRouter.get('/eventos/:eventoId', async (c) => {
     ? await db.select().from(rsvp).where(inArray(rsvp.convocacaoDestinatarioId, destIds)).all()
     : []
 
-  const totalConfirmados = rsvpList.filter((r: any) => r.resposta === 'PARTICIPAREI').length
-  const totalRecusados = rsvpList.filter((r: any) => r.resposta === 'NAO_PARTICIPAREI').length
-  const totalNaoSei = rsvpList.filter((r: any) => r.resposta === 'NAO_SEI').length
-  const totalSemResposta = Math.max(0, totalConvocados - rsvpList.length)
+  const consolidados = consolidarDestinatariosPorMembro(destinatarios, rsvpList)
+  const totalConvocados = consolidados.length
+  const totalConfirmados = consolidados.filter(item => item.rsvp?.resposta === 'PARTICIPAREI').length
+  const totalRecusados = consolidados.filter(item => item.rsvp?.resposta === 'NAO_PARTICIPAREI').length
+  const totalNaoSei = consolidados.filter(item => item.rsvp?.resposta === 'NAO_SEI').length
+  const totalSemResposta = consolidados.filter(item => !item.rsvp).length
 
   // Checkins records
   const checkinList = await db.select().from(checkins).where(and(eq(checkins.eventoId, eventoId), eq(checkins.status, 'ATIVO'))).all()
   const totalPresencas = checkinList.length
 
   // Presenças dos confirmados
-  const confirmadosDestIds = new Set(rsvpList.filter((r: any) => r.resposta === 'PARTICIPAREI').map((r: any) => r.convocacaoDestinatarioId))
-  const presencasConfirmados = checkinList.filter((c: any) => confirmadosDestIds.has(c.convocacaoDestinatarioId)).length
+  const membrosConfirmados = new Set(
+    consolidados
+      .filter(item => item.rsvp?.resposta === 'PARTICIPAREI')
+      .map(item => item.destinatario.membroId)
+  )
+  const presencasConfirmados = checkinList.filter((item: any) => membrosConfirmados.has(item.membroId)).length
 
   const taxaEngajamentoRsvp = totalConvocados > 0 ? parseFloat((((totalConfirmados + totalRecusados + totalNaoSei) / totalConvocados) * 100).toFixed(2)) : 0
   const taxaPresencaConvocados = totalConvocados > 0 ? parseFloat(((totalPresencas / totalConvocados) * 100).toFixed(2)) : 0
@@ -473,6 +502,7 @@ relatoriosRouter.get('/eventos/:eventoId/presencas', async (c) => {
     casaNome: casas.nome,
     respostaRsvp: rsvp.resposta,
     periodosParticipacao: rsvp.periodosParticipacao,
+    rsvpAtualizadoEm: rsvp.atualizadoEm,
     checkinId: checkins.id,
     formaCheckin: checkins.forma,
     dataHoraCheckin: checkins.dataHoraCheckin,
@@ -485,7 +515,19 @@ relatoriosRouter.get('/eventos/:eventoId/presencas', async (c) => {
   .where(inArray(convocacaoDestinatarios.convocacaoId, convocacaoIds))
   .all()
 
-  let result = rows.map((r: any) => ({
+  const linhaPorMembro = new Map<string, any>()
+  for (const row of rows) {
+    const atual = linhaPorMembro.get(row.membroId)
+    const atualEm = atual?.rsvpAtualizadoEm ?? ''
+    const novoEm = row.rsvpAtualizadoEm ?? ''
+    const preferirNova =
+      !atual ||
+      novoEm > atualEm ||
+      (novoEm === atualEm && row.checkinId !== null && atual.checkinId === null)
+    if (preferirNova) linhaPorMembro.set(row.membroId, row)
+  }
+
+  let result = Array.from(linhaPorMembro.values()).map((r: any) => ({
     destinatarioId: r.destinatarioId,
     membroId: r.membroId,
     membroNome: r.membroNome,
@@ -586,13 +628,13 @@ relatoriosRouter.get('/agregado', async (c) => {
       const dests = await db.select().from(convocacaoDestinatarios)
         .where(inArray(convocacaoDestinatarios.convocacaoId, idsConvocacoesEvento))
         .all()
-      evConvocados = dests.length
       const destIds = dests.map((d: any) => d.id)
-
-      if (destIds.length > 0) {
-        const rsvps = await db.select().from(rsvp).where(inArray(rsvp.convocacaoDestinatarioId, destIds)).all()
-        evConfirmados = rsvps.filter((r: any) => r.resposta === 'PARTICIPAREI').length
-      }
+      const rsvps = destIds.length > 0
+        ? await db.select().from(rsvp).where(inArray(rsvp.convocacaoDestinatarioId, destIds)).all()
+        : []
+      const consolidados = consolidarDestinatariosPorMembro(dests, rsvps)
+      evConvocados = consolidados.length
+      evConfirmados = consolidados.filter(item => item.rsvp?.resposta === 'PARTICIPAREI').length
     }
 
     const evCheckins = await db.select().from(checkins).where(and(eq(checkins.eventoId, ev.id), eq(checkins.status, 'ATIVO'))).all()
