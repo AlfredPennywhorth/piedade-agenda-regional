@@ -82,6 +82,8 @@ describe('SeriesView', () => {
       expect(screen.getByText('Reunião Semanal')).toBeInTheDocument()
     })
 
+    expect(screen.getByText('01/01/2025')).toBeInTheDocument()
+
     // Abre detalhes
     const btns = screen.getAllByText('Ver')
     fireEvent.click(btns[0])
@@ -91,7 +93,7 @@ describe('SeriesView', () => {
     expect(dialog).toBeInTheDocument()
     const view = within(dialog)
     expect(view.getByText('Semanal')).toBeInTheDocument()
-    expect(view.getByText(/2025-01-01\s*20:00/)).toBeInTheDocument()
+    expect(view.getByText(/01\/01\/2025\s*20:00/)).toBeInTheDocument()
 
     // Fecha o modal
     fireEvent.click(screen.getByText('✕'))
