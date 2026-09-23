@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { ApiError, fetchWithAuth, patchWithAuth, postWithAuth } from '../../api/apiClient'
 import type { Regional } from '../regionais/RegionaisView'
@@ -81,6 +81,7 @@ export function MembrosView() {
   const [resultadosPreCadastro, setResultadosPreCadastro] = useState<PreCadastroMinisterial[]>([])
   const [preCadastroSelecionado, setPreCadastroSelecionado] = useState<PreCadastroMinisterial | null>(null)
   const [buscandoPreCadastro, setBuscandoPreCadastro] = useState(false)
+  const buscaPreCadastroSeq = useRef(0)
 
   const carregarDados = async () => {
     setLoading(true)
@@ -114,8 +115,11 @@ export function MembrosView() {
     if (tipoCriacao !== 'pre-cadastro' || modoForm !== 'criar') return
 
     const busca = buscaPreCadastro.trim()
+    const seq = ++buscaPreCadastroSeq.current
+
     if (busca.length < 2) {
       setResultadosPreCadastro([])
+      setBuscandoPreCadastro(false)
       return
     }
 
@@ -127,11 +131,17 @@ export function MembrosView() {
         const resposta = await fetchWithAuth<RespostaBuscaPreCadastro>(
           `/admin/pre-cadastros-ministeriais?${params.toString()}`
         )
-        setResultadosPreCadastro(resposta.data)
+        if (seq === buscaPreCadastroSeq.current) {
+          setResultadosPreCadastro(resposta.data)
+        }
       } catch (err: any) {
-        setErro(err.message || 'Não foi possível pesquisar o pré-cadastro ministerial.')
+        if (seq === buscaPreCadastroSeq.current) {
+          setErro(err.message || 'Não foi possível pesquisar o pré-cadastro ministerial.')
+        }
       } finally {
-        setBuscandoPreCadastro(false)
+        if (seq === buscaPreCadastroSeq.current) {
+          setBuscandoPreCadastro(false)
+        }
       }
     }, 300)
 
@@ -198,12 +208,8 @@ export function MembrosView() {
   }
 
   const resetarFormulario = () => {
-    const primeiraRegional = regionais[0]?.id || ''
-    const primeiraAdministracao =
-      administracoes.find(item => item.regionalId === primeiraRegional)?.id || ''
-
-    setRegionalId(primeiraRegional)
-    setAdministracaoId(primeiraAdministracao)
+    setRegionalId('')
+    setAdministracaoId('')
     setSetorId('')
     setCasaId('')
     setBuscaCasa('')
@@ -690,10 +696,13 @@ export function MembrosView() {
                     readOnly={modoForm === 'criar' && tipoCriacao === 'pre-cadastro'}
                     placeholder="Ex: João da Silva"
                     className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                      errosForm.nome ? 'border-red-400' : 'border-slate-300'
+                    } ${
                       modoForm === 'criar' && tipoCriacao === 'pre-cadastro' ? 'bg-slate-100' : 'bg-white'
                     }`}
                     disabled={salvando}
                   />
+                  {errosForm.nome && <p className="text-xs text-red-600 mt-1">{errosForm.nome}</p>}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -706,9 +715,10 @@ export function MembrosView() {
                       type="text"
                       value={codigoCarteirinha}
                       onChange={event => setCodigoCarteirinha(event.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                      className={`w-full px-3 py-2 border rounded-lg text-sm ${errosForm.codigoCarteirinha ? 'border-red-400' : 'border-slate-300'}`}
                       disabled={salvando}
                     />
+                    {errosForm.codigoCarteirinha && <p className="text-xs text-red-600 mt-1">{errosForm.codigoCarteirinha}</p>}
                   </div>
 
                   <div>
@@ -721,11 +731,14 @@ export function MembrosView() {
                       value={dataOrdenacao}
                       onChange={event => setDataOrdenacao(event.target.value)}
                       readOnly={modoForm === 'criar' && tipoCriacao === 'pre-cadastro'}
-                      className={`w-full px-3 py-2 border border-slate-300 rounded-lg text-sm ${
+                      className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                        errosForm.dataOrdenacao ? 'border-red-400' : 'border-slate-300'
+                      } ${
                         modoForm === 'criar' && tipoCriacao === 'pre-cadastro' ? 'bg-slate-100' : 'bg-white'
                       }`}
                       disabled={salvando}
                     />
+                    {errosForm.dataOrdenacao && <p className="text-xs text-red-600 mt-1">{errosForm.dataOrdenacao}</p>}
                   </div>
 
                   <div>
@@ -739,9 +752,10 @@ export function MembrosView() {
                       value={celular}
                       onChange={event => setCelular(event.target.value)}
                       placeholder="Ex: 11999999999"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                      className={`w-full px-3 py-2 border rounded-lg text-sm ${errosForm.celular ? 'border-red-400' : 'border-slate-300'}`}
                       disabled={salvando}
                     />
+                    {errosForm.celular && <p className="text-xs text-red-600 mt-1">{errosForm.celular}</p>}
                   </div>
                 </div>
 
