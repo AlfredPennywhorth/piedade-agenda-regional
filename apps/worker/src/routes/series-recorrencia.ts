@@ -182,9 +182,15 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
     
     if (parsed.updateMode === 'ALL') {
       const mergedSerieData = { ...existingSerie, ...parsed.changes }
-      SerieCreate.parse(mergedSerieData)
-      if (!(await podeGerenciarEntidade(c, mergedSerieData))) {
-        return c.json({ error: 'Acesso não autorizado para mover a série para este escopo', code: 'FORBIDDEN' }, 403)
+      const apenasDesativacao =
+        parsed.changes.ativo === false &&
+        Object.keys(parsed.changes).every((chave) => chave === 'ativo')
+
+      if (!apenasDesativacao) {
+        SerieCreate.parse(mergedSerieData)
+        if (!(await podeGerenciarEntidade(c, mergedSerieData))) {
+          return c.json({ error: 'Acesso não autorizado para mover a série para este escopo', code: 'FORBIDDEN' }, 403)
+        }
       }
 
       if (parsed.changes.ativo === false) {
@@ -295,7 +301,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         return c.json({ error: 'Acesso não autorizado para gerir este evento', code: 'FORBIDDEN' }, 403)
       }
 
-      const pivotDateIso = existingEvent.inicioEm
+      const pivotDateIso = existingEvent.recorrenciaOrigemInicioEm ?? existingEvent.inicioEm
       
       const newSerieId = crypto.randomUUID()
       
