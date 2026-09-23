@@ -21,12 +21,26 @@ function statusParticipacao(item: AgendaItem) {
 export function EventCard({ item, onClick }: EventCardProps) {
   const inicio = new Date(item.evento.inicioEm)
   const fim = new Date(item.evento.fimEm)
-  const day = String(inicio.getDate()).padStart(2, '0')
-  const month = String(inicio.getMonth() + 1).padStart(2, '0')
-  const year = inicio.getFullYear()
-  const weekday = inicio.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')
-  const timeInicio = inicio.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-  const timeFim = fim.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  const timeZone = 'America/Sao_Paulo'
+
+  const dateParts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
+      .formatToParts(inicio)
+      .filter(part => part.type !== 'literal')
+      .map(part => [part.type, part.value])
+  )
+
+  const day = dateParts.day
+  const month = dateParts.month
+  const year = dateParts.year
+  const weekday = inicio.toLocaleDateString('pt-BR', { timeZone, weekday: 'short' }).replace('.', '')
+  const timeInicio = inicio.toLocaleTimeString('pt-BR', { timeZone, hour: '2-digit', minute: '2-digit' })
+  const timeFim = fim.toLocaleTimeString('pt-BR', { timeZone, hour: '2-digit', minute: '2-digit' })
   const status = statusParticipacao(item)
 
   return (
