@@ -104,10 +104,8 @@ export function SeriesView() {
     setErro(null)
     setLookupAviso(null)
     try {
-      const seriesData = await fetchWithAuth<SerieRecorrencia[]>('/series-recorrencia')
-      setSeries(seriesData || [])
-
-      const resultados = await Promise.allSettled([
+      const seriesPromise = fetchWithAuth<SerieRecorrencia[]>('/series-recorrencia')
+      const lookupsPromise = Promise.allSettled([
         fetchWithAuth<Local[]>('/locais'),
         fetchWithAuth<Membro[]>('/membros'),
         fetchWithAuth<Regional[]>('/regionais'),
@@ -116,6 +114,11 @@ export function SeriesView() {
         fetchWithAuth<Casa[]>('/casas'),
         fetchWithAuth<GrupoTrabalho[]>('/grupos-trabalho'),
       ])
+
+      const seriesData = await seriesPromise
+      setSeries(seriesData || [])
+
+      const resultados = await lookupsPromise
 
       const setters = [
         (valor: unknown) => setLocais(valor as Local[]),
