@@ -41,7 +41,19 @@ describe('DATA-06 — contrato da carga institucional', () => {
     `)
   })
 
-  it('carga estrutural pode ser reaplicada com IDs determinísticos sem duplicar registros', () => {
+  it('carga estrutural pode ser aplicada do zero e reaplicada sem duplicar registros', () => {
+    sqlite.exec(`
+      DELETE FROM pre_cadastros_ministeriais;
+      DELETE FROM grupos_trabalho;
+      DELETE FROM casas;
+      DELETE FROM setores;
+    `)
+
+    expect(sqlite.prepare("SELECT COUNT(*) total FROM setores").get()).toEqual({ total: 0 })
+    expect(sqlite.prepare("SELECT COUNT(*) total FROM casas").get()).toEqual({ total: 0 })
+    expect(sqlite.prepare("SELECT COUNT(*) total FROM grupos_trabalho").get()).toEqual({ total: 0 })
+    expect(sqlite.prepare("SELECT COUNT(*) total FROM pre_cadastros_ministeriais").get()).toEqual({ total: 0 })
+
     const carga = `
       INSERT OR IGNORE INTO setores
         (id, administracao_id, nome, ativo)
