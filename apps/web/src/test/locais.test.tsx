@@ -140,7 +140,10 @@ describe('LocaisView', () => {
     fireEvent.change(getByLabelText(/CEP/i), { target: { value: '03127001' } })
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('https://viacep.com.br/ws/03127001/json/')
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://viacep.com.br/ws/03127001/json/',
+        expect.objectContaining({ signal: expect.anything() })
+      )
       expect((getByLabelText(/endereço/i) as HTMLInputElement).value).toBe('Rua Ibitirama')
       expect((getByLabelText(/bairro/i) as HTMLInputElement).value).toBe('Vila Prudente')
       expect((getByLabelText(/cidade/i) as HTMLInputElement).value).toBe('São Paulo')
