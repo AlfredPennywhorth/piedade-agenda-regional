@@ -27,9 +27,12 @@ export function CalendarioView() {
   }, [])
 
   const handleRsvpUpdated = (destinatarioId: string, rsvp: any) => {
-    setItems(current => current.map(item => 
+    const atualizarItem = (item: AgendaItem) =>
       item.destinatarioId === destinatarioId ? { ...item, rsvp } : item
-    ))
+
+    setItems(current => current.map(atualizarItem))
+    setSelectedDayEvents(current => current ? current.map(atualizarItem) : current)
+
     if (selectedEvent?.destinatarioId === destinatarioId) {
       setSelectedEvent({ ...selectedEvent, rsvp })
     }
