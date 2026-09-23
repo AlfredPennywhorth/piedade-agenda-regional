@@ -16,11 +16,21 @@ describe('S12 — RelatoriosView (Frontend)', () => {
     vi.resetAllMocks()
   })
 
-  it('deve manter disponível o formulário legado de relatório do evento', () => {
+  it('deve disponibilizar seletor amigável de evento no relatório', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url: string) => {
+      if (url === '/eventos') {
+        return [{ id: 'ev-123', titulo: 'Assembleia Regional', inicioEm: '2026-10-01T09:00:00Z', ativo: true }]
+      }
+      return []
+    })
+
     render(<RelatoriosView />)
     fireEvent.click(screen.getByText('Relatório do Evento'))
-    expect(screen.getByPlaceholderText(/Digite o ID do Evento/i)).toBeInTheDocument()
-    expect(screen.getByText('Buscar Relatório')).toBeInTheDocument()
+
+    expect(screen.getByPlaceholderText(/Pesquisar evento por nome/i)).toBeInTheDocument()
+    const select = await screen.findByRole('combobox', { name: /selecionar evento/i })
+    expect(select).toHaveTextContent('Assembleia Regional')
+    expect(screen.queryByPlaceholderText(/Digite o ID do Evento/i)).not.toBeInTheDocument()
   })
 
   it('deve buscar e exibir relatório consolidado e lista nominal', async () => {
@@ -60,6 +70,9 @@ describe('S12 — RelatoriosView (Frontend)', () => {
     ]
 
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url: string) => {
+      if (url === '/eventos') {
+        return [{ id: 'ev-123', titulo: 'Assembleia Regional', inicioEm: '2026-10-01T09:00:00Z', ativo: true }]
+      }
       if (url.includes('/relatorios/eventos/ev-123/presencas')) {
         return mockPresencas
       }
@@ -72,8 +85,8 @@ describe('S12 — RelatoriosView (Frontend)', () => {
     render(<RelatoriosView />)
     fireEvent.click(screen.getByText('Relatório do Evento'))
 
-    const input = screen.getByPlaceholderText(/Digite o ID do Evento/i)
-    fireEvent.change(input, { target: { value: 'ev-123' } })
+    const select = await screen.findByRole('combobox', { name: /selecionar evento/i })
+    fireEvent.change(select, { target: { value: 'ev-123' } })
 
     const btn = screen.getByText('Buscar Relatório')
     fireEvent.click(btn)
@@ -107,7 +120,10 @@ describe('S12 — RelatoriosView (Frontend)', () => {
       ]
     }
 
-    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue(mockAgregado)
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url: string) => {
+      if (url === '/eventos') return []
+      return mockAgregado
+    })
 
     render(<RelatoriosView />)
 
