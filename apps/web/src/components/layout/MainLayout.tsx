@@ -50,7 +50,10 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
 
       {/* Bottom Navigation */}
       <nav className="bg-white border-t border-slate-200 fixed bottom-0 w-full z-10 safe-area-bottom">
-        <div className="max-w-2xl mx-auto flex justify-between items-center px-2 py-2">
+        <div
+          className="max-w-2xl mx-auto flex items-center gap-1 overflow-x-auto px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>button]:flex-none [&>button]:min-w-[76px]"
+          aria-label="Navegação principal com rolagem horizontal"
+        >
           
           <button 
             onClick={() => onTabChange('agenda')} 

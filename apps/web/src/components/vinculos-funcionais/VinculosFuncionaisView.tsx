@@ -259,12 +259,40 @@ export function VinculosFuncionaisView() {
     }
   }
 
+  const getMembroNome = (v: VinculoFuncional) =>
+    v.membro?.nome || membros.find(item => item.id === v.membroId)?.nome || 'Membro não encontrado'
+
+  const getFuncaoNome = (v: VinculoFuncional) =>
+    v.funcao?.nome || funcoes.find(item => item.id === v.funcaoId)?.nome || 'Função não encontrada'
+
   const renderNomeEscopo = (v: VinculoFuncional) => {
     if (v.regional) return `Regional: ${v.regional.nome}`
     if (v.administracao) return `Administração: ${v.administracao.nome}`
     if (v.setor) return `Setor: ${v.setor.nome}`
     if (v.casa) return `Casa: ${v.casa.nome}`
     if (v.grupoTrabalho) return `GT: ${v.grupoTrabalho.nome}`
+
+    if (v.regionalId) {
+      const item = regionais.find(item => item.id === v.regionalId)
+      return item ? `Regional: ${item.nome}` : 'Regional não encontrada'
+    }
+    if (v.administracaoId) {
+      const item = administracoes.find(item => item.id === v.administracaoId)
+      return item ? `Administração: ${item.nome}` : 'Administração não encontrada'
+    }
+    if (v.setorId) {
+      const item = setores.find(item => item.id === v.setorId)
+      return item ? `Setor: ${item.nome}` : 'Setor não encontrado'
+    }
+    if (v.casaId) {
+      const item = casas.find(item => item.id === v.casaId)
+      return item ? `Casa: ${item.nome}` : 'Casa não encontrada'
+    }
+    if (v.grupoTrabalhoId) {
+      const item = gts.find(item => item.id === v.grupoTrabalhoId)
+      return item ? `GT: ${item.nome}` : 'Grupo de Trabalho não encontrado'
+    }
+
     return 'Escopo não definido'
   }
 
@@ -571,10 +599,10 @@ export function VinculosFuncionaisView() {
                 {vinculos.map((v) => (
                   <tr key={v.id} className="hover:bg-slate-50">
                     <td className="p-3 font-semibold text-slate-800">
-                      {v.membro?.nome || 'Membro não encontrado'}
+                      {getMembroNome(v)}
                     </td>
                     <td className="p-3 text-slate-600">
-                      {v.funcao?.nome || 'Função não encontrada'}
+                      {getFuncaoNome(v)}
                     </td>
                     <td className="p-3 text-xs text-slate-500">
                       {renderNomeEscopo(v)}
@@ -634,11 +662,11 @@ export function VinculosFuncionaisView() {
             <div className="space-y-3 text-sm">
               <div>
                 <span className="text-xs font-semibold text-slate-500 block">Membro:</span>
-                <span className="font-semibold text-slate-800">{vinculoDetalhe.membro?.nome || 'Desconhecido'}</span>
+                <span className="font-semibold text-slate-800">{getMembroNome(vinculoDetalhe)}</span>
               </div>
               <div>
                 <span className="text-xs font-semibold text-slate-500 block">Função:</span>
-                <span className="text-slate-700">{vinculoDetalhe.funcao?.nome || 'Desconhecida'}</span>
+                <span className="text-slate-700">{getFuncaoNome(vinculoDetalhe)}</span>
               </div>
               <div>
                 <span className="text-xs font-semibold text-slate-500 block">Escopo:</span>
