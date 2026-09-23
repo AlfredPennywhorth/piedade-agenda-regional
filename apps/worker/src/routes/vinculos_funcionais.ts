@@ -1,6 +1,15 @@
 import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
-import { vinculosFuncionais } from '../db/schema'
+import {
+  administracoes,
+  casas,
+  funcoes,
+  gruposTrabalho,
+  membros,
+  regionais,
+  setores,
+  vinculosFuncionais,
+} from '../db/schema'
 import { CreateVinculoFuncionalSchema, UpdateVinculoFuncionalSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { exigirMasterParaEscrita } from '../middleware/master-write'
@@ -10,16 +19,66 @@ export const vinculosFuncionaisRouter = new Hono<any>()
 vinculosFuncionaisRouter.use('*', authMiddleware)
 vinculosFuncionaisRouter.use('*', exigirMasterParaEscrita)
 
+const vinculoDetalhadoSelect = {
+  id: vinculosFuncionais.id,
+  membroId: vinculosFuncionais.membroId,
+  funcaoId: vinculosFuncionais.funcaoId,
+  regionalId: vinculosFuncionais.regionalId,
+  administracaoId: vinculosFuncionais.administracaoId,
+  setorId: vinculosFuncionais.setorId,
+  casaId: vinculosFuncionais.casaId,
+  grupoTrabalhoId: vinculosFuncionais.grupoTrabalhoId,
+  ativo: vinculosFuncionais.ativo,
+  createdAt: vinculosFuncionais.createdAt,
+  updatedAt: vinculosFuncionais.updatedAt,
+  membro: {
+    nome: membros.nome,
+  },
+  funcao: {
+    nome: funcoes.nome,
+  },
+  regional: {
+    nome: regionais.nome,
+  },
+  administracao: {
+    nome: administracoes.nome,
+  },
+  setor: {
+    nome: setores.nome,
+  },
+  casa: {
+    nome: casas.nome,
+  },
+  grupoTrabalho: {
+    nome: gruposTrabalho.nome,
+  },
+}
+
+function selecionarVinculosDetalhados(db: any) {
+  return db
+    .select(vinculoDetalhadoSelect)
+    .from(vinculosFuncionais)
+    .leftJoin(membros, eq(vinculosFuncionais.membroId, membros.id))
+    .leftJoin(funcoes, eq(vinculosFuncionais.funcaoId, funcoes.id))
+    .leftJoin(regionais, eq(vinculosFuncionais.regionalId, regionais.id))
+    .leftJoin(administracoes, eq(vinculosFuncionais.administracaoId, administracoes.id))
+    .leftJoin(setores, eq(vinculosFuncionais.setorId, setores.id))
+    .leftJoin(casas, eq(vinculosFuncionais.casaId, casas.id))
+    .leftJoin(gruposTrabalho, eq(vinculosFuncionais.grupoTrabalhoId, gruposTrabalho.id))
+}
+
 vinculosFuncionaisRouter.get('/', async (c) => {
   const db = c.get('db')
-  const data = await db.select().from(vinculosFuncionais).all()
+  const data = await selecionarVinculosDetalhados(db).all()
   return c.json(data)
 })
 
 vinculosFuncionaisRouter.get('/:id', async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')
-  const data = await db.select().from(vinculosFuncionais).where(eq(vinculosFuncionais.id, id)).get()
+  const data = await selecionarVinculosDetalhados(db)
+    .where(eq(vinculosFuncionais.id, id))
+    .get()
   
   if (!data) return c.json({ error: 'Vínculo funcional não encontrado' }, 404)
   return c.json(data)
