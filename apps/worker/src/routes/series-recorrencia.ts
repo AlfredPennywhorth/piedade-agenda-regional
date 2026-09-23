@@ -4,8 +4,28 @@ import { eventos, seriesRecorrencia } from '../db/schema'
 import { SerieCreate, SerieUpdatePayload, generateOccurrences, getLocalDateFromUtc } from '@piedade/shared'
 import { EventoCreate } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
+import { authMiddleware } from '../middleware/auth'
+import { podeGerenciarAgendaNoEscopo } from '../security/permissoes'
+import { extrairEscopoDoEvento } from '../services/auditoria'
 
 export const seriesRecorrenciaRouter = new Hono<any>()
+
+seriesRecorrenciaRouter.use('*', authMiddleware)
+
+async function podeGerenciarEntidade(c: any, entidade: any): Promise<boolean> {
+  const db = c.get('db')
+  const membroId = c.get('membroId')
+  const escopo = extrairEscopoDoEvento(entidade)
+
+  if (!membroId || !escopo.escopoTipo || !escopo.escopoId) return false
+
+  return podeGerenciarAgendaNoEscopo(
+    db,
+    membroId,
+    escopo.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+    escopo.escopoId
+  )
+}
 
 seriesRecorrenciaRouter.get('/', async (c) => {
   const db = c.get('db')
@@ -21,7 +41,12 @@ seriesRecorrenciaRouter.get('/', async (c) => {
     ? await query.where(and(...conditions)).all()
     : await query.all()
 
-  return c.json(data)
+  const autorizadas = []
+  for (const serie of data) {
+    if (await podeGerenciarEntidade(c, serie)) autorizadas.push(serie)
+  }
+
+  return c.json(autorizadas)
 })
 
 seriesRecorrenciaRouter.get('/:id', async (c) => {
@@ -30,6 +55,9 @@ seriesRecorrenciaRouter.get('/:id', async (c) => {
   const data = await db.select().from(seriesRecorrencia).where(eq(seriesRecorrencia.id, id)).get()
   
   if (!data) return c.json({ error: 'Série não encontrada' }, 404)
+  if (!(await podeGerenciarEntidade(c, data))) {
+    return c.json({ error: 'Acesso não autorizado para gerir esta série', code: 'FORBIDDEN' }, 403)
+  }
   return c.json(data)
 })
 
@@ -39,6 +67,10 @@ seriesRecorrenciaRouter.post('/', async (c) => {
     const body = await c.req.json()
     const parsed = SerieCreate.parse(body)
     
+    if (!(await podeGerenciarEntidade(c, parsed))) {
+      return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
+    }
+
     const serieId = crypto.randomUUID()
     
     const nowIso = new Date().toISOString()
@@ -109,6 +141,9 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
     
     const existingSerie = await db.select().from(seriesRecorrencia).where(eq(seriesRecorrencia.id, serieId)).get()
     if (!existingSerie) return c.json({ error: 'Série não encontrada' }, 404)
+    if (!(await podeGerenciarEntidade(c, existingSerie))) {
+      return c.json({ error: 'Acesso não autorizado para gerir esta série', code: 'FORBIDDEN' }, 403)
+    }
     
     const nowIso = new Date().toISOString()
     
@@ -120,8 +155,15 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
          return c.json({ error: 'Evento origem não encontrado ou não pertence a esta série' }, 400)
       }
       
+      if (!(await podeGerenciarEntidade(c, existingEvent))) {
+        return c.json({ error: 'Acesso não autorizado para gerir este evento', code: 'FORBIDDEN' }, 403)
+      }
+
       const mergedEvent = { ...existingEvent, ...parsed.changes }
       EventoCreate.parse(mergedEvent) // Valida regras S04
+      if (!(await podeGerenciarEntidade(c, mergedEvent))) {
+        return c.json({ error: 'Acesso não autorizado para mover o evento para este escopo', code: 'FORBIDDEN' }, 403)
+      }
       
       const updatedEvent = await db.update(eventos)
         .set({ ...parsed.changes, recorrenciaExcecao: true, updatedAt: nowIso }) // serieRecorrenciaId intacto
@@ -151,6 +193,9 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
 
       const mergedSerieData = { ...existingSerie, ...parsed.changes }
       SerieCreate.parse(mergedSerieData)
+      if (!(await podeGerenciarEntidade(c, mergedSerieData))) {
+        return c.json({ error: 'Acesso não autorizado para mover a série para este escopo', code: 'FORBIDDEN' }, 403)
+      }
       
       const exceptions = await db.select().from(eventos).where(and(
         eq(eventos.serieRecorrenciaId, serieId),
@@ -231,6 +276,10 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
          return c.json({ error: 'Evento origem não encontrado ou não pertence a esta série' }, 400)
       }
       
+      if (!(await podeGerenciarEntidade(c, existingEvent))) {
+        return c.json({ error: 'Acesso não autorizado para gerir este evento', code: 'FORBIDDEN' }, 403)
+      }
+
       const pivotDateIso = existingEvent.inicioEm
       
       const newSerieId = crypto.randomUUID()
@@ -243,6 +292,9 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         ...parsed.changes,
         dataInicio: newStartDateStr
       })
+      if (!(await podeGerenciarEntidade(c, serieBData))) {
+        return c.json({ error: 'Acesso não autorizado para mover a série para este escopo', code: 'FORBIDDEN' }, 403)
+      }
       
       // Série A (Antiga) termina no dia anterior a novaStartDateStr
       // Para saber isso facilmente no mesmo timezone de SP: 
