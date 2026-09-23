@@ -7,6 +7,13 @@ import * as schema from '../db/schema'
 type VinculoResponse = {
   id: string
   ativo?: boolean
+  membro?: { nome: string } | null
+  funcao?: { nome: string } | null
+  regional?: { nome: string } | null
+  administracao?: { nome: string } | null
+  setor?: { nome: string } | null
+  casa?: { nome: string } | null
+  grupoTrabalho?: { nome: string } | null
 }
 
 type ErroResponse = {
@@ -145,6 +152,34 @@ describe('Testes de Vínculos Funcionais', () => {
     })
 
     expect(res.status).toBe(201)
+  })
+
+  it('11 b. listar vínculos com membro, função e escopo resolvidos', async () => {
+    const res = await req('/api/v1/vinculos-funcionais')
+    const json = (await res.json()) as VinculoResponse[]
+
+    expect(res.status).toBe(200)
+    const vinculoGt = json.find(item => item.grupoTrabalho?.nome === 'GT 1')
+    expect(vinculoGt).toBeDefined()
+    expect(vinculoGt?.membro?.nome).toBe('Pessoa Teste')
+    expect(vinculoGt?.funcao?.nome).toBe('Responsável')
+    expect(vinculoGt?.grupoTrabalho?.nome).toBe('GT 1')
+  })
+
+  it('11 c. detalhar vínculo com relacionamentos resolvidos', async () => {
+    const resLista = await req('/api/v1/vinculos-funcionais')
+    const lista = (await resLista.json()) as VinculoResponse[]
+    const vinculoCasa = lista.find(item => item.casa?.nome === 'Casa 1')
+
+    expect(vinculoCasa).toBeDefined()
+
+    const res = await req(`/api/v1/vinculos-funcionais/${vinculoCasa!.id}`)
+    const json = (await res.json()) as VinculoResponse
+
+    expect(res.status).toBe(200)
+    expect(json.membro?.nome).toBe('Pessoa Teste')
+    expect(json.funcao?.nome).toBe('Responsável')
+    expect(json.casa?.nome).toBe('Casa 1')
   })
 
   it('12. permitir múltiplos vínculos para o mesmo membro', async () => {
