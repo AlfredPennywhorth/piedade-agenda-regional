@@ -40,6 +40,7 @@ export function VinculosFuncionaisView() {
 
   const [loading, setLoading] = useState<boolean>(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [lookupAviso, setLookupAviso] = useState<string | null>(null)
   const [sucesso, setSucesso] = useState<string | null>(null)
 
   // Form State
@@ -61,6 +62,7 @@ export function VinculosFuncionaisView() {
   const [salvando, setSalvando] = useState<boolean>(false)
 
   const carregarLookups = async () => {
+    setLookupAviso(null)
     const resultados = await Promise.allSettled([
       fetchWithAuth<any[]>('/membros'),
       fetchWithAuth<any[]>('/funcoes'),
@@ -91,7 +93,7 @@ export function VinculosFuncionaisView() {
     })
 
     if (falhou) {
-      setErro('Alguns dados de apoio não puderam ser carregados. A listagem permanece disponível, mas revise os dados antes de criar ou editar um vínculo.')
+      setLookupAviso('Alguns dados de apoio não puderam ser carregados. A listagem permanece disponível, mas revise os dados antes de criar ou editar um vínculo.')
     }
   }
 
@@ -327,6 +329,12 @@ export function VinculosFuncionaisView() {
         <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm flex justify-between items-center">
           <span>{erro}</span>
           <button onClick={() => setErro(null)} className="text-red-500 hover:text-red-700 font-bold ml-2">✕</button>
+        </div>
+      )}
+
+      {lookupAviso && (
+        <div className="p-3 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-sm">
+          {lookupAviso}
         </div>
       )}
 
