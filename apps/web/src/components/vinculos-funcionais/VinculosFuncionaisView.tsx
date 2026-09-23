@@ -61,25 +61,37 @@ export function VinculosFuncionaisView() {
   const [salvando, setSalvando] = useState<boolean>(false)
 
   const carregarLookups = async () => {
-    try {
-      const [mems, funcs, regs, adms, sets, cas, gs] = await Promise.all([
-        fetchWithAuth<any[]>('/membros'),
-        fetchWithAuth<any[]>('/funcoes'),
-        fetchWithAuth<any[]>('/regionais'),
-        fetchWithAuth<any[]>('/administracoes'),
-        fetchWithAuth<any[]>('/setores'),
-        fetchWithAuth<any[]>('/casas'),
-        fetchWithAuth<any[]>('/grupos-trabalho')
-      ])
-      setMembros(mems)
-      setFuncoes(funcs)
-      setRegionais(regs)
-      setAdministracoes(adms)
-      setSetores(sets)
-      setCasas(cas)
-      setGts(gs)
-    } catch (err: any) {
-      console.error('Erro ao carregar dados de apoio', err)
+    const resultados = await Promise.allSettled([
+      fetchWithAuth<any[]>('/membros'),
+      fetchWithAuth<any[]>('/funcoes'),
+      fetchWithAuth<any[]>('/regionais'),
+      fetchWithAuth<any[]>('/administracoes'),
+      fetchWithAuth<any[]>('/setores'),
+      fetchWithAuth<any[]>('/casas'),
+      fetchWithAuth<any[]>('/grupos-trabalho')
+    ])
+
+    const setters = [
+      (valor: unknown) => setMembros(valor as any[]),
+      (valor: unknown) => setFuncoes(valor as any[]),
+      (valor: unknown) => setRegionais(valor as any[]),
+      (valor: unknown) => setAdministracoes(valor as any[]),
+      (valor: unknown) => setSetores(valor as any[]),
+      (valor: unknown) => setCasas(valor as any[]),
+      (valor: unknown) => setGts(valor as any[]),
+    ]
+
+    let falhou = false
+    resultados.forEach((resultado, indice) => {
+      if (resultado.status === 'fulfilled') {
+        setters[indice](resultado.value || [])
+      } else {
+        falhou = true
+      }
+    })
+
+    if (falhou) {
+      setErro('Alguns dados de apoio não puderam ser carregados. A listagem permanece disponível, mas revise os dados antes de criar ou editar um vínculo.')
     }
   }
 
