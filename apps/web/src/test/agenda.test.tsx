@@ -276,9 +276,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     ;(apiClient.putWithAuth as any).mockResolvedValue({})
     render(<App />)
 
-    await waitFor(() => {
-      expect((await mobileNav()).getByText('Minha Agenda')).toBeInTheDocument()
-    })
+    expect((await mobileNav()).getByText('Minha Agenda')).toBeInTheDocument()
 
     const evt = await screen.findByText('Reunião de Setor')
     fireEvent.click(evt)
@@ -304,9 +302,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     ;(apiClient.putWithAuth as any).mockResolvedValue({})
     render(<App />)
 
-    await waitFor(() => {
-      expect((await mobileNav()).getByText('Minha Agenda')).toBeInTheDocument()
-    })
+    expect((await mobileNav()).getByText('Minha Agenda')).toBeInTheDocument()
 
     let evt = await screen.findByText('Reunião de Setor')
     fireEvent.click(evt)
@@ -345,9 +341,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     mockAgenda(mockEventos)
     render(<App />)
 
-    await waitFor(() => {
-      expect((await mobileNav()).getByText('Minha Agenda')).toBeInTheDocument()
-    })
+    expect((await mobileNav()).getByText('Minha Agenda')).toBeInTheDocument()
 
     const evt = await screen.findByText('Reunião de Setor')
     fireEvent.click(evt)
