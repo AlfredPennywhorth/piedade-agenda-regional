@@ -141,6 +141,38 @@ describe('Administração de contas — PR-ACC-05', () => {
     expect(pessoas.some(pessoa => pessoa.membroId === 'membro-outra-regional')).toBe(true)
   })
 
+  it('sinaliza recuperação de PIN pendente na listagem administrativa', async () => {
+    const token = 'token-admin-recuperacao'
+    await criarSessao('sessao-admin-recuperacao', 'conta-admin', 'membro-admin', token)
+
+    sqlite.prepare(
+      `INSERT INTO tentativas_acesso
+        (id, conta_acesso_id, membro_id, tipo, sucesso, motivo, created_at)
+       VALUES (?, ?, ?, ?, 1, ?, ?)`
+    ).run(
+      'tentativa-recuperacao',
+      'conta-reset',
+      'membro-reset',
+      'RECUPERACAO_PIN_SOLICITADA',
+      'Solicitação registrada',
+      new Date().toISOString()
+    )
+
+    const response = await requisicao('/api/v1/admin/acessos', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(response.status).toBe(200)
+    const pessoas = (await response.json()) as Array<{
+      membroId: string
+      recuperacaoPinPendente?: boolean
+      recuperacaoPinSolicitadaEm?: string | null
+    }>
+    const pessoa = pessoas.find(item => item.membroId === 'membro-reset')
+    expect(pessoa?.recuperacaoPinPendente).toBe(true)
+    expect(pessoa?.recuperacaoPinSolicitadaEm).toBeTruthy()
+  })
+
   it('gera ativação individual, armazena somente o hash e registra auditoria', async () => {
     const tokenAdmin = 'token-admin-ativacao'
     await criarSessao('sessao-admin-ativacao', 'conta-admin', 'membro-admin', tokenAdmin)
