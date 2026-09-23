@@ -323,6 +323,7 @@ export function setupDb(sqlite: any) {
       observacoes text,
       ativo integer DEFAULT true NOT NULL,
       serie_recorrencia_id text,
+      recorrencia_origem_inicio_em text,
       recorrencia_excecao integer DEFAULT false NOT NULL,
       possui_manha integer DEFAULT false NOT NULL,
       possui_tarde integer DEFAULT false NOT NULL,

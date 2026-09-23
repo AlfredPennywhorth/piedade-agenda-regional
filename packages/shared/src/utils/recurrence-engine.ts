@@ -25,27 +25,48 @@ export function createUtcDateFromSaoPaulo(dateStr: string, timeStr: string): str
   const [year, month, day] = dateStr.split('-').map(Number)
   const [hour, minute] = timeStr.split(':').map(Number)
   const targetLocalMs = Date.UTC(year, month - 1, day, hour, minute, 0)
-  
+
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Sao_Paulo',
     year: 'numeric', month: 'numeric', day: 'numeric',
     hour: 'numeric', minute: 'numeric', second: 'numeric',
     hour12: false
   })
-  
-  const parts = formatter.formatToParts(new Date(targetLocalMs))
-  const p: any = {}
-  parts.forEach(part => p[part.type] = part.value)
-  
-  let parsedHour = Number(p.hour)
-  // Alguns motores Node formatam 00:00 como 24:00 quando hour12: false
-  if (parsedHour === 24) parsedHour = 0
-  
-  const guessLocalMs = Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day), parsedHour, Number(p.minute), Number(p.second))
-  
-  const offsetMs = guessLocalMs - targetLocalMs
-  const trueUtcMs = targetLocalMs - offsetMs
-  return new Date(trueUtcMs).toISOString()
+
+  const localMsNoFuso = (instantMs: number) => {
+    const parts = formatter.formatToParts(new Date(instantMs))
+    const p: Record<string, string> = {}
+    parts.forEach(part => {
+      if (part.type !== 'literal') p[part.type] = part.value
+    })
+
+    let parsedHour = Number(p.hour)
+    if (parsedHour === 24) parsedHour = 0
+
+    return Date.UTC(
+      Number(p.year),
+      Number(p.month) - 1,
+      Number(p.day),
+      parsedHour,
+      Number(p.minute),
+      Number(p.second)
+    )
+  }
+
+  // Itera até o relógio local formatado coincidir com a parede de São Paulo.
+  // Isso evita usar um offset medido no lado errado de uma transição histórica de DST.
+  let candidatoUtcMs = targetLocalMs
+  for (let tentativa = 0; tentativa < 6; tentativa++) {
+    const diferenca = targetLocalMs - localMsNoFuso(candidatoUtcMs)
+    if (diferenca === 0) break
+    candidatoUtcMs += diferenca
+  }
+
+  if (localMsNoFuso(candidatoUtcMs) !== targetLocalMs) {
+    throw new Error(`Horário local inexistente ou ambíguo em America/Sao_Paulo: ${dateStr} ${timeStr}`)
+  }
+
+  return new Date(candidatoUtcMs).toISOString()
 }
 
 /**

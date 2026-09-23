@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, gte } from 'drizzle-orm'
+import { eq, and, gte, sql } from 'drizzle-orm'
 import { eventos, seriesRecorrencia } from '../db/schema'
 import { SerieCreate, SerieUpdatePayload, generateOccurrences, getLocalDateFromUtc } from '@piedade/shared'
 import { EventoCreate } from '@piedade/shared'
@@ -103,6 +103,7 @@ seriesRecorrenciaRouter.post('/', async (c) => {
         fimEm: occ.fimEm,
         
         serieRecorrenciaId: serieId,
+        recorrenciaOrigemInicioEm: occ.inicioEm,
         recorrenciaExcecao: false,
         createdAt: nowIso,
         updatedAt: nowIso
@@ -166,7 +167,13 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       }
       
       const updatedEvent = await db.update(eventos)
-        .set({ ...parsed.changes, recorrenciaExcecao: true, updatedAt: nowIso }) // serieRecorrenciaId intacto
+        .set({
+          ...parsed.changes,
+          recorrenciaOrigemInicioEm:
+            existingEvent.recorrenciaOrigemInicioEm ?? existingEvent.inicioEm,
+          recorrenciaExcecao: true,
+          updatedAt: nowIso,
+        }) // serieRecorrenciaId intacto
         .where(eq(eventos.id, parsed.fromEventId))
         .returning().get()
         
@@ -174,11 +181,17 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
     }
     
     if (parsed.updateMode === 'ALL') {
+      const mergedSerieData = { ...existingSerie, ...parsed.changes }
+      SerieCreate.parse(mergedSerieData)
+      if (!(await podeGerenciarEntidade(c, mergedSerieData))) {
+        return c.json({ error: 'Acesso não autorizado para mover a série para este escopo', code: 'FORBIDDEN' }, 403)
+      }
+
       if (parsed.changes.ativo === false) {
         await executeAtomic(db, (qdb) => {
           return [
             qdb.update(seriesRecorrencia)
-              .set({ ativo: false, updatedAt: nowIso })
+              .set({ ...parsed.changes, ativo: false, updatedAt: nowIso })
               .where(eq(seriesRecorrencia.id, serieId)),
             qdb.update(eventos)
               .set({ ativo: false, updatedAt: nowIso })
@@ -188,21 +201,22 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
               ))
           ]
         })
-        return c.json({ message: 'Série e eventos futuros inativados com sucesso' })
+        return c.json({ message: 'Série atualizada e eventos futuros inativados com sucesso' })
       }
 
-      const mergedSerieData = { ...existingSerie, ...parsed.changes }
-      SerieCreate.parse(mergedSerieData)
-      if (!(await podeGerenciarEntidade(c, mergedSerieData))) {
-        return c.json({ error: 'Acesso não autorizado para mover a série para este escopo', code: 'FORBIDDEN' }, 403)
-      }
-      
       const exceptions = await db.select().from(eventos).where(and(
         eq(eventos.serieRecorrenciaId, serieId),
-        gte(eventos.inicioEm, nowIso),
+        gte(
+          sql`COALESCE(${eventos.recorrenciaOrigemInicioEm}, ${eventos.inicioEm})`,
+          nowIso
+        ),
         eq(eventos.recorrenciaExcecao, true)
       )).all()
-      const exceptionDates = new Set(exceptions.map((e: any) => getLocalDateFromUtc(e.inicioEm)))
+      const exceptionDates = new Set(
+        exceptions.map((e: any) =>
+          getLocalDateFromUtc(e.recorrenciaOrigemInicioEm ?? e.inicioEm)
+        )
+      )
       
       const occurrencesDates = generateOccurrences(mergedSerieData)
       const futureOccurrences = occurrencesDates
@@ -232,6 +246,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
           fimEm: occ.fimEm,
           
           serieRecorrenciaId: serieId,
+          recorrenciaOrigemInicioEm: occ.inicioEm,
           recorrenciaExcecao: false,
           createdAt: nowIso,
           updatedAt: nowIso
@@ -310,10 +325,17 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       
       const exceptions = await db.select().from(eventos).where(and(
         eq(eventos.serieRecorrenciaId, serieId),
-        gte(eventos.inicioEm, pivotDateIso),
+        gte(
+          sql`COALESCE(${eventos.recorrenciaOrigemInicioEm}, ${eventos.inicioEm})`,
+          pivotDateIso
+        ),
         eq(eventos.recorrenciaExcecao, true)
       )).all()
-      const exceptionDates = new Set(exceptions.map((e: any) => getLocalDateFromUtc(e.inicioEm)))
+      const exceptionDates = new Set(
+        exceptions.map((e: any) =>
+          getLocalDateFromUtc(e.recorrenciaOrigemInicioEm ?? e.inicioEm)
+        )
+      )
       
       const occurrencesDates = generateOccurrences(serieBData)
       const eventosToInsert = occurrencesDates
@@ -341,6 +363,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
             fimEm: occ.fimEm,
             
             serieRecorrenciaId: newSerieId,
+            recorrenciaOrigemInicioEm: occ.inicioEm,
             recorrenciaExcecao: false,
             createdAt: nowIso,
             updatedAt: nowIso
@@ -349,10 +372,16 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       
       await executeAtomic(db, (qdb) => {
         const queries = []
-        // 1. Atualizar Série A
+        // 1. Atualizar Série A. Se o pivô for a primeira ocorrência,
+        // não persistir dataFim anterior a dataInicio: a série antiga fica inativa.
+        const splitNaPrimeiraOcorrencia = newStartDateStr <= existingSerie.dataInicio
         queries.push(
           qdb.update(seriesRecorrencia)
-            .set({ dataFim: oldEndDateStr, updatedAt: nowIso })
+            .set(
+              splitNaPrimeiraOcorrencia
+                ? { ativo: false, updatedAt: nowIso }
+                : { dataFim: oldEndDateStr, updatedAt: nowIso }
+            )
             .where(eq(seriesRecorrencia.id, serieId))
         )
           
@@ -369,7 +398,10 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
             .set({ serieRecorrenciaId: newSerieId, updatedAt: nowIso })
             .where(and(
               eq(eventos.serieRecorrenciaId, serieId),
-              gte(eventos.inicioEm, pivotDateIso),
+              gte(
+                sql`COALESCE(${eventos.recorrenciaOrigemInicioEm}, ${eventos.inicioEm})`,
+                pivotDateIso
+              ),
               eq(eventos.recorrenciaExcecao, true)
             ))
         )
