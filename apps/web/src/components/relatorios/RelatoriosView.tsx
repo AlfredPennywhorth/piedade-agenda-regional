@@ -1,6 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import * as apiClient from '../../api/apiClient'
 import { RelatoriosPresencaView } from './RelatoriosPresencaView'
+
+interface EventoLookup {
+  id: string
+  titulo: string
+  inicioEm: string
+  ativo?: boolean
+}
 
 interface RelatorioEventoData {
   evento: {
@@ -60,7 +67,9 @@ export function RelatoriosView() {
   const [modo, setModo] = useState<'evento' | 'agregado' | 'presencas'>('presencas')
 
   // Estado Relatório do Evento
-  const [eventoIdInput, setEventoIdInput] = useState('')
+  const [eventoBusca, setEventoBusca] = useState('')
+  const [eventoIdSelecionado, setEventoIdSelecionado] = useState('')
+  const [eventosLookup, setEventosLookup] = useState<EventoLookup[]>([])
   const [relatorioEvento, setRelatorioEvento] = useState<RelatorioEventoData | null>(null)
   const [presencas, setPresencas] = useState<ItemPresenca[]>([])
   const [loadingEvento, setLoadingEvento] = useState(false)
@@ -80,15 +89,36 @@ export function RelatoriosView() {
   const [loadingAgregado, setLoadingAgregado] = useState(false)
   const [erroAgregado, setErroAgregado] = useState<string | null>(null)
 
+  useEffect(() => {
+    let ativo = true
+    apiClient.fetchWithAuth<EventoLookup[]>('/eventos')
+      .then(eventos => {
+        if (!ativo) return
+        setEventosLookup((eventos || []).filter(evento => evento.ativo !== false))
+      })
+      .catch(() => {
+        if (ativo) setErroEvento('Não foi possível carregar a lista de eventos.')
+      })
+    return () => { ativo = false }
+  }, [])
+
+  const eventosFiltrados = useMemo(() => {
+    const termo = eventoBusca.trim().toLowerCase()
+    return eventosLookup
+      .filter(evento => !termo || evento.titulo.toLowerCase().includes(termo))
+      .sort((a, b) => b.inicioEm.localeCompare(a.inicioEm))
+      .slice(0, 50)
+  }, [eventosLookup, eventoBusca])
+
   const carregarRelatorioEvento = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
-    if (!eventoIdInput.trim()) return
+    if (!eventoIdSelecionado) return
     setLoadingEvento(true)
     setErroEvento(null)
     try {
-      const data = await apiClient.fetchWithAuth<RelatorioEventoData>(`/relatorios/eventos/${eventoIdInput.trim()}`)
+      const data = await apiClient.fetchWithAuth<RelatorioEventoData>(`/relatorios/eventos/${eventoIdSelecionado}`)
       setRelatorioEvento(data)
-      await carregarPresencas(eventoIdInput.trim())
+      await carregarPresencas(eventoIdSelecionado)
     } catch (err: any) {
       setErroEvento(err.message || 'Erro ao carregar relatório do evento.')
       setRelatorioEvento(null)
@@ -171,18 +201,32 @@ export function RelatoriosView() {
 
       {modo === 'evento' && (
         <div className="space-y-6">
-          <form onSubmit={carregarRelatorioEvento} className="flex gap-2">
+          <form onSubmit={carregarRelatorioEvento} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
             <input
               type="text"
-              placeholder="Digite o ID do Evento (UUID)"
-              value={eventoIdInput}
-              onChange={(e) => setEventoIdInput(e.target.value)}
-              className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              aria-label="Pesquisar evento"
+              placeholder="Pesquisar evento por nome"
+              value={eventoBusca}
+              onChange={(e) => setEventoBusca(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
+            <select
+              aria-label="Selecionar evento"
+              value={eventoIdSelecionado}
+              onChange={(e) => setEventoIdSelecionado(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="">Selecione um evento</option>
+              {eventosFiltrados.map(evento => (
+                <option key={evento.id} value={evento.id}>
+                  {evento.titulo} — {new Date(evento.inicioEm).toLocaleDateString('pt-BR')}
+                </option>
+              ))}
+            </select>
             <button
               type="submit"
-              disabled={loadingEvento}
-              className="bg-brand-600 hover:bg-brand-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50"
+              disabled={loadingEvento || !eventoIdSelecionado}
+              className="w-full sm:w-auto bg-brand-600 hover:bg-brand-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50"
             >
               {loadingEvento ? 'Carregando...' : 'Buscar Relatório'}
             </button>
@@ -234,7 +278,7 @@ export function RelatoriosView() {
                     value={buscaNome}
                     onChange={(e) => {
                       setBuscaNome(e.target.value)
-                      carregarPresencas(eventoIdInput)
+                      carregarPresencas(eventoIdSelecionado)
                     }}
                     className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm"
                   />
@@ -242,7 +286,7 @@ export function RelatoriosView() {
                     value={filtroRsvp}
                     onChange={(e) => {
                       setFiltroRsvp(e.target.value)
-                      carregarPresencas(eventoIdInput)
+                      carregarPresencas(eventoIdSelecionado)
                     }}
                     className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm"
                   >
@@ -256,7 +300,7 @@ export function RelatoriosView() {
                     value={filtroPresente}
                     onChange={(e) => {
                       setFiltroPresente(e.target.value)
-                      carregarPresencas(eventoIdInput)
+                      carregarPresencas(eventoIdSelecionado)
                     }}
                     className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm"
                   >
