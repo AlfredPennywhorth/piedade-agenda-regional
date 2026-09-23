@@ -6,6 +6,8 @@ import { AcompanhamentoRsvpModal } from './AcompanhamentoRsvpModal'
 interface EventoLookup {
   id: string
   titulo: string
+  inicioEm: string
+  fimEm: string
   ativo?: boolean
 }
 
@@ -160,10 +162,33 @@ export function ConvocacoesView() {
     }
   }
 
+  const formatarEvento = (evento: EventoLookup) => {
+    const data = new Date(evento.inicioEm)
+    const dataHora = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(data)
+
+    return `${evento.titulo} — ${dataHora}`
+  }
+
   const getNomeEvento = (eventoId: string) => {
     const ev = eventosLookup.find(e => e.id === eventoId)
-    return ev ? ev.titulo : 'Evento não encontrado'
+    return ev ? formatarEvento(ev) : 'Evento não encontrado'
   }
+
+  const eventosDisponiveis = eventosLookup
+    .filter(ev => {
+      if (editandoId && ev.id === formData.eventoId) return true
+      if (ev.ativo === false) return false
+      return new Date(ev.fimEm).getTime() >= Date.now()
+    })
+    .sort((a, b) => new Date(a.inicioEm).getTime() - new Date(b.inicioEm).getTime())
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-5xl mx-auto">
@@ -287,8 +312,8 @@ export function ConvocacoesView() {
                     className={`w-full p-2 border rounded-lg bg-white ${editandoId ? 'bg-slate-100' : ''} ${errosForm.eventoId ? 'border-red-500 focus:ring-red-500' : 'border-slate-300 focus:border-brand-500 focus:ring-brand-500'} focus:ring-2 outline-none transition-all`}
                   >
                     <option value="">Selecione um evento</option>
-                    {eventosLookup.map(ev => (
-                      <option key={ev.id} value={ev.id}>{ev.titulo}</option>
+                    {eventosDisponiveis.map(ev => (
+                      <option key={ev.id} value={ev.id}>{formatarEvento(ev)}</option>
                     ))}
                   </select>
                   {errosForm.eventoId && (
