@@ -253,6 +253,39 @@ describe('S07 - Minha Agenda e Calendário', () => {
     })
   })
 
+  it('9b. Atualiza imediatamente o badge de RSVP no card do Calendário', async () => {
+    mockAgenda(mockEventos)
+    ;(apiClient.putWithAuth as any).mockResolvedValue({})
+    render(<App />)
+
+    fireEvent.click((await mobileNav()).getByText('Calendário'))
+    await waitFor(() => expect(screen.getByText('Dom')).toBeInTheDocument())
+
+    const dia = new Date(Date.now() + 86400000)
+    fireEvent.click(screen.getByLabelText(`Selecionar dia ${dia.getDate()}`))
+
+    const card = await screen.findByRole('button', { name: /Reunião de Setor/i })
+    expect(within(card).getByText('Aguardando resposta')).toBeInTheDocument()
+
+    fireEvent.click(card)
+    const dialog = await screen.findByRole('dialog')
+    const dq = within(dialog)
+    fireEvent.click(dq.getByText('✓ Vou participar'))
+
+    await waitFor(() => {
+      expect(apiClient.putWithAuth).toHaveBeenCalledWith('/minha-agenda/rsvp/dest-1', {
+        resposta: 'PARTICIPAREI',
+        justificativa: null
+      })
+    })
+
+    fireEvent.click(dq.getByLabelText('Fechar detalhes'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+    const cardAtualizado = screen.getByRole('button', { name: /Reunião de Setor/i })
+    expect(within(cardAtualizado).getByText('Confirmado')).toBeInTheDocument()
+  })
+
   it('10. Exibe seção de RSVP no detalhe', async () => {
     mockAgenda(mockEventos)
     render(<App />)
