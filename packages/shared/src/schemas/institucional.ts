@@ -63,17 +63,33 @@ export type UpdateCasa = z.infer<typeof UpdateCasaSchema>
 export const CreateGrupoTrabalhoSchema = z.object({
   nome: z.string().min(2, "Nome deve ter no mínimo 2 caracteres").max(255),
   ativo: z.boolean().optional().default(true),
-  regionalId: z.string().uuid("regionalId deve ser um UUID válido"),
-  administracaoId: z.null().optional(),
-  setorId: z.null().optional(),
+  regionalId: z.string().uuid("regionalId deve ser um UUID válido").optional().nullable(),
+  administracaoId: z.string().uuid().optional().nullable(),
+  setorId: z.string().uuid().optional().nullable(),
+}).superRefine((data, ctx) => {
+  if (!data.regionalId || data.administracaoId || data.setorId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "O Grupo de Trabalho deve pertencer exclusivamente a uma Regional.",
+      path: ["escopo"],
+    })
+  }
 })
 
 export const UpdateGrupoTrabalhoSchema = z.object({
   nome: z.string().min(2).max(255).optional(),
   ativo: z.boolean().optional(),
-  regionalId: z.string().uuid("regionalId deve ser um UUID válido").optional(),
-  administracaoId: z.null().optional(),
-  setorId: z.null().optional(),
+  regionalId: z.string().uuid("regionalId deve ser um UUID válido").optional().nullable(),
+  administracaoId: z.string().uuid().optional().nullable(),
+  setorId: z.string().uuid().optional().nullable(),
+}).superRefine((data, ctx) => {
+  if (data.administracaoId || data.setorId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "O Grupo de Trabalho deve pertencer exclusivamente a uma Regional.",
+      path: ["escopo"],
+    })
+  }
 })
 
 export type CreateGrupoTrabalho = z.infer<typeof CreateGrupoTrabalhoSchema>
