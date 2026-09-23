@@ -101,6 +101,19 @@ describe('PORT-02 — autocadastro de convidados e validação pelo porteiro', (
     expect(row.token_hash).not.toBe(gerada.credencial.token)
   })
 
+  it('QR de convidados permanece válido até o fim do dia da reunião em São Paulo', async () => {
+    await prepararPorteiro()
+    const gerada = await gerarCredencial()
+
+    expect(gerada.credencial.expiraEm).toBe('2099-01-02T02:59:59.000Z')
+
+    const row = sqlite.prepare(
+      'SELECT expira_em FROM credenciais_cadastro_portaria_evento WHERE evento_id = ?'
+    ).get('evento-1') as { expira_em: string }
+
+    expect(row.expira_em).toBe('2099-01-02T02:59:59.000Z')
+  })
+
   it('mesmo QR permite autocadastro de vários convidados sem criar membros', async () => {
     await prepararPorteiro()
     const gerada = await gerarCredencial()

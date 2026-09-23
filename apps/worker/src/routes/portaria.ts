@@ -418,6 +418,8 @@ portariaRouter.post('/eventos/:eventoId/cadastro-convidados/credencial', async c
   const tokenHash = await hashToken(token)
   const agora = new Date().toISOString()
   const credencialId = crypto.randomUUID()
+  const dataEventoSaoPaulo = getSaoPauloDateString(evento.inicioEm)
+  const expiraEm = new Date(`${dataEventoSaoPaulo}T23:59:59-03:00`).toISOString()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
   await executarOperacaoComAudit(
@@ -435,7 +437,7 @@ portariaRouter.post('/eventos/:eventoId/cadastro-convidados/credencial', async c
         id: credencialId,
         eventoId,
         tokenHash,
-        expiraEm: evento.fimEm,
+        expiraEm,
         criadoPorMembroId: atorMembroId,
         ativo: true,
         createdAt: agora,
@@ -457,7 +459,7 @@ portariaRouter.post('/eventos/:eventoId/cadastro-convidados/credencial', async c
     eventoId,
     credencial: {
       token,
-      expiraEm: evento.fimEm,
+      expiraEm,
       caminhoCadastro: `/c?p=${encodeURIComponent(token)}`,
       endpointCadastro: `/api/v1/portaria-publica/cadastro/${token}`,
     },
