@@ -6,6 +6,15 @@ declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: (string | Precac
 // Precache resources injected by vite-plugin-pwa
 precacheAndRoute(self.__WB_MANIFEST || [])
 
+// Assume a nova versão do PWA assim que ela for instalada.
+self.addEventListener('install', () => {
+  self.skipWaiting()
+})
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim())
+})
+
 self.addEventListener('push', (event) => {
   if (!event.data) return
 
