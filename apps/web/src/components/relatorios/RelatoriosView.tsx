@@ -110,6 +110,15 @@ export function RelatoriosView() {
       .slice(0, 50)
   }, [eventosLookup, eventoBusca])
 
+  useEffect(() => {
+    if (
+      eventoIdSelecionado &&
+      !eventosFiltrados.some(evento => evento.id === eventoIdSelecionado)
+    ) {
+      setEventoIdSelecionado('')
+    }
+  }, [eventoIdSelecionado, eventosFiltrados])
+
   const carregarRelatorioEvento = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     if (!eventoIdSelecionado) return

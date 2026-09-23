@@ -17,6 +17,10 @@ const EVENTO_ID = '33333333-3333-3333-3333-333333333333'
 const CONVOCACAO_ID = '44444444-4444-4444-4444-444444444444'
 
 const EVENTO_PASSADO_ID = '22222222-2222-2222-2222-222222222222'
+const INICIO_EVENTO_FUTURO = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+const FIM_EVENTO_FUTURO = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString()
+const INICIO_EVENTO_PASSADO = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+const FIM_EVENTO_PASSADO = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString()
 
 const mockEventos = [
   {
@@ -25,8 +29,8 @@ const mockEventos = [
     descricao: null,
     pauta: null,
     modalidade: 'PRESENCIAL',
-    inicioEm: '2026-10-10T10:00:00.000Z',
-    fimEm: '2026-10-10T12:00:00.000Z',
+    inicioEm: INICIO_EVENTO_FUTURO,
+    fimEm: FIM_EVENTO_FUTURO,
     localId: null,
     urlOnline: null,
     organizadorMembroId: null,
@@ -44,8 +48,8 @@ const mockEventos = [
     descricao: null,
     pauta: null,
     modalidade: 'PRESENCIAL',
-    inicioEm: '2026-01-10T10:00:00.000Z',
-    fimEm: '2026-01-10T12:00:00.000Z',
+    inicioEm: INICIO_EVENTO_PASSADO,
+    fimEm: FIM_EVENTO_PASSADO,
     localId: null,
     urlOnline: null,
     organizadorMembroId: null,
@@ -125,7 +129,16 @@ describe('ConvocacoesView', () => {
     fireEvent.click(screen.getByRole('button', { name: /novo rascunho/i }))
 
     const select = await screen.findByRole('combobox')
-    expect(select).toHaveTextContent('Reunião Presencial Teste — 10/10/2026, 07:00')
+    const dataHoraEsperada = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(new Date(INICIO_EVENTO_FUTURO))
+    expect(select).toHaveTextContent(`Reunião Presencial Teste — ${dataHoraEsperada}`)
     expect(select).not.toHaveTextContent('Reunião Antiga')
   })
 

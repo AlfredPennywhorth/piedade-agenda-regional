@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { RelatoriosView } from '../components/relatorios/RelatoriosView'
 import * as apiClient from '../api/apiClient'
 
@@ -31,6 +31,32 @@ describe('S12 — RelatoriosView (Frontend)', () => {
     const select = await screen.findByRole('combobox', { name: /selecionar evento/i })
     expect(select).toHaveTextContent('Assembleia Regional')
     expect(screen.queryByPlaceholderText(/Digite o ID do Evento/i)).not.toBeInTheDocument()
+  })
+
+  it('limpa o evento selecionado quando a busca deixa de exibi-lo', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url: string) => {
+      if (url === '/eventos') {
+        return [
+          { id: 'ev-123', titulo: 'Assembleia Regional', inicioEm: '2026-10-01T09:00:00Z', ativo: true },
+          { id: 'ev-456', titulo: 'Reunião Administrativa', inicioEm: '2026-10-02T09:00:00Z', ativo: true },
+        ]
+      }
+      return []
+    })
+
+    render(<RelatoriosView />)
+    fireEvent.click(screen.getByText('Relatório do Evento'))
+
+    const select = await screen.findByRole('combobox', { name: /selecionar evento/i }) as HTMLSelectElement
+    fireEvent.change(select, { target: { value: 'ev-123' } })
+    expect(select.value).toBe('ev-123')
+
+    fireEvent.change(screen.getByRole('textbox', { name: /pesquisar evento/i }), {
+      target: { value: 'Administrativa' },
+    })
+
+    await waitFor(() => expect(select.value).toBe(''))
+    expect(screen.getByRole('button', { name: /buscar relatório/i })).toBeDisabled()
   })
 
   it('deve buscar e exibir relatório consolidado e lista nominal', async () => {

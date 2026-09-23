@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { MainLayout } from '../components/layout/MainLayout'
 
@@ -32,6 +32,24 @@ describe('MainLayout — navegação móvel', () => {
     fireEvent.click(menu.getByRole('button', { name: 'Locais' }))
     expect(onTabChange).toHaveBeenCalledWith('locais')
     expect(screen.queryByRole('dialog', { name: /mais opções/i })).not.toBeInTheDocument()
+  })
+
+  it('mantém Mais ativo para módulos agrupados e move o foco para o menu', async () => {
+    render(
+      <MainLayout currentTab="series" onTabChange={vi.fn()} capacidades={{}}>
+        <div>Conteúdo</div>
+      </MainLayout>
+    )
+
+    const botaoMais = screen.getByRole('button', { name: /mais/i })
+    expect(botaoMais.className).toContain('text-brand-600')
+
+    fireEvent.click(botaoMais)
+    const fechar = screen.getByRole('button', { name: /fechar menu/i })
+    await waitFor(() => expect(fechar).toHaveFocus())
+
+    fireEvent.click(fechar)
+    await waitFor(() => expect(botaoMais).toHaveFocus())
   })
 
   it('não mostra opções condicionais sem capacidade', () => {
