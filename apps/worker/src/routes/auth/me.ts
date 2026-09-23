@@ -6,6 +6,7 @@ import { authMiddleware, Variables } from '../../middleware/auth'
 import { obterCapacidadesMembro } from '../../security/permissoes'
 import { gerarSalt, hashPin, verifyPin } from '../../security/pin'
 import { executeAtomic } from '../../db/batch'
+import { obterPinPepper } from '../../security/pin-pepper'
 
 import type { Env } from '../../index'
 
@@ -163,7 +164,7 @@ meApp.patch('/', async c => {
     return respostaPinAtualBloqueado(c, new Date(identidade.conta.bloqueadoAte))
   }
 
-  const pepper = c.env?.PIN_PEPPER || 'test-pepper'
+  const pepper = obterPinPepper(c.env)
   const pinValido = await verifyPin(parsed.data.pinAtual, pepper, identidade.conta.pinHash)
   if (!pinValido) {
     const bloqueadoAte = await registrarFalhaPinAtual(
@@ -247,7 +248,7 @@ meApp.post('/alterar-pin', async c => {
     return respostaPinAtualBloqueado(c, new Date(conta.bloqueadoAte))
   }
 
-  const pepper = c.env?.PIN_PEPPER || 'test-pepper'
+  const pepper = obterPinPepper(c.env)
   const pinValido = await verifyPin(parsed.data.pinAtual, pepper, conta.pinHash)
   if (!pinValido) {
     const bloqueadoAte = await registrarFalhaPinAtual(db, conta, membroId)
