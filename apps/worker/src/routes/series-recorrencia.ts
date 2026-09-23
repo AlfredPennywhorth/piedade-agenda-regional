@@ -206,7 +206,10 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
 
       const exceptions = await db.select().from(eventos).where(and(
         eq(eventos.serieRecorrenciaId, serieId),
-        gte(eventos.inicioEm, nowIso),
+        gte(
+          sql`COALESCE(${eventos.recorrenciaOrigemInicioEm}, ${eventos.inicioEm})`,
+          nowIso
+        ),
         eq(eventos.recorrenciaExcecao, true)
       )).all()
       const exceptionDates = new Set(
@@ -395,7 +398,10 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
             .set({ serieRecorrenciaId: newSerieId, updatedAt: nowIso })
             .where(and(
               eq(eventos.serieRecorrenciaId, serieId),
-              gte(eventos.inicioEm, pivotDateIso),
+              gte(
+                sql`COALESCE(${eventos.recorrenciaOrigemInicioEm}, ${eventos.inicioEm})`,
+                pivotDateIso
+              ),
               eq(eventos.recorrenciaExcecao, true)
             ))
         )
