@@ -55,10 +55,22 @@ export function CalendarioView() {
 
   const today = new Date()
 
-  // Get events mapped by day string YYYY-MM-DD
+  const chaveDiaSaoPaulo = (iso: string) => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+    }).formatToParts(new Date(iso))
+    const valores = Object.fromEntries(
+      parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value])
+    )
+    return `${valores.year}-${Number(valores.month) - 1}-${Number(valores.day)}`
+  }
+
+  // Get events mapped by São Paulo operational day.
   const eventsByDay = items.reduce((acc, item) => {
-    const evDate = new Date(item.evento.inicioEm)
-    const key = `${evDate.getFullYear()}-${evDate.getMonth()}-${evDate.getDate()}`
+    const key = chaveDiaSaoPaulo(item.evento.inicioEm)
     if (!acc[key]) acc[key] = []
     acc[key].push(item)
     return acc
