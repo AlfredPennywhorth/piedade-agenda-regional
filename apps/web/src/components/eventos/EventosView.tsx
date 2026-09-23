@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput, SerieCreateInput } from '@piedade/shared'
+import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput, SerieCreateInput, createUtcDateFromSaoPaulo } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import { SerieFormModal, TipoEscopo } from '../series/SerieFormModal'
 import type { Casa } from '../casas/CasasView'
@@ -158,23 +158,32 @@ export function EventosView() {
     carregarDados()
   }, [])
 
-  const toLocalISOString = (date: Date) => {
-    const pad = (n: number) => n.toString().padStart(2, '0')
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-  }
-
   const parseDatetimeLocal = (val: string) => {
     if (!val) return ''
-    const d = new Date(val)
-    if (isNaN(d.getTime())) return val
-    return d.toISOString()
+    const [data, horario] = val.split('T')
+    if (!data || !horario) return val
+    return createUtcDateFromSaoPaulo(data, horario.slice(0, 5))
   }
 
   const formatDatetimeLocal = (iso: string) => {
     if (!iso) return ''
     const d = new Date(iso)
     if (isNaN(d.getTime())) return ''
-    return toLocalISOString(d)
+
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(d)
+
+    const valores = Object.fromEntries(
+      parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value])
+    )
+    return `${valores.year}-${valores.month}-${valores.day}T${valores.hour}:${valores.minute}`
   }
 
   const handleModalidadeChange = (mod: 'PRESENCIAL' | 'ONLINE' | 'HIBRIDO') => {
