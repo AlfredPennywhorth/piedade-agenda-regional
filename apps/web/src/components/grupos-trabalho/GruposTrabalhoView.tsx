@@ -10,11 +10,13 @@ export interface Regional {
 export interface Administracao {
   id: string
   nome: string
+  regionalId: string
 }
 
 export interface Setor {
   id: string
   nome: string
+  administracaoId: string
 }
 
 export interface GrupoTrabalho {
@@ -52,10 +54,8 @@ export function GruposTrabalhoView() {
   // Campos do formulário
   const [nome, setNome] = useState<string>('')
   const [ativo, setAtivo] = useState<boolean>(true)
-  const [tipoEscopo, setTipoEscopo] = useState<'regional' | 'administracao' | 'setor'>('regional')
   const [regionalId, setRegionalId] = useState<string>('')
-  const [administracaoId, setAdministracaoId] = useState<string>('')
-  const [setorId, setSetorId] = useState<string>('')
+  const [avisoMigracaoEscopo, setAvisoMigracaoEscopo] = useState<string | null>(null)
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
   const [salvando, setSalvando] = useState<boolean>(false)
 
@@ -89,10 +89,8 @@ export function GruposTrabalhoView() {
     setGrupoEditandoId(null)
     setNome('')
     setAtivo(true)
-    setTipoEscopo('regional')
     setRegionalId('')
-    setAdministracaoId('')
-    setSetorId('')
+    setAvisoMigracaoEscopo(null)
     setErrosForm({})
     setErro(null)
     setSucesso(null)
@@ -112,25 +110,28 @@ export function GruposTrabalhoView() {
       setAtivo(item.ativo ?? true)
       
       if (item.regionalId) {
-        setTipoEscopo('regional')
         setRegionalId(item.regionalId)
-        setAdministracaoId('')
-        setSetorId('')
+        setAvisoMigracaoEscopo(null)
       } else if (item.administracaoId) {
-        setTipoEscopo('administracao')
-        setRegionalId('')
-        setAdministracaoId(item.administracaoId)
-        setSetorId('')
+        const administracao = administracoes.find(a => a.id === item.administracaoId)
+        setRegionalId(administracao?.regionalId ?? '')
+        setAvisoMigracaoEscopo(
+          'Este GT usa um escopo legado de Administração. Ao salvar, ele será migrado para a Regional correspondente.'
+        )
       } else if (item.setorId) {
-        setTipoEscopo('setor')
-        setRegionalId('')
-        setAdministracaoId('')
-        setSetorId(item.setorId)
+        const setor = setores.find(s => s.id === item.setorId)
+        const administracao = setor
+          ? administracoes.find(a => a.id === setor.administracaoId)
+          : undefined
+        setRegionalId(administracao?.regionalId ?? '')
+        setAvisoMigracaoEscopo(
+          'Este GT usa um escopo legado de Setor. Ao salvar, ele será migrado para a Regional correspondente.'
+        )
       } else {
-        setTipoEscopo('regional')
         setRegionalId('')
-        setAdministracaoId('')
-        setSetorId('')
+        setAvisoMigracaoEscopo(
+          'Este GT não possui uma Regional válida. Selecione a Regional antes de salvar.'
+        )
       }
     } catch (err: any) {
       setErro(err.message || 'Erro ao carregar os detalhes do grupo para edição.')
@@ -165,29 +166,17 @@ export function GruposTrabalhoView() {
     setErro(null)
     setSucesso(null)
 
-    let reqRegionalId = null
-    let reqAdmId = null
-    let reqSetorId = null
-
-    if (tipoEscopo === 'regional') {
-      reqRegionalId = regionalId || null
-    } else if (tipoEscopo === 'administracao') {
-      reqAdmId = administracaoId || null
-    } else if (tipoEscopo === 'setor') {
-      reqSetorId = setorId || null
-    }
-
-    if (!reqRegionalId && !reqAdmId && !reqSetorId) {
-      setErrosForm({ escopo: 'Selecione a localidade do escopo escolhido.' })
+    if (!regionalId) {
+      setErrosForm({ escopo: 'Selecione a Regional do Grupo de Trabalho.' })
       return
     }
 
     const payload = {
       nome: nome.trim(),
       ativo,
-      regionalId: reqRegionalId,
-      administracaoId: reqAdmId,
-      setorId: reqSetorId,
+      regionalId,
+      administracaoId: null,
+      setorId: null,
     }
 
     if (modoForm === 'criar') {
@@ -362,55 +351,34 @@ export function GruposTrabalhoView() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Tipo de Escopo <span className="text-red-500">*</span>
+                <label htmlFor="select-regional" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Regional vinculada ao Grupo <span className="text-red-500">*</span>
                 </label>
-                <div className="flex space-x-4 mb-2">
-                  <label className="inline-flex items-center">
-                    <input type="radio" value="regional" checked={tipoEscopo === 'regional'} onChange={() => { setTipoEscopo('regional'); setAdministracaoId(''); setSetorId(''); }} className="form-radio text-brand-600" disabled={salvando} />
-                    <span className="ml-2 text-sm text-slate-700">Regional</span>
-                  </label>
-                  <label className="inline-flex items-center">
-                    <input type="radio" value="administracao" checked={tipoEscopo === 'administracao'} onChange={() => { setTipoEscopo('administracao'); setRegionalId(''); setSetorId(''); }} className="form-radio text-brand-600" disabled={salvando} />
-                    <span className="ml-2 text-sm text-slate-700">Administração</span>
-                  </label>
-                  <label className="inline-flex items-center">
-                    <input type="radio" value="setor" checked={tipoEscopo === 'setor'} onChange={() => { setTipoEscopo('setor'); setRegionalId(''); setAdministracaoId(''); }} className="form-radio text-brand-600" disabled={salvando} />
-                    <span className="ml-2 text-sm text-slate-700">Setor</span>
-                  </label>
-                </div>
+                <select
+                  id="select-regional"
+                  value={regionalId}
+                  onChange={(e) => {
+                    setRegionalId(e.target.value)
+                    setErrosForm(atual => ({ ...atual, escopo: '' }))
+                  }}
+                  disabled={salvando}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
+                >
+                  <option value="">Selecione...</option>
+                  {regionais.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
+                </select>
+                <p className="mt-1 text-xs text-slate-500">
+                  Grupos de Trabalho são exclusivamente Regionais. Os Setores participam por meio de seus representantes.
+                </p>
+                {avisoMigracaoEscopo && (
+                  <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                    {avisoMigracaoEscopo}
+                  </p>
+                )}
+                {errosForm.escopo && (
+                  <p className="text-xs text-red-600 mt-1">{errosForm.escopo}</p>
+                )}
               </div>
-
-              {tipoEscopo === 'regional' && (
-                <div>
-                  <label htmlFor="select-regional" className="block text-xs font-semibold text-slate-700 mb-1">Regional vinculada ao Grupo <span className="text-red-500">*</span></label>
-                  <select id="select-regional" value={regionalId} onChange={(e) => setRegionalId(e.target.value)} disabled={salvando} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
-                    <option value="">Selecione...</option>
-                    {regionais.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
-                  </select>
-                </div>
-              )}
-              {tipoEscopo === 'administracao' && (
-                <div>
-                  <label htmlFor="select-administracao" className="block text-xs font-semibold text-slate-700 mb-1">Administração vinculada ao Grupo <span className="text-red-500">*</span></label>
-                  <select id="select-administracao" value={administracaoId} onChange={(e) => setAdministracaoId(e.target.value)} disabled={salvando} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
-                    <option value="">Selecione...</option>
-                    {administracoes.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
-                  </select>
-                </div>
-              )}
-              {tipoEscopo === 'setor' && (
-                <div>
-                  <label htmlFor="select-setor" className="block text-xs font-semibold text-slate-700 mb-1">Setor vinculado ao Grupo <span className="text-red-500">*</span></label>
-                  <select id="select-setor" value={setorId} onChange={(e) => setSetorId(e.target.value)} disabled={salvando} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200">
-                    <option value="">Selecione...</option>
-                    {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-                  </select>
-                </div>
-              )}
-              {errosForm.escopo && (
-                <p className="text-xs text-red-600 mt-1">{errosForm.escopo}</p>
-              )}
 
               <div className="flex items-center space-x-2 pt-1">
                 <input
