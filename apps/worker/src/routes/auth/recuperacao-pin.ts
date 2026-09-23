@@ -2,11 +2,72 @@ import { Hono } from 'hono'
 import { eq } from 'drizzle-orm'
 import { solicitarRecuperacaoPinSchema } from '@piedade/shared'
 import * as schema from '../../db/schema'
+import { hashToken } from '../../security/tokens'
 
 export const recuperacaoPinApp = new Hono<{ Variables: { db: any } }>()
 
+const JANELA_RECUPERACAO_MS = 15 * 60 * 1000
+const LIMITE_RECUPERACOES_POR_JANELA = 10
+
+async function aplicarThrottleRecuperacao(c: any, db: any) {
+  const origem = c.req.header('CF-Connecting-IP') || 'origem-local'
+  const chaveHash = await hashToken(`recuperacao-pin:${origem}`)
+  const agora = new Date()
+  const existente = await db
+    .select()
+    .from(schema.rateLimitsAutenticacao)
+    .where(eq(schema.rateLimitsAutenticacao.chaveHash, chaveHash))
+    .get()
+
+  if (existente && new Date(existente.expiraEm) > agora) {
+    if (existente.falhasConsecutivas >= LIMITE_RECUPERACOES_POR_JANELA) {
+      const retryAfter = Math.max(
+        1,
+        Math.ceil((new Date(existente.expiraEm).getTime() - agora.getTime()) / 1000)
+      )
+      c.header('Retry-After', String(retryAfter))
+      return false
+    }
+
+    await db
+      .update(schema.rateLimitsAutenticacao)
+      .set({
+        falhasConsecutivas: existente.falhasConsecutivas + 1,
+        updatedAt: agora.toISOString(),
+      })
+      .where(eq(schema.rateLimitsAutenticacao.chaveHash, chaveHash))
+      .execute()
+    return true
+  }
+
+  if (existente) {
+    await db
+      .delete(schema.rateLimitsAutenticacao)
+      .where(eq(schema.rateLimitsAutenticacao.chaveHash, chaveHash))
+      .execute()
+  }
+
+  await db.insert(schema.rateLimitsAutenticacao).values({
+    chaveHash,
+    falhasConsecutivas: 1,
+    bloqueadoAte: null,
+    expiraEm: new Date(agora.getTime() + JANELA_RECUPERACAO_MS).toISOString(),
+    createdAt: agora.toISOString(),
+    updatedAt: agora.toISOString(),
+  })
+
+  return true
+}
+
 recuperacaoPinApp.post('/', async c => {
   const db = c.get('db')
+
+  if (!(await aplicarThrottleRecuperacao(c, db))) {
+    return c.json(
+      { message: 'Muitas solicitações. Tente novamente mais tarde.' },
+      429
+    )
+  }
 
   let body: unknown
   try {

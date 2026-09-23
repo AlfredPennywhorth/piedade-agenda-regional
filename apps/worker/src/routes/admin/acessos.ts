@@ -212,6 +212,54 @@ adminAcessosApp.get('/', async c => {
 
   const acessosVisiveis = acessos
 
+  const recuperacoes = await db
+    .select({
+      membroId: schema.tentativasAcesso.membroId,
+      tipo: schema.tentativasAcesso.tipo,
+      createdAt: schema.tentativasAcesso.createdAt,
+    })
+    .from(schema.tentativasAcesso)
+    .innerJoin(schema.membros, eq(schema.tentativasAcesso.membroId, schema.membros.id))
+    .innerJoin(schema.casas, eq(schema.membros.casaId, schema.casas.id))
+    .innerJoin(schema.setores, eq(schema.casas.setorId, schema.setores.id))
+    .innerJoin(schema.administracoes, eq(schema.setores.administracaoId, schema.administracoes.id))
+    .where(
+      and(
+        eq(schema.membros.ativo, true),
+        inArray(schema.tentativasAcesso.tipo, [
+          'RECUPERACAO_PIN_SOLICITADA',
+          'RECUPERACAO_ADMIN',
+        ]),
+        filtroRegional
+      )
+    )
+    .all()
+
+  const recuperacaoPorMembro = new Map<
+    string,
+    { solicitadaEm: string | null; tratadaEm: string | null }
+  >()
+  for (const item of recuperacoes) {
+    if (!item.membroId) continue
+    const atual = recuperacaoPorMembro.get(item.membroId) ?? {
+      solicitadaEm: null,
+      tratadaEm: null,
+    }
+    if (
+      item.tipo === 'RECUPERACAO_PIN_SOLICITADA' &&
+      (!atual.solicitadaEm || item.createdAt > atual.solicitadaEm)
+    ) {
+      atual.solicitadaEm = item.createdAt
+    }
+    if (
+      item.tipo === 'RECUPERACAO_ADMIN' &&
+      (!atual.tratadaEm || item.createdAt > atual.tratadaEm)
+    ) {
+      atual.tratadaEm = item.createdAt
+    }
+    recuperacaoPorMembro.set(item.membroId, atual)
+  }
+
   const acessosPorConta = new Map<string, typeof acessosVisiveis>()
   for (const acesso of acessosVisiveis) {
     const atuais = acessosPorConta.get(acesso.contaAcessoId) ?? []
@@ -220,12 +268,24 @@ adminAcessosApp.get('/', async c => {
   }
 
   return c.json(
-    visiveis.map((pessoa: any) => ({
-      ...pessoa,
-      acessos: pessoa.contaAcessoId
-        ? acessosPorConta.get(pessoa.contaAcessoId) ?? []
-        : [],
-    })),
+    visiveis.map((pessoa: any) => {
+      const recuperacao = recuperacaoPorMembro.get(pessoa.membroId)
+      const recuperacaoPinPendente = Boolean(
+        recuperacao?.solicitadaEm &&
+        (!recuperacao.tratadaEm || recuperacao.solicitadaEm > recuperacao.tratadaEm)
+      )
+
+      return {
+        ...pessoa,
+        acessos: pessoa.contaAcessoId
+          ? acessosPorConta.get(pessoa.contaAcessoId) ?? []
+          : [],
+        recuperacaoPinPendente,
+        recuperacaoPinSolicitadaEm: recuperacaoPinPendente
+          ? recuperacao?.solicitadaEm ?? null
+          : null,
+      }
+    }),
     200
   )
 })
