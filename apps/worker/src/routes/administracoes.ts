@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
-import { administracoes } from '../db/schema'
+import { and, eq } from 'drizzle-orm'
+import { administracoes, setores, participacoesGruposTrabalho, gruposTrabalho } from '../db/schema'
 import { CreateAdministracaoSchema, UpdateAdministracaoSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { exigirMasterParaEscrita } from '../middleware/master-write'
@@ -51,6 +51,28 @@ administracoesRouter.patch('/:id', async (c) => {
     
     const existing = await db.select().from(administracoes).where(eq(administracoes.id, id)).get()
     if (!existing) return c.json({ error: 'Administração não encontrada' }, 404)
+
+    if (parsed.regionalId && parsed.regionalId !== existing.regionalId) {
+      const participacoes = await db
+        .select({ regionalIdGt: gruposTrabalho.regionalId })
+        .from(participacoesGruposTrabalho)
+        .innerJoin(setores, eq(setores.id, participacoesGruposTrabalho.setorRepresentadoId))
+        .innerJoin(gruposTrabalho, eq(gruposTrabalho.id, participacoesGruposTrabalho.grupoTrabalhoId))
+        .where(
+          and(
+            eq(setores.administracaoId, id),
+            eq(participacoesGruposTrabalho.ativo, true)
+          )
+        )
+        .all()
+
+      if (participacoes.some((item: any) => item.regionalIdGt !== parsed.regionalId)) {
+        return c.json({
+          error: 'Não é possível mover a Administração para outra Regional enquanto houver participação em GT incompatível.',
+          code: 'GT_PARTICIPACOES_INCOMPATIVEIS',
+        }, 409)
+      }
+    }
 
     const updated = await db.update(administracoes)
       .set({ ...parsed, updatedAt: new Date().toISOString() })
