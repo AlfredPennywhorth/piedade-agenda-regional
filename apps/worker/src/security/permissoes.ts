@@ -219,7 +219,7 @@ export async function podeGerenciarAgendaNoEscopo(
 ): Promise<boolean> {
   if (!db || !membroId || !escopoId) return false
 
-  const contexto = contextoPermissoes ?? await carregarContextoPermissoes(db, membroId)
+  const contexto = await carregarContextoPermissoes(db, membroId)
   if (eMasterSistema(contexto)) return true
 
   // Regra institucional: todo membro pode gerir automaticamente a Agenda da própria Casa.
@@ -370,7 +370,7 @@ export async function eOperadorPortariaAutorizado(
     return false
   }
 
-  const contexto = await carregarContextoPermissoes(db, membroId)
+  const contexto = contextoPermissoes ?? await carregarContextoPermissoes(db, membroId)
   if (eMasterSistema(contexto)) return true
 
   const autorizacaoTemporaria = await db
