@@ -714,7 +714,12 @@ portariaRouter.get('/eventos', async (c) => {
         continue
       }
 
-      const isAuthorized = await eOperadorPortariaAutorizado(db, membroSessaoId, evento)
+      const isAuthorized = await eOperadorPortariaAutorizado(
+        db,
+        membroSessaoId,
+        evento,
+        c.get('contextoPermissoes')
+      )
       if (isAuthorized) {
         authorizedEvents.push({
           id: evento.id,

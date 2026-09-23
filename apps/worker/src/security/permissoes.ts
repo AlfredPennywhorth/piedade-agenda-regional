@@ -352,7 +352,12 @@ export function temVinculoEmTipoEscopo(contexto: ContextoPermissoes, tipo: 'regi
 /**
  * Valida se o membro possui vínculo ativo estritamente com a função de código OPERADOR_PORTARIA no mesmo escopo do evento.
  */
-export async function eOperadorPortariaAutorizado(db: any, membroId: string, evento: any): Promise<boolean> {
+export async function eOperadorPortariaAutorizado(
+  db: any,
+  membroId: string,
+  evento: any,
+  contextoPermissoes?: ContextoPermissoes
+): Promise<boolean> {
   if (!db || !membroId || !evento) return false
 
   const estadoPortaria = await db
@@ -364,6 +369,9 @@ export async function eOperadorPortariaAutorizado(db: any, membroId: string, eve
   if (estadoPortaria?.status === 'FECHADA') {
     return false
   }
+
+  const contexto = contextoPermissoes ?? await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) return true
 
   const autorizacaoTemporaria = await db
     .select({ id: schema.portariaOperadoresEvento.id })
@@ -645,6 +653,7 @@ export async function obterCapacidadesMembro(
     .get()
 
   const podeOperarPortaria =
+    eMasterSistema(contexto) ||
     perfisTecnicos.has('OPERADOR_PORTARIA_PERMANENTE') ||
     codigos.has('OPERADOR_PORTARIA') ||
     !!autorizacaoTemporariaPortaria

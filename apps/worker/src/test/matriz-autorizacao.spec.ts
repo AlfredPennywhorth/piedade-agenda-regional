@@ -107,11 +107,12 @@ describe('QA-AUTH-01 — matriz de capacidades por perfil técnico', () => {
       membroId: 'm-master',
       contaId: 'c-master',
       esperado: {
-        // O backend de Relatórios já autoriza Master global; /auth/me deve
-        // refletir a mesma autorização para não esconder o módulo no frontend.
+        // O Master global é o fallback administrativo e operacional de contingência.
+        // /auth/me deve expor Portaria para que ele consiga atuar quando não houver
+        // operador temporário/permanente disponível, mantendo as ações auditadas.
         podeVisualizarRelatorios: true,
         podeVisualizarAuditoria: false,
-        podeOperarPortaria: false,
+        podeOperarPortaria: true,
         podeAdministrarAcessos: true,
       },
     },
