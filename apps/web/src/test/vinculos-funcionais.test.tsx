@@ -30,10 +30,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
     administracaoId: null,
     setorId: null,
     casaId: null,
-    grupoTrabalhoId: null,
-    membro: { nome: 'João da Silva' },
-    funcao: { nome: 'Ancião' },
-    regional: { nome: 'Regional Leste' }
+    grupoTrabalhoId: null
   }
 
   const mockMembros = [{ id: MEMBRO_ID, nome: 'João da Silva' }]
@@ -57,7 +54,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
     })
   })
 
-  it('1. Listar: deve exibir o vínculo e apenas dados institucionais', async () => {
+  it('1. Listar: deve resolver nomes pelos lookups quando a API retorna apenas IDs', async () => {
     render(<VinculosFuncionaisView />)
     
     expect(await screen.findByText('João da Silva')).toBeInTheDocument()
