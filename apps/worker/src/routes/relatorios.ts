@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, gte, lt, inArray } from 'drizzle-orm'
+import { eq, and, gte, lt, lte, inArray } from 'drizzle-orm'
 import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, membros, casas, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo } from '../security/permissoes'
@@ -258,9 +258,13 @@ relatoriosRouter.get('/presencas/periodo', async c => {
 
   if (dataInicio) condicoes.push(gte(eventos.inicioEm, dataInicio))
   if (dataFim) {
-    const fimExclusivo = new Date(`${dataFim}T00:00:00.000Z`)
-    fimExclusivo.setUTCDate(fimExclusivo.getUTCDate() + 1)
-    condicoes.push(lt(eventos.inicioEm, fimExclusivo.toISOString()))
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) {
+      const fimExclusivo = new Date(`${dataFim}T00:00:00.000Z`)
+      fimExclusivo.setUTCDate(fimExclusivo.getUTCDate() + 1)
+      condicoes.push(lt(eventos.inicioEm, fimExclusivo.toISOString()))
+    } else {
+      condicoes.push(lte(eventos.inicioEm, dataFim))
+    }
   }
 
   const fechamentos = await db
@@ -549,9 +553,13 @@ relatoriosRouter.get('/agregado', async (c) => {
     conditions.push(gte(eventos.inicioEm, dataInicio))
   }
   if (dataFim) {
-    const fimExclusivo = new Date(`${dataFim}T00:00:00.000Z`)
-    fimExclusivo.setUTCDate(fimExclusivo.getUTCDate() + 1)
-    conditions.push(lt(eventos.inicioEm, fimExclusivo.toISOString()))
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) {
+      const fimExclusivo = new Date(`${dataFim}T00:00:00.000Z`)
+      fimExclusivo.setUTCDate(fimExclusivo.getUTCDate() + 1)
+      conditions.push(lt(eventos.inicioEm, fimExclusivo.toISOString()))
+    } else {
+      conditions.push(lte(eventos.inicioEm, dataFim))
+    }
   }
 
   const listaEventos = await db.select().from(eventos).where(and(...conditions)).all()
