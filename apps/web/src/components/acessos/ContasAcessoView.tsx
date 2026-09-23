@@ -18,6 +18,8 @@ interface ContaAdministrada {
   contaAcessoId: string | null
   status: string | null
   ativadoEm: string | null
+  recuperacaoPinPendente?: boolean
+  recuperacaoPinSolicitadaEm?: string | null
   acessos: Acesso[]
 }
 
@@ -184,6 +186,11 @@ export function ContasAcessoView() {
                 <p className="text-xs text-slate-500">
                   Carteirinha: {conta.codigoCarteirinha || 'não informada'} · Conta: {conta.status || 'sem conta'}
                 </p>
+                {conta.recuperacaoPinPendente && (
+                  <p className="mt-2 inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">
+                    Recuperação de PIN solicitada
+                  </p>
+                )}
               </div>
               <div className="flex flex-wrap gap-2">
                 {!conta.contaAcessoId && (
