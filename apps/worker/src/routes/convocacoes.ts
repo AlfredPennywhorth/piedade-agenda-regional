@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, inArray, sql } from 'drizzle-orm'
+import { eq, and, inArray, sql, asc } from 'drizzle-orm'
 import {
   convocacoes,
   convocacaoFuncoes,
@@ -25,6 +25,14 @@ import {
 import { authMiddleware, Variables } from '../middleware/auth'
 
 export const convocacoesRouter = new Hono<{ Variables: Variables }>()
+
+function emLotes<T>(itens: T[], tamanho: number): T[][] {
+  const lotes: T[][] = []
+  for (let i = 0; i < itens.length; i += tamanho) {
+    lotes.push(itens.slice(i, i + tamanho))
+  }
+  return lotes
+}
 
 convocacoesRouter.use('*', authMiddleware)
 
@@ -111,16 +119,26 @@ convocacoesRouter.patch('/:id', async c => {
       return c.json({ error: 'Apenas convocações em RASCUNHO podem ser alteradas' }, 400)
 
     const nowIso = new Date().toISOString()
-    await executeAtomic(db, qdb => {
-      return [
-        qdb
-          .update(convocacoes)
-          .set({ observacoes: parsed.observacoes, updatedAt: nowIso })
-          .where(eq(convocacoes.id, id)),
-      ]
-    })
+    const updated = await db
+      .update(convocacoes)
+      .set({ observacoes: parsed.observacoes, updatedAt: nowIso })
+      .where(
+        and(
+          eq(convocacoes.id, id),
+          eq(convocacoes.status, 'RASCUNHO'),
+          eq(convocacoes.updatedAt, convocacao.updatedAt)
+        )
+      )
+      .returning()
+      .get()
 
-    const updated = await db.select().from(convocacoes).where(eq(convocacoes.id, id)).get()
+    if (!updated) {
+      return c.json(
+        { error: 'Conflito: a convocação deixou de ser um rascunho ou foi alterada por outra operação.' },
+        409
+      )
+    }
+
     return c.json(updated)
   } catch (err: any) {
     return c.json({ error: err.issues || err.message }, 400)
@@ -341,12 +359,13 @@ convocacoesRouter.post('/:id/publicar', async c => {
           )
       )
 
-      // 2. INSERÇÕES
-      if (destinatariosToInsert.length > 0) {
-        queries.push(qdb.insert(convocacaoDestinatarios).values(destinatariosToInsert))
+      // 2. INSERÇÕES em lotes abaixo do limite de parâmetros do D1.
+      // Destinatário: 4 valores vinculados por linha; evidência: 5.
+      for (const lote of emLotes(destinatariosToInsert, 20)) {
+        queries.push(qdb.insert(convocacaoDestinatarios).values(lote))
       }
-      if (evidenciasToInsert.length > 0) {
-        queries.push(qdb.insert(convocacaoDestinatarioEvidencias).values(evidenciasToInsert))
+      for (const lote of emLotes(evidenciasToInsert, 15)) {
+        queries.push(qdb.insert(convocacaoDestinatarioEvidencias).values(lote))
       }
 
       // 3. AUDITORIA
@@ -514,6 +533,7 @@ convocacoesRouter.get('/:id/acompanhamento-rsvp', async c => {
     .innerJoin(membros, eq(membros.id, convocacaoDestinatarios.membroId))
     .leftJoin(rsvp, eq(rsvp.convocacaoDestinatarioId, convocacaoDestinatarios.id))
     .where(and(...conditions))
+    .orderBy(asc(membros.nome), asc(convocacaoDestinatarios.id))
     .limit(limit)
     .offset(offset)
     .all()
