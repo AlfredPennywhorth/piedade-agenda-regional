@@ -100,6 +100,18 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(localStorage.getItem('token-temporario')).toBeNull()
   })
 
+  it('não redefine PIN quando a confirmação é cancelada', async () => {
+    vi.mocked(window.confirm).mockReturnValueOnce(false)
+
+    render(<ContasAcessoView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Redefinir PIN' }))
+
+    expect(apiClient.postWithAuth).not.toHaveBeenCalled()
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('Redefinir o PIN de Pessoa Teste?')
+    )
+  })
+
   it('revoga sessões após confirmação explícita', async () => {
     vi.mocked(apiClient.postWithAuth).mockResolvedValue({
       message: 'Sessões revogadas',

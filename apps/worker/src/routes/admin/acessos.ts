@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, count, eq, inArray, isNull } from 'drizzle-orm'
+import { and, count, eq, isNull } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { executeAtomic } from '../../db/batch'
 import { gerarTokenAleatorio, hashToken } from '../../security/tokens'
@@ -79,12 +79,31 @@ async function regionalDoMembro(db: any, membroId: string): Promise<string | nul
   return item?.regionalId ?? null
 }
 
+async function membroPossuiMasterAtivo(db: any, membroId: string): Promise<boolean> {
+  const acesso = await db
+    .select({ id: schema.acessosConta.id })
+    .from(schema.acessosConta)
+    .innerJoin(schema.contasAcesso, eq(schema.acessosConta.contaAcessoId, schema.contasAcesso.id))
+    .where(
+      and(
+        eq(schema.contasAcesso.membroId, membroId),
+        eq(schema.acessosConta.perfilCodigo, 'MASTER_SISTEMA'),
+        eq(schema.acessosConta.ativo, true)
+      )
+    )
+    .get()
+
+  return Boolean(acesso)
+}
+
 async function podeAdministrarMembro(
   db: any,
   contexto: ContextoPermissoes,
   membroId: string
 ): Promise<boolean> {
   if (eMasterSistema(contexto)) return true
+  if (await membroPossuiMasterAtivo(db, membroId)) return false
+
   const regionalId = await regionalDoMembro(db, membroId)
   return Boolean(regionalId && regionaisAdministradas(contexto).has(regionalId))
 }
@@ -164,31 +183,35 @@ adminAcessosApp.get('/', async c => {
   const visiveis = pessoas.filter(
     (pessoa: any) => master || regionaisPermitidas.has(pessoa.regionalId)
   )
-  const contasIds = visiveis
-    .map((pessoa: any) => pessoa.contaAcessoId)
-    .filter((id: string | null): id is string => Boolean(id))
+  const acessos = await db
+    .select({
+      id: schema.acessosConta.id,
+      contaAcessoId: schema.acessosConta.contaAcessoId,
+      perfilCodigo: schema.acessosConta.perfilCodigo,
+      escopoTipo: schema.acessosConta.escopoTipo,
+      escopoId: schema.acessosConta.escopoId,
+      regionalId: schema.administracoes.regionalId,
+    })
+    .from(schema.acessosConta)
+    .innerJoin(schema.contasAcesso, eq(schema.acessosConta.contaAcessoId, schema.contasAcesso.id))
+    .innerJoin(schema.membros, eq(schema.contasAcesso.membroId, schema.membros.id))
+    .innerJoin(schema.casas, eq(schema.membros.casaId, schema.casas.id))
+    .innerJoin(schema.setores, eq(schema.casas.setorId, schema.setores.id))
+    .innerJoin(schema.administracoes, eq(schema.setores.administracaoId, schema.administracoes.id))
+    .where(
+      and(
+        eq(schema.acessosConta.ativo, true),
+        eq(schema.membros.ativo, true)
+      )
+    )
+    .all()
 
-  const acessos = contasIds.length
-    ? await db
-        .select({
-          id: schema.acessosConta.id,
-          contaAcessoId: schema.acessosConta.contaAcessoId,
-          perfilCodigo: schema.acessosConta.perfilCodigo,
-          escopoTipo: schema.acessosConta.escopoTipo,
-          escopoId: schema.acessosConta.escopoId,
-        })
-        .from(schema.acessosConta)
-        .where(
-          and(
-            inArray(schema.acessosConta.contaAcessoId, contasIds),
-            eq(schema.acessosConta.ativo, true)
-          )
-        )
-        .all()
-    : []
+  const acessosVisiveis = acessos.filter(
+    (acesso: any) => master || regionaisPermitidas.has(acesso.regionalId)
+  )
 
-  const acessosPorConta = new Map<string, typeof acessos>()
-  for (const acesso of acessos) {
+  const acessosPorConta = new Map<string, typeof acessosVisiveis>()
+  for (const acesso of acessosVisiveis) {
     const atuais = acessosPorConta.get(acesso.contaAcessoId) ?? []
     atuais.push(acesso)
     acessosPorConta.set(acesso.contaAcessoId, atuais)

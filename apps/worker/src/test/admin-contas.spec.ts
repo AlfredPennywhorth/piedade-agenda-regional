@@ -443,7 +443,32 @@ describe('Administração de contas — PR-ACC-05', () => {
     expect(acesso).toBeUndefined()
   })
 
-  it('protege o último Master operacional contra bloqueio', async () => {
+  it('impede Administrador regional de gerar link de ativação para conta Master', async () => {
+    const tokenAdmin = 'token-admin-link-master'
+    await criarSessao('sessao-admin-link-master', 'conta-admin', 'membro-admin', tokenAdmin)
+
+    const response = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-master/link-ativacao',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenAdmin}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }
+    )
+
+    expect(response.status).toBe(403)
+    expect((await response.json()) as any).toMatchObject({ code: 'FORBIDDEN' })
+
+    const links = sqlite.prepare(
+      `SELECT COUNT(*) AS total FROM links_ativacao WHERE conta_acesso_id = 'conta-master'`
+    ).get() as { total: number }
+    expect(links.total).toBe(0)
+  })
+
+  it('impede Administrador regional de bloquear qualquer conta Master', async () => {
     const tokenAdmin = 'token-admin-protege-master'
     await criarSessao('sessao-admin-protege-master', 'conta-admin', 'membro-admin', tokenAdmin)
 
@@ -459,15 +484,15 @@ describe('Administração de contas — PR-ACC-05', () => {
       }
     )
 
-    expect(response.status).toBe(409)
-    expect((await response.json()) as any).toMatchObject({ code: 'ULTIMO_MASTER' })
+    expect(response.status).toBe(403)
+    expect((await response.json()) as any).toMatchObject({ code: 'FORBIDDEN' })
     const conta = sqlite.prepare(
       `SELECT status FROM contas_acesso WHERE id = 'conta-master'`
     ).get() as any
     expect(conta.status).toBe('ATIVA')
   })
 
-  it('protege o último Master operacional contra redefinição de PIN', async () => {
+  it('impede Administrador regional de redefinir PIN de qualquer conta Master', async () => {
     const tokenAdmin = 'token-admin-reset-master'
     await criarSessao('sessao-admin-reset-master', 'conta-admin', 'membro-admin', tokenAdmin)
 
@@ -483,8 +508,8 @@ describe('Administração de contas — PR-ACC-05', () => {
       }
     )
 
-    expect(response.status).toBe(409)
-    expect((await response.json()) as any).toMatchObject({ code: 'ULTIMO_MASTER' })
+    expect(response.status).toBe(403)
+    expect((await response.json()) as any).toMatchObject({ code: 'FORBIDDEN' })
     const conta = sqlite.prepare(
       `SELECT status, pin_hash FROM contas_acesso WHERE id = 'conta-master'`
     ).get() as any
