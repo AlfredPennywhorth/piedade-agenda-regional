@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 
 export interface CapacidadesFrontend {
   podeVisualizarRelatorios?: boolean
@@ -31,12 +31,6 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
     setMostrarMais(false)
     botaoMaisRef.current?.focus()
   }
-
-  useEffect(() => {
-    if (mostrarMais) {
-      fecharMaisRef.current?.focus()
-    }
-  }, [mostrarMais])
 
   const navegar = (tab: MainLayoutProps['currentTab']) => {
     onTabChange(tab)
