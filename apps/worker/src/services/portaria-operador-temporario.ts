@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm'
-import { credenciaisOperadorPortariaEvento, eventos, portariasEvento } from '../db/schema'
+import { credenciaisOperadorPortariaEvento, eventos, portariasEvento, portariaFechamentoLocks } from '../db/schema'
 import { hashToken } from '../security/tokens'
 
 export type CredencialOperadorValida = {
@@ -57,6 +57,16 @@ export async function validarCredencialOperadorPortaria(
 
   if (portaria?.status === 'FECHADA') {
     return { ok: false, status: 409, code: 'PORTARIA_FECHADA', error: 'A Portaria desta reunião já foi fechada' }
+  }
+
+  const fechamentoEmCurso = await db
+    .select({ eventoId: portariaFechamentoLocks.eventoId })
+    .from(portariaFechamentoLocks)
+    .where(eq(portariaFechamentoLocks.eventoId, credencial.eventoId))
+    .get()
+
+  if (fechamentoEmCurso) {
+    return { ok: false, status: 409, code: 'PORTARIA_FECHANDO', error: 'A Portaria desta reunião está sendo encerrada' }
   }
 
   const agora = new Date().toISOString()
