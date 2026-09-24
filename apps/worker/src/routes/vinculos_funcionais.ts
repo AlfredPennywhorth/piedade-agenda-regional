@@ -91,6 +91,10 @@ function escopoDoVinculo(vinculo: any): {
   return null
 }
 
+function podeEscreverVinculos(contexto: any): boolean {
+  return eMasterSistema(contexto) || regionaisAdministradas(contexto).size > 0
+}
+
 async function podeAdministrarVinculo(db: any, contexto: any, vinculo: any): Promise<boolean> {
   if (eMasterSistema(contexto)) return true
 
@@ -244,6 +248,10 @@ vinculosFuncionaisRouter.get('/:id', async (c) => {
 
 vinculosFuncionaisRouter.post('/', async (c) => {
   const db = c.get('db')
+  if (!podeEscreverVinculos(c.get('contextoPermissoes'))) {
+    return c.json({ error: 'Acesso não autorizado para administrar vínculos', code: 'FORBIDDEN' }, 403)
+  }
+
   try {
     const body = await c.req.json()
     const parsed = CreateVinculoFuncionalSchema.parse(body)
@@ -269,6 +277,10 @@ vinculosFuncionaisRouter.post('/', async (c) => {
 vinculosFuncionaisRouter.patch('/:id', async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')
+  if (!podeEscreverVinculos(c.get('contextoPermissoes'))) {
+    return c.json({ error: 'Acesso não autorizado para administrar vínculos', code: 'FORBIDDEN' }, 403)
+  }
+
   try {
     const body = await c.req.json()
     const parsed = UpdateVinculoFuncionalSchema.parse(body)
