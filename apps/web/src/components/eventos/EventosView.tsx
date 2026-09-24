@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput, SerieCreateInput, createUtcDateFromSaoPaulo } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import { SerieFormModal, TipoEscopo } from '../series/SerieFormModal'
+import { generateQrMatrix } from '../agenda/qrGenerator'
 import type { Casa } from '../casas/CasasView'
 import type { Setor } from '../setores/SetoresView'
 import type { Administracao } from '../administracoes/AdministracoesView'
@@ -529,22 +530,37 @@ export function EventosView() {
         </div>
       )}
 
-      {acessoPortariaUrl && !formOpen && (
-        <div className="p-4 bg-brand-50 border border-brand-200 text-brand-900 rounded-xl text-sm">
-          <p className="font-semibold">Acesso temporário de Portaria gerado</p>
-          <p className="mt-1 text-xs">Envie este link somente ao voluntário que atuará nesta reunião. Ele não precisa estar cadastrado no sistema.</p>
-          <a href={acessoPortariaUrl} target="_blank" rel="noreferrer" className="mt-3 block break-all font-mono text-xs underline">
-            {acessoPortariaUrl}
-          </a>
-          <button
-            type="button"
-            onClick={() => void navigator.clipboard.writeText(acessoPortariaUrl)}
-            className="mt-3 rounded-lg border border-brand-300 bg-white px-3 py-2 text-xs font-semibold text-brand-800"
-          >
-            Copiar link
-          </button>
-        </div>
-      )}
+      {acessoPortariaUrl && !formOpen && (() => {
+        const matrix = generateQrMatrix(acessoPortariaUrl)
+        const quiet = 4
+        const size = matrix.length + quiet * 2
+        return (
+          <div className="p-4 bg-brand-50 border border-brand-200 text-brand-900 rounded-xl text-sm">
+            <p className="font-semibold">Acesso temporário de Portaria gerado</p>
+            <p className="mt-1 text-xs">Envie o link ou mostre este QR Code ao voluntário. Ele não precisa estar cadastrado no sistema.</p>
+            <div className="mt-4 flex flex-col sm:flex-row gap-4 items-center sm:items-start">
+              <svg viewBox={`0 0 ${size} ${size}`} className="h-44 w-44 bg-white p-2 rounded-lg border" shapeRendering="crispEdges" role="img" aria-label="QR Code de acesso temporário da Portaria">
+                <rect width={size} height={size} fill="#fff" />
+                {matrix.map((row, r) => row.map((cell, col) => cell
+                  ? <rect key={`${r}-${col}`} x={col + quiet} y={r + quiet} width="1" height="1" fill="#000" />
+                  : null))}
+              </svg>
+              <div className="min-w-0 flex-1">
+                <a href={acessoPortariaUrl} target="_blank" rel="noreferrer" className="block break-all font-mono text-xs underline">
+                  {acessoPortariaUrl}
+                </a>
+                <button
+                  type="button"
+                  onClick={() => void navigator.clipboard.writeText(acessoPortariaUrl)}
+                  className="mt-3 rounded-lg border border-brand-300 bg-white px-3 py-2 text-xs font-semibold text-brand-800"
+                >
+                  Copiar link
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {loading && !formOpen && !eventoDetalhe ? (
         <div className="flex justify-center items-center py-12">
