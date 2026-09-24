@@ -1,9 +1,10 @@
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
-import { membros, vinculosFuncionais, tentativasAcesso } from '../db/schema'
+import { eq, inArray, or } from 'drizzle-orm'
+import { administracoes, casas, membros, setores, vinculosFuncionais, tentativasAcesso } from '../db/schema'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { exigirMasterParaEscrita } from '../middleware/master-write'
+import { eMasterSistema, regionaisAdministradas } from '../security/permissoes'
 
 export const membrosRouter = new Hono<any>()
 
@@ -36,9 +37,51 @@ function somenteCadastroInstitucional(membro: any) {
   }
 }
 
+async function idsMembrosVisiveis(c: any): Promise<Set<string> | null> {
+  const db = c.get('db')
+  const contexto = c.get('contextoPermissoes')
+
+  if (eMasterSistema(contexto)) return null
+
+  const ids = new Set<string>([contexto.membroId])
+  const regionaisIds = Array.from(regionaisAdministradas(contexto))
+  if (regionaisIds.length === 0) return ids
+
+  const rows = await db
+    .select({ id: membros.id })
+    .from(membros)
+    .leftJoin(casas, eq(membros.casaId, casas.id))
+    .leftJoin(setores, eq(casas.setorId, setores.id))
+    .leftJoin(administracoes, eq(setores.administracaoId, administracoes.id))
+    .where(
+      or(
+        eq(membros.id, contexto.membroId),
+        inArray(administracoes.regionalId, regionaisIds)
+      )
+    )
+    .all()
+
+  rows.forEach((row: { id: string }) => ids.add(row.id))
+  return ids
+}
+
 membrosRouter.get('/', async (c) => {
   const db = c.get('db')
-  const data = await db.select(membroPublico).from(membros).all()
+  const idsVisiveis = await idsMembrosVisiveis(c)
+
+  if (idsVisiveis === null) {
+    return c.json(await db.select(membroPublico).from(membros).all())
+  }
+
+  const ids = Array.from(idsVisiveis)
+  if (ids.length === 0) return c.json([])
+
+  const data = await db
+    .select(membroPublico)
+    .from(membros)
+    .where(inArray(membros.id, ids))
+    .all()
+
   return c.json(data)
 })
 
@@ -48,6 +91,12 @@ membrosRouter.get('/:id', async (c) => {
   const data = await db.select(membroPublico).from(membros).where(eq(membros.id, id)).get()
   
   if (!data) return c.json({ error: 'Membro não encontrado' }, 404)
+
+  const idsVisiveis = await idsMembrosVisiveis(c)
+  if (idsVisiveis !== null && !idsVisiveis.has(id)) {
+    return c.json({ error: 'Acesso não autorizado para este membro', code: 'FORBIDDEN' }, 403)
+  }
+
   return c.json(data)
 })
 
@@ -57,6 +106,11 @@ membrosRouter.get('/:id/vinculos', async (c) => {
   
   const membroExists = await db.select().from(membros).where(eq(membros.id, id)).get()
   if (!membroExists) return c.json({ error: 'Membro não encontrado' }, 404)
+
+  const idsVisiveis = await idsMembrosVisiveis(c)
+  if (idsVisiveis !== null && !idsVisiveis.has(id)) {
+    return c.json({ error: 'Acesso não autorizado para este membro', code: 'FORBIDDEN' }, 403)
+  }
 
   const data = await db.select().from(vinculosFuncionais).where(eq(vinculosFuncionais.membroId, id)).all()
   return c.json(data)

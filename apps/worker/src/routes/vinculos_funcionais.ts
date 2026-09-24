@@ -13,6 +13,7 @@ import {
 import { CreateVinculoFuncionalSchema, UpdateVinculoFuncionalSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { exigirMasterParaEscrita } from '../middleware/master-write'
+import { eMasterSistema, obterRegionalDoEscopo, regionaisAdministradas } from '../security/permissoes'
 
 export const vinculosFuncionaisRouter = new Hono<any>()
 
@@ -67,10 +68,53 @@ function selecionarVinculosDetalhados(db: any) {
     .leftJoin(gruposTrabalho, eq(vinculosFuncionais.grupoTrabalhoId, gruposTrabalho.id))
 }
 
+async function vinculoVisivelParaContexto(db: any, contexto: any, vinculo: any): Promise<boolean> {
+  if (eMasterSistema(contexto)) return true
+  if (vinculo.membroId === contexto.membroId) return true
+
+  const administradas = regionaisAdministradas(contexto)
+  if (administradas.size === 0) return false
+
+  let escopoTipo: 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO' | null = null
+  let escopoId: string | null = null
+
+  if (vinculo.regionalId) {
+    escopoTipo = 'REGIONAL'
+    escopoId = vinculo.regionalId
+  } else if (vinculo.administracaoId) {
+    escopoTipo = 'ADMINISTRACAO'
+    escopoId = vinculo.administracaoId
+  } else if (vinculo.setorId) {
+    escopoTipo = 'SETOR'
+    escopoId = vinculo.setorId
+  } else if (vinculo.casaId) {
+    escopoTipo = 'CASA'
+    escopoId = vinculo.casaId
+  } else if (vinculo.grupoTrabalhoId) {
+    escopoTipo = 'GRUPO_TRABALHO'
+    escopoId = vinculo.grupoTrabalhoId
+  }
+
+  if (!escopoTipo || !escopoId) return false
+  const regionalId = await obterRegionalDoEscopo(db, escopoTipo, escopoId)
+  return regionalId ? administradas.has(regionalId) : false
+}
+
 vinculosFuncionaisRouter.get('/', async (c) => {
   const db = c.get('db')
+  const contexto = c.get('contextoPermissoes')
   const data = await selecionarVinculosDetalhados(db).all()
-  return c.json(data)
+
+  if (eMasterSistema(contexto)) return c.json(data)
+
+  const visiveis = []
+  for (const vinculo of data) {
+    if (await vinculoVisivelParaContexto(db, contexto, vinculo)) {
+      visiveis.push(vinculo)
+    }
+  }
+
+  return c.json(visiveis)
 })
 
 vinculosFuncionaisRouter.get('/:id', async (c) => {
@@ -81,6 +125,12 @@ vinculosFuncionaisRouter.get('/:id', async (c) => {
     .get()
   
   if (!data) return c.json({ error: 'Vínculo funcional não encontrado' }, 404)
+
+  const contexto = c.get('contextoPermissoes')
+  if (!(await vinculoVisivelParaContexto(db, contexto, data))) {
+    return c.json({ error: 'Acesso não autorizado para este vínculo', code: 'FORBIDDEN' }, 403)
+  }
+
   return c.json(data)
 })
 
