@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import App from '../App'
 import { QrCodeModal } from '../components/agenda/QrCodeModal'
@@ -77,8 +77,14 @@ describe('S07 - Minha Agenda e Calendário', () => {
   const mobileNav = async () => within(await screen.findByRole('navigation', { name: /navegação móvel principal/i }))
 
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-23T15:00:00.000Z'))
     vi.clearAllMocks()
     localStorage.setItem('session_token', 'sessao-teste')
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   const mockAgenda = (dados: unknown) => {
