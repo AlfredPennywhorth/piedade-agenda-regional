@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import {
   administracoes,
   casas,
@@ -12,7 +12,7 @@ import {
 } from '../db/schema'
 import { CreateVinculoFuncionalSchema, UpdateVinculoFuncionalSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { eMasterSistema, obterRegionalDoEscopo, regionaisAdministradas } from '../security/permissoes'
+import { eMasterSistema, obterEscoposTerritoriaisVisiveis, obterRegionalDoEscopo, regionaisAdministradas } from '../security/permissoes'
 
 export const vinculosFuncionaisRouter = new Hono<any>()
 
@@ -107,53 +107,67 @@ async function podeAdministrarVinculo(db: any, contexto: any, vinculo: any): Pro
   return !!regionalEscopo && administradas.has(regionalEscopo) && regionalEscopo === regionalMembro
 }
 
-async function vinculoVisivelParaContexto(db: any, contexto: any, vinculo: any): Promise<boolean> {
-  if (eMasterSistema(contexto)) return true
-  if (vinculo.membroId === contexto.membroId) return true
-
-  const administradas = regionaisAdministradas(contexto)
-  if (administradas.size === 0) return false
-
-  let escopoTipo: 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO' | null = null
-  let escopoId: string | null = null
-
-  if (vinculo.regionalId) {
-    escopoTipo = 'REGIONAL'
-    escopoId = vinculo.regionalId
-  } else if (vinculo.administracaoId) {
-    escopoTipo = 'ADMINISTRACAO'
-    escopoId = vinculo.administracaoId
-  } else if (vinculo.setorId) {
-    escopoTipo = 'SETOR'
-    escopoId = vinculo.setorId
-  } else if (vinculo.casaId) {
-    escopoTipo = 'CASA'
-    escopoId = vinculo.casaId
-  } else if (vinculo.grupoTrabalhoId) {
-    escopoTipo = 'GRUPO_TRABALHO'
-    escopoId = vinculo.grupoTrabalhoId
+export async function listarVinculosVisiveis(db: any, contexto: any, membroId?: string) {
+  if (eMasterSistema(contexto)) {
+    const query = selecionarVinculosDetalhados(db)
+    return membroId
+      ? await query.where(eq(vinculosFuncionais.membroId, membroId)).all()
+      : await query.all()
   }
 
-  if (!escopoTipo || !escopoId) return false
-  const regionalId = await obterRegionalDoEscopo(db, escopoTipo, escopoId)
-  return regionalId ? administradas.has(regionalId) : false
+  const porId = new Map<string, any>()
+
+  const incluir = (itens: any[]) => {
+    for (const item of itens) porId.set(item.id, item)
+  }
+
+  // O titular sempre pode ler os próprios vínculos.
+  if (!membroId || membroId === contexto.membroId) {
+    incluir(
+      await selecionarVinculosDetalhados(db)
+        .where(eq(vinculosFuncionais.membroId, contexto.membroId))
+        .all()
+    )
+  }
+
+  const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+  const LIMITE_IDS_D1 = 90
+
+  const consultarEmLotes = async (coluna: any, ids: string[]) => {
+    for (let i = 0; i < ids.length; i += LIMITE_IDS_D1) {
+      const lote = ids.slice(i, i + LIMITE_IDS_D1)
+      if (lote.length === 0) continue
+
+      let query = selecionarVinculosDetalhados(db).where(inArray(coluna, lote))
+      const itens = await query.all()
+
+      if (membroId) {
+        incluir(itens.filter((item: any) => item.membroId === membroId))
+      } else {
+        incluir(itens)
+      }
+    }
+  }
+
+  await consultarEmLotes(vinculosFuncionais.regionalId, Array.from(visiveis.regionaisIds))
+  await consultarEmLotes(vinculosFuncionais.administracaoId, Array.from(visiveis.administracoesIds))
+  await consultarEmLotes(vinculosFuncionais.setorId, Array.from(visiveis.setoresIds))
+  await consultarEmLotes(vinculosFuncionais.casaId, Array.from(visiveis.casasIds))
+  await consultarEmLotes(vinculosFuncionais.grupoTrabalhoId, Array.from(visiveis.gruposTrabalhoIds))
+
+  return Array.from(porId.values())
+}
+
+async function vinculoVisivelParaContexto(db: any, contexto: any, vinculoId: string): Promise<boolean> {
+  if (eMasterSistema(contexto)) return true
+  const visiveis = await listarVinculosVisiveis(db, contexto)
+  return visiveis.some((item: any) => item.id === vinculoId)
 }
 
 vinculosFuncionaisRouter.get('/', async (c) => {
   const db = c.get('db')
   const contexto = c.get('contextoPermissoes')
-  const data = await selecionarVinculosDetalhados(db).all()
-
-  if (eMasterSistema(contexto)) return c.json(data)
-
-  const visiveis = []
-  for (const vinculo of data) {
-    if (await vinculoVisivelParaContexto(db, contexto, vinculo)) {
-      visiveis.push(vinculo)
-    }
-  }
-
-  return c.json(visiveis)
+  return c.json(await listarVinculosVisiveis(db, contexto))
 })
 
 vinculosFuncionaisRouter.get('/:id', async (c) => {
@@ -166,7 +180,7 @@ vinculosFuncionaisRouter.get('/:id', async (c) => {
   if (!data) return c.json({ error: 'Vínculo funcional não encontrado' }, 404)
 
   const contexto = c.get('contextoPermissoes')
-  if (!(await vinculoVisivelParaContexto(db, contexto, data))) {
+  if (!(await vinculoVisivelParaContexto(db, contexto, data.id))) {
     return c.json({ error: 'Acesso não autorizado para este vínculo', code: 'FORBIDDEN' }, 403)
   }
 
