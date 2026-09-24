@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { eq, inArray, or } from 'drizzle-orm'
-import { administracoes, casas, membros, setores, vinculosFuncionais, tentativasAcesso } from '../db/schema'
+import { and, eq, inArray, or } from 'drizzle-orm'
+import { acessosConta, administracoes, casas, contasAcesso, membros, setores, tentativasAcesso } from '../db/schema'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, regionaisAdministradas } from '../security/permissoes'
@@ -54,10 +54,34 @@ function podeAdministrarRegionalDoContexto(contexto: any, regionalId: string | n
   return regionaisAdministradas(contexto).has(regionalId)
 }
 
-async function podeAdministrarMembro(c: any, membro: { casaId: string }): Promise<boolean> {
+async function membroPossuiMasterAtivo(db: any, membroId: string): Promise<boolean> {
+  const acesso = await db
+    .select({ id: acessosConta.id })
+    .from(acessosConta)
+    .innerJoin(contasAcesso, eq(acessosConta.contaAcessoId, contasAcesso.id))
+    .where(
+      and(
+        eq(contasAcesso.membroId, membroId),
+        eq(acessosConta.perfilCodigo, 'MASTER_SISTEMA'),
+        eq(acessosConta.ativo, true)
+      )
+    )
+    .get()
+
+  return Boolean(acesso)
+}
+
+async function podeAdministrarMembro(
+  c: any,
+  membro: { id: string; casaId: string }
+): Promise<boolean> {
   const db = c.get('db')
   const contexto = c.get('contextoPermissoes')
   if (eMasterSistema(contexto)) return true
+
+  // Administrador Regional nunca pode alterar um membro que seja Master ativo.
+  if (await membroPossuiMasterAtivo(db, membro.id)) return false
+
   const regionalId = await regionalIdDaCasa(db, membro.casaId)
   return podeAdministrarRegionalDoContexto(contexto, regionalId)
 }
