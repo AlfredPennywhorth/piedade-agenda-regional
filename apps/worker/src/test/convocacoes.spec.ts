@@ -178,6 +178,46 @@ describe('S06 - Convocações', () => {
     const json = await res.json()
     expect(json.status).toBe('RASCUNHO')
     expect(json.id).toBeDefined()
+
+    const log = await db.select().from(auditoriaLogs)
+      .where(eq(auditoriaLogs.recursoId, json.id))
+      .get()
+    expect(log?.acao).toBe('CONVOCACAO_CRIADA')
+    expect(log?.atorMembroId).toBe(ctx.mem1Id)
+    expect(log?.escopoTipo).toBe('SETOR')
+    expect(log?.escopoId).toBe(ctx.setId)
+  })
+
+  it('1.1 audita adição e remoção de função da convocação', async () => {
+    const ctx = await setupBaseData()
+    const convRes = await app.request('/api/v1/convocacoes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId: ctx.evSetorId }),
+    })
+    const conv = await convRes.json()
+
+    const addRes = await app.request(`/api/v1/convocacoes/${conv.id}/funcoes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ funcaoId: ctx.f1Id }),
+    })
+    expect(addRes.status).toBe(201)
+
+    const addLog = await db.select().from(auditoriaLogs)
+      .where(eq(auditoriaLogs.acao, 'CONVOCACAO_FUNCAO_ADICIONADA'))
+      .all()
+    expect(addLog.some((item: any) => item.recursoId === conv.id)).toBe(true)
+
+    const delRes = await app.request(`/api/v1/convocacoes/${conv.id}/funcoes/${ctx.f1Id}`, {
+      method: 'DELETE',
+    })
+    expect(delRes.status).toBe(200)
+
+    const delLog = await db.select().from(auditoriaLogs)
+      .where(eq(auditoriaLogs.acao, 'CONVOCACAO_FUNCAO_REMOVIDA'))
+      .all()
+    expect(delLog.some((item: any) => item.recursoId === conv.id)).toBe(true)
   })
 
   it('2. não publicar quando função associada estiver inativa', async () => {
