@@ -49,9 +49,13 @@ async function regionalIdDaCasa(db: any, casaId: string): Promise<string | null>
 }
 
 function podeAdministrarRegionalDoContexto(contexto: any, regionalId: string | null): boolean {
-  if (!regionalId) return false
   if (eMasterSistema(contexto)) return true
+  if (!regionalId) return false
   return regionaisAdministradas(contexto).has(regionalId)
+}
+
+function podeEscreverMembros(contexto: any): boolean {
+  return eMasterSistema(contexto) || regionaisAdministradas(contexto).size > 0
 }
 
 async function membroPossuiMasterAtivo(db: any, membroId: string): Promise<boolean> {
@@ -176,6 +180,10 @@ membrosRouter.get('/:id/vinculos', async (c) => {
 
 membrosRouter.post('/', async (c) => {
   const db = c.get('db')
+  if (!podeEscreverMembros(c.get('contextoPermissoes'))) {
+    return c.json({ error: 'Acesso não autorizado para administrar pessoas', code: 'FORBIDDEN' }, 403)
+  }
+
   try {
     const body = await c.req.json()
     const parsed = CreateMembroSchema.parse(body)
@@ -226,6 +234,10 @@ membrosRouter.post('/', async (c) => {
 membrosRouter.patch('/:id', async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')
+  if (!podeEscreverMembros(c.get('contextoPermissoes'))) {
+    return c.json({ error: 'Acesso não autorizado para administrar pessoas', code: 'FORBIDDEN' }, 403)
+  }
+
   try {
     const body = await c.req.json()
     const parsed = UpdateMembroSchema.parse(body)
