@@ -220,6 +220,29 @@ describe('S06 - Convocações', () => {
     expect(delLog.some((item: any) => item.recursoId === conv.id)).toBe(true)
   })
 
+  it('1.2 não audita remoção de função inexistente', async () => {
+    const ctx = await setupBaseData()
+    const convRes = await app.request('/api/v1/convocacoes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId: ctx.evSetorId }),
+    })
+    const conv = await convRes.json()
+
+    const delRes = await app.request(`/api/v1/convocacoes/${conv.id}/funcoes/${ctx.f1Id}`, {
+      method: 'DELETE',
+    })
+    expect(delRes.status).toBe(404)
+
+    const logs = await db.select().from(auditoriaLogs)
+      .where(and(
+        eq(auditoriaLogs.recursoId, conv.id),
+        eq(auditoriaLogs.acao, 'CONVOCACAO_FUNCAO_REMOVIDA')
+      ))
+      .all()
+    expect(logs).toHaveLength(0)
+  })
+
   it('2. não publicar quando função associada estiver inativa', async () => {
     const ctx = await setupBaseData()
     const fInativaId = crypto.randomUUID()
