@@ -11,7 +11,7 @@ export interface Regional {
   updatedAt?: string
 }
 
-export function RegionaisView() {
+export function RegionaisView({ podeEditar = true }: { podeEditar?: boolean }) {
   const [regionais, setRegionais] = useState<Regional[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [erro, setErro] = useState<string | null>(null)
@@ -178,14 +178,18 @@ export function RegionaisView() {
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Gestão Territorial — Regionais</h2>
-          <p className="text-xs text-slate-500">Listagem, cadastro e atualização de Regionais</p>
+          <p className="text-xs text-slate-500">
+            {podeEditar ? 'Listagem, cadastro e atualização de Regionais' : 'Consulta de Regionais'}
+          </p>
         </div>
-        <button
-          onClick={abrirFormCriar}
-          className="bg-brand-600 hover:bg-brand-700 text-white font-medium text-xs px-4 py-2 rounded-lg transition-colors shadow-sm"
-        >
-          + Nova Regional
-        </button>
+        {podeEditar && (
+          <button
+            onClick={abrirFormCriar}
+            className="bg-brand-600 hover:bg-brand-700 text-white font-medium text-xs px-4 py-2 rounded-lg transition-colors shadow-sm"
+          >
+            + Nova Regional
+          </button>
+        )}
       </div>
 
       {/* Mensagens Globais de Erro e Sucesso */}
@@ -204,7 +208,7 @@ export function RegionaisView() {
       )}
 
       {/* Form de Criação / Edição Inline ou Card */}
-      {modoForm && (
+      {podeEditar && modoForm && (
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-md space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <h3 className="font-bold text-slate-800 text-base">
@@ -346,12 +350,14 @@ export function RegionaisView() {
                       >
                         Detalhes
                       </button>
-                      <button
-                        onClick={() => abrirFormEditar(reg.id)}
-                        className="text-xs text-brand-600 hover:text-brand-800 font-medium px-2 py-1 bg-brand-50 hover:bg-brand-100 rounded transition-colors"
-                      >
-                        Editar
-                      </button>
+                      {podeEditar && (
+                        <button
+                          onClick={() => abrirFormEditar(reg.id)}
+                          className="text-xs text-brand-600 hover:text-brand-800 font-medium px-2 py-1 bg-brand-50 hover:bg-brand-100 rounded transition-colors"
+                        >
+                          Editar
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
