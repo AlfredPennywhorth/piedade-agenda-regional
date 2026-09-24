@@ -1,9 +1,10 @@
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { casas } from '../db/schema'
 import { CreateCasaSchema, UpdateCasaSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { exigirMasterParaEscrita } from '../middleware/master-write'
+import { obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
 
 export const casasRouter = new Hono<any>()
 
@@ -12,7 +13,26 @@ casasRouter.use('*', exigirMasterParaEscrita)
 
 casasRouter.get('/', async (c) => {
   const db = c.get('db')
-  const data = await db.select().from(casas).all()
+  const contexto = c.get('contextoPermissoes')
+  const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+
+  if (visiveis.tudo) {
+    return c.json(await db.select().from(casas).all())
+  }
+
+  const ids = Array.from(visiveis.casasIds)
+  if (ids.length === 0) return c.json([])
+
+  const LIMITE_IDS_D1 = 90
+  const data: Array<typeof casas.$inferSelect> = []
+
+  for (let i = 0; i < ids.length; i += LIMITE_IDS_D1) {
+    const lote = ids.slice(i, i + LIMITE_IDS_D1)
+    const parcial = await db.select().from(casas).where(inArray(casas.id, lote)).all()
+    data.push(...parcial)
+  }
+
+  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   return c.json(data)
 })
 
@@ -22,6 +42,13 @@ casasRouter.get('/:id', async (c) => {
   const data = await db.select().from(casas).where(eq(casas.id, id)).get()
   
   if (!data) return c.json({ error: 'Casa de oração não encontrada' }, 404)
+
+  const contexto = c.get('contextoPermissoes')
+  const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+  if (!visiveis.tudo && !visiveis.casasIds.has(id)) {
+    return c.json({ error: 'Acesso não autorizado para este escopo', code: 'FORBIDDEN' }, 403)
+  }
+
   return c.json(data)
 })
 

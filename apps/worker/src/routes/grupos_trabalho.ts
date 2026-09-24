@@ -1,9 +1,10 @@
 import { Hono } from 'hono'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { gruposTrabalho, participacoesGruposTrabalho, setores, administracoes } from '../db/schema'
 import { CreateGrupoTrabalhoSchema, UpdateGrupoTrabalhoSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { exigirMasterParaEscrita } from '../middleware/master-write'
+import { obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
 
 export const gruposTrabalhoRouter = new Hono<any>()
 
@@ -12,7 +13,17 @@ gruposTrabalhoRouter.use('*', exigirMasterParaEscrita)
 
 gruposTrabalhoRouter.get('/', async (c) => {
   const db = c.get('db')
-  const data = await db.select().from(gruposTrabalho).all()
+  const contexto = c.get('contextoPermissoes')
+  const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+
+  if (visiveis.tudo) {
+    return c.json(await db.select().from(gruposTrabalho).all())
+  }
+
+  const ids = Array.from(visiveis.gruposTrabalhoIds)
+  if (ids.length === 0) return c.json([])
+
+  const data = await db.select().from(gruposTrabalho).where(inArray(gruposTrabalho.id, ids)).all()
   return c.json(data)
 })
 
@@ -22,6 +33,13 @@ gruposTrabalhoRouter.get('/:id', async (c) => {
   const data = await db.select().from(gruposTrabalho).where(eq(gruposTrabalho.id, id)).get()
   
   if (!data) return c.json({ error: 'Grupo de Trabalho não encontrado' }, 404)
+
+  const contexto = c.get('contextoPermissoes')
+  const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+  if (!visiveis.tudo && !visiveis.gruposTrabalhoIds.has(id)) {
+    return c.json({ error: 'Acesso não autorizado para este escopo', code: 'FORBIDDEN' }, 403)
+  }
+
   return c.json(data)
 })
 

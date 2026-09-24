@@ -1,9 +1,10 @@
 import { Hono } from 'hono'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { setores, administracoes, participacoesGruposTrabalho, gruposTrabalho } from '../db/schema'
 import { CreateSetorSchema, UpdateSetorSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { exigirMasterParaEscrita } from '../middleware/master-write'
+import { obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
 
 export const setoresRouter = new Hono<any>()
 
@@ -12,7 +13,17 @@ setoresRouter.use('*', exigirMasterParaEscrita)
 
 setoresRouter.get('/', async (c) => {
   const db = c.get('db')
-  const data = await db.select().from(setores).all()
+  const contexto = c.get('contextoPermissoes')
+  const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+
+  if (visiveis.tudo) {
+    return c.json(await db.select().from(setores).all())
+  }
+
+  const ids = Array.from(visiveis.setoresIds)
+  if (ids.length === 0) return c.json([])
+
+  const data = await db.select().from(setores).where(inArray(setores.id, ids)).all()
   return c.json(data)
 })
 
@@ -22,6 +33,13 @@ setoresRouter.get('/:id', async (c) => {
   const data = await db.select().from(setores).where(eq(setores.id, id)).get()
   
   if (!data) return c.json({ error: 'Setor não encontrado' }, 404)
+
+  const contexto = c.get('contextoPermissoes')
+  const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+  if (!visiveis.tudo && !visiveis.setoresIds.has(id)) {
+    return c.json({ error: 'Acesso não autorizado para este escopo', code: 'FORBIDDEN' }, 403)
+  }
+
   return c.json(data)
 })
 

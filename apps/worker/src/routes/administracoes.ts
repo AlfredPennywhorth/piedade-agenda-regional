@@ -1,9 +1,10 @@
 import { Hono } from 'hono'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { administracoes, setores, participacoesGruposTrabalho, gruposTrabalho } from '../db/schema'
 import { CreateAdministracaoSchema, UpdateAdministracaoSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { exigirMasterParaEscrita } from '../middleware/master-write'
+import { obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
 
 export const administracoesRouter = new Hono<any>()
 
@@ -12,7 +13,17 @@ administracoesRouter.use('*', exigirMasterParaEscrita)
 
 administracoesRouter.get('/', async (c) => {
   const db = c.get('db')
-  const data = await db.select().from(administracoes).all()
+  const contexto = c.get('contextoPermissoes')
+  const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+
+  if (visiveis.tudo) {
+    return c.json(await db.select().from(administracoes).all())
+  }
+
+  const ids = Array.from(visiveis.administracoesIds)
+  if (ids.length === 0) return c.json([])
+
+  const data = await db.select().from(administracoes).where(inArray(administracoes.id, ids)).all()
   return c.json(data)
 })
 
@@ -22,6 +33,13 @@ administracoesRouter.get('/:id', async (c) => {
   const data = await db.select().from(administracoes).where(eq(administracoes.id, id)).get()
   
   if (!data) return c.json({ error: 'Administração não encontrada' }, 404)
+
+  const contexto = c.get('contextoPermissoes')
+  const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+  if (!visiveis.tudo && !visiveis.administracoesIds.has(id)) {
+    return c.json({ error: 'Acesso não autorizado para este escopo', code: 'FORBIDDEN' }, 403)
+  }
+
   return c.json(data)
 })
 
