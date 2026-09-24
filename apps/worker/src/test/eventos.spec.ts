@@ -4,8 +4,9 @@ import { setupDb } from './setup'
 import { createApp } from '../index'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import BetterSqlite3 from 'better-sqlite3'
-import { regionais, locais, eventos, administracoes, setores, casas, gruposTrabalho, membros, sessoes } from '../db/schema'
+import { regionais, locais, eventos, administracoes, setores, casas, gruposTrabalho, membros, sessoes, auditoriaLogs } from '../db/schema'
 import { hashToken } from '../security/tokens'
+import { eq } from 'drizzle-orm'
 
 describe('Eventos API (S04)', () => {
   let sqlite: Database
@@ -292,6 +293,38 @@ describe('Eventos API (S04)', () => {
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.titulo).toBe('Evento Atualizado')
+  })
+
+  it('21.1 audita atualização no escopo final do Evento', async () => {
+    const regionalOrigem = await createRegional()
+    const regionalDestino = await createRegional()
+    const createRes = await req('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Evento Movido',
+        modalidade: 'ONLINE',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        urlOnline: 'https://meet.google.com/abc',
+        regionalId: regionalOrigem
+      })
+    })
+    const { id } = await createRes.json()
+
+    const patchRes = await req(`/api/v1/eventos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ regionalId: regionalDestino })
+    })
+    expect(patchRes.status).toBe(200)
+
+    const logs = await db.select().from(auditoriaLogs)
+      .where(eq(auditoriaLogs.recursoId, id))
+      .all()
+    const atualizado = logs.find((item: any) => item.acao === 'EVENTO_ATUALIZADO')
+    expect(atualizado?.escopoTipo).toBe('REGIONAL')
+    expect(atualizado?.escopoId).toBe(regionalDestino)
   })
 
   it('22. inativar evento', async () => {
