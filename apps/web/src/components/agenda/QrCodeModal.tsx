@@ -29,6 +29,8 @@ export function QrCodeModal({ destinatarioId, tituloEvento, onClose }: QrCodeMod
   }, [destinatarioId])
 
   const size = matrix.length
+  const quietZone = 4
+  const viewSize = size + quietZone * 2
 
   return (
     <dialog
@@ -64,19 +66,20 @@ export function QrCodeModal({ destinatarioId, tituloEvento, onClose }: QrCodeMod
           data-qr-payload={destinatarioId}
         >
           <svg
-            viewBox={`0 0 ${size} ${size}`}
+            viewBox={`0 0 ${viewSize} ${viewSize}`}
             className="w-48 h-48 bg-white"
             shapeRendering="crispEdges"
             role="img"
             aria-label={`QR Code para o destinatário ${destinatarioId}`}
           >
+            <rect x="0" y="0" width={viewSize} height={viewSize} fill="#ffffff" />
             {matrix.map((row, r) =>
               row.map((cell, c) =>
                 cell ? (
                   <rect
                     key={`${r}-${c}`}
-                    x={c}
-                    y={r}
+                    x={c + quietZone}
+                    y={r + quietZone}
                     width={1}
                     height={1}
                     fill="#000000"
