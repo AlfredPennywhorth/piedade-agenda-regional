@@ -773,6 +773,7 @@ export interface CapacidadesMembro {
   podeAdministrarRegionais: boolean
   podeAdministrarEstrutura: boolean
   podeAdministrarPessoas: boolean
+  podeAdministrarFuncoes: boolean
   podeGerirAgenda: boolean
 }
 
@@ -790,6 +791,7 @@ export async function obterCapacidadesMembro(
       podeAdministrarRegionais: false,
       podeAdministrarEstrutura: false,
       podeAdministrarPessoas: false,
+      podeAdministrarFuncoes: false,
       podeGerirAgenda: false
     }
   }
@@ -858,9 +860,8 @@ export async function obterCapacidadesMembro(
   const podeAdministrarAcessos = master || administraAlgumaRegional
   const podeAdministrarRegionais = master
   const podeAdministrarEstrutura = master || administraAlgumaRegional
-  // Pessoas já possuem autorização regional no backend; a capacidade será alinhada
-  // no bloco específico de Pessoas/Vínculos.
-  const podeAdministrarPessoas = master
+  const podeAdministrarPessoas = master || administraAlgumaRegional
+  const podeAdministrarFuncoes = master
 
   const membroAtivo = await db
     .select({ id: schema.membros.id })
@@ -882,6 +883,7 @@ export async function obterCapacidadesMembro(
     podeAdministrarRegionais,
     podeAdministrarEstrutura,
     podeAdministrarPessoas,
+    podeAdministrarFuncoes,
     podeGerirAgenda
   }
 }
