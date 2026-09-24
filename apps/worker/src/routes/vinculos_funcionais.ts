@@ -12,13 +12,11 @@ import {
 } from '../db/schema'
 import { CreateVinculoFuncionalSchema, UpdateVinculoFuncionalSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { exigirMasterParaEscrita } from '../middleware/master-write'
 import { eMasterSistema, obterRegionalDoEscopo, regionaisAdministradas } from '../security/permissoes'
 
 export const vinculosFuncionaisRouter = new Hono<any>()
 
 vinculosFuncionaisRouter.use('*', authMiddleware)
-vinculosFuncionaisRouter.use('*', exigirMasterParaEscrita)
 
 const vinculoDetalhadoSelect = {
   id: vinculosFuncionais.id,
@@ -66,6 +64,47 @@ function selecionarVinculosDetalhados(db: any) {
     .leftJoin(setores, eq(vinculosFuncionais.setorId, setores.id))
     .leftJoin(casas, eq(vinculosFuncionais.casaId, casas.id))
     .leftJoin(gruposTrabalho, eq(vinculosFuncionais.grupoTrabalhoId, gruposTrabalho.id))
+}
+
+async function regionalIdDoMembro(db: any, membroId: string): Promise<string | null> {
+  const row = await db
+    .select({ regionalId: administracoes.regionalId })
+    .from(membros)
+    .innerJoin(casas, eq(membros.casaId, casas.id))
+    .innerJoin(setores, eq(casas.setorId, setores.id))
+    .innerJoin(administracoes, eq(setores.administracaoId, administracoes.id))
+    .where(eq(membros.id, membroId))
+    .get()
+
+  return row?.regionalId ?? null
+}
+
+function escopoDoVinculo(vinculo: any): {
+  tipo: 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO'
+  id: string
+} | null {
+  if (vinculo.regionalId) return { tipo: 'REGIONAL', id: vinculo.regionalId }
+  if (vinculo.administracaoId) return { tipo: 'ADMINISTRACAO', id: vinculo.administracaoId }
+  if (vinculo.setorId) return { tipo: 'SETOR', id: vinculo.setorId }
+  if (vinculo.casaId) return { tipo: 'CASA', id: vinculo.casaId }
+  if (vinculo.grupoTrabalhoId) return { tipo: 'GRUPO_TRABALHO', id: vinculo.grupoTrabalhoId }
+  return null
+}
+
+async function podeAdministrarVinculo(db: any, contexto: any, vinculo: any): Promise<boolean> {
+  if (eMasterSistema(contexto)) return true
+
+  const administradas = regionaisAdministradas(contexto)
+  if (administradas.size === 0) return false
+
+  const regionalMembro = await regionalIdDoMembro(db, vinculo.membroId)
+  if (!regionalMembro || !administradas.has(regionalMembro)) return false
+
+  const escopo = escopoDoVinculo(vinculo)
+  if (!escopo) return false
+
+  const regionalEscopo = await obterRegionalDoEscopo(db, escopo.tipo, escopo.id)
+  return !!regionalEscopo && administradas.has(regionalEscopo) && regionalEscopo === regionalMembro
 }
 
 async function vinculoVisivelParaContexto(db: any, contexto: any, vinculo: any): Promise<boolean> {
@@ -139,6 +178,10 @@ vinculosFuncionaisRouter.post('/', async (c) => {
   try {
     const body = await c.req.json()
     const parsed = CreateVinculoFuncionalSchema.parse(body)
+
+    if (!(await podeAdministrarVinculo(db, c.get('contextoPermissoes'), parsed))) {
+      return c.json({ error: 'Acesso não autorizado para administrar vínculo neste escopo', code: 'FORBIDDEN' }, 403)
+    }
     
     const id = crypto.randomUUID()
     const result = await db.insert(vinculosFuncionais).values({ id, ...parsed }).returning().get()
@@ -163,6 +206,10 @@ vinculosFuncionaisRouter.patch('/:id', async (c) => {
     
     const existing = await db.select().from(vinculosFuncionais).where(eq(vinculosFuncionais.id, id)).get()
     if (!existing) return c.json({ error: 'Vínculo funcional não encontrado' }, 404)
+
+    if (!(await podeAdministrarVinculo(db, c.get('contextoPermissoes'), existing))) {
+      return c.json({ error: 'Acesso não autorizado para administrar este vínculo', code: 'FORBIDDEN' }, 403)
+    }
 
     // Validar se o estado resultante possui exatamente um escopo
     // O fallback é explícito com null para que as propriedades undefined no PATCH não preservem
@@ -190,6 +237,17 @@ vinculosFuncionaisRouter.patch('/:id', async (c) => {
 
     if (preenchidos !== 1) {
       return c.json({ error: 'O vínculo funcional resultante deve possuir exatamente um escopo institucional.' }, 400)
+    }
+
+    const vinculoResultante = {
+      ...existing,
+      ...parsed,
+      membroId: parsed.membroId !== undefined ? parsed.membroId : existing.membroId,
+      ...estadoResultante,
+    }
+
+    if (!(await podeAdministrarVinculo(db, c.get('contextoPermissoes'), vinculoResultante))) {
+      return c.json({ error: 'Acesso não autorizado para mover vínculo para outro escopo', code: 'FORBIDDEN' }, 403)
     }
 
     const updated = await db.update(vinculosFuncionais)
