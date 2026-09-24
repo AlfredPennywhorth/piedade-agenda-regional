@@ -49,7 +49,7 @@ portariaRouter.post('/eventos/:eventoId/credenciais-operador', async c => {
     return c.json({ error: 'A Portaria desta reunião já foi fechada', code: 'PORTARIA_FECHADA' }, 409)
   }
 
-  const token = gerarTokenAleatorio(32)
+  const token = gerarTokenAleatorio(16)
   const tokenHash = await hashToken(token)
   const agora = new Date().toISOString()
   const credencialId = crypto.randomUUID()
@@ -97,7 +97,7 @@ portariaRouter.post('/eventos/:eventoId/credenciais-operador', async c => {
     expiraEm,
     acesso: {
       token,
-      caminho: `/portaria-operador?op=${encodeURIComponent(token)}`,
+      caminho: `/o/${encodeURIComponent(token)}`,
     },
   }, 201)
 })
