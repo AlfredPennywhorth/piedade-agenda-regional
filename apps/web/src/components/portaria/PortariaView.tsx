@@ -175,6 +175,16 @@ export function PortariaView() {
     }
   }
 
+  const handleCopiarLinkConvidados = async () => {
+    if (!cadastroQrUrl) return
+    try {
+      await navigator.clipboard.writeText(cadastroQrUrl)
+      setMensagem({ tipo: 'sucesso', texto: 'Link do formulário copiado.' })
+    } catch {
+      setMensagem({ tipo: 'erro', texto: 'Não foi possível copiar o link automaticamente.' })
+    }
+  }
+
   const handleValidarConvidado = async (convidado: ConvidadoPortaria) => {
     if (!eventoIdAtual) return
     setLoading(true)
@@ -484,29 +494,66 @@ export function PortariaView() {
           {cadastroQrUrl && (() => {
             const matrix = generateQrMatrix(cadastroQrUrl)
             const size = matrix.length
+            const quietZone = 4
+            const qrViewSize = size + quietZone * 2
             return (
-              <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 flex flex-col sm:flex-row gap-4 items-center">
-                <div className="bg-white p-3 rounded-xl border border-slate-200" data-testid="qr-autocadastro-convidados">
+              <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 flex flex-col sm:flex-row gap-5 items-center sm:items-start">
+                <div className="bg-white p-3 rounded-xl border border-slate-200 shrink-0" data-testid="qr-autocadastro-convidados">
                   <svg
-                    viewBox={`0 0 ${size} ${size}`}
-                    className="w-44 h-44 bg-white"
+                    viewBox={`0 0 ${qrViewSize} ${qrViewSize}`}
+                    className="w-60 h-60 bg-white"
                     shapeRendering="crispEdges"
                     role="img"
                     aria-label="QR Code para autocadastro de convidados"
                   >
+                    <rect x="0" y="0" width={qrViewSize} height={qrViewSize} fill="#ffffff" />
                     {matrix.map((row, r) =>
                       row.map((cell, col) =>
-                        cell ? <rect key={`${r}-${col}`} x={col} y={r} width={1} height={1} fill="#000000" /> : null
+                        cell ? (
+                          <rect
+                            key={`${r}-${col}`}
+                            x={col + quietZone}
+                            y={r + quietZone}
+                            width={1}
+                            height={1}
+                            fill="#000000"
+                          />
+                        ) : null
                       )
                     )}
                   </svg>
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 w-full">
                   <p className="text-sm font-semibold text-slate-800">Autocadastro desta reunião</p>
                   <p className="text-xs text-slate-600 mt-1">
                     Os convidados podem usar o mesmo QR. Após preencherem o formulário, aparecerão abaixo como pendentes.
                   </p>
-                  <p className="mt-2 text-[10px] font-mono break-all text-slate-500">{cadastroQrUrl}</p>
+
+                  <a
+                    href={cadastroQrUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex items-center justify-center rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700"
+                  >
+                    Abrir formulário
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleCopiarLinkConvidados()}
+                    className="mt-2 sm:ml-2 inline-flex items-center justify-center rounded-lg border border-brand-300 bg-white px-4 py-2.5 text-sm font-semibold text-brand-700 hover:bg-brand-50"
+                  >
+                    Copiar link
+                  </button>
+
+                  <a
+                    href={cadastroQrUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 block break-all font-mono text-xs text-brand-700 underline"
+                  >
+                    {cadastroQrUrl}
+                  </a>
                 </div>
               </div>
             )
