@@ -74,8 +74,8 @@ gruposTrabalhoRouter.post('/', async (c) => {
         atorMembroId: c.get('membroId') || null,
         recursoTipo: 'GRUPO_TRABALHO',
         recursoId: id,
-        escopoTipo: 'REGIONAL',
-        escopoId: parsed.regionalId,
+        escopoTipo: 'GRUPO_TRABALHO',
+        escopoId: id,
         contexto: { campos: ['nome', 'codigo', 'ativo', 'regionalId'] },
       }
     )
@@ -154,8 +154,8 @@ gruposTrabalhoRouter.patch('/:id', async (c) => {
         atorMembroId: c.get('membroId') || null,
         recursoTipo: 'GRUPO_TRABALHO',
         recursoId: id,
-        escopoTipo: 'REGIONAL',
-        escopoId: finalRegionalId,
+        escopoTipo: 'GRUPO_TRABALHO',
+        escopoId: id,
         contexto: { camposAlterados: Object.keys(parsed) },
       }
     )
