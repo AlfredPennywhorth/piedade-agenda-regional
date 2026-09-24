@@ -1,6 +1,7 @@
 name: CI — Agenda Regional São Paulo
 
 on:
+  workflow_dispatch:
   push:
     branches: [main, develop]
   pull_request:
