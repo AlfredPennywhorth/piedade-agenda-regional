@@ -4,7 +4,7 @@ import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, ch
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eMasterSistema, eOperadorPortariaAutorizado } from '../security/permissoes'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
-import { PortariaEventosQuerySchema, getSaoPauloDateString } from '@piedade/shared'
+import { PortariaEventosQuerySchema, getSaoPauloDateString, getSaoPauloEndOfDayIso } from '@piedade/shared'
 import { gerarTokenAleatorio, hashToken } from '../security/tokens'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
 
@@ -418,8 +418,7 @@ portariaRouter.post('/eventos/:eventoId/cadastro-convidados/credencial', async c
   const tokenHash = await hashToken(token)
   const agora = new Date().toISOString()
   const credencialId = crypto.randomUUID()
-  const dataEventoSaoPaulo = getSaoPauloDateString(evento.inicioEm)
-  const expiraEm = new Date(`${dataEventoSaoPaulo}T23:59:59-03:00`).toISOString()
+  const expiraEm = getSaoPauloEndOfDayIso(evento.inicioEm)
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
   await executarOperacaoComAudit(
