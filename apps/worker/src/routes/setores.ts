@@ -3,7 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { setores, administracoes, participacoesGruposTrabalho, gruposTrabalho } from '../db/schema'
 import { CreateSetorSchema, UpdateSetorSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { eMasterSistema, obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo, regionaisAdministradas, obterRegionalDoEscopo } from '../security/permissoes'
+import { eMasterSistema, obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo, regionaisAdministradas } from '../security/permissoes'
 import { executarOperacaoComAudit } from '../services/auditoria'
 
 export const setoresRouter = new Hono<any>()
@@ -65,7 +65,6 @@ setoresRouter.post('/', async (c) => {
       return c.json({ error: 'Acesso não autorizado para administrar este escopo', code: 'FORBIDDEN' }, 403)
     }
 
-    const regionalId = await obterRegionalDoEscopo(db, 'ADMINISTRACAO', parsed.administracaoId)
     const id = crypto.randomUUID()
     await executarOperacaoComAudit(
       db,
@@ -141,7 +140,6 @@ setoresRouter.patch('/:id', async (c) => {
       }
     }
 
-    const regionalFinal = await obterRegionalDoEscopo(db, 'ADMINISTRACAO', administracaoFinal)
     await executarOperacaoComAudit(
       db,
       (qdb) => [
