@@ -42,6 +42,8 @@ async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAu
   const setoresAgenda = new Set<string>()
   const casasAgenda = new Set<string>()
   const gtsAgenda = new Set<string>()
+  const administracoesDescendentesDeRegional = new Set<string>()
+  const setoresDescendentesDeRegional = new Set<string>()
 
   for (const acesso of contexto.acessosAtivos) {
     if (
@@ -71,7 +73,10 @@ async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAu
       .from(administracoes)
       .where(inArray(administracoes.regionalId, regionaisIds))
       .all()
-    adms.forEach((item: any) => administracoesAgenda.add(item.id))
+    adms.forEach((item: any) => {
+      administracoesAgenda.add(item.id)
+      administracoesDescendentesDeRegional.add(item.id)
+    })
 
     const gtsRegionais = await db
       .select({ id: gruposTrabalho.id })
@@ -84,18 +89,26 @@ async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAu
   const administracoesIds = Array.from(administracoesAgenda)
   if (administracoesIds.length > 0) {
     const itensSetor = await db
-      .select({ id: setores.id })
+      .select({ id: setores.id, administracaoId: setores.administracaoId })
       .from(setores)
       .where(inArray(setores.administracaoId, administracoesIds))
       .all()
-    itensSetor.forEach((item: any) => setoresAgenda.add(item.id))
+    itensSetor.forEach((item: any) => {
+      setoresAgenda.add(item.id)
+      if (administracoesDescendentesDeRegional.has(item.administracaoId)) {
+        setoresDescendentesDeRegional.add(item.id)
+      }
+    })
 
-    const gtsAdministracao = await db
-      .select({ id: gruposTrabalho.id })
-      .from(gruposTrabalho)
-      .where(inArray(gruposTrabalho.administracaoId, administracoesIds))
-      .all()
-    gtsAdministracao.forEach((item: any) => gtsAgenda.add(item.id))
+    const administracoesRegionaisIds = Array.from(administracoesDescendentesDeRegional)
+    if (administracoesRegionaisIds.length > 0) {
+      const gtsAdministracao = await db
+        .select({ id: gruposTrabalho.id })
+        .from(gruposTrabalho)
+        .where(inArray(gruposTrabalho.administracaoId, administracoesRegionaisIds))
+        .all()
+      gtsAdministracao.forEach((item: any) => gtsAgenda.add(item.id))
+    }
   }
 
   const setoresIds = Array.from(setoresAgenda)
@@ -107,12 +120,15 @@ async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAu
       .all()
     itensCasa.forEach((item: any) => casasAgenda.add(item.id))
 
-    const gtsSetor = await db
-      .select({ id: gruposTrabalho.id })
-      .from(gruposTrabalho)
-      .where(inArray(gruposTrabalho.setorId, setoresIds))
-      .all()
-    gtsSetor.forEach((item: any) => gtsAgenda.add(item.id))
+    const setoresRegionaisIds = Array.from(setoresDescendentesDeRegional)
+    if (setoresRegionaisIds.length > 0) {
+      const gtsSetor = await db
+        .select({ id: gruposTrabalho.id })
+        .from(gruposTrabalho)
+        .where(inArray(gruposTrabalho.setorId, setoresRegionaisIds))
+        .all()
+      gtsSetor.forEach((item: any) => gtsAgenda.add(item.id))
+    }
   }
 
   resultado.regionaisIds = regionaisAgenda
