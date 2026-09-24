@@ -112,6 +112,7 @@ describe('S01 — SetoresView (Gestão Territorial Frontend)', () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
       if (endpoint === '/setores') return mockSetores
       if (endpoint === '/administracoes') return mockAdministracoes
+      if (endpoint === '/regionais') return mockRegionais
       if (endpoint === `/setores/${SET_1_ID}`) return mockSetores[0]
       throw new Error('Not found')
     })
@@ -148,6 +149,7 @@ describe('S01 — SetoresView (Gestão Territorial Frontend)', () => {
 
     expect(screen.getByText('Cadastrar Novo Setor')).toBeInTheDocument()
 
+    const selectRegional = screen.getByLabelText(/^Regional \*/i)
     const selectAdm = screen.getByLabelText(/^Administração \*/i)
     const inputNome = screen.getByLabelText(/Nome do Setor/i)
     const inputCodigo = screen.getByLabelText(/Código/i)
@@ -206,6 +208,7 @@ describe('S01 — SetoresView (Gestão Territorial Frontend)', () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
       if (endpoint === '/setores') return [setorAntigo]
       if (endpoint === '/administracoes') return mockAdministracoes
+      if (endpoint === '/regionais') return mockRegionais
       if (endpoint === `/setores/${SET_1_ID}`) return setorAntigo
       throw new Error('Not found')
     })
