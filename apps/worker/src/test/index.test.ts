@@ -165,7 +165,7 @@ describe('Worker — Rotas de infraestrutura', () => {
     const res = await app.request('/health', {}, env)
 
     expect(res.headers.get('content-security-policy')).toContain("default-src 'none'")
-    expect(res.headers.get('permissions-policy')).toBe('geolocation=(), microphone=(), camera=()')
+    expect(res.headers.get('permissions-policy')).toBe('geolocation=(), microphone=(), camera=(self)')
     expect(res.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin')
     expect(res.headers.get('strict-transport-security')).toContain('max-age=31536000')
     expect(res.headers.get('x-content-type-options')).toBe('nosniff')

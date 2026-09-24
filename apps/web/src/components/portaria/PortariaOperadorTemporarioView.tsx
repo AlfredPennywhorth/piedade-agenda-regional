@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { API_BASE_URL, ApiError } from '../../api/apiClient'
 import { generateQrMatrix } from '../agenda/qrGenerator'
 
@@ -61,6 +61,11 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
   const [mensagem, setMensagem] = useState('')
+  const [cameraAtiva, setCameraAtiva] = useState(false)
+  const [cameraErro, setCameraErro] = useState('')
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const scanFrameRef = useRef<number | null>(null)
 
   const carregar = async () => {
     setLoading(true)
@@ -86,6 +91,7 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
 
   useEffect(() => {
     void carregar()
+    return () => pararCamera()
   }, [token])
 
   const participantesFiltrados = useMemo(() => {
@@ -112,21 +118,104 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
     }
   }
 
-  const registrarQr = async (event: FormEvent) => {
-    event.preventDefault()
-    if (!qrToken.trim()) return
+  const registrarQrValor = async (valor: string) => {
+    const codigo = valor.trim()
+    if (!codigo) return
+
     setMensagem('')
     setErro('')
     try {
       await chamadaOperador(token, '/checkin/qr', {
         method: 'POST',
-        body: JSON.stringify({ qrToken: qrToken.trim() }),
+        body: JSON.stringify({ qrToken: codigo }),
       })
       setQrToken('')
       setMensagem('Presença registrada pelo QR Code.')
       await carregar()
     } catch (err) {
       setErro((err as Error).message)
+    }
+  }
+
+  const registrarQr = async (event: FormEvent) => {
+    event.preventDefault()
+    await registrarQrValor(qrToken)
+  }
+
+  const pararCamera = () => {
+    if (scanFrameRef.current !== null) {
+      cancelAnimationFrame(scanFrameRef.current)
+      scanFrameRef.current = null
+    }
+    streamRef.current?.getTracks().forEach(track => track.stop())
+    streamRef.current = null
+    if (videoRef.current) videoRef.current.srcObject = null
+    setCameraAtiva(false)
+  }
+
+  const iniciarCamera = async () => {
+    setCameraErro('')
+    setErro('')
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraErro('Este navegador não oferece acesso à câmera.')
+      return
+    }
+
+    const BarcodeDetectorCtor = (window as any).BarcodeDetector
+    if (!BarcodeDetectorCtor) {
+      setCameraErro('A leitura automática de QR Code não é suportada neste navegador. Use o campo manual como contingência.')
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: 'environment' } },
+      })
+      streamRef.current = stream
+
+      const video = videoRef.current
+      if (!video) {
+        stream.getTracks().forEach(track => track.stop())
+        return
+      }
+
+      video.srcObject = stream
+      await video.play()
+      setCameraAtiva(true)
+
+      const detector = new BarcodeDetectorCtor({ formats: ['qr_code'] })
+
+      const detectar = async () => {
+        const currentVideo = videoRef.current
+        if (!currentVideo || !streamRef.current) return
+
+        try {
+          if (currentVideo.readyState >= 2) {
+            const codigos = await detector.detect(currentVideo)
+            const valor = codigos?.[0]?.rawValue?.trim()
+            if (valor) {
+              pararCamera()
+              await registrarQrValor(valor)
+              return
+            }
+          }
+        } catch {
+          // Mantém a leitura ativa; quadros transitórios podem falhar.
+        }
+
+        scanFrameRef.current = requestAnimationFrame(detectar)
+      }
+
+      scanFrameRef.current = requestAnimationFrame(detectar)
+    } catch (err: any) {
+      pararCamera()
+      if (err?.name === 'NotAllowedError') {
+        setCameraErro('Permissão da câmera negada. Autorize a câmera no navegador e tente novamente.')
+      } else {
+        setCameraErro('Não foi possível abrir a câmera deste aparelho.')
+      }
     }
   }
 
@@ -161,6 +250,7 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
     setErro('')
     try {
       await chamadaOperador(token, '/fechar', { method: 'POST' })
+      pararCamera()
       setMensagem('Portaria encerrada com sucesso.')
       setSessao(null)
       setParticipantes([])
@@ -208,12 +298,38 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
         </section>
 
         <section className="rounded-xl border bg-white p-5 space-y-3">
-          <h2 className="font-semibold">Check-in por QR</h2>
+          <div>
+            <h2 className="font-semibold">Check-in por QR</h2>
+            <p className="mt-1 text-xs text-slate-500">Use a câmera do celular ou, como contingência, cole/digite o código.</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => cameraAtiva ? pararCamera() : void iniciarCamera()}
+            className="w-full rounded-lg bg-green-600 px-4 py-3 text-sm font-semibold text-white hover:bg-green-700"
+          >
+            {cameraAtiva ? 'Fechar câmera' : 'Abrir câmera para ler QR Code'}
+          </button>
+
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            className={`w-full rounded-xl bg-black ${cameraAtiva ? 'block' : 'hidden'}`}
+            aria-label="Câmera para leitura de QR Code"
+          />
+
+          {cameraErro && (
+            <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              {cameraErro}
+            </div>
+          )}
+
           <form onSubmit={registrarQr} className="flex gap-2">
             <input
               value={qrToken}
               onChange={e => setQrToken(e.target.value)}
-              placeholder="Leia ou cole o código do participante"
+              placeholder="Cole ou digite o código do participante"
               className="min-w-0 flex-1 rounded-lg border border-slate-300 p-3 text-sm"
             />
             <button className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white">Registrar</button>
