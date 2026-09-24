@@ -19,7 +19,7 @@ import {
   sessoes,
   auditoriaLogs,
 } from '../db/schema'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { hashToken } from '../security/tokens'
 
 describe('S06 - Convocações', () => {
