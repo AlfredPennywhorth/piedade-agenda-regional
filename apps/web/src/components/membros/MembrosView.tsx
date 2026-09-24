@@ -655,6 +655,11 @@ export function MembrosView() {
                             {item.codigoCasaReferencia ? ` · ${item.codigoCasaReferencia}` : ''}
                             {item.vinculado ? ' · Já vinculado' : ''}
                           </span>
+                          <span className="mt-1 block text-[11px] text-slate-500">
+                            RRM: {item.rrm || 'não informado'}
+                            {item.administracaoOrigem ? ` · Administração: ${item.administracaoOrigem}` : ''}
+                            {item.dataOrdenacao ? ` · Ordenação: ${item.dataOrdenacao.substring(0, 10)}` : ''}
+                          </span>
                         </button>
                       ))}
                     </div>

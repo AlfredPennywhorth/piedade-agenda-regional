@@ -189,7 +189,69 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
     })
   })
 
-  it('7. Pré-cadastro: ignora resposta antiga quando a busca muda', async () => {
+  it('7. Pré-cadastro: diferencia homônimos com RRM, Administração e ordenação', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/membros') return []
+      if (endpoint === '/casas') return mockCasas
+      if (endpoint === '/setores') return mockSetores
+      if (endpoint === '/administracoes') return mockAdministracoes
+      if (endpoint === '/regionais') return mockRegionais
+      if (endpoint.includes('/admin/pre-cadastros-ministeriais?')) {
+        return {
+          data: [
+            {
+              id: 'pre-joao-1',
+              nome: 'João da Silva',
+              ministerio: 'Diácono',
+              rrm: 'RRM-001',
+              regionalId: REGIONAL_ID,
+              administracaoOrigem: 'Administração Centro',
+              localidadeOrigem: 'Brás',
+              codigoCasaReferencia: 'BRAS-01',
+              casaId: null,
+              dataOrdenacao: '2001-05-10',
+              statusOrigem: null,
+              membroId: null,
+              vinculado: false,
+            },
+            {
+              id: 'pre-joao-2',
+              nome: 'João da Silva',
+              ministerio: 'Diácono',
+              rrm: 'RRM-002',
+              regionalId: REGIONAL_ID,
+              administracaoOrigem: 'Administração Leste',
+              localidadeOrigem: 'Tatuapé',
+              codigoCasaReferencia: 'TAT-02',
+              casaId: null,
+              dataOrdenacao: '2012-08-20',
+              statusOrigem: null,
+              membroId: null,
+              vinculado: false,
+            },
+          ],
+          meta: { busca: 'João', limit: 20, totalRetornado: 2 },
+        }
+      }
+      throw new Error(`Not found: ${endpoint}`)
+    })
+
+    render(<MembrosView />)
+    await screen.findByText('Nenhum membro encontrado.')
+    fireEvent.click(screen.getByText('+ Cadastrar Membro'))
+
+    fireEvent.change(screen.getByLabelText(/Localizar pré-cadastro pelo nome/i), {
+      target: { value: 'João' },
+    })
+
+    expect(await screen.findAllByText('João da Silva')).toHaveLength(2)
+    expect(screen.getByText(/RRM: RRM-001/)).toHaveTextContent('Administração: Administração Centro')
+    expect(screen.getByText(/RRM: RRM-001/)).toHaveTextContent('Ordenação: 2001-05-10')
+    expect(screen.getByText(/RRM: RRM-002/)).toHaveTextContent('Administração: Administração Leste')
+    expect(screen.getByText(/RRM: RRM-002/)).toHaveTextContent('Ordenação: 2012-08-20')
+  })
+
+  it('8. Pré-cadastro: ignora resposta antiga quando a busca muda', async () => {
     let resolveAntiga: ((value: any) => void) | undefined
 
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
