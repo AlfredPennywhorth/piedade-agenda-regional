@@ -826,6 +826,16 @@ export const portariasEvento = sqliteTable(
   })
 )
 
+export const portariaFechamentoLocks = sqliteTable(
+  'portaria_fechamento_locks',
+  {
+    eventoId: text('evento_id').primaryKey().references(() => eventos.id),
+    criadoEm: text('criado_em')
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  }
+)
+
 export const portariaOperadoresEvento = sqliteTable(
   'portaria_operadores_evento',
   {
@@ -843,6 +853,25 @@ export const portariaOperadoresEvento = sqliteTable(
       .where(sql`${table.ativo} = 1`),
     idxEvento: index('idx_portaria_operador_evento').on(table.eventoId, table.ativo),
     idxMembro: index('idx_portaria_operador_membro').on(table.membroId, table.ativo),
+  })
+)
+
+export const credenciaisOperadorPortariaEvento = sqliteTable(
+  'credenciais_operador_portaria_evento',
+  {
+    id: text('id').primaryKey(),
+    eventoId: text('evento_id').notNull().references(() => eventos.id),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiraEm: text('expira_em').notNull(),
+    revogadoEm: text('revogado_em'),
+    criadoPorMembroId: text('criado_por_membro_id').references(() => membros.id),
+    ultimoAcessoEm: text('ultimo_acesso_em'),
+    ativo: ativoDefault,
+    ...timestampsS02,
+  },
+  table => ({
+    idxEvento: index('idx_credencial_operador_portaria_evento')
+      .on(table.eventoId, table.ativo),
   })
 )
 
