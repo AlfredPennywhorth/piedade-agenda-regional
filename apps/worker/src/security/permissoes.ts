@@ -395,6 +395,12 @@ export async function podeGerenciarAgendaNoEscopo(
   const contexto = await carregarContextoPermissoes(db, membroId)
   if (eMasterSistema(contexto)) return true
 
+  const regionalAlvo = await obterRegionalDoEscopo(db, escopoTipo, escopoId)
+  if (!regionalAlvo) return false
+
+  // Administrador Regional pode gerir a Agenda apenas dentro da Regional administrada.
+  if (podeAdministrarRegional(contexto, regionalAlvo)) return true
+
   // Regra institucional: todo membro pode gerir automaticamente a Agenda da própria Casa.
   if (escopoTipo === 'CASA') {
     const membro = await db
@@ -412,9 +418,6 @@ export async function podeGerenciarAgendaNoEscopo(
       acesso.escopoId !== null
   )
   if (acessosAgenda.length === 0) return false
-
-  const regionalAlvo = await obterRegionalDoEscopo(db, escopoTipo, escopoId)
-  if (!regionalAlvo) return false
 
   // Gestor Regional herda todos os escopos descendentes da Regional, inclusive GT Regional.
   if (
