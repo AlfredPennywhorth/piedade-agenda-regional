@@ -66,7 +66,7 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
       'Content-Security-Policy',
       "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
     )
-    c.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+    c.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=(self)')
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
     c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
     c.header('X-Content-Type-Options', 'nosniff')
