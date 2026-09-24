@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import App from '../App'
 import { QrCodeModal } from '../components/agenda/QrCodeModal'
@@ -13,13 +13,15 @@ vi.mock('../api/apiClient', () => ({
   API_BASE_URL: 'http://test'
 }))
 
+const TEST_NOW = Date.parse('2026-09-23T15:00:00.000Z')
+
 const mockEventos = [
   {
     evento: {
       id: '1',
       titulo: 'Reunião de Setor',
-      inicioEm: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
-      fimEm: new Date(Date.now() + 90000000).toISOString(),
+      inicioEm: new Date(TEST_NOW + 86400000).toISOString(), // Tomorrow
+      fimEm: new Date(TEST_NOW + 90000000).toISOString(),
       modalidade: 'HIBRIDO',
     },
     convocacao: { id: 'c1', observacoes: 'Levar caderno' },
@@ -31,8 +33,8 @@ const mockEventos = [
     evento: {
       id: '2',
       titulo: 'Encontro Online',
-      inicioEm: new Date(Date.now() + 172800000).toISOString(), // In 2 days
-      fimEm: new Date(Date.now() + 180000000).toISOString(),
+      inicioEm: new Date(TEST_NOW + 172800000).toISOString(), // In 2 days
+      fimEm: new Date(TEST_NOW + 180000000).toISOString(),
       modalidade: 'ONLINE',
     },
     convocacao: { id: 'c2', observacoes: null },
@@ -43,8 +45,8 @@ const mockEventos = [
     evento: {
       id: 's09-integral',
       titulo: 'Evento S09 Integral',
-      inicioEm: new Date(Date.now() + 86400000).toISOString(),
-      fimEm: new Date(Date.now() + 90000000).toISOString(),
+      inicioEm: new Date(TEST_NOW + 86400000).toISOString(),
+      fimEm: new Date(TEST_NOW + 90000000).toISOString(),
       modalidade: 'PRESENCIAL',
       possuiManha: true,
       possuiTarde: true,
@@ -59,8 +61,8 @@ const mockEventos = [
     evento: {
       id: 's09-manha',
       titulo: 'Evento S09 Manhã',
-      inicioEm: new Date(Date.now() + 86400000).toISOString(),
-      fimEm: new Date(Date.now() + 90000000).toISOString(),
+      inicioEm: new Date(TEST_NOW + 86400000).toISOString(),
+      fimEm: new Date(TEST_NOW + 90000000).toISOString(),
       modalidade: 'PRESENCIAL',
       possuiManha: true,
       possuiTarde: false,
@@ -77,8 +79,14 @@ describe('S07 - Minha Agenda e Calendário', () => {
   const mobileNav = async () => within(await screen.findByRole('navigation', { name: /navegação móvel principal/i }))
 
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date(TEST_NOW))
     vi.clearAllMocks()
     localStorage.setItem('session_token', 'sessao-teste')
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   const mockAgenda = (dados: unknown) => {
@@ -171,7 +179,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     await waitFor(() => expect(screen.getByText('Dom')).toBeInTheDocument())
     
     // Find the day button (tomorrow)
-    const tmrw = new Date(Date.now() + 86400000)
+    const tmrw = new Date(TEST_NOW + 86400000)
     const dayBtn = screen.getByLabelText(`Selecionar dia ${tmrw.getDate()}`)
     fireEvent.click(dayBtn)
     
@@ -235,7 +243,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     await waitFor(() => expect(screen.getByText('Dom')).toBeInTheDocument())
     
     // Click day
-    const day = new Date(Date.now() + 172800000)
+    const day = new Date(TEST_NOW + 172800000)
     const dayBtn = screen.getByLabelText(`Selecionar dia ${day.getDate()}`)
     fireEvent.click(dayBtn)
     
@@ -261,7 +269,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     fireEvent.click((await mobileNav()).getByText('Calendário'))
     await waitFor(() => expect(screen.getByText('Dom')).toBeInTheDocument())
 
-    const dia = new Date(Date.now() + 86400000)
+    const dia = new Date(TEST_NOW + 86400000)
     fireEvent.click(screen.getByLabelText(`Selecionar dia ${dia.getDate()}`))
 
     const card = await screen.findByRole('button', { name: /Reunião de Setor/i })
