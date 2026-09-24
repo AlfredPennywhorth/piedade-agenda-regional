@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento, convidadosEvento, credenciaisCadastroPortariaEvento, presencasConvidadoEvento, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento, convidadosEvento, credenciaisCadastroPortariaEvento, credenciaisOperadorPortariaEvento, presencasConvidadoEvento, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
-import { eMasterSistema, eOperadorPortariaAutorizado } from '../security/permissoes'
+import { eMasterSistema, eOperadorPortariaAutorizado, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
 import { PortariaEventosQuerySchema, getSaoPauloDateString, getSaoPauloEndOfDayIso } from '@piedade/shared'
 import { gerarTokenAleatorio, hashToken } from '../security/tokens'
@@ -11,6 +11,177 @@ import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechament
 export const portariaRouter = new Hono<{ Variables: Variables }>()
 
 portariaRouter.use('*', authMiddleware)
+
+
+async function podeGerarCredencialOperador(db: any, membroId: string, contexto: any, evento: any) {
+  if (eMasterSistema(contexto)) return true
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+  if (!escopoTipo || !escopoId) return false
+  return podeGerenciarAgendaNoEscopo(
+    db,
+    membroId,
+    escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+    escopoId
+  )
+}
+
+// POST /api/v1/portaria/eventos/:eventoId/credenciais-operador
+// Gera acesso temporário sem exigir cadastro do porteiro.
+portariaRouter.post('/eventos/:eventoId/credenciais-operador', async c => {
+  const db = c.get('db')
+  const atorMembroId = c.get('membroId')
+  const contexto = c.get('contextoPermissoes')
+  const eventoId = c.req.param('eventoId')
+
+  const evento = await db.select().from(eventos)
+    .where(and(eq(eventos.id, eventoId), eq(eventos.ativo, true))).get()
+  if (!evento) {
+    return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
+  }
+
+  if (!atorMembroId || !(await podeGerarCredencialOperador(db, atorMembroId, contexto, evento))) {
+    return c.json({ error: 'Acesso não autorizado para gerar porteiro temporário', code: 'FORBIDDEN' }, 403)
+  }
+
+  const estado = await db.select().from(portariasEvento)
+    .where(eq(portariasEvento.eventoId, eventoId)).get()
+  if (estado?.status === 'FECHADA') {
+    return c.json({ error: 'A Portaria desta reunião já foi fechada', code: 'PORTARIA_FECHADA' }, 409)
+  }
+
+  const token = gerarTokenAleatorio(32)
+  const tokenHash = await hashToken(token)
+  const agora = new Date().toISOString()
+  const credencialId = crypto.randomUUID()
+  const expiraEm = getSaoPauloEndOfDayIso(evento.inicioEm)
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+
+  await executarOperacaoComAudit(
+    db,
+    qdb => {
+      const queries = []
+      if (!estado) {
+        queries.push(qdb.insert(portariasEvento).values({
+          eventoId,
+          status: 'ABERTA',
+          createdAt: agora,
+          updatedAt: agora,
+        }))
+      }
+      queries.push(qdb.insert(credenciaisOperadorPortariaEvento).values({
+        id: credencialId,
+        eventoId,
+        tokenHash,
+        expiraEm,
+        criadoPorMembroId: atorMembroId,
+        ativo: true,
+        createdAt: agora,
+        updatedAt: agora,
+      }))
+      return queries
+    },
+    {
+      acao: 'PORTARIA_CREDENCIAL_OPERADOR_CRIADA',
+      atorMembroId,
+      recursoTipo: 'CREDENCIAL_OPERADOR_PORTARIA',
+      recursoId: credencialId,
+      escopoTipo,
+      escopoId,
+      contexto: { eventoId },
+    }
+  )
+
+  return c.json({
+    id: credencialId,
+    eventoId,
+    expiraEm,
+    acesso: {
+      token,
+      caminho: `/portaria-operador?op=${encodeURIComponent(token)}`,
+    },
+  }, 201)
+})
+
+// GET /api/v1/portaria/eventos/:eventoId/credenciais-operador
+portariaRouter.get('/eventos/:eventoId/credenciais-operador', async c => {
+  const db = c.get('db')
+  const atorMembroId = c.get('membroId')
+  const contexto = c.get('contextoPermissoes')
+  const eventoId = c.req.param('eventoId')
+
+  const evento = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
+  if (!evento) return c.json({ error: 'Evento não encontrado', code: 'NOT_FOUND' }, 404)
+
+  if (!atorMembroId || !(await podeGerarCredencialOperador(db, atorMembroId, contexto, evento))) {
+    return c.json({ error: 'Acesso não autorizado', code: 'FORBIDDEN' }, 403)
+  }
+
+  const data = await db.select({
+    id: credenciaisOperadorPortariaEvento.id,
+    eventoId: credenciaisOperadorPortariaEvento.eventoId,
+    expiraEm: credenciaisOperadorPortariaEvento.expiraEm,
+    ativo: credenciaisOperadorPortariaEvento.ativo,
+    revogadoEm: credenciaisOperadorPortariaEvento.revogadoEm,
+    ultimoAcessoEm: credenciaisOperadorPortariaEvento.ultimoAcessoEm,
+    createdAt: credenciaisOperadorPortariaEvento.createdAt,
+  }).from(credenciaisOperadorPortariaEvento)
+    .where(eq(credenciaisOperadorPortariaEvento.eventoId, eventoId))
+    .all()
+
+  return c.json({ data }, 200)
+})
+
+// DELETE /api/v1/portaria/eventos/:eventoId/credenciais-operador/:credencialId
+portariaRouter.delete('/eventos/:eventoId/credenciais-operador/:credencialId', async c => {
+  const db = c.get('db')
+  const atorMembroId = c.get('membroId')
+  const contexto = c.get('contextoPermissoes')
+  const eventoId = c.req.param('eventoId')
+  const credencialId = c.req.param('credencialId')
+
+  const evento = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
+  if (!evento) return c.json({ error: 'Evento não encontrado', code: 'NOT_FOUND' }, 404)
+
+  if (!atorMembroId || !(await podeGerarCredencialOperador(db, atorMembroId, contexto, evento))) {
+    return c.json({ error: 'Acesso não autorizado', code: 'FORBIDDEN' }, 403)
+  }
+
+  const credencial = await db.select().from(credenciaisOperadorPortariaEvento)
+    .where(and(
+      eq(credenciaisOperadorPortariaEvento.id, credencialId),
+      eq(credenciaisOperadorPortariaEvento.eventoId, eventoId),
+      eq(credenciaisOperadorPortariaEvento.ativo, true)
+    )).get()
+
+  if (!credencial) {
+    return c.json({ error: 'Credencial temporária não encontrada', code: 'NOT_FOUND' }, 404)
+  }
+
+  const agora = new Date().toISOString()
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+
+  await executarOperacaoComAudit(
+    db,
+    qdb => [
+      qdb.update(credenciaisOperadorPortariaEvento).set({
+        ativo: false,
+        revogadoEm: agora,
+        updatedAt: agora,
+      }).where(eq(credenciaisOperadorPortariaEvento.id, credencialId))
+    ],
+    {
+      acao: 'PORTARIA_CREDENCIAL_OPERADOR_REVOGADA',
+      atorMembroId,
+      recursoTipo: 'CREDENCIAL_OPERADOR_PORTARIA',
+      recursoId: credencialId,
+      escopoTipo,
+      escopoId,
+      contexto: { eventoId },
+    }
+  )
+
+  return c.json({ message: 'Credencial temporária revogada' }, 200)
+})
 
 // POST /api/v1/portaria/eventos/:eventoId/operadores
 // Concessão temporária: somente Master até homologação de quem mais pode nomear porteiros.
