@@ -322,7 +322,7 @@ portariaOperadorPublicaRouter.post('/cadastro-convidados/credencial', async c =>
   const ctx = await contextoOperador(c)
   if ('response' in ctx) return ctx.response
 
-  const token = gerarTokenAleatorio(24)
+  const token = gerarTokenAleatorio(16)
   const tokenHash = await hashToken(token)
   const agora = new Date().toISOString()
   const credencialId = crypto.randomUUID()
