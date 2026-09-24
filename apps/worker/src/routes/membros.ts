@@ -4,6 +4,7 @@ import { administracoes, casas, membros, setores, vinculosFuncionais, tentativas
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, regionaisAdministradas } from '../security/permissoes'
+import { listarVinculosVisiveis } from './vinculos_funcionais'
 
 export const membrosRouter = new Hono<any>()
 
@@ -100,12 +101,20 @@ membrosRouter.get('/', async (c) => {
   const ids = Array.from(idsVisiveis)
   if (ids.length === 0) return c.json([])
 
-  const data = await db
-    .select(membroPublico)
-    .from(membros)
-    .where(inArray(membros.id, ids))
-    .all()
+  const LIMITE_IDS_D1 = 90
+  const data: Array<typeof membros.$inferSelect> = []
 
+  for (let i = 0; i < ids.length; i += LIMITE_IDS_D1) {
+    const lote = ids.slice(i, i + LIMITE_IDS_D1)
+    const parcial = await db
+      .select(membroPublico)
+      .from(membros)
+      .where(inArray(membros.id, lote))
+      .all()
+    data.push(...parcial)
+  }
+
+  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   return c.json(data)
 })
 
@@ -136,7 +145,8 @@ membrosRouter.get('/:id/vinculos', async (c) => {
     return c.json({ error: 'Acesso não autorizado para este membro', code: 'FORBIDDEN' }, 403)
   }
 
-  const data = await db.select().from(vinculosFuncionais).where(eq(vinculosFuncionais.membroId, id)).all()
+  const contexto = c.get('contextoPermissoes')
+  const data = await listarVinculosVisiveis(db, contexto, id)
   return c.json(data)
 })
 
