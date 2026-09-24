@@ -15,3 +15,26 @@ CREATE TABLE `credenciais_operador_portaria_evento` (
 --> statement-breakpoint
 CREATE INDEX `idx_credencial_operador_portaria_evento`
   ON `credenciais_operador_portaria_evento` (`evento_id`, `ativo`);
+
+--> statement-breakpoint
+CREATE TRIGGER `trg_checkin_portaria_aberta`
+BEFORE INSERT ON `checkins`
+WHEN EXISTS (
+  SELECT 1 FROM `portarias_evento`
+  WHERE `evento_id` = NEW.`evento_id`
+    AND `status` <> 'ABERTA'
+)
+BEGIN
+  SELECT RAISE(ABORT, 'PORTARIA_NAO_ABERTA');
+END;
+--> statement-breakpoint
+CREATE TRIGGER `trg_presenca_convidado_portaria_aberta`
+BEFORE INSERT ON `presencas_convidado_evento`
+WHEN EXISTS (
+  SELECT 1 FROM `portarias_evento`
+  WHERE `evento_id` = NEW.`evento_id`
+    AND `status` <> 'ABERTA'
+)
+BEGIN
+  SELECT RAISE(ABORT, 'PORTARIA_NAO_ABERTA');
+END;
