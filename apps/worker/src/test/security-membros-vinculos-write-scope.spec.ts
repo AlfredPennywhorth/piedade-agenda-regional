@@ -13,10 +13,13 @@ describe('PR-SEC-01 — escrita de Membros e Vínculos por Regional', () => {
     regionalA: '11111111-1111-4111-8111-111111111111',
     regionalB: '22222222-2222-4222-8222-222222222222',
     admA: '33333333-3333-4333-8333-333333333333',
+    admA2: '34343434-3434-4434-8434-343434343434',
     admB: '44444444-4444-4444-8444-444444444444',
     setorA: '55555555-5555-4555-8555-555555555555',
+    setorA2: '56565656-5656-4656-8656-565656565656',
     setorB: '66666666-6666-4666-8666-666666666666',
     casaA: '77777777-7777-4777-8777-777777777777',
+    casaA2: '78787878-7878-4787-8787-787878787878',
     casaB: '88888888-8888-4888-8888-888888888888',
     adminA: '99999999-9999-4999-8999-999999999999',
     comumA: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -71,14 +74,17 @@ describe('PR-SEC-01 — escrita de Membros e Vínculos por Regional', () => {
 
       INSERT INTO administracoes (id, regional_id, nome) VALUES
         ('${id.admA}', '${id.regionalA}', 'Administração A'),
+        ('${id.admA2}', '${id.regionalA}', 'Administração A2'),
         ('${id.admB}', '${id.regionalB}', 'Administração B');
 
       INSERT INTO setores (id, administracao_id, nome) VALUES
         ('${id.setorA}', '${id.admA}', 'Setor A'),
+        ('${id.setorA2}', '${id.admA2}', 'Setor A2'),
         ('${id.setorB}', '${id.admB}', 'Setor B');
 
       INSERT INTO casas (id, setor_id, nome) VALUES
         ('${id.casaA}', '${id.setorA}', 'Casa A'),
+        ('${id.casaA2}', '${id.setorA2}', 'Casa A2'),
         ('${id.casaB}', '${id.setorB}', 'Casa B');
 
       INSERT INTO membros (id, nome, data_ordenacao, codigo_carteirinha, casa_id, ativo) VALUES
@@ -146,6 +152,28 @@ describe('PR-SEC-01 — escrita de Membros e Vínculos por Regional', () => {
       body: JSON.stringify({ nome: 'Tentativa indevida' }),
     })
     expect(fora.status).toBe(403)
+  })
+
+  it('movimentação de membro preserva auditoria na Casa de origem e destino', async () => {
+    const token = await criarSessaoAdminA()
+
+    const res = await req(token, `/api/v1/membros/${id.comumA}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ casaId: id.casaA2 }),
+    })
+    expect(res.status).toBe(200)
+
+    const logs = sqlite.prepare(
+      "SELECT escopo_tipo, escopo_id FROM auditoria_logs WHERE recurso_id = ? AND acao = 'MEMBRO_ATUALIZADO' ORDER BY escopo_id"
+    ).all(id.comumA) as any[]
+
+    expect(logs).toHaveLength(2)
+    expect(logs.map(log => [log.escopo_tipo, log.escopo_id])).toEqual(
+      expect.arrayContaining([
+        ['CASA', id.casaA],
+        ['CASA', id.casaA2],
+      ])
+    )
   })
 
   it('Administrador Regional não move membro para Casa de outra Regional', async () => {
@@ -230,6 +258,35 @@ describe('PR-SEC-01 — escrita de Membros e Vínculos por Regional', () => {
       }),
     })
     expect(escopoFora.status).toBe(403)
+  })
+
+  it('movimentação de vínculo preserva auditoria no escopo de origem e destino', async () => {
+    const token = await criarSessaoAdminA()
+
+    const vinculoCasaId = 'abababab-abab-4bab-8bab-abababababab'
+    sqlite.prepare(`
+      INSERT INTO vinculos_funcionais
+        (id, membro_id, funcao_id, casa_id, ativo)
+      VALUES (?, ?, ?, ?, 1)
+    `).run(vinculoCasaId, id.comumA, id.funcao, id.casaA)
+
+    const res = await req(token, `/api/v1/vinculos-funcionais/${vinculoCasaId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ casaId: id.casaA2 }),
+    })
+    expect(res.status).toBe(200)
+
+    const logs = sqlite.prepare(
+      "SELECT escopo_tipo, escopo_id FROM auditoria_logs WHERE recurso_id = ? AND acao = 'VINCULO_FUNCIONAL_ATUALIZADO' ORDER BY escopo_id"
+    ).all(vinculoCasaId) as any[]
+
+    expect(logs).toHaveLength(2)
+    expect(logs.map(log => [log.escopo_tipo, log.escopo_id])).toEqual(
+      expect.arrayContaining([
+        ['CASA', id.casaA],
+        ['CASA', id.casaA2],
+      ])
+    )
   })
 
   it('Administrador Regional não altera vínculo de outra Regional nem move vínculo para fora', async () => {
