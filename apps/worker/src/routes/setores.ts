@@ -3,7 +3,8 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { setores, administracoes, participacoesGruposTrabalho, gruposTrabalho } from '../db/schema'
 import { CreateSetorSchema, UpdateSetorSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { eMasterSistema, obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo, regionaisAdministradas } from '../security/permissoes'
+import { eMasterSistema, obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo, regionaisAdministradas, obterRegionalDoEscopo } from '../security/permissoes'
+import { executarOperacaoComAudit } from '../services/auditoria'
 
 export const setoresRouter = new Hono<any>()
 
@@ -64,8 +65,22 @@ setoresRouter.post('/', async (c) => {
       return c.json({ error: 'Acesso não autorizado para administrar este escopo', code: 'FORBIDDEN' }, 403)
     }
 
+    const regionalId = await obterRegionalDoEscopo(db, 'ADMINISTRACAO', parsed.administracaoId)
     const id = crypto.randomUUID()
-    const result = await db.insert(setores).values({ id, ...parsed }).returning().get()
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [qdb.insert(setores).values({ id, ...parsed })],
+      {
+        acao: 'SETOR_CRIADO',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'SETOR',
+        recursoId: id,
+        escopoTipo: 'REGIONAL',
+        escopoId: regionalId,
+        contexto: { administracaoId: parsed.administracaoId },
+      }
+    )
+    const result = await db.select().from(setores).where(eq(setores.id, id)).get()
     return c.json(result, 201)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
@@ -126,11 +141,25 @@ setoresRouter.patch('/:id', async (c) => {
       }
     }
 
-    const updated = await db.update(setores)
-      .set({ ...parsed, updatedAt: new Date().toISOString() })
-      .where(eq(setores.id, id))
-      .returning().get()
-      
+    const regionalFinal = await obterRegionalDoEscopo(db, 'ADMINISTRACAO', administracaoFinal)
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [
+        qdb.update(setores)
+          .set({ ...parsed, updatedAt: new Date().toISOString() })
+          .where(eq(setores.id, id))
+      ],
+      {
+        acao: 'SETOR_ATUALIZADO',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'SETOR',
+        recursoId: id,
+        escopoTipo: 'REGIONAL',
+        escopoId: regionalFinal,
+        contexto: { camposAlterados: Object.keys(parsed) },
+      }
+    )
+    const updated = await db.select().from(setores).where(eq(setores.id, id)).get()
     return c.json(updated)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
