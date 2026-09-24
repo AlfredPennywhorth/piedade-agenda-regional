@@ -271,7 +271,6 @@ eventosRouter.patch('/:id', async (c) => {
     const isExcecao = existing.serieRecorrenciaId !== null ? true : existing.recorrenciaExcecao
     const nowIso = new Date().toISOString()
 
-    const { escopoTipo, escopoId } = extrairEscopoDoEvento(existing)
     const atorMembroId = c.get('membroId') || null
 
     const auditData: AuditLogData = {
@@ -279,8 +278,8 @@ eventosRouter.patch('/:id', async (c) => {
       atorMembroId,
       recursoTipo: 'EVENTO',
       recursoId: id,
-      escopoTipo,
-      escopoId,
+      escopoTipo: escopoFinal.escopoTipo,
+      escopoId: escopoFinal.escopoId,
       contexto: {
         titulo: existing.titulo,
         modalidade: existing.modalidade,
