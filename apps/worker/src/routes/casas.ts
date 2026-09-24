@@ -3,13 +3,24 @@ import { eq, inArray } from 'drizzle-orm'
 import { casas } from '../db/schema'
 import { CreateCasaSchema, UpdateCasaSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { exigirMasterParaEscrita } from '../middleware/master-write'
-import { obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
+import { eMasterSistema, obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo, regionaisAdministradas } from '../security/permissoes'
 
 export const casasRouter = new Hono<any>()
 
 casasRouter.use('*', authMiddleware)
-casasRouter.use('*', exigirMasterParaEscrita)
+casasRouter.use('*', async (c, next) => {
+  if (c.req.method === 'GET' || c.req.method === 'HEAD' || c.req.method === 'OPTIONS') {
+    await next()
+    return
+  }
+
+  const contexto = c.get('contextoPermissoes')
+  if (!contexto || (!eMasterSistema(contexto) && regionaisAdministradas(contexto).size === 0)) {
+    return c.json({ error: 'Acesso não autorizado para administrar estrutura', code: 'FORBIDDEN' }, 403)
+  }
+
+  await next()
+})
 
 casasRouter.get('/', async (c) => {
   const db = c.get('db')
@@ -58,6 +69,10 @@ casasRouter.post('/', async (c) => {
     const body = await c.req.json()
     const parsed = CreateCasaSchema.parse(body)
     
+    if (!(await podeAdministrarEscopo(db, c.get('contextoPermissoes'), 'SETOR', parsed.setorId))) {
+      return c.json({ error: 'Acesso não autorizado para administrar este escopo', code: 'FORBIDDEN' }, 403)
+    }
+
     const id = crypto.randomUUID()
     const result = await db.insert(casas).values({ id, ...parsed }).returning().get()
     return c.json(result, 201)
@@ -78,6 +93,16 @@ casasRouter.patch('/:id', async (c) => {
     
     const existing = await db.select().from(casas).where(eq(casas.id, id)).get()
     if (!existing) return c.json({ error: 'Casa de oração não encontrada' }, 404)
+
+    const contexto = c.get('contextoPermissoes')
+    const setorFinal = parsed.setorId ?? existing.setorId
+    const [podeAtual, podeFinal] = await Promise.all([
+      podeAdministrarEscopo(db, contexto, 'SETOR', existing.setorId),
+      podeAdministrarEscopo(db, contexto, 'SETOR', setorFinal),
+    ])
+    if (!podeAtual || !podeFinal) {
+      return c.json({ error: 'Acesso não autorizado para administrar este escopo', code: 'FORBIDDEN' }, 403)
+    }
 
     const updated = await db.update(casas)
       .set({ ...parsed, updatedAt: new Date().toISOString() })

@@ -171,6 +171,20 @@ describe('S01 — RegionaisView (Gestão Territorial Frontend)', () => {
     expect(await screen.findByText('Regional atualizada com sucesso!')).toBeInTheDocument()
   })
 
+  it('Administrador Regional consulta Regionais sem controles de mutação', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([
+      { id: 'reg-1', nome: 'Regional São Paulo', codigo: 'SP', ativo: true }
+    ])
+
+    render(<RegionaisView podeEditar={false} />)
+
+    expect(await screen.findByText('Regional São Paulo')).toBeInTheDocument()
+    expect(screen.getByText('Consulta de Regionais')).toBeInTheDocument()
+    expect(screen.queryByText('+ Nova Regional')).not.toBeInTheDocument()
+    expect(screen.queryByText('Editar')).not.toBeInTheDocument()
+    expect(screen.getByText('Detalhes')).toBeInTheDocument()
+  })
+
   it('8. Erro no servidor ao criar/editar: exibe mensagem de erro retornada pela API', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([])
     vi.mocked(apiClient.postWithAuth).mockRejectedValue(new apiClient.ApiError(400, 'Código regional já cadastrado', { error: 'Código regional já cadastrado' }))

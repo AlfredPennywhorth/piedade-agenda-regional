@@ -5,6 +5,7 @@ export interface CapacidadesFrontend {
   podeVisualizarAuditoria?: boolean
   podeOperarPortaria?: boolean
   podeAdministrarAcessos?: boolean
+  podeAdministrarRegionais?: boolean
   podeAdministrarEstrutura?: boolean
   podeAdministrarPessoas?: boolean
   podeGerirAgenda?: boolean

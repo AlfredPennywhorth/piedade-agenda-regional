@@ -366,6 +366,17 @@ export function podeAdministrarRegional(
   return regionaisAdministradas(contexto).has(regionalId)
 }
 
+export async function podeAdministrarEscopo(
+  db: any,
+  contexto: ContextoPermissoes,
+  escopoTipo: Exclude<AcessoTecnico['escopoTipo'], 'GLOBAL'>,
+  escopoId: string
+): Promise<boolean> {
+  if (eMasterSistema(contexto)) return true
+  const regionalId = await obterRegionalDoEscopo(db, escopoTipo, escopoId)
+  return !!regionalId && regionaisAdministradas(contexto).has(regionalId)
+}
+
 export function temPerfil(contexto: ContextoPermissoes, perfilCodigo: string): boolean {
   return contexto.acessosAtivos.some(acesso => acesso.perfilCodigo === perfilCodigo)
 }
@@ -759,6 +770,7 @@ export interface CapacidadesMembro {
   podeVisualizarAuditoria: boolean
   podeOperarPortaria: boolean
   podeAdministrarAcessos: boolean
+  podeAdministrarRegionais: boolean
   podeAdministrarEstrutura: boolean
   podeAdministrarPessoas: boolean
   podeGerirAgenda: boolean
@@ -775,6 +787,7 @@ export async function obterCapacidadesMembro(
       podeVisualizarAuditoria: false,
       podeOperarPortaria: false,
       podeAdministrarAcessos: false,
+      podeAdministrarRegionais: false,
       podeAdministrarEstrutura: false,
       podeAdministrarPessoas: false,
       podeGerirAgenda: false
@@ -843,9 +856,10 @@ export async function obterCapacidadesMembro(
   const administraAlgumaRegional = regionaisAdministradas(contexto).size > 0
 
   const podeAdministrarAcessos = master || administraAlgumaRegional
-  // Os routers de Estrutura e Pessoas ainda exigem Master para escrita.
-  // Não expor CRUD regional até o hardening por escopo do backend estar concluído.
-  const podeAdministrarEstrutura = master
+  const podeAdministrarRegionais = master
+  const podeAdministrarEstrutura = master || administraAlgumaRegional
+  // Pessoas já possuem autorização regional no backend; a capacidade será alinhada
+  // no bloco específico de Pessoas/Vínculos.
   const podeAdministrarPessoas = master
 
   const membroAtivo = await db
@@ -865,6 +879,7 @@ export async function obterCapacidadesMembro(
     podeVisualizarAuditoria,
     podeOperarPortaria,
     podeAdministrarAcessos,
+    podeAdministrarRegionais,
     podeAdministrarEstrutura,
     podeAdministrarPessoas,
     podeGerirAgenda
