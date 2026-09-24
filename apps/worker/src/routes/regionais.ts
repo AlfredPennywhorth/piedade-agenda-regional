@@ -5,6 +5,7 @@ import { CreateRegionalSchema, UpdateRegionalSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { exigirMasterParaEscrita } from '../middleware/master-write'
 import { obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
+import { executarOperacaoComAudit } from '../services/auditoria'
 
 export const regionaisRouter = new Hono<any>()
 
@@ -51,7 +52,20 @@ regionaisRouter.post('/', async (c) => {
     
     // Fallback caso crypto n exista localmente em dev sem polyfill, no worker nativo crypto.randomUUID() está ok
     const id = crypto.randomUUID()
-    const result = await db.insert(regionais).values({ id, ...parsed }).returning().get()
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [qdb.insert(regionais).values({ id, ...parsed })],
+      {
+        acao: 'REGIONAL_CRIADA',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'REGIONAL',
+        recursoId: id,
+        escopoTipo: 'REGIONAL',
+        escopoId: id,
+        contexto: { campos: ['nome', 'codigo', 'ativo'] },
+      }
+    )
+    const result = await db.select().from(regionais).where(eq(regionais.id, id)).get()
     return c.json(result, 201)
   } catch (err: any) {
     return c.json({ error: err.issues || err.message }, 400)
@@ -68,11 +82,24 @@ regionaisRouter.patch('/:id', async (c) => {
     const existing = await db.select().from(regionais).where(eq(regionais.id, id)).get()
     if (!existing) return c.json({ error: 'Regional não encontrada' }, 404)
 
-    const updated = await db.update(regionais)
-      .set({ ...parsed, updatedAt: new Date().toISOString() })
-      .where(eq(regionais.id, id))
-      .returning().get()
-      
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [
+        qdb.update(regionais)
+          .set({ ...parsed, updatedAt: new Date().toISOString() })
+          .where(eq(regionais.id, id))
+      ],
+      {
+        acao: 'REGIONAL_ATUALIZADA',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'REGIONAL',
+        recursoId: id,
+        escopoTipo: 'REGIONAL',
+        escopoId: id,
+        contexto: { camposAlterados: Object.keys(parsed) },
+      }
+    )
+    const updated = await db.select().from(regionais).where(eq(regionais.id, id)).get()
     return c.json(updated)
   } catch (err: any) {
     return c.json({ error: err.issues || err.message }, 400)

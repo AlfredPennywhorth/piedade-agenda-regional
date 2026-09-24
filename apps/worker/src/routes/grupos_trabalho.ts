@@ -4,6 +4,7 @@ import { gruposTrabalho, participacoesGruposTrabalho, setores, administracoes } 
 import { CreateGrupoTrabalhoSchema, UpdateGrupoTrabalhoSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo, regionaisAdministradas } from '../security/permissoes'
+import { executarOperacaoComAudit } from '../services/auditoria'
 
 export const gruposTrabalhoRouter = new Hono<any>()
 
@@ -65,7 +66,20 @@ gruposTrabalhoRouter.post('/', async (c) => {
     }
 
     const id = crypto.randomUUID()
-    const result = await db.insert(gruposTrabalho).values({ id, ...parsed }).returning().get()
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [qdb.insert(gruposTrabalho).values({ id, ...parsed })],
+      {
+        acao: 'GRUPO_TRABALHO_CRIADO',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'GRUPO_TRABALHO',
+        recursoId: id,
+        escopoTipo: 'GRUPO_TRABALHO',
+        escopoId: id,
+        contexto: { campos: ['nome', 'codigo', 'ativo', 'regionalId'] },
+      }
+    )
+    const result = await db.select().from(gruposTrabalho).where(eq(gruposTrabalho.id, id)).get()
     return c.json(result, 201)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
@@ -122,17 +136,30 @@ gruposTrabalhoRouter.patch('/:id', async (c) => {
       }, 409)
     }
 
-    const updated = await db.update(gruposTrabalho)
-      .set({
-        ...parsed,
-        regionalId: finalRegionalId,
-        administracaoId: null,
-        setorId: null,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(gruposTrabalho.id, id))
-      .returning().get()
-      
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [
+        qdb.update(gruposTrabalho)
+          .set({
+            ...parsed,
+            regionalId: finalRegionalId,
+            administracaoId: null,
+            setorId: null,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(gruposTrabalho.id, id))
+      ],
+      {
+        acao: 'GRUPO_TRABALHO_ATUALIZADO',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'GRUPO_TRABALHO',
+        recursoId: id,
+        escopoTipo: 'GRUPO_TRABALHO',
+        escopoId: id,
+        contexto: { camposAlterados: Object.keys(parsed) },
+      }
+    )
+    const updated = await db.select().from(gruposTrabalho).where(eq(gruposTrabalho.id, id)).get()
     return c.json(updated)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {

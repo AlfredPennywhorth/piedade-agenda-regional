@@ -331,7 +331,28 @@ describe('S12 - Auditoria, Anti-Spoofing, Escopos e Fail-Closed', () => {
       expect(json.items.some((item: any) => item.id === logGlobalId)).toBe(true)
     })
 
-    it('9. Auditor Regional não deve ver logs globais', async () => {
+    it('9. Master deve ver logs territoriais de qualquer escopo', async () => {
+      const logTerritorialId = crypto.randomUUID()
+      await db.insert(auditoriaLogs).values({
+        id: logTerritorialId,
+        acao: 'ADMINISTRACAO_CRIADA',
+        atorMembroId: memMasterId,
+        recursoTipo: 'ADMINISTRACAO',
+        recursoId: admBId,
+        escopoTipo: 'ADMINISTRACAO',
+        escopoId: admBId,
+        criadoEm: new Date().toISOString()
+      })
+
+      const res = await app.request('/api/v1/auditoria', {
+        headers: { Authorization: `Bearer ${tokenMaster}` }
+      })
+      expect(res.status).toBe(200)
+      const json = await res.json()
+      expect(json.items.some((item: any) => item.id === logTerritorialId)).toBe(true)
+    })
+
+    it('10. Auditor Regional não deve ver logs globais', async () => {
       const logGlobalId = crypto.randomUUID()
       await db.insert(auditoriaLogs).values({
         id: logGlobalId,

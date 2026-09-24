@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, gte, lte, desc, count, inArray, or, isNull } from 'drizzle-orm'
+import { eq, and, gte, lte, desc, count, inArray, or } from 'drizzle-orm'
 import { auditoriaLogs, membros } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { obterEscoposAutorizadosDoAuditor } from '../security/permissoes'
@@ -23,9 +23,6 @@ auditoriaRouter.get('/', async (c) => {
   }
 
   const autorizacaoConditions = []
-  if (escoposAutorizados.global) {
-    autorizacaoConditions.push(and(eq(auditoriaLogs.escopoTipo, 'GLOBAL'), isNull(auditoriaLogs.escopoId)))
-  }
   if (escoposAutorizados.regionaisIds.length > 0) {
     autorizacaoConditions.push(and(eq(auditoriaLogs.escopoTipo, 'REGIONAL'), inArray(auditoriaLogs.escopoId, escoposAutorizados.regionaisIds)))
   }
@@ -42,7 +39,7 @@ auditoriaRouter.get('/', async (c) => {
     autorizacaoConditions.push(and(eq(auditoriaLogs.escopoTipo, 'GRUPO_TRABALHO'), inArray(auditoriaLogs.escopoId, escoposAutorizados.gtsIds)))
   }
 
-  if (autorizacaoConditions.length === 0) {
+  if (!escoposAutorizados.global && autorizacaoConditions.length === 0) {
     return c.json({ error: 'Acesso não autorizado para consultar a trilha de auditoria' }, 403)
   }
 
@@ -56,7 +53,7 @@ auditoriaRouter.get('/', async (c) => {
   const dataFim = c.req.query('dataFim')
 
   if (escopoTipo && escopoId) {
-    let escopoPermitido = false
+    let escopoPermitido = escoposAutorizados.global
     switch (escopoTipo) {
       case 'GLOBAL': escopoPermitido = escoposAutorizados.global; break
       case 'REGIONAL': escopoPermitido = escoposAutorizados.regionaisIds.includes(escopoId); break
@@ -74,7 +71,7 @@ auditoriaRouter.get('/', async (c) => {
   const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '50', 10)))
   const offset = (page - 1) * limit
 
-  const conditions = [or(...autorizacaoConditions)!]
+  const conditions = escoposAutorizados.global ? [] : [or(...autorizacaoConditions)!]
 
   if (acao) conditions.push(eq(auditoriaLogs.acao, acao))
   if (atorMembroId) conditions.push(eq(auditoriaLogs.atorMembroId, atorMembroId))
@@ -85,7 +82,7 @@ auditoriaRouter.get('/', async (c) => {
   if (dataInicio) conditions.push(gte(auditoriaLogs.criadoEm, dataInicio))
   if (dataFim) conditions.push(lte(auditoriaLogs.criadoEm, dataFim))
 
-  const whereClause = and(...conditions)
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined
 
   const totalResult = await db.select({ count: count() })
     .from(auditoriaLogs)
