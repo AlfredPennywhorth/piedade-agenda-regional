@@ -601,16 +601,30 @@ export function EventosView() {
                         {item.ativo ? 'Ativo' : 'Inativo'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right space-x-3">
-                      <button onClick={() => setEventoDetalhe(item)} className="text-brand-600 hover:text-brand-900 font-medium">
-                        Ver
-                      </button>
-                      <button onClick={() => void gerarAcessoPortaria(item.id)} className="text-green-700 hover:text-green-900 font-medium">
-                        Gerar acesso de Portaria
-                      </button>
-                      <button onClick={() => handleClickEditar(item)} className="text-amber-600 hover:text-amber-900 font-medium">
-                        Editar
-                      </button>
+                    <td className="px-4 sm:px-6 py-4">
+                      <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 min-w-[220px]">
+                        <button
+                          type="button"
+                          onClick={() => setEventoDetalhe(item)}
+                          className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-brand-700 hover:bg-brand-50 hover:text-brand-900 font-medium"
+                        >
+                          Ver
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void gerarAcessoPortaria(item.id)}
+                          className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-green-800 hover:bg-green-50 hover:text-green-950 font-medium"
+                        >
+                          Gerar acesso de Portaria
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleClickEditar(item)}
+                          className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-amber-700 hover:bg-amber-50 hover:text-amber-900 font-medium"
+                        >
+                          Editar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
