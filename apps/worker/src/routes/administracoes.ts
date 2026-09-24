@@ -3,13 +3,11 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { administracoes, setores, participacoesGruposTrabalho, gruposTrabalho } from '../db/schema'
 import { CreateAdministracaoSchema, UpdateAdministracaoSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { exigirMasterParaEscrita } from '../middleware/master-write'
-import { obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
+import { obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo } from '../security/permissoes'
 
 export const administracoesRouter = new Hono<any>()
 
 administracoesRouter.use('*', authMiddleware)
-administracoesRouter.use('*', exigirMasterParaEscrita)
 
 administracoesRouter.get('/', async (c) => {
   const db = c.get('db')
@@ -49,6 +47,10 @@ administracoesRouter.post('/', async (c) => {
     const body = await c.req.json()
     const parsed = CreateAdministracaoSchema.parse(body)
     
+    if (!(await podeAdministrarEscopo(db, c.get('contextoPermissoes'), 'REGIONAL', parsed.regionalId))) {
+      return c.json({ error: 'Acesso não autorizado para administrar esta Regional', code: 'FORBIDDEN' }, 403)
+    }
+
     const id = crypto.randomUUID()
     const result = await db.insert(administracoes).values({ id, ...parsed }).returning().get()
     return c.json(result, 201)
@@ -69,6 +71,16 @@ administracoesRouter.patch('/:id', async (c) => {
     
     const existing = await db.select().from(administracoes).where(eq(administracoes.id, id)).get()
     if (!existing) return c.json({ error: 'Administração não encontrada' }, 404)
+
+    const contexto = c.get('contextoPermissoes')
+    const regionalFinal = parsed.regionalId ?? existing.regionalId
+    const [podeAtual, podeFinal] = await Promise.all([
+      podeAdministrarEscopo(db, contexto, 'REGIONAL', existing.regionalId),
+      podeAdministrarEscopo(db, contexto, 'REGIONAL', regionalFinal),
+    ])
+    if (!podeAtual || !podeFinal) {
+      return c.json({ error: 'Acesso não autorizado para administrar esta Regional', code: 'FORBIDDEN' }, 403)
+    }
 
     if (parsed.regionalId && parsed.regionalId !== existing.regionalId) {
       const participacoes = await db
