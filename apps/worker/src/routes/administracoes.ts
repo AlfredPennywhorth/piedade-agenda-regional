@@ -74,8 +74,8 @@ administracoesRouter.post('/', async (c) => {
         atorMembroId: c.get('membroId') || null,
         recursoTipo: 'ADMINISTRACAO',
         recursoId: id,
-        escopoTipo: 'REGIONAL',
-        escopoId: parsed.regionalId,
+        escopoTipo: 'ADMINISTRACAO',
+        escopoId: id,
         contexto: { campos: ['nome', 'codigo', 'ativo', 'regionalId'] },
       }
     )
@@ -143,8 +143,8 @@ administracoesRouter.patch('/:id', async (c) => {
         atorMembroId: c.get('membroId') || null,
         recursoTipo: 'ADMINISTRACAO',
         recursoId: id,
-        escopoTipo: 'REGIONAL',
-        escopoId: regionalFinal,
+        escopoTipo: 'ADMINISTRACAO',
+        escopoId: id,
         contexto: { camposAlterados: Object.keys(parsed) },
       }
     )
