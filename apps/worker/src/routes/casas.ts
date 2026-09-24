@@ -84,8 +84,8 @@ casasRouter.post('/', async (c) => {
         atorMembroId: c.get('membroId') || null,
         recursoTipo: 'CASA',
         recursoId: id,
-        escopoTipo: 'REGIONAL',
-        escopoId: regionalId,
+        escopoTipo: 'CASA',
+        escopoId: id,
         contexto: { setorId: parsed.setorId },
       }
     )
@@ -132,8 +132,8 @@ casasRouter.patch('/:id', async (c) => {
         atorMembroId: c.get('membroId') || null,
         recursoTipo: 'CASA',
         recursoId: id,
-        escopoTipo: 'REGIONAL',
-        escopoId: regionalFinal,
+        escopoTipo: 'CASA',
+        escopoId: id,
         contexto: { camposAlterados: Object.keys(parsed) },
       }
     )
