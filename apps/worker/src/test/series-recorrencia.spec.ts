@@ -94,6 +94,12 @@ describe('Series Recorrencia API (S05)', () => {
     expect(res.status).toBe(201)
     const json = await res.json()
     expect(json.generatedOccurrences).toBe(5) // 1 to 5 inclusive
+
+    const audit = sqlite.prepare(
+      "SELECT acao, recurso_tipo FROM auditoria_logs WHERE recurso_id = ?"
+    ).get(json.serie.id) as any
+    expect(audit.acao).toBe('SERIE_RECORRENCIA_CRIADA')
+    expect(audit.recurso_tipo).toBe('SERIE_RECORRENCIA')
   })
 
   it('2. criar série semanal', async () => {
