@@ -188,6 +188,24 @@ describe('PR-SEC-01 — escrita territorial por Regional', () => {
     expect(logsBloqueados.total).toBe(0)
   })
 
+  it('Master audita criação de Regional no próprio escopo', async () => {
+    const token = await criarSessao('MASTER_SISTEMA')
+    const res = await app.request('/api/v1/regionais', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nome: 'Regional Nova' }),
+    })
+    expect(res.status).toBe(201)
+    const regional = await res.json() as any
+    expect(sqlite.prepare(
+      "SELECT acao, escopo_tipo, escopo_id FROM auditoria_logs WHERE recurso_id = ?"
+    ).get(regional.id)).toMatchObject({
+      acao: 'REGIONAL_CRIADA',
+      escopo_tipo: 'REGIONAL',
+      escopo_id: regional.id,
+    })
+  })
+
   it('Master mantém escrita global', async () => {
     const token = await criarSessao('MASTER_SISTEMA')
     const res = await app.request('/api/v1/administracoes', {
