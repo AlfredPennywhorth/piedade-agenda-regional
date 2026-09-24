@@ -36,6 +36,9 @@ describe('ACC-11 — capacidades consolidadas da conta', () => {
       podeVisualizarAuditoria: false,
       podeOperarPortaria: false,
       podeAdministrarAcessos: false,
+      podeAdministrarEstrutura: false,
+      podeAdministrarPessoas: false,
+      podeGerirAgenda: true,
     })
   })
 

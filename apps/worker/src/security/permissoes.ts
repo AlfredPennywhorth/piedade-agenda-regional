@@ -583,6 +583,9 @@ export interface CapacidadesMembro {
   podeVisualizarAuditoria: boolean
   podeOperarPortaria: boolean
   podeAdministrarAcessos: boolean
+  podeAdministrarEstrutura: boolean
+  podeAdministrarPessoas: boolean
+  podeGerirAgenda: boolean
 }
 
 export async function obterCapacidadesMembro(
@@ -595,7 +598,10 @@ export async function obterCapacidadesMembro(
       podeVisualizarRelatorios: false,
       podeVisualizarAuditoria: false,
       podeOperarPortaria: false,
-      podeAdministrarAcessos: false
+      podeAdministrarAcessos: false,
+      podeAdministrarEstrutura: false,
+      podeAdministrarPessoas: false,
+      podeGerirAgenda: false
     }
   }
 
@@ -657,14 +663,35 @@ export async function obterCapacidadesMembro(
     perfisTecnicos.has('OPERADOR_PORTARIA_PERMANENTE') ||
     codigos.has('OPERADOR_PORTARIA') ||
     !!autorizacaoTemporariaPortaria
-  const podeAdministrarAcessos =
-    eMasterSistema(contexto) || regionaisAdministradas(contexto).size > 0
+  const master = eMasterSistema(contexto)
+  const administraAlgumaRegional = regionaisAdministradas(contexto).size > 0
+
+  const podeAdministrarAcessos = master || administraAlgumaRegional
+  // Os routers de Estrutura e Pessoas ainda exigem Master para escrita.
+  // Não expor CRUD regional até o hardening por escopo do backend estar concluído.
+  const podeAdministrarEstrutura = master
+  const podeAdministrarPessoas = master
+
+  const membroAtivo = await db
+    .select({ id: schema.membros.id })
+    .from(schema.membros)
+    .where(and(eq(schema.membros.id, membroId), eq(schema.membros.ativo, true)))
+    .get()
+
+  const podeGerirAgenda =
+    master ||
+    administraAlgumaRegional ||
+    perfisTecnicos.has('GESTOR_AGENDA') ||
+    !!membroAtivo
 
   return {
     podeVisualizarRelatorios,
     podeVisualizarAuditoria,
     podeOperarPortaria,
-    podeAdministrarAcessos
+    podeAdministrarAcessos,
+    podeAdministrarEstrutura,
+    podeAdministrarPessoas,
+    podeGerirAgenda
   }
 }
 

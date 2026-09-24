@@ -13,6 +13,9 @@ describe('MainLayout — navegação móvel', () => {
         capacidades={{
           podeVisualizarRelatorios: true,
           podeAdministrarAcessos: true,
+          podeAdministrarEstrutura: true,
+          podeAdministrarPessoas: true,
+          podeGerirAgenda: true,
         }}
         nomeUsuario="Usuário Teste"
       >
