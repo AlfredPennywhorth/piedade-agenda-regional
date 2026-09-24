@@ -17,12 +17,21 @@ CREATE INDEX `idx_credencial_operador_portaria_evento`
   ON `credenciais_operador_portaria_evento` (`evento_id`, `ativo`);
 
 --> statement-breakpoint
+CREATE TABLE `portaria_fechamento_locks` (
+  `evento_id` text PRIMARY KEY NOT NULL,
+  `criado_em` text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  FOREIGN KEY (`evento_id`) REFERENCES `eventos`(`id`)
+);
+--> statement-breakpoint
 CREATE TRIGGER `trg_checkin_portaria_aberta`
 BEFORE INSERT ON `checkins`
 WHEN EXISTS (
   SELECT 1 FROM `portarias_evento`
   WHERE `evento_id` = NEW.`evento_id`
-    AND `status` <> 'ABERTA'
+    AND `status` = 'FECHADA'
+) OR EXISTS (
+  SELECT 1 FROM `portaria_fechamento_locks`
+  WHERE `evento_id` = NEW.`evento_id`
 )
 BEGIN
   SELECT RAISE(ABORT, 'PORTARIA_NAO_ABERTA');
@@ -33,7 +42,10 @@ BEFORE INSERT ON `presencas_convidado_evento`
 WHEN EXISTS (
   SELECT 1 FROM `portarias_evento`
   WHERE `evento_id` = NEW.`evento_id`
-    AND `status` <> 'ABERTA'
+    AND `status` = 'FECHADA'
+) OR EXISTS (
+  SELECT 1 FROM `portaria_fechamento_locks`
+  WHERE `evento_id` = NEW.`evento_id`
 )
 BEGIN
   SELECT RAISE(ABORT, 'PORTARIA_NAO_ABERTA');
