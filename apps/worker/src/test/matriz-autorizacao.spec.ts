@@ -61,6 +61,9 @@ describe('QA-AUTH-01 — matriz de capacidades por perfil técnico', () => {
         podeVisualizarAuditoria: false,
         podeOperarPortaria: false,
         podeAdministrarAcessos: false,
+        podeAdministrarEstrutura: false,
+        podeAdministrarPessoas: false,
+        podeGerirAgenda: true,
       },
     },
     {
@@ -71,6 +74,9 @@ describe('QA-AUTH-01 — matriz de capacidades por perfil técnico', () => {
         podeVisualizarAuditoria: false,
         podeOperarPortaria: false,
         podeAdministrarAcessos: false,
+        podeAdministrarEstrutura: false,
+        podeAdministrarPessoas: false,
+        podeGerirAgenda: true,
       },
     },
     {
@@ -81,6 +87,9 @@ describe('QA-AUTH-01 — matriz de capacidades por perfil técnico', () => {
         podeVisualizarAuditoria: true,
         podeOperarPortaria: false,
         podeAdministrarAcessos: false,
+        podeAdministrarEstrutura: false,
+        podeAdministrarPessoas: false,
+        podeGerirAgenda: true,
       },
     },
     {
@@ -91,6 +100,9 @@ describe('QA-AUTH-01 — matriz de capacidades por perfil técnico', () => {
         podeVisualizarAuditoria: false,
         podeOperarPortaria: true,
         podeAdministrarAcessos: false,
+        podeAdministrarEstrutura: false,
+        podeAdministrarPessoas: false,
+        podeGerirAgenda: true,
       },
     },
     {
@@ -101,6 +113,9 @@ describe('QA-AUTH-01 — matriz de capacidades por perfil técnico', () => {
         podeVisualizarAuditoria: false,
         podeOperarPortaria: false,
         podeAdministrarAcessos: true,
+        podeAdministrarEstrutura: true,
+        podeAdministrarPessoas: true,
+        podeGerirAgenda: true,
       },
     },
     {
@@ -114,6 +129,9 @@ describe('QA-AUTH-01 — matriz de capacidades por perfil técnico', () => {
         podeVisualizarAuditoria: false,
         podeOperarPortaria: true,
         podeAdministrarAcessos: true,
+        podeAdministrarEstrutura: true,
+        podeAdministrarPessoas: true,
+        podeGerirAgenda: true,
       },
     },
   ])('$membroId expõe somente as capacidades previstas', async ({ membroId, contaId, esperado }) => {
