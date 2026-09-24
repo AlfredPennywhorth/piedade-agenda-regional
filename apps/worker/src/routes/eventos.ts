@@ -4,7 +4,7 @@ import { eventos } from '../db/schema'
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
-import { obterEscoposTerritoriaisVisiveis, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
+import { eGestorRelatoriosAutorizadoParaEvento, obterEscoposTerritoriaisVisiveis, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
 
 export const eventosRouter = new Hono<any>()
 
@@ -16,6 +16,19 @@ function eventoVisivelNoEscopo(evento: any, escopos: any): boolean {
   if (evento.casaId && escopos.casasIds.has(evento.casaId)) return true
   if (evento.grupoTrabalhoId && escopos.gruposTrabalhoIds.has(evento.grupoTrabalhoId)) return true
   return false
+}
+
+async function eventoVisivelParaLeitura(
+  db: any,
+  membroId: string,
+  evento: any,
+  escopos: any
+): Promise<boolean> {
+  if (eventoVisivelNoEscopo(evento, escopos)) return true
+
+  // Compatibilidade com relatórios: organizador ou gestor de relatórios autorizado
+  // precisa continuar vendo o evento nos seletores de relatório.
+  return eGestorRelatoriosAutorizadoParaEvento(db, membroId, evento)
 }
 
 eventosRouter.use('*', authMiddleware)
@@ -40,7 +53,16 @@ eventosRouter.get('/', async (c) => {
     : await query.all()
 
   const escopos = await obterEscoposTerritoriaisVisiveis(db, c.get('contextoPermissoes'))
-  return c.json(data.filter((evento: any) => eventoVisivelNoEscopo(evento, escopos)))
+  const membroId = c.get('membroId')
+  const visiveis = []
+
+  for (const evento of data) {
+    if (await eventoVisivelParaLeitura(db, membroId, evento, escopos)) {
+      visiveis.push(evento)
+    }
+  }
+
+  return c.json(visiveis)
 })
 
 eventosRouter.get('/:id', async (c) => {
@@ -51,7 +73,7 @@ eventosRouter.get('/:id', async (c) => {
   if (!data) return c.json({ error: 'Evento não encontrado' }, 404)
 
   const escopos = await obterEscoposTerritoriaisVisiveis(db, c.get('contextoPermissoes'))
-  if (!eventoVisivelNoEscopo(data, escopos)) {
+  if (!(await eventoVisivelParaLeitura(db, c.get('membroId'), data, escopos))) {
     return c.json({ error: 'Acesso não autorizado para este evento', code: 'FORBIDDEN' }, 403)
   }
 
