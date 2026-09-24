@@ -82,6 +82,12 @@ describe('PR-SEC-01 — leitura de séries por escopo sem N+1', () => {
         ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Série Casa A', 'ONLINE', 'DIARIA', 1,
          '2030-01-01', '2030-01-02', '09:00', '10:00', 'America/Sao_Paulo', '${ids.casaA}', 1);
 
+      INSERT INTO grupos_trabalho (id, nome, administracao_id, ativo)
+      VALUES ('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'GT Adm A', '${ids.admA}', 1);
+
+      INSERT INTO grupos_trabalho (id, nome, setor_id, ativo)
+      VALUES ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'GT Setor A', '${ids.setorA}', 1);
+
       INSERT INTO series_recorrencia
         (id, titulo, modalidade, frequencia, intervalo, data_inicio, data_fim,
          horario_inicio, horario_fim, timezone, regional_id, ativo)
@@ -90,6 +96,15 @@ describe('PR-SEC-01 — leitura de séries por escopo sem N+1', () => {
          '2030-01-01', '2030-01-02', '09:00', '10:00', 'America/Sao_Paulo', '${ids.regionalA}', 1),
         ('cccccccc-cccc-4ccc-8ccc-cccccccccccc', 'Série Regional B', 'ONLINE', 'DIARIA', 1,
          '2030-01-01', '2030-01-02', '09:00', '10:00', 'America/Sao_Paulo', '${ids.regionalB}', 1);
+
+      INSERT INTO series_recorrencia
+        (id, titulo, modalidade, frequencia, intervalo, data_inicio, data_fim,
+         horario_inicio, horario_fim, timezone, grupo_trabalho_id, ativo)
+      VALUES
+        ('ffffffff-ffff-4fff-8fff-ffffffffffff', 'Série GT Adm A', 'ONLINE', 'DIARIA', 1,
+         '2030-01-01', '2030-01-02', '09:00', '10:00', 'America/Sao_Paulo', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 1),
+        ('12121212-1212-4212-8212-121212121212', 'Série GT Setor A', 'ONLINE', 'DIARIA', 1,
+         '2030-01-01', '2030-01-02', '09:00', '10:00', 'America/Sao_Paulo', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 1);
     `)
   })
 
@@ -118,8 +133,48 @@ describe('PR-SEC-01 — leitura de séries por escopo sem N+1', () => {
     expect(res.status).toBe(200)
     const body = await res.json() as Array<{ titulo: string }>
     const titulos = body.map(item => item.titulo).sort()
-    expect(titulos).toEqual(['Série Casa A', 'Série Regional A'])
+    expect(titulos).toEqual([
+      'Série Casa A',
+      'Série GT Adm A',
+      'Série GT Setor A',
+      'Série Regional A',
+    ])
     expect(titulos).not.toContain('Série Regional B')
+  })
+
+  it('Gestor de Agenda em Administração não herda GTs da Administração', async () => {
+    const token = await criarSessao({
+      codigo: 'GESTOR_AGENDA',
+      escopoTipo: 'ADMINISTRACAO',
+      escopoId: ids.admA,
+    })
+
+    const res = await app.request('/api/v1/series-recorrencia', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(res.status).toBe(200)
+    const body = await res.json() as Array<{ titulo: string }>
+    const titulos = body.map(item => item.titulo)
+    expect(titulos).not.toContain('Série GT Adm A')
+    expect(titulos).not.toContain('Série GT Setor A')
+  })
+
+  it('Gestor de Agenda em Setor não herda GTs do Setor', async () => {
+    const token = await criarSessao({
+      codigo: 'GESTOR_AGENDA',
+      escopoTipo: 'SETOR',
+      escopoId: ids.setorA,
+    })
+
+    const res = await app.request('/api/v1/series-recorrencia', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(res.status).toBe(200)
+    const body = await res.json() as Array<{ titulo: string }>
+    const titulos = body.map(item => item.titulo)
+    expect(titulos).not.toContain('Série GT Setor A')
   })
 
   it('Gestor de Agenda Regional também herda os descendentes da própria Regional', async () => {
@@ -136,6 +191,11 @@ describe('PR-SEC-01 — leitura de séries por escopo sem N+1', () => {
     expect(res.status).toBe(200)
     const body = await res.json() as Array<{ titulo: string }>
     const titulos = body.map(item => item.titulo).sort()
-    expect(titulos).toEqual(['Série Casa A', 'Série Regional A'])
+    expect(titulos).toEqual([
+      'Série Casa A',
+      'Série GT Adm A',
+      'Série GT Setor A',
+      'Série Regional A',
+    ])
   })
 })
