@@ -3,7 +3,7 @@ import { eq, inArray } from 'drizzle-orm'
 import { casas } from '../db/schema'
 import { CreateCasaSchema, UpdateCasaSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { eMasterSistema, obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo, regionaisAdministradas, obterRegionalDoEscopo } from '../security/permissoes'
+import { eMasterSistema, obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo, regionaisAdministradas } from '../security/permissoes'
 import { executarOperacaoComAudit } from '../services/auditoria'
 
 export const casasRouter = new Hono<any>()
@@ -74,7 +74,6 @@ casasRouter.post('/', async (c) => {
       return c.json({ error: 'Acesso não autorizado para administrar este escopo', code: 'FORBIDDEN' }, 403)
     }
 
-    const regionalId = await obterRegionalDoEscopo(db, 'SETOR', parsed.setorId)
     const id = crypto.randomUUID()
     await executarOperacaoComAudit(
       db,
@@ -119,7 +118,6 @@ casasRouter.patch('/:id', async (c) => {
       return c.json({ error: 'Acesso não autorizado para administrar este escopo', code: 'FORBIDDEN' }, 403)
     }
 
-    const regionalFinal = await obterRegionalDoEscopo(db, 'SETOR', setorFinal)
     await executarOperacaoComAudit(
       db,
       (qdb) => [
