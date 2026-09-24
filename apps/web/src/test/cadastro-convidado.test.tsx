@@ -40,6 +40,43 @@ describe('CadastroConvidadoView — PORT-02', () => {
     expect(screen.getByLabelText('Localidade / Casa de Oração')).toBeInTheDocument()
   })
 
+  it('exibe estado de reunião encerrada quando a Portaria foi fechada', async () => {
+    vi.mocked(apiClient.fetchPublic).mockRejectedValueOnce(
+      new apiClient.ApiError(409, 'Portaria fechada', { code: 'PORTARIA_FECHADA' })
+    )
+
+    render(<CadastroConvidadoView token="token-fechado" />)
+
+    expect(await screen.findByText('Reunião encerrada')).toBeInTheDocument()
+    expect(
+      screen.getByText('A Portaria desta reunião já foi fechada. Não é mais possível enviar novos cadastros.')
+    ).toBeInTheDocument()
+  })
+
+  it('exibe estado de cadastro encerrado quando a credencial expirou', async () => {
+    vi.mocked(apiClient.fetchPublic).mockRejectedValueOnce(
+      new apiClient.ApiError(410, 'Credencial expirada', { code: 'CREDENCIAL_EXPIRADA' })
+    )
+
+    render(<CadastroConvidadoView token="token-expirado" />)
+
+    expect(await screen.findByText('Cadastro encerrado')).toBeInTheDocument()
+    expect(screen.getByText('O período de cadastro de convidados desta reunião terminou.')).toBeInTheDocument()
+  })
+
+  it('exibe estado de link indisponível quando a credencial foi revogada', async () => {
+    vi.mocked(apiClient.fetchPublic).mockRejectedValueOnce(
+      new apiClient.ApiError(409, 'Credencial indisponível', { code: 'CREDENCIAL_INDISPONIVEL' })
+    )
+
+    render(<CadastroConvidadoView token="token-revogado" />)
+
+    expect(await screen.findByText('Link indisponível')).toBeInTheDocument()
+    expect(
+      screen.getByText('Este link não está mais ativo. Se a Portaria ainda estiver aberta, solicite um novo link ao porteiro.')
+    ).toBeInTheDocument()
+  })
+
   it('envia nome e localidade e orienta aguardar validação do porteiro', async () => {
     vi.mocked(apiClient.postPublic).mockResolvedValue({
       cadastrado: true,
