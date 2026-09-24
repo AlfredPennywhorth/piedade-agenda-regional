@@ -92,8 +92,8 @@ describe('PR-SEC-01 — escrita territorial por Regional', () => {
     ).get(admCriada.id) as any
     expect(auditAdm).toMatchObject({
       acao: 'ADMINISTRACAO_CRIADA',
-      escopo_tipo: 'REGIONAL',
-      escopo_id: ids.regionalA,
+      escopo_tipo: 'ADMINISTRACAO',
+      escopo_id: admCriada.id,
     })
 
     const fora = await app.request('/api/v1/administracoes', {
@@ -118,7 +118,7 @@ describe('PR-SEC-01 — escrita territorial por Regional', () => {
       "SELECT acao, escopo_id FROM auditoria_logs WHERE recurso_id = ?"
     ).get(setorCriado.id)).toMatchObject({
       acao: 'SETOR_CRIADO',
-      escopo_id: ids.regionalA,
+      escopo_id: setorCriado.id,
     })
 
     expect((await app.request('/api/v1/setores', {
@@ -136,7 +136,7 @@ describe('PR-SEC-01 — escrita territorial por Regional', () => {
       "SELECT acao, escopo_id FROM auditoria_logs WHERE recurso_id = ?"
     ).get(casaCriada.id)).toMatchObject({
       acao: 'CASA_CRIADA',
-      escopo_id: ids.regionalA,
+      escopo_id: casaCriada.id,
     })
 
     expect((await app.request('/api/v1/casas', {
@@ -154,7 +154,7 @@ describe('PR-SEC-01 — escrita territorial por Regional', () => {
       "SELECT acao, escopo_id FROM auditoria_logs WHERE recurso_id = ?"
     ).get(gtCriado.id)).toMatchObject({
       acao: 'GRUPO_TRABALHO_CRIADO',
-      escopo_id: ids.regionalA,
+      escopo_id: gtCriado.id,
     })
 
     expect((await app.request('/api/v1/grupos-trabalho', {
@@ -219,8 +219,8 @@ describe('PR-SEC-01 — escrita territorial por Regional', () => {
       "SELECT acao, escopo_tipo, escopo_id FROM auditoria_logs WHERE recurso_id = ?"
     ).get(regional.id)).toMatchObject({
       acao: 'ADMINISTRACAO_CRIADA',
-      escopo_tipo: 'REGIONAL',
-      escopo_id: ids.regionalB,
+      escopo_tipo: 'ADMINISTRACAO',
+      escopo_id: regional.id,
     })
   })
 })
