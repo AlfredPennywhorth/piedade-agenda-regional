@@ -14,11 +14,13 @@ import {
   portariasEvento,
   portariaFechamentos,
   portariaFechamentoItens,
+  portariaFechamentoLocks,
 } from '../db/schema'
 import { CheckinManualSchema, CheckinQrSchema, getSaoPauloEndOfDayIso } from '@piedade/shared'
 import { gerarTokenAleatorio, hashToken } from '../security/tokens'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
+import { executeAtomic } from '../db/batch'
 import { validarCredencialOperadorPortaria } from '../services/portaria-operador-temporario'
 
 export const portariaOperadorPublicaRouter = new Hono<any>()
@@ -386,21 +388,42 @@ portariaOperadorPublicaRouter.post('/fechar', async c => {
     return c.json({ error: 'Fechamento final já materializado', code: 'FECHAMENTO_EXISTENTE' }, 409)
   }
 
-  const snapshot = await montarSnapshotFechamentoPortaria(ctx.db, ctx.eventoId)
+  try {
+    await executeAtomic(ctx.db, qdb => [
+      qdb.insert(portariaFechamentoLocks).values({
+        eventoId: ctx.eventoId,
+        criadoEm: new Date().toISOString(),
+      }),
+    ])
+  } catch {
+    return c.json({ error: 'A Portaria já está sendo encerrada', code: 'PORTARIA_FECHANDO' }, 409)
+  }
+
+  let snapshot
+  try {
+    snapshot = await montarSnapshotFechamentoPortaria(ctx.db, ctx.eventoId)
+  } catch (err) {
+    await ctx.db.delete(portariaFechamentoLocks)
+      .where(eq(portariaFechamentoLocks.eventoId, ctx.eventoId))
+      .execute()
+    throw err
+  }
+
   const agora = new Date().toISOString()
   const fechamentoId = crypto.randomUUID()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(ctx.evento)
 
-  await executarOperacaoComAudit(
-    ctx.db,
-    qdb => {
-      const queries = [
-        qdb.update(portariasEvento).set({
-          status: 'FECHADA',
-          fechadaEm: agora,
-          fechadaPorMembroId: null,
-          updatedAt: agora,
-        }).where(eq(portariasEvento.eventoId, ctx.eventoId)),
+  try {
+    await executarOperacaoComAudit(
+      ctx.db,
+      qdb => {
+        const queries = [
+          qdb.update(portariasEvento).set({
+            status: 'FECHADA',
+            fechadaEm: agora,
+            fechadaPorMembroId: null,
+            updatedAt: agora,
+          }).where(eq(portariasEvento.eventoId, ctx.eventoId)),
         qdb.update(credenciaisOperadorPortariaEvento).set({
           ativo: false,
           revogadoEm: agora,
@@ -445,22 +468,32 @@ portariaOperadorPublicaRouter.post('/fechar', async c => {
           updatedAt: agora,
         }) as any)
       }
-      return queries
-    },
-    {
-      acao: 'PORTARIA_FECHADA_COM_SNAPSHOT',
-      atorMembroId: null,
-      recursoTipo: 'PORTARIA_FECHAMENTO',
-      recursoId: fechamentoId,
-      escopoTipo,
-      escopoId,
-      contexto: {
-        eventoId: ctx.eventoId,
-        operadorCredencialId: ctx.id,
-        ...snapshot.resumo,
+        queries.push(
+          qdb.delete(portariaFechamentoLocks)
+            .where(eq(portariaFechamentoLocks.eventoId, ctx.eventoId))
+        )
+        return queries
       },
-    }
-  )
+      {
+        acao: 'PORTARIA_FECHADA_COM_SNAPSHOT',
+        atorMembroId: null,
+        recursoTipo: 'PORTARIA_FECHAMENTO',
+        recursoId: fechamentoId,
+        escopoTipo,
+        escopoId,
+        contexto: {
+          eventoId: ctx.eventoId,
+          operadorCredencialId: ctx.id,
+          ...snapshot.resumo,
+        },
+      }
+    )
+  } catch (err) {
+    await ctx.db.delete(portariaFechamentoLocks)
+      .where(eq(portariaFechamentoLocks.eventoId, ctx.eventoId))
+      .execute()
+    throw err
+  }
 
   return c.json({ status: 'FECHADA', fechamentoId, resumo: snapshot.resumo }, 200)
 })
