@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, gte, lte, desc, count, inArray, or } from 'drizzle-orm'
+import { eq, and, gte, lte, desc, count, inArray, or, isNull } from 'drizzle-orm'
 import { auditoriaLogs, membros } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { obterEscoposAutorizadosDoAuditor } from '../security/permissoes'
@@ -23,6 +23,9 @@ auditoriaRouter.get('/', async (c) => {
   }
 
   const autorizacaoConditions = []
+  if (escoposAutorizados.global) {
+    autorizacaoConditions.push(and(eq(auditoriaLogs.escopoTipo, 'GLOBAL'), isNull(auditoriaLogs.escopoId)))
+  }
   if (escoposAutorizados.regionaisIds.length > 0) {
     autorizacaoConditions.push(and(eq(auditoriaLogs.escopoTipo, 'REGIONAL'), inArray(auditoriaLogs.escopoId, escoposAutorizados.regionaisIds)))
   }
@@ -55,6 +58,7 @@ auditoriaRouter.get('/', async (c) => {
   if (escopoTipo && escopoId) {
     let escopoPermitido = false
     switch (escopoTipo) {
+      case 'GLOBAL': escopoPermitido = escoposAutorizados.global; break
       case 'REGIONAL': escopoPermitido = escoposAutorizados.regionaisIds.includes(escopoId); break
       case 'ADMINISTRACAO': escopoPermitido = escoposAutorizados.administracoesIds.includes(escopoId); break
       case 'SETOR': escopoPermitido = escoposAutorizados.setoresIds.includes(escopoId); break

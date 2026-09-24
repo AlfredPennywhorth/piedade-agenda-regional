@@ -46,11 +46,13 @@ describe('S12 - Auditoria, Anti-Spoofing, Escopos e Fail-Closed', () => {
   let memAuditorRegBId: string
   let memComumId: string
   let memOperadorId: string
+  let memMasterId: string
 
   // Tokens
   let tokenAuditorRegA: string
   let tokenAuditorAdmA: string
   let tokenMembroComum: string
+  let tokenMaster: string
 
   beforeAll(async () => {
     sqlite = new Database(':memory:')
@@ -158,6 +160,18 @@ describe('S12 - Auditoria, Anti-Spoofing, Escopos e Fail-Closed', () => {
       regionalId: regAId,
       ativo: true
     })
+
+    // Membro 6: Master global
+    memMasterId = crypto.randomUUID()
+    await db.insert(membros).values({ id: memMasterId, nome: 'Master Global', casaId: casAId, ativo: true, autenticacaoAtiva: true })
+    const contaMasterId = crypto.randomUUID()
+    sqlite.prepare(
+      'INSERT INTO contas_acesso (id, membro_id, status, ativado_em) VALUES (?, ?, \'ATIVA\', CURRENT_TIMESTAMP)'
+    ).run(contaMasterId, memMasterId)
+    sqlite.prepare(
+      'INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, \'MASTER_SISTEMA\', \'GLOBAL\', NULL)'
+    ).run(crypto.randomUUID(), contaMasterId)
+    tokenMaster = await criarSessao(memMasterId)
   })
 
   afterAll(() => {
@@ -294,6 +308,48 @@ describe('S12 - Auditoria, Anti-Spoofing, Escopos e Fail-Closed', () => {
         headers: { Authorization: `Bearer ${tokenAuditorAdmA}` }
       })
       expect(res.status).toBe(403)
+    })
+
+    it('8. Master deve ver logs globais', async () => {
+      const logGlobalId = crypto.randomUUID()
+      await db.insert(auditoriaLogs).values({
+        id: logGlobalId,
+        acao: 'LOCAL_CRIADO',
+        atorMembroId: memMasterId,
+        recursoTipo: 'LOCAL',
+        recursoId: crypto.randomUUID(),
+        escopoTipo: 'GLOBAL',
+        escopoId: null,
+        criadoEm: new Date().toISOString()
+      })
+
+      const res = await app.request('/api/v1/auditoria', {
+        headers: { Authorization: `Bearer ${tokenMaster}` }
+      })
+      expect(res.status).toBe(200)
+      const json = await res.json()
+      expect(json.items.some((item: any) => item.id === logGlobalId)).toBe(true)
+    })
+
+    it('9. Auditor Regional não deve ver logs globais', async () => {
+      const logGlobalId = crypto.randomUUID()
+      await db.insert(auditoriaLogs).values({
+        id: logGlobalId,
+        acao: 'LOCAL_ATUALIZADO',
+        atorMembroId: memMasterId,
+        recursoTipo: 'LOCAL',
+        recursoId: crypto.randomUUID(),
+        escopoTipo: 'GLOBAL',
+        escopoId: null,
+        criadoEm: new Date().toISOString()
+      })
+
+      const res = await app.request('/api/v1/auditoria', {
+        headers: { Authorization: `Bearer ${tokenAuditorRegA}` }
+      })
+      expect(res.status).toBe(200)
+      const json = await res.json()
+      expect(json.items.some((item: any) => item.id === logGlobalId)).toBe(false)
     })
   })
 

@@ -4,6 +4,7 @@ import { locais } from '../db/schema'
 import { LocalCreate, LocalUpdate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { exigirMasterParaEscrita } from '../middleware/master-write'
+import { executarOperacaoComAudit } from '../services/auditoria'
 
 export const locaisRouter = new Hono<any>()
 
@@ -32,7 +33,21 @@ locaisRouter.post('/', async (c) => {
     const parsed = LocalCreate.parse(body)
     
     const id = crypto.randomUUID()
-    const result = await db.insert(locais).values({ id, ...parsed }).returning().get()
+    const atorMembroId = c.get('membroId') || null
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [qdb.insert(locais).values({ id, ...parsed })],
+      {
+        acao: 'LOCAL_CRIADO',
+        atorMembroId,
+        recursoTipo: 'LOCAL',
+        recursoId: id,
+        escopoTipo: 'GLOBAL',
+        escopoId: null,
+        contexto: { nome: parsed.nome, cidade: parsed.cidade, uf: parsed.uf },
+      }
+    )
+    const result = await db.select().from(locais).where(eq(locais.id, id)).get()
     return c.json(result, 201)
   } catch (err: any) {
     return c.json({ error: err.issues || err.message }, 400)
@@ -49,11 +64,25 @@ locaisRouter.patch('/:id', async (c) => {
     const existing = await db.select().from(locais).where(eq(locais.id, id)).get()
     if (!existing) return c.json({ error: 'Local não encontrado' }, 404)
 
-    const updated = await db.update(locais)
-      .set({ ...parsed, updatedAt: new Date().toISOString() })
-      .where(eq(locais.id, id))
-      .returning().get()
-      
+    const atorMembroId = c.get('membroId') || null
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [
+        qdb.update(locais)
+          .set({ ...parsed, updatedAt: new Date().toISOString() })
+          .where(eq(locais.id, id))
+      ],
+      {
+        acao: 'LOCAL_ATUALIZADO',
+        atorMembroId,
+        recursoTipo: 'LOCAL',
+        recursoId: id,
+        escopoTipo: 'GLOBAL',
+        escopoId: null,
+        contexto: { camposAlterados: Object.keys(parsed) },
+      }
+    )
+    const updated = await db.select().from(locais).where(eq(locais.id, id)).get()
     return c.json(updated)
   } catch (err: any) {
     return c.json({ error: err.issues || err.message }, 400)

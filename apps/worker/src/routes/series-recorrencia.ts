@@ -6,7 +6,7 @@ import { EventoCreate } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, podeGerenciarAgendaNoEscopo, regionaisAdministradas } from '../security/permissoes'
-import { extrairEscopoDoEvento } from '../services/auditoria'
+import { criarAuditQuery, executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
 
 export const seriesRecorrenciaRouter = new Hono<any>()
 
@@ -250,6 +250,16 @@ seriesRecorrenciaRouter.post('/', async (c) => {
       if (eventosToInsert.length > 0) {
         queries.push(qdb.insert(eventos).values(eventosToInsert))
       }
+      const escopo = extrairEscopoDoEvento(resultSerie)
+      queries.push(criarAuditQuery(qdb, {
+        acao: 'SERIE_RECORRENCIA_CRIADA',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'SERIE_RECORRENCIA',
+        recursoId: serieId,
+        escopoTipo: escopo.escopoTipo,
+        escopoId: escopo.escopoId,
+        contexto: { titulo: resultSerie.titulo, ocorrenciasGeradas: eventosToInsert.length },
+      }))
       return queries
     })
 
@@ -299,17 +309,31 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         return c.json({ error: 'Acesso não autorizado para mover o evento para este escopo', code: 'FORBIDDEN' }, 403)
       }
       
-      const updatedEvent = await db.update(eventos)
-        .set({
-          ...parsed.changes,
-          recorrenciaOrigemInicioEm:
-            existingEvent.recorrenciaOrigemInicioEm ?? existingEvent.inicioEm,
-          recorrenciaExcecao: true,
-          updatedAt: nowIso,
-        }) // serieRecorrenciaId intacto
-        .where(eq(eventos.id, parsed.fromEventId))
-        .returning().get()
-        
+      const escopo = extrairEscopoDoEvento(existingEvent)
+      await executarOperacaoComAudit(
+        db,
+        (qdb) => [
+          qdb.update(eventos)
+            .set({
+              ...parsed.changes,
+              recorrenciaOrigemInicioEm:
+                existingEvent.recorrenciaOrigemInicioEm ?? existingEvent.inicioEm,
+              recorrenciaExcecao: true,
+              updatedAt: nowIso,
+            })
+            .where(eq(eventos.id, parsed.fromEventId))
+        ],
+        {
+          acao: 'SERIE_OCORRENCIA_ATUALIZADA',
+          atorMembroId: c.get('membroId') || null,
+          recursoTipo: 'EVENTO',
+          recursoId: parsed.fromEventId,
+          escopoTipo: escopo.escopoTipo,
+          escopoId: escopo.escopoId,
+          contexto: { serieRecorrenciaId: serieId, camposAlterados: Object.keys(parsed.changes) },
+        }
+      )
+      const updatedEvent = await db.select().from(eventos).where(eq(eventos.id, parsed.fromEventId)).get()
       return c.json({ message: 'Evento atualizado individualmente', event: updatedEvent })
     }
     
@@ -337,7 +361,18 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
               .where(and(
                 eq(eventos.serieRecorrenciaId, serieId),
                 gte(eventos.inicioEm, nowIso)
-              ))
+              )),
+            criarAuditQuery(qdb, {
+              acao: 'SERIE_RECORRENCIA_ATUALIZADA',
+              atorMembroId: c.get('membroId') || null,
+              recursoTipo: 'SERIE_RECORRENCIA',
+              recursoId: serieId,
+              ...(() => {
+                const escopo = extrairEscopoDoEvento(existingSerie)
+                return { escopoTipo: escopo.escopoTipo, escopoId: escopo.escopoId }
+              })(),
+              contexto: { updateMode: 'ALL', camposAlterados: Object.keys(parsed.changes) },
+            })
           ]
         })
         return c.json({ message: 'Série atualizada e eventos futuros inativados com sucesso' })
@@ -415,7 +450,16 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         if (eventosToInsert.length > 0) {
           queries.push(qdb.insert(eventos).values(eventosToInsert))
         }
-        
+        const escopo = extrairEscopoDoEvento(existingSerie)
+        queries.push(criarAuditQuery(qdb, {
+          acao: 'SERIE_RECORRENCIA_ATUALIZADA',
+          atorMembroId: c.get('membroId') || null,
+          recursoTipo: 'SERIE_RECORRENCIA',
+          recursoId: serieId,
+          escopoTipo: escopo.escopoTipo,
+          escopoId: escopo.escopoId,
+          contexto: { updateMode: 'ALL', camposAlterados: Object.keys(parsed.changes) },
+        }))
         return queries
       })
       
@@ -561,7 +605,16 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         if (eventosToInsert.length > 0) {
           queries.push(qdb.insert(eventos).values(eventosToInsert))
         }
-        
+        const escopo = extrairEscopoDoEvento(existingSerie)
+        queries.push(criarAuditQuery(qdb, {
+          acao: 'SERIE_RECORRENCIA_DIVIDIDA',
+          atorMembroId: c.get('membroId') || null,
+          recursoTipo: 'SERIE_RECORRENCIA',
+          recursoId: serieId,
+          escopoTipo: escopo.escopoTipo,
+          escopoId: escopo.escopoId,
+          contexto: { updateMode: 'THIS_AND_FUTURE', novaSerieId: newSerieId, fromEventId: parsed.fromEventId },
+        }))
         return queries
       })
       

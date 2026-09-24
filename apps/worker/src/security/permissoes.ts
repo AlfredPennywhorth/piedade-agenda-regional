@@ -872,6 +872,7 @@ export async function obterCapacidadesMembro(
 }
 
 export interface EscoposAutorizadosAuditor {
+  global: boolean
   regionaisIds: string[]
   administracoesIds: string[]
   setoresIds: string[]
@@ -881,6 +882,18 @@ export interface EscoposAutorizadosAuditor {
 
 export async function obterEscoposAutorizadosDoAuditor(db: any, membroId: string): Promise<EscoposAutorizadosAuditor | null> {
   if (!db || !membroId) return null
+
+  const contexto = await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) {
+    return {
+      global: true,
+      regionaisIds: [],
+      administracoesIds: [],
+      setoresIds: [],
+      casasIds: [],
+      gtsIds: [],
+    }
+  }
 
   const vinculosAuditor = await db
     .select({
@@ -944,6 +957,7 @@ export async function obterEscoposAutorizadosDoAuditor(db: any, membroId: string
   }
 
   return {
+    global: false,
     regionaisIds: Array.from(regionaisIds),
     administracoesIds: Array.from(administracoesIds),
     setoresIds: Array.from(setoresIds),
