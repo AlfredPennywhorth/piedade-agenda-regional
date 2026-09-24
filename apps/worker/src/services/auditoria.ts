@@ -51,3 +51,19 @@ export async function executarOperacaoComAudit(
     return [...businessQueries, auditQuery]
   })
 }
+
+
+/**
+ * Executa de forma atômica e fail-closed as queries de negócio + múltiplos logs de auditoria.
+ */
+export async function executarOperacaoComAudits(
+  db: any,
+  buildQueries: (dbOrTx: any) => any[],
+  auditData: AuditLogData[]
+) {
+  return executeAtomic(db, (qdb) => {
+    const businessQueries = buildQueries(qdb)
+    const auditQueries = auditData.map(data => criarAuditQuery(qdb, data))
+    return [...businessQueries, ...auditQueries]
+  })
+}

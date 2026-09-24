@@ -5,7 +5,7 @@ import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, regionaisAdministradas } from '../security/permissoes'
 import { listarVinculosVisiveis } from './vinculos_funcionais'
-import { executarOperacaoComAudit } from '../services/auditoria'
+import { executarOperacaoComAudit, executarOperacaoComAudits } from '../services/auditoria'
 
 export const membrosRouter = new Hono<any>()
 
@@ -302,23 +302,58 @@ membrosRouter.patch('/:id', async (c) => {
     }
 
     const casaFinalId = parsed.casaId ?? existing.casaId
-    await executarOperacaoComAudit(
-      db,
-      (qdb) => [
-        qdb.update(membros)
-          .set({ ...parsed, updatedAt: new Date().toISOString() })
-          .where(eq(membros.id, id))
-      ],
-      {
-        acao: 'MEMBRO_ATUALIZADO',
-        atorMembroId: c.get('membroId') || null,
-        recursoTipo: 'MEMBRO',
-        recursoId: id,
-        escopoTipo: 'CASA',
-        escopoId: casaFinalId,
-        contexto: { camposAlterados: Object.keys(parsed) },
-      }
-    )
+    const atorMembroId = c.get('membroId') || null
+    const camposAlterados = Object.keys(parsed)
+    const moveuCasa = casaFinalId !== existing.casaId
+
+    if (moveuCasa) {
+      await executarOperacaoComAudits(
+        db,
+        (qdb) => [
+          qdb.update(membros)
+            .set({ ...parsed, updatedAt: new Date().toISOString() })
+            .where(eq(membros.id, id))
+        ],
+        [
+          {
+            acao: 'MEMBRO_ATUALIZADO',
+            atorMembroId,
+            recursoTipo: 'MEMBRO',
+            recursoId: id,
+            escopoTipo: 'CASA',
+            escopoId: existing.casaId,
+            contexto: { camposAlterados, movimentoEscopo: 'ORIGEM', casaDestinoId: casaFinalId },
+          },
+          {
+            acao: 'MEMBRO_ATUALIZADO',
+            atorMembroId,
+            recursoTipo: 'MEMBRO',
+            recursoId: id,
+            escopoTipo: 'CASA',
+            escopoId: casaFinalId,
+            contexto: { camposAlterados, movimentoEscopo: 'DESTINO', casaOrigemId: existing.casaId },
+          },
+        ]
+      )
+    } else {
+      await executarOperacaoComAudit(
+        db,
+        (qdb) => [
+          qdb.update(membros)
+            .set({ ...parsed, updatedAt: new Date().toISOString() })
+            .where(eq(membros.id, id))
+        ],
+        {
+          acao: 'MEMBRO_ATUALIZADO',
+          atorMembroId,
+          recursoTipo: 'MEMBRO',
+          recursoId: id,
+          escopoTipo: 'CASA',
+          escopoId: casaFinalId,
+          contexto: { camposAlterados },
+        }
+      )
+    }
     const updated = await db.select().from(membros).where(eq(membros.id, id)).get()
     return c.json(somenteCadastroInstitucional(updated))
   } catch (err: any) {
