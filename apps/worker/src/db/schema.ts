@@ -822,7 +822,7 @@ export const portariasEvento = sqliteTable(
     ...timestampsS02,
   },
   table => ({
-    checkStatus: check('check_portaria_evento_status', sql`${table.status} IN ('ABERTA','FECHADA')`),
+    checkStatus: check('check_portaria_evento_status', sql`${table.status} IN ('ABERTA','FECHANDO','FECHADA')`),
   })
 )
 
