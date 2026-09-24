@@ -135,6 +135,8 @@ describe('ACC-11 — capacidades consolidadas da conta', () => {
     expect(capacidades.podeAdministrarAcessos).toBe(true)
     expect(capacidades.podeAdministrarRegionais).toBe(false)
     expect(capacidades.podeAdministrarEstrutura).toBe(true)
+    expect(capacidades.podeAdministrarPessoas).toBe(true)
+    expect(capacidades.podeAdministrarFuncoes).toBe(false)
   })
 
   it('Master global pode administrar acessos', async () => {
@@ -149,5 +151,7 @@ describe('ACC-11 — capacidades consolidadas da conta', () => {
     expect(capacidades.podeAdministrarAcessos).toBe(true)
     expect(capacidades.podeAdministrarRegionais).toBe(true)
     expect(capacidades.podeAdministrarEstrutura).toBe(true)
+    expect(capacidades.podeAdministrarPessoas).toBe(true)
+    expect(capacidades.podeAdministrarFuncoes).toBe(true)
   })
 })
