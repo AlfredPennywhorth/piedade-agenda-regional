@@ -502,7 +502,13 @@ describe('Autenticação e Sessões S03', () => {
     })
     expect(res.status).toBe(200)
     const json = (await res.json()) as any
-    expect(json.vinculosAtivos).toHaveLength(1)
+    expect(json.vinculos).toHaveLength(1)
+    expect(json.membroId).toBe(membroId)
+    expect(json).not.toHaveProperty('contaAcessoId')
+    expect(json).not.toHaveProperty('acessosAtivos')
+    expect(JSON.stringify(json)).not.toContain('pinHash')
+    expect(JSON.stringify(json)).not.toContain('pinSalt')
+    expect(JSON.stringify(json)).not.toContain('tokenHash')
   })
 
   it('38.1 Sessão expira por inatividade após 12 horas', async () => {
