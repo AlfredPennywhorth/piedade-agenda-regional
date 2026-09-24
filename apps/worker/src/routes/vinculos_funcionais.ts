@@ -13,7 +13,7 @@ import {
 import { CreateVinculoFuncionalSchema, UpdateVinculoFuncionalSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, obterRegionalDoEscopo, regionaisAdministradas } from '../security/permissoes'
-import { executarOperacaoComAudit } from '../services/auditoria'
+import { executarOperacaoComAudit, executarOperacaoComAudits } from '../services/auditoria'
 
 export const vinculosFuncionaisRouter = new Hono<any>()
 
@@ -349,27 +349,74 @@ vinculosFuncionaisRouter.patch('/:id', async (c) => {
       return c.json({ error: 'Acesso não autorizado para mover vínculo para outro escopo', code: 'FORBIDDEN' }, 403)
     }
 
+    const escopoOrigem = escopoDoVinculo(existing)
     const escopoFinal = escopoDoVinculo(vinculoResultante)
-    if (!escopoFinal) {
+    if (!escopoOrigem || !escopoFinal) {
       return c.json({ error: 'O vínculo funcional resultante deve possuir exatamente um escopo institucional.' }, 400)
     }
-    await executarOperacaoComAudit(
-      db,
-      (qdb) => [
-        qdb.update(vinculosFuncionais)
-          .set({ ...parsed, updatedAt: new Date().toISOString() })
-          .where(eq(vinculosFuncionais.id, id))
-      ],
-      {
-        acao: 'VINCULO_FUNCIONAL_ATUALIZADO',
-        atorMembroId: c.get('membroId') || null,
-        recursoTipo: 'VINCULO_FUNCIONAL',
-        recursoId: id,
-        escopoTipo: escopoFinal.tipo,
-        escopoId: escopoFinal.id,
-        contexto: { camposAlterados: Object.keys(parsed) },
-      }
-    )
+
+    const atorMembroId = c.get('membroId') || null
+    const camposAlterados = Object.keys(parsed)
+    const moveuEscopo = escopoOrigem.tipo !== escopoFinal.tipo || escopoOrigem.id !== escopoFinal.id
+
+    if (moveuEscopo) {
+      await executarOperacaoComAudits(
+        db,
+        (qdb) => [
+          qdb.update(vinculosFuncionais)
+            .set({ ...parsed, updatedAt: new Date().toISOString() })
+            .where(eq(vinculosFuncionais.id, id))
+        ],
+        [
+          {
+            acao: 'VINCULO_FUNCIONAL_ATUALIZADO',
+            atorMembroId,
+            recursoTipo: 'VINCULO_FUNCIONAL',
+            recursoId: id,
+            escopoTipo: escopoOrigem.tipo,
+            escopoId: escopoOrigem.id,
+            contexto: {
+              camposAlterados,
+              movimentoEscopo: 'ORIGEM',
+              escopoDestinoTipo: escopoFinal.tipo,
+              escopoDestinoId: escopoFinal.id,
+            },
+          },
+          {
+            acao: 'VINCULO_FUNCIONAL_ATUALIZADO',
+            atorMembroId,
+            recursoTipo: 'VINCULO_FUNCIONAL',
+            recursoId: id,
+            escopoTipo: escopoFinal.tipo,
+            escopoId: escopoFinal.id,
+            contexto: {
+              camposAlterados,
+              movimentoEscopo: 'DESTINO',
+              escopoOrigemTipo: escopoOrigem.tipo,
+              escopoOrigemId: escopoOrigem.id,
+            },
+          },
+        ]
+      )
+    } else {
+      await executarOperacaoComAudit(
+        db,
+        (qdb) => [
+          qdb.update(vinculosFuncionais)
+            .set({ ...parsed, updatedAt: new Date().toISOString() })
+            .where(eq(vinculosFuncionais.id, id))
+        ],
+        {
+          acao: 'VINCULO_FUNCIONAL_ATUALIZADO',
+          atorMembroId,
+          recursoTipo: 'VINCULO_FUNCIONAL',
+          recursoId: id,
+          escopoTipo: escopoFinal.tipo,
+          escopoId: escopoFinal.id,
+          contexto: { camposAlterados },
+        }
+      )
+    }
     const updated = await db.select().from(vinculosFuncionais).where(eq(vinculosFuncionais.id, id)).get()
     return c.json(updated)
   } catch (err: any) {
