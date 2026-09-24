@@ -79,6 +79,7 @@ export function EventosView() {
 
   const [loading, setLoading] = useState<boolean>(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [acessoPortariaUrl, setAcessoPortariaUrl] = useState<string | null>(null)
   
   // Form State
   const [formOpen, setFormOpen] = useState(false)
@@ -205,6 +206,21 @@ export function EventosView() {
       casaId: '',
       grupoTrabalhoId: ''
     }))
+  }
+
+  const gerarAcessoPortaria = async (eventoId: string) => {
+    setErro(null)
+    setAcessoPortariaUrl(null)
+    try {
+      const data = await postWithAuth<{
+        acesso: { caminho: string }
+      }>(`/portaria/eventos/${eventoId}/credenciais-operador`, {})
+      setAcessoPortariaUrl(`${window.location.origin}${data.acesso.caminho}`)
+    } catch (err: unknown) {
+      if (err instanceof ApiError) setErro(err.message)
+      else if (err instanceof Error) setErro(err.message)
+      else setErro('Erro ao gerar acesso temporário da Portaria.')
+    }
   }
 
   const abrirFormCriar = () => {
@@ -513,6 +529,23 @@ export function EventosView() {
         </div>
       )}
 
+      {acessoPortariaUrl && !formOpen && (
+        <div className="p-4 bg-brand-50 border border-brand-200 text-brand-900 rounded-xl text-sm">
+          <p className="font-semibold">Acesso temporário de Portaria gerado</p>
+          <p className="mt-1 text-xs">Envie este link somente ao voluntário que atuará nesta reunião. Ele não precisa estar cadastrado no sistema.</p>
+          <a href={acessoPortariaUrl} target="_blank" rel="noreferrer" className="mt-3 block break-all font-mono text-xs underline">
+            {acessoPortariaUrl}
+          </a>
+          <button
+            type="button"
+            onClick={() => void navigator.clipboard.writeText(acessoPortariaUrl)}
+            className="mt-3 rounded-lg border border-brand-300 bg-white px-3 py-2 text-xs font-semibold text-brand-800"
+          >
+            Copiar link
+          </button>
+        </div>
+      )}
+
       {loading && !formOpen && !eventoDetalhe ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
@@ -555,6 +588,9 @@ export function EventosView() {
                     <td className="px-6 py-4 text-right space-x-3">
                       <button onClick={() => setEventoDetalhe(item)} className="text-brand-600 hover:text-brand-900 font-medium">
                         Ver
+                      </button>
+                      <button onClick={() => void gerarAcessoPortaria(item.id)} className="text-green-700 hover:text-green-900 font-medium">
+                        Gerar acesso de Portaria
                       </button>
                       <button onClick={() => handleClickEditar(item)} className="text-amber-600 hover:text-amber-900 font-medium">
                         Editar
