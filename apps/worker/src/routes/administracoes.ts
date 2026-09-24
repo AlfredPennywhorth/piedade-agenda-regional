@@ -4,6 +4,7 @@ import { administracoes, setores, participacoesGruposTrabalho, gruposTrabalho } 
 import { CreateAdministracaoSchema, UpdateAdministracaoSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo, regionaisAdministradas } from '../security/permissoes'
+import { executarOperacaoComAudit } from '../services/auditoria'
 
 export const administracoesRouter = new Hono<any>()
 
@@ -65,7 +66,20 @@ administracoesRouter.post('/', async (c) => {
     }
 
     const id = crypto.randomUUID()
-    const result = await db.insert(administracoes).values({ id, ...parsed }).returning().get()
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [qdb.insert(administracoes).values({ id, ...parsed })],
+      {
+        acao: 'ADMINISTRACAO_CRIADA',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'ADMINISTRACAO',
+        recursoId: id,
+        escopoTipo: 'REGIONAL',
+        escopoId: parsed.regionalId,
+        contexto: { campos: ['nome', 'codigo', 'ativo', 'regionalId'] },
+      }
+    )
+    const result = await db.select().from(administracoes).where(eq(administracoes.id, id)).get()
     return c.json(result, 201)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
@@ -117,11 +131,24 @@ administracoesRouter.patch('/:id', async (c) => {
       }
     }
 
-    const updated = await db.update(administracoes)
-      .set({ ...parsed, updatedAt: new Date().toISOString() })
-      .where(eq(administracoes.id, id))
-      .returning().get()
-      
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [
+        qdb.update(administracoes)
+          .set({ ...parsed, updatedAt: new Date().toISOString() })
+          .where(eq(administracoes.id, id))
+      ],
+      {
+        acao: 'ADMINISTRACAO_ATUALIZADA',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'ADMINISTRACAO',
+        recursoId: id,
+        escopoTipo: 'REGIONAL',
+        escopoId: regionalFinal,
+        contexto: { camposAlterados: Object.keys(parsed) },
+      }
+    )
+    const updated = await db.select().from(administracoes).where(eq(administracoes.id, id)).get()
     return c.json(updated)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
