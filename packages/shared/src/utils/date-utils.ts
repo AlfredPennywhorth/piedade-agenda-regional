@@ -66,25 +66,31 @@ function converterHorarioLocalParaUtc(
   second: number,
   timeZone: string
 ): Date {
-  const localComoUtc = Date.UTC(year, month - 1, day, hour, minute, second)
-  let instanteUtc = localComoUtc
+  const alvoLocal = Date.UTC(year, month - 1, day, hour, minute, second)
+  const janelaInicio = alvoLocal - 15 * 60 * 60 * 1000
+  const janelaFim = alvoLocal + 15 * 60 * 60 * 1000
+  const correspondencias: number[] = []
 
-  // Duas iterações acomodam mudanças históricas de offset do fuso (ex.: horário de verão).
-  for (let i = 0; i < 2; i++) {
-    const partes = obterPartesNoFuso(new Date(instanteUtc), timeZone)
-    const representacaoUtc = Date.UTC(
-      partes.year,
-      partes.month - 1,
-      partes.day,
-      partes.hour,
-      partes.minute,
-      partes.second
-    )
-    const offset = representacaoUtc - instanteUtc
-    instanteUtc = localComoUtc - offset
+  // Procura todas as ocorrências possíveis do horário local em passos de 1 minuto.
+  // Em transições de offset, o mesmo horário local pode ocorrer duas vezes.
+  for (let instante = janelaInicio; instante <= janelaFim; instante += 60 * 1000) {
+    const partes = obterPartesNoFuso(new Date(instante), timeZone)
+    if (
+      partes.year === year &&
+      partes.month === month &&
+      partes.day === day &&
+      partes.hour === hour &&
+      partes.minute === minute
+    ) {
+      correspondencias.push(instante + second * 1000)
+    }
   }
 
-  return new Date(instanteUtc)
+  if (correspondencias.length === 0) {
+    throw new Error('Horário local inválido para o fuso informado')
+  }
+
+  return new Date(Math.max(...correspondencias))
 }
 
 export function getSaoPauloEndOfDayIso(dateIso: string): string {
