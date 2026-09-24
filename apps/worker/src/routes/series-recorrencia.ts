@@ -73,12 +73,12 @@ async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAu
       .all()
     adms.forEach((item: any) => administracoesAgenda.add(item.id))
 
-    const gts = await db
+    const gtsRegionais = await db
       .select({ id: gruposTrabalho.id })
       .from(gruposTrabalho)
       .where(inArray(gruposTrabalho.regionalId, regionaisIds))
       .all()
-    gts.forEach((item: any) => gtsAgenda.add(item.id))
+    gtsRegionais.forEach((item: any) => gtsAgenda.add(item.id))
   }
 
   const administracoesIds = Array.from(administracoesAgenda)
@@ -89,6 +89,13 @@ async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAu
       .where(inArray(setores.administracaoId, administracoesIds))
       .all()
     itensSetor.forEach((item: any) => setoresAgenda.add(item.id))
+
+    const gtsAdministracao = await db
+      .select({ id: gruposTrabalho.id })
+      .from(gruposTrabalho)
+      .where(inArray(gruposTrabalho.administracaoId, administracoesIds))
+      .all()
+    gtsAdministracao.forEach((item: any) => gtsAgenda.add(item.id))
   }
 
   const setoresIds = Array.from(setoresAgenda)
@@ -99,6 +106,13 @@ async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAu
       .where(inArray(casas.setorId, setoresIds))
       .all()
     itensCasa.forEach((item: any) => casasAgenda.add(item.id))
+
+    const gtsSetor = await db
+      .select({ id: gruposTrabalho.id })
+      .from(gruposTrabalho)
+      .where(inArray(gruposTrabalho.setorId, setoresIds))
+      .all()
+    gtsSetor.forEach((item: any) => gtsAgenda.add(item.id))
   }
 
   resultado.regionaisIds = regionaisAgenda
