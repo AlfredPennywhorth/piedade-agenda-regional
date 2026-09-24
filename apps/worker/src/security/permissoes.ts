@@ -163,6 +163,179 @@ export async function obterRegionalDoEscopo(
   return gtSetor?.regionalId ?? null
 }
 
+export interface EscoposTerritoriaisVisiveis {
+  tudo: boolean
+  regionaisIds: Set<string>
+  administracoesIds: Set<string>
+  setoresIds: Set<string>
+  casasIds: Set<string>
+  gruposTrabalhoIds: Set<string>
+}
+
+export async function obterEscoposTerritoriaisVisiveis(
+  db: any,
+  contexto: ContextoPermissoes
+): Promise<EscoposTerritoriaisVisiveis> {
+  const resultado: EscoposTerritoriaisVisiveis = {
+    tudo: eMasterSistema(contexto),
+    regionaisIds: new Set<string>(),
+    administracoesIds: new Set<string>(),
+    setoresIds: new Set<string>(),
+    casasIds: new Set<string>(),
+    gruposTrabalhoIds: new Set<string>(),
+  }
+
+  if (resultado.tudo) return resultado
+
+  const incluirCasa = async (casaId: string) => {
+    const casa = await db
+      .select({
+        casaId: schema.casas.id,
+        setorId: schema.setores.id,
+        administracaoId: schema.administracoes.id,
+        regionalId: schema.regionais.id,
+      })
+      .from(schema.casas)
+      .innerJoin(schema.setores, eq(schema.casas.setorId, schema.setores.id))
+      .innerJoin(schema.administracoes, eq(schema.setores.administracaoId, schema.administracoes.id))
+      .innerJoin(schema.regionais, eq(schema.administracoes.regionalId, schema.regionais.id))
+      .where(eq(schema.casas.id, casaId))
+      .get()
+
+    if (!casa) return
+    resultado.casasIds.add(casa.casaId)
+    resultado.setoresIds.add(casa.setorId)
+    resultado.administracoesIds.add(casa.administracaoId)
+    resultado.regionaisIds.add(casa.regionalId)
+  }
+
+  const membro = await db
+    .select({ casaId: schema.membros.casaId })
+    .from(schema.membros)
+    .where(eq(schema.membros.id, contexto.membroId))
+    .get()
+
+  if (membro?.casaId) {
+    await incluirCasa(membro.casaId)
+  }
+
+  for (const acesso of contexto.acessosAtivos) {
+    if (!acesso.escopoId || acesso.escopoTipo === 'GLOBAL') continue
+
+    if (acesso.escopoTipo === 'REGIONAL') {
+      resultado.regionaisIds.add(acesso.escopoId)
+
+      const adms = await db
+        .select({ id: schema.administracoes.id })
+        .from(schema.administracoes)
+        .where(eq(schema.administracoes.regionalId, acesso.escopoId))
+        .all()
+      adms.forEach((item: any) => resultado.administracoesIds.add(item.id))
+
+      const admIds = adms.map((item: any) => item.id)
+      if (admIds.length > 0) {
+        const setores = await db
+          .select({ id: schema.setores.id })
+          .from(schema.setores)
+          .where(inArray(schema.setores.administracaoId, admIds))
+          .all()
+        setores.forEach((item: any) => resultado.setoresIds.add(item.id))
+
+        const setorIds = setores.map((item: any) => item.id)
+        if (setorIds.length > 0) {
+          const casas = await db
+            .select({ id: schema.casas.id })
+            .from(schema.casas)
+            .where(inArray(schema.casas.setorId, setorIds))
+            .all()
+          casas.forEach((item: any) => resultado.casasIds.add(item.id))
+        }
+      }
+
+      const gts = await db
+        .select({ id: schema.gruposTrabalho.id })
+        .from(schema.gruposTrabalho)
+        .where(eq(schema.gruposTrabalho.regionalId, acesso.escopoId))
+        .all()
+      gts.forEach((item: any) => resultado.gruposTrabalhoIds.add(item.id))
+      continue
+    }
+
+    if (acesso.escopoTipo === 'ADMINISTRACAO') {
+      const adm = await db
+        .select({ id: schema.administracoes.id, regionalId: schema.administracoes.regionalId })
+        .from(schema.administracoes)
+        .where(eq(schema.administracoes.id, acesso.escopoId))
+        .get()
+      if (!adm) continue
+
+      resultado.administracoesIds.add(adm.id)
+      resultado.regionaisIds.add(adm.regionalId)
+
+      const setores = await db
+        .select({ id: schema.setores.id })
+        .from(schema.setores)
+        .where(eq(schema.setores.administracaoId, adm.id))
+        .all()
+      setores.forEach((item: any) => resultado.setoresIds.add(item.id))
+
+      const setorIds = setores.map((item: any) => item.id)
+      if (setorIds.length > 0) {
+        const casas = await db
+          .select({ id: schema.casas.id })
+          .from(schema.casas)
+          .where(inArray(schema.casas.setorId, setorIds))
+          .all()
+        casas.forEach((item: any) => resultado.casasIds.add(item.id))
+      }
+      continue
+    }
+
+    if (acesso.escopoTipo === 'SETOR') {
+      const setor = await db
+        .select({
+          setorId: schema.setores.id,
+          administracaoId: schema.administracoes.id,
+          regionalId: schema.administracoes.regionalId,
+        })
+        .from(schema.setores)
+        .innerJoin(schema.administracoes, eq(schema.setores.administracaoId, schema.administracoes.id))
+        .where(eq(schema.setores.id, acesso.escopoId))
+        .get()
+      if (!setor) continue
+
+      resultado.setoresIds.add(setor.setorId)
+      resultado.administracoesIds.add(setor.administracaoId)
+      resultado.regionaisIds.add(setor.regionalId)
+
+      const casas = await db
+        .select({ id: schema.casas.id })
+        .from(schema.casas)
+        .where(eq(schema.casas.setorId, setor.setorId))
+        .all()
+      casas.forEach((item: any) => resultado.casasIds.add(item.id))
+      continue
+    }
+
+    if (acesso.escopoTipo === 'CASA') {
+      await incluirCasa(acesso.escopoId)
+      continue
+    }
+
+    const gt = await db
+      .select({ id: schema.gruposTrabalho.id, regionalId: schema.gruposTrabalho.regionalId })
+      .from(schema.gruposTrabalho)
+      .where(eq(schema.gruposTrabalho.id, acesso.escopoId))
+      .get()
+    if (gt) {
+      resultado.gruposTrabalhoIds.add(gt.id)
+      if (gt.regionalId) resultado.regionaisIds.add(gt.regionalId)
+    }
+  }
+
+  return resultado
+}
+
 export function eMasterSistema(contexto: ContextoPermissoes): boolean {
   return contexto.acessosAtivos.some(
     acesso =>
