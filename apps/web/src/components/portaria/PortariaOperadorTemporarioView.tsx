@@ -250,6 +250,7 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
     setErro('')
     try {
       await chamadaOperador(token, '/fechar', { method: 'POST' })
+      pararCamera()
       setMensagem('Portaria encerrada com sucesso.')
       setSessao(null)
       setParticipantes([])
