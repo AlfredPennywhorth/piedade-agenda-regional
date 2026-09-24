@@ -19,6 +19,11 @@ describe('S01 — SetoresView (Gestão Territorial Frontend)', () => {
   const SET_1_ID = '33333333-3333-4333-8333-333333333333'
   const SET_2_ID = '44444444-4444-4444-8444-444444444444'
 
+  const mockRegionais = [
+    { id: 'reg-1', nome: 'Regional São Paulo', codigo: 'REG-SP', ativo: true },
+    { id: 'reg-2', nome: 'Regional Teste', codigo: 'REG-TST', ativo: true }
+  ]
+
   const mockAdministracoes = [
     { id: ADM_1_ID, regionalId: 'reg-1', nome: 'Administração Osasco', codigo: 'ADM-OSC', ativo: true },
     { id: ADM_2_ID, regionalId: 'reg-2', nome: 'Administração Jundiaí', codigo: 'ADM-JND', ativo: true }
@@ -37,6 +42,7 @@ describe('S01 — SetoresView (Gestão Territorial Frontend)', () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
       if (endpoint === '/setores') return mockSetores
       if (endpoint === '/administracoes') return mockAdministracoes
+      if (endpoint === '/regionais') return mockRegionais
       throw new Error('Not found')
     })
 
@@ -52,10 +58,11 @@ describe('S01 — SetoresView (Gestão Territorial Frontend)', () => {
     expect(screen.getByText('Inativo')).toBeInTheDocument()
   })
 
-  it('2. Filtrar: deve filtrar setores por administração no cliente', async () => {
+  it('2. Filtrar: deve respeitar a trilha Regional → Administração', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
       if (endpoint === '/setores') return mockSetores
       if (endpoint === '/administracoes') return mockAdministracoes
+      if (endpoint === '/regionais') return mockRegionais
       throw new Error('Not found')
     })
 
@@ -64,11 +71,19 @@ describe('S01 — SetoresView (Gestão Territorial Frontend)', () => {
     await screen.findByText('Setor 01 — Osasco Centro')
     expect(screen.getByText('Setor 02 — Jundiaí Sul')).toBeInTheDocument()
 
-    const selectFiltro = screen.getByLabelText(/Filtrar por Administração/i)
-    fireEvent.change(selectFiltro, { target: { value: ADM_1_ID } })
+    const selectRegional = screen.getByLabelText(/^Regional$/i)
+    fireEvent.change(selectRegional, { target: { value: 'reg-1' } })
 
     expect(screen.getByText('Setor 01 — Osasco Centro')).toBeInTheDocument()
     expect(screen.queryByText('Setor 02 — Jundiaí Sul')).not.toBeInTheDocument()
+
+    const selectAdm = screen.getByLabelText(/^Administração$/i)
+    expect(screen.getByRole('option', { name: /Administração Osasco/i })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /Administração Jundiaí/i })).not.toBeInTheDocument()
+
+    fireEvent.change(selectAdm, { target: { value: ADM_1_ID } })
+
+    expect(screen.getByText('Setor 01 — Osasco Centro')).toBeInTheDocument()
     expect(screen.getByText('Exibindo 1 de 2 setores')).toBeInTheDocument()
   })
 
@@ -76,6 +91,7 @@ describe('S01 — SetoresView (Gestão Territorial Frontend)', () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
       if (endpoint === '/setores') return []
       if (endpoint === '/administracoes') return mockAdministracoes
+      if (endpoint === '/regionais') return mockRegionais
       throw new Error('Not found')
     })
 
@@ -118,6 +134,7 @@ describe('S01 — SetoresView (Gestão Territorial Frontend)', () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
       if (endpoint === '/setores') return []
       if (endpoint === '/administracoes') return mockAdministracoes
+      if (endpoint === '/regionais') return mockRegionais
       throw new Error('Not found')
     })
     vi.mocked(apiClient.postWithAuth).mockResolvedValue(novoSetor)
@@ -135,6 +152,7 @@ describe('S01 — SetoresView (Gestão Territorial Frontend)', () => {
     const inputNome = screen.getByLabelText(/Nome do Setor/i)
     const inputCodigo = screen.getByLabelText(/Código/i)
 
+    fireEvent.change(selectRegional, { target: { value: 'reg-1' } })
     fireEvent.change(selectAdm, { target: { value: ADM_1_ID } })
     fireEvent.change(inputNome, { target: { value: 'Setor 03 — Rochdale' } })
     fireEvent.change(inputCodigo, { target: { value: 'SET-03' } })
@@ -158,6 +176,7 @@ describe('S01 — SetoresView (Gestão Territorial Frontend)', () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
       if (endpoint === '/setores') return []
       if (endpoint === '/administracoes') return mockAdministracoes
+      if (endpoint === '/regionais') return mockRegionais
       throw new Error('Not found')
     })
 
@@ -229,6 +248,7 @@ describe('S01 — SetoresView (Gestão Territorial Frontend)', () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
       if (endpoint === '/setores') return []
       if (endpoint === '/administracoes') return mockAdministracoes
+      if (endpoint === '/regionais') return mockRegionais
       throw new Error('Not found')
     })
     vi.mocked(apiClient.postWithAuth).mockRejectedValue(
