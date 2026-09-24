@@ -11,4 +11,10 @@ describe('date-utils — fim do dia em São Paulo', () => {
     expect(getSaoPauloEndOfDayIso('2018-12-01T15:00:00.000Z'))
       .toBe('2018-12-02T01:59:59.000Z')
   })
+
+
+  it('escolhe a ocorrência tardia quando 23:59:59 se repete na volta do horário de verão', () => {
+    expect(getSaoPauloEndOfDayIso('2018-02-17T15:00:00.000Z'))
+      .toBe('2018-02-18T02:59:59.000Z')
+  })
 })
