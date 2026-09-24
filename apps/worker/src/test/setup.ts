@@ -465,11 +465,20 @@ export function setupDb(sqlite: any) {
       CONSTRAINT check_checkin_status CHECK (status IN ('ATIVO', 'RETIFICADO'))
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_checkin_evento_membro_unico ON checkins (evento_id, membro_id) WHERE status = 'ATIVO';
+    CREATE TABLE IF NOT EXISTS portaria_fechamento_locks (
+      evento_id text PRIMARY KEY NOT NULL,
+      criado_em text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (evento_id) REFERENCES eventos(id)
+    );
+
     CREATE TRIGGER IF NOT EXISTS trg_checkin_portaria_aberta
     BEFORE INSERT ON checkins
     WHEN EXISTS (
       SELECT 1 FROM portarias_evento
-      WHERE evento_id = NEW.evento_id AND status <> 'ABERTA'
+      WHERE evento_id = NEW.evento_id AND status = 'FECHADA'
+    ) OR EXISTS (
+      SELECT 1 FROM portaria_fechamento_locks
+      WHERE evento_id = NEW.evento_id
     )
     BEGIN
       SELECT RAISE(ABORT, 'PORTARIA_NAO_ABERTA');
@@ -479,7 +488,7 @@ export function setupDb(sqlite: any) {
 
     CREATE TABLE IF NOT EXISTS portarias_evento (
       evento_id text PRIMARY KEY NOT NULL,
-      status text DEFAULT 'ABERTA' NOT NULL CHECK (status IN ('ABERTA','FECHANDO','FECHADA')),
+      status text DEFAULT 'ABERTA' NOT NULL CHECK (status IN ('ABERTA','FECHADA')),
       fechada_em text,
       fechada_por_membro_id text,
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -583,7 +592,10 @@ export function setupDb(sqlite: any) {
     BEFORE INSERT ON presencas_convidado_evento
     WHEN EXISTS (
       SELECT 1 FROM portarias_evento
-      WHERE evento_id = NEW.evento_id AND status <> 'ABERTA'
+      WHERE evento_id = NEW.evento_id AND status = 'FECHADA'
+    ) OR EXISTS (
+      SELECT 1 FROM portaria_fechamento_locks
+      WHERE evento_id = NEW.evento_id
     )
     BEGIN
       SELECT RAISE(ABORT, 'PORTARIA_NAO_ABERTA');
