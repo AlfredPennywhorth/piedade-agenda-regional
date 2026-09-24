@@ -846,6 +846,25 @@ export const portariaOperadoresEvento = sqliteTable(
   })
 )
 
+export const credenciaisOperadorPortariaEvento = sqliteTable(
+  'credenciais_operador_portaria_evento',
+  {
+    id: text('id').primaryKey(),
+    eventoId: text('evento_id').notNull().references(() => eventos.id),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiraEm: text('expira_em').notNull(),
+    revogadoEm: text('revogado_em'),
+    criadoPorMembroId: text('criado_por_membro_id').references(() => membros.id),
+    ultimoAcessoEm: text('ultimo_acesso_em'),
+    ativo: ativoDefault,
+    ...timestampsS02,
+  },
+  table => ({
+    idxEvento: index('idx_credencial_operador_portaria_evento')
+      .on(table.eventoId, table.ativo),
+  })
+)
+
 export const convidadosEvento = sqliteTable(
   'convidados_evento',
   {
