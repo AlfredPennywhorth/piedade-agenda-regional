@@ -21,6 +21,7 @@ export function CadastroConvidadoView({ token }: CadastroConvidadoProps) {
   const [referencia, setReferencia] = useState('')
   const [observacoes, setObservacoes] = useState('')
   const [erro, setErro] = useState('')
+  const [tituloIndisponivel, setTituloIndisponivel] = useState('Cadastro indisponível')
   const [enviado, setEnviado] = useState(false)
   const [carregando, setCarregando] = useState(true)
 
@@ -33,7 +34,28 @@ export function CadastroConvidadoView({ token }: CadastroConvidadoProps) {
       })
       .catch(error => {
         if (!ativo) return
-        setErro(error instanceof ApiError ? error.message : 'Não foi possível abrir o cadastro.')
+
+        if (error instanceof ApiError) {
+          const code = (error.body as { code?: string } | undefined)?.code
+
+          if (code === 'PORTARIA_FECHADA') {
+            setTituloIndisponivel('Reunião encerrada')
+            setErro('A Portaria desta reunião já foi fechada. Não é mais possível enviar novos cadastros.')
+          } else if (code === 'CREDENCIAL_EXPIRADA') {
+            setTituloIndisponivel('Cadastro encerrado')
+            setErro('O período de cadastro de convidados desta reunião terminou.')
+          } else if (code === 'CREDENCIAL_INDISPONIVEL') {
+            setTituloIndisponivel('Link indisponível')
+            setErro('Este link não está mais ativo. Se a Portaria ainda estiver aberta, solicite um novo link ao porteiro.')
+          } else if (code === 'NOT_FOUND') {
+            setTituloIndisponivel('Link inválido')
+            setErro('Este link de cadastro não foi reconhecido.')
+          } else {
+            setErro(error.message)
+          }
+        } else {
+          setErro('Não foi possível abrir o cadastro.')
+        }
       })
       .finally(() => {
         if (ativo) setCarregando(false)
@@ -60,7 +82,30 @@ export function CadastroConvidadoView({ token }: CadastroConvidadoProps) {
       )
       setEnviado(true)
     } catch (error) {
-      setErro(error instanceof ApiError ? error.message : 'Não foi possível enviar o cadastro.')
+      if (error instanceof ApiError) {
+        const code = (error.body as { code?: string } | undefined)?.code
+        if (code === 'PORTARIA_FECHADA') {
+          setInfo(null)
+          setTituloIndisponivel('Reunião encerrada')
+          setErro('A Portaria desta reunião foi fechada antes do envio. Não é mais possível concluir o cadastro.')
+          return
+        }
+        if (code === 'CREDENCIAL_EXPIRADA') {
+          setInfo(null)
+          setTituloIndisponivel('Cadastro encerrado')
+          setErro('O período de cadastro de convidados desta reunião terminou antes do envio.')
+          return
+        }
+        if (code === 'CREDENCIAL_INDISPONIVEL') {
+          setInfo(null)
+          setTituloIndisponivel('Link indisponível')
+          setErro('Este link deixou de estar ativo. Se a Portaria ainda estiver aberta, solicite um novo link ao porteiro.')
+          return
+        }
+        setErro(error.message)
+      } else {
+        setErro('Não foi possível enviar o cadastro.')
+      }
     }
   }
 
@@ -76,7 +121,7 @@ export function CadastroConvidadoView({ token }: CadastroConvidadoProps) {
     return (
       <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-sm border border-slate-200">
-          <h1 className="text-xl font-semibold text-slate-900">Cadastro indisponível</h1>
+          <h1 className="text-xl font-semibold text-slate-900">{tituloIndisponivel}</h1>
           <p role="alert" className="mt-3 text-sm text-red-700">{erro}</p>
         </div>
       </main>
