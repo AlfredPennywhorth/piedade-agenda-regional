@@ -86,6 +86,15 @@ describe('PR-SEC-01 — escrita territorial por Regional', () => {
       body: JSON.stringify({ nome: 'Nova Administração A', regionalId: ids.regionalA }),
     })
     expect(ok.status).toBe(201)
+    const admCriada = await ok.json() as any
+    const auditAdm = sqlite.prepare(
+      "SELECT acao, escopo_tipo, escopo_id FROM auditoria_logs WHERE recurso_id = ?"
+    ).get(admCriada.id) as any
+    expect(auditAdm).toMatchObject({
+      acao: 'ADMINISTRACAO_CRIADA',
+      escopo_tipo: 'REGIONAL',
+      escopo_id: ids.regionalA,
+    })
 
     const fora = await app.request('/api/v1/administracoes', {
       method: 'POST',
@@ -99,30 +108,54 @@ describe('PR-SEC-01 — escrita territorial por Regional', () => {
     const token = await criarSessao('ADMINISTRADOR_SISTEMA')
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
 
-    expect((await app.request('/api/v1/setores', {
+    const setorOk = await app.request('/api/v1/setores', {
       method: 'POST', headers,
       body: JSON.stringify({ nome: 'Novo Setor A', administracaoId: ids.admA }),
-    })).status).toBe(201)
+    })
+    expect(setorOk.status).toBe(201)
+    const setorCriado = await setorOk.json() as any
+    expect(sqlite.prepare(
+      "SELECT acao, escopo_id FROM auditoria_logs WHERE recurso_id = ?"
+    ).get(setorCriado.id)).toMatchObject({
+      acao: 'SETOR_CRIADO',
+      escopo_id: ids.regionalA,
+    })
 
     expect((await app.request('/api/v1/setores', {
       method: 'POST', headers,
       body: JSON.stringify({ nome: 'Novo Setor B', administracaoId: ids.admB }),
     })).status).toBe(403)
 
-    expect((await app.request('/api/v1/casas', {
+    const casaOk = await app.request('/api/v1/casas', {
       method: 'POST', headers,
       body: JSON.stringify({ nome: 'Nova Casa A', setorId: ids.setorA }),
-    })).status).toBe(201)
+    })
+    expect(casaOk.status).toBe(201)
+    const casaCriada = await casaOk.json() as any
+    expect(sqlite.prepare(
+      "SELECT acao, escopo_id FROM auditoria_logs WHERE recurso_id = ?"
+    ).get(casaCriada.id)).toMatchObject({
+      acao: 'CASA_CRIADA',
+      escopo_id: ids.regionalA,
+    })
 
     expect((await app.request('/api/v1/casas', {
       method: 'POST', headers,
       body: JSON.stringify({ nome: 'Nova Casa B', setorId: ids.setorB }),
     })).status).toBe(403)
 
-    expect((await app.request('/api/v1/grupos-trabalho', {
+    const gtOk = await app.request('/api/v1/grupos-trabalho', {
       method: 'POST', headers,
       body: JSON.stringify({ nome: 'GT Regional A', regionalId: ids.regionalA }),
-    })).status).toBe(201)
+    })
+    expect(gtOk.status).toBe(201)
+    const gtCriado = await gtOk.json() as any
+    expect(sqlite.prepare(
+      "SELECT acao, escopo_id FROM auditoria_logs WHERE recurso_id = ?"
+    ).get(gtCriado.id)).toMatchObject({
+      acao: 'GRUPO_TRABALHO_CRIADO',
+      escopo_id: ids.regionalA,
+    })
 
     expect((await app.request('/api/v1/grupos-trabalho', {
       method: 'POST', headers,
@@ -148,6 +181,11 @@ describe('PR-SEC-01 — escrita territorial por Regional', () => {
       method: 'PATCH', headers,
       body: JSON.stringify({ setorId: ids.setorB }),
     })).status).toBe(403)
+
+    const logsBloqueados = sqlite.prepare(
+      "SELECT COUNT(*) AS total FROM auditoria_logs WHERE recurso_id IN (?, ?, ?)"
+    ).get(ids.admA, ids.setorA, ids.casaA) as any
+    expect(logsBloqueados.total).toBe(0)
   })
 
   it('Master mantém escrita global', async () => {
@@ -158,5 +196,13 @@ describe('PR-SEC-01 — escrita territorial por Regional', () => {
       body: JSON.stringify({ nome: 'Administração Master B', regionalId: ids.regionalB }),
     })
     expect(res.status).toBe(201)
+    const regional = await res.json() as any
+    expect(sqlite.prepare(
+      "SELECT acao, escopo_tipo, escopo_id FROM auditoria_logs WHERE recurso_id = ?"
+    ).get(regional.id)).toMatchObject({
+      acao: 'ADMINISTRACAO_CRIADA',
+      escopo_tipo: 'REGIONAL',
+      escopo_id: ids.regionalB,
+    })
   })
 })
