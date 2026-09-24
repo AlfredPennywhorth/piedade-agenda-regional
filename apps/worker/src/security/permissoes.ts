@@ -854,9 +854,9 @@ export async function obterCapacidadesMembro(
   const administraAlgumaRegional = regionaisAdministradas(contexto).size > 0
 
   const podeAdministrarAcessos = master || administraAlgumaRegional
-  // Os routers de Estrutura e Pessoas ainda exigem Master para escrita.
-  // Não expor CRUD regional até o hardening por escopo do backend estar concluído.
-  const podeAdministrarEstrutura = master
+  const podeAdministrarEstrutura = master || administraAlgumaRegional
+  // Pessoas já possuem autorização regional no backend; a capacidade será alinhada
+  // no bloco específico de Pessoas/Vínculos.
   const podeAdministrarPessoas = master
 
   const membroAtivo = await db
