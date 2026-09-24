@@ -326,15 +326,24 @@ convocacoesRouter.delete('/:id/funcoes/:funcaoId', async c => {
   if (convocacao.status !== 'RASCUNHO')
     return c.json({ error: 'Não é possível remover funções fora do status RASCUNHO' }, 400)
 
+  const associacao = await db
+    .select({ id: convocacaoFuncoes.id })
+    .from(convocacaoFuncoes)
+    .where(
+      and(eq(convocacaoFuncoes.convocacaoId, id), eq(convocacaoFuncoes.funcaoId, funcaoId))
+    )
+    .get()
+  if (!associacao) {
+    return c.json({ error: 'Função não associada a esta convocação' }, 404)
+  }
+
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
   await executarOperacaoComAudit(
     db,
     qdb => [
       qdb
         .delete(convocacaoFuncoes)
-        .where(
-          and(eq(convocacaoFuncoes.convocacaoId, id), eq(convocacaoFuncoes.funcaoId, funcaoId))
-        ),
+        .where(eq(convocacaoFuncoes.id, associacao.id)),
     ],
     {
       acao: 'CONVOCACAO_FUNCAO_REMOVIDA',
