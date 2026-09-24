@@ -450,6 +450,17 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
         ))
       )
 
+      queries.push(
+        qdb.update(credenciaisOperadorPortariaEvento).set({
+          ativo: false,
+          revogadoEm: agora,
+          updatedAt: agora,
+        }).where(and(
+          eq(credenciaisOperadorPortariaEvento.eventoId, eventoId),
+          eq(credenciaisOperadorPortariaEvento.ativo, true)
+        ))
+      )
+
       queries.push(qdb.insert(portariaFechamentos).values({
         id: fechamentoId,
         eventoId,
