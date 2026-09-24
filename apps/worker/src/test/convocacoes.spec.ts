@@ -655,7 +655,10 @@ describe('S06 - Convocações', () => {
     const log = await db
       .select()
       .from(auditoriaLogs)
-      .where(eq(auditoriaLogs.recursoId, conv.id))
+      .where(and(
+        eq(auditoriaLogs.recursoId, conv.id),
+        eq(auditoriaLogs.acao, 'CONVOCACAO_PUBLICADA')
+      ))
       .get()
     expect(log?.acao).toBe('CONVOCACAO_PUBLICADA')
     expect(log?.atorMembroId).toBe(ctx.mem1Id)
@@ -678,7 +681,10 @@ describe('S06 - Convocações', () => {
     const log = await db
       .select()
       .from(auditoriaLogs)
-      .where(eq(auditoriaLogs.recursoId, conv.id))
+      .where(and(
+        eq(auditoriaLogs.recursoId, conv.id),
+        eq(auditoriaLogs.acao, 'CONVOCACAO_CANCELADA')
+      ))
       .get()
     expect(log?.acao).toBe('CONVOCACAO_CANCELADA')
     expect(log?.atorMembroId).toBe(ctx.mem1Id)
