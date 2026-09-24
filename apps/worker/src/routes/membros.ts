@@ -102,7 +102,7 @@ membrosRouter.get('/', async (c) => {
   if (ids.length === 0) return c.json([])
 
   const LIMITE_IDS_D1 = 90
-  const data: Array<typeof membros.$inferSelect> = []
+  const data: any[] = []
 
   for (let i = 0; i < ids.length; i += LIMITE_IDS_D1) {
     const lote = ids.slice(i, i + LIMITE_IDS_D1)
