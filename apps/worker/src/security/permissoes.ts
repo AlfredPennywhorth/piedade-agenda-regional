@@ -366,6 +366,17 @@ export function podeAdministrarRegional(
   return regionaisAdministradas(contexto).has(regionalId)
 }
 
+export async function podeAdministrarEscopo(
+  db: any,
+  contexto: ContextoPermissoes,
+  escopoTipo: Exclude<AcessoTecnico['escopoTipo'], 'GLOBAL'>,
+  escopoId: string
+): Promise<boolean> {
+  if (eMasterSistema(contexto)) return true
+  const regionalId = await obterRegionalDoEscopo(db, escopoTipo, escopoId)
+  return !!regionalId && regionaisAdministradas(contexto).has(regionalId)
+}
+
 export function temPerfil(contexto: ContextoPermissoes, perfilCodigo: string): boolean {
   return contexto.acessosAtivos.some(acesso => acesso.perfilCodigo === perfilCodigo)
 }
