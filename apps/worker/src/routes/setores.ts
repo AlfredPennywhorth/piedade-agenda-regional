@@ -3,13 +3,11 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { setores, administracoes, participacoesGruposTrabalho, gruposTrabalho } from '../db/schema'
 import { CreateSetorSchema, UpdateSetorSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { exigirMasterParaEscrita } from '../middleware/master-write'
-import { obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
+import { obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo } from '../security/permissoes'
 
 export const setoresRouter = new Hono<any>()
 
 setoresRouter.use('*', authMiddleware)
-setoresRouter.use('*', exigirMasterParaEscrita)
 
 setoresRouter.get('/', async (c) => {
   const db = c.get('db')
@@ -49,6 +47,10 @@ setoresRouter.post('/', async (c) => {
     const body = await c.req.json()
     const parsed = CreateSetorSchema.parse(body)
     
+    if (!(await podeAdministrarEscopo(db, c.get('contextoPermissoes'), 'ADMINISTRACAO', parsed.administracaoId))) {
+      return c.json({ error: 'Acesso não autorizado para administrar este escopo', code: 'FORBIDDEN' }, 403)
+    }
+
     const id = crypto.randomUUID()
     const result = await db.insert(setores).values({ id, ...parsed }).returning().get()
     return c.json(result, 201)
@@ -69,6 +71,16 @@ setoresRouter.patch('/:id', async (c) => {
     
     const existing = await db.select().from(setores).where(eq(setores.id, id)).get()
     if (!existing) return c.json({ error: 'Setor não encontrado' }, 404)
+
+    const contexto = c.get('contextoPermissoes')
+    const administracaoFinal = parsed.administracaoId ?? existing.administracaoId
+    const [podeAtual, podeFinal] = await Promise.all([
+      podeAdministrarEscopo(db, contexto, 'ADMINISTRACAO', existing.administracaoId),
+      podeAdministrarEscopo(db, contexto, 'ADMINISTRACAO', administracaoFinal),
+    ])
+    if (!podeAtual || !podeFinal) {
+      return c.json({ error: 'Acesso não autorizado para administrar este escopo', code: 'FORBIDDEN' }, 403)
+    }
 
     if (parsed.administracaoId && parsed.administracaoId !== existing.administracaoId) {
       const destino = await db
