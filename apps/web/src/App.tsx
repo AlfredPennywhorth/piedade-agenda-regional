@@ -158,7 +158,9 @@ function App() {
       {currentTab === 'portaria' && capacidades.podeOperarPortaria === true && <PortariaView />}
       {currentTab === 'relatorios' && capacidades.podeVisualizarRelatorios === true && <RelatoriosView />}
       {currentTab === 'auditoria' && capacidades.podeVisualizarAuditoria === true && <AuditoriaView />}
-      {currentTab === 'regionais' && capacidades.podeAdministrarEstrutura === true && <RegionaisView />}
+      {currentTab === 'regionais' && capacidades.podeAdministrarEstrutura === true && (
+        <RegionaisView podeEditar={capacidades.podeAdministrarRegionais === true} />
+      )}
       {currentTab === 'administracoes' && capacidades.podeAdministrarEstrutura === true && <AdministracoesView />}
       {currentTab === 'setores' && capacidades.podeAdministrarEstrutura === true && <SetoresView />}
       {currentTab === 'casas' && capacidades.podeAdministrarEstrutura === true && <CasasView />}
