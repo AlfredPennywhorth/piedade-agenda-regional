@@ -23,7 +23,16 @@ casasRouter.get('/', async (c) => {
   const ids = Array.from(visiveis.casasIds)
   if (ids.length === 0) return c.json([])
 
-  const data = await db.select().from(casas).where(inArray(casas.id, ids)).all()
+  const LIMITE_IDS_D1 = 90
+  const data: Array<typeof casas.$inferSelect> = []
+
+  for (let i = 0; i < ids.length; i += LIMITE_IDS_D1) {
+    const lote = ids.slice(i, i + LIMITE_IDS_D1)
+    const parcial = await db.select().from(casas).where(inArray(casas.id, lote)).all()
+    data.push(...parcial)
+  }
+
+  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   return c.json(data)
 })
 
