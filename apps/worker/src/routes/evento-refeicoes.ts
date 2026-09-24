@@ -3,12 +3,33 @@ import { eq, and } from 'drizzle-orm'
 import { eventos, eventoRefeicoes } from '../db/schema'
 import { EventoRefeicaoCreate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { podeGerenciarAgendaNoEscopo } from '../security/permissoes'
+import { eGestorRelatoriosAutorizadoParaEvento, obterEscoposTerritoriaisVisiveis, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
 import { extrairEscopoDoEvento } from '../services/auditoria'
 
 export const eventoRefeicoesRouter = new Hono<any>()
 
 eventoRefeicoesRouter.use('*', authMiddleware)
+
+function eventoVisivelNoEscopo(evento: any, escopos: any): boolean {
+  if (escopos.tudo) return true
+  if (evento.regionalId && escopos.regionaisIds.has(evento.regionalId)) return true
+  if (evento.administracaoId && escopos.administracoesIds.has(evento.administracaoId)) return true
+  if (evento.setorId && escopos.setoresIds.has(evento.setorId)) return true
+  if (evento.casaId && escopos.casasIds.has(evento.casaId)) return true
+  if (evento.grupoTrabalhoId && escopos.gruposTrabalhoIds.has(evento.grupoTrabalhoId)) return true
+  return false
+}
+
+async function podeLerEvento(c: any, evento: any): Promise<boolean> {
+  const db = c.get('db')
+  const membroId = c.get('membroId')
+  if (!membroId) return false
+
+  const escopos = await obterEscoposTerritoriaisVisiveis(db, c.get('contextoPermissoes'))
+  if (eventoVisivelNoEscopo(evento, escopos)) return true
+
+  return eGestorRelatoriosAutorizadoParaEvento(db, membroId, evento)
+}
 
 async function podeGerenciarEvento(c: any, evento: any) {
   const db = c.get('db')
@@ -30,6 +51,9 @@ eventoRefeicoesRouter.get('/:eventoId/refeicoes', async (c) => {
   
   const evento = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
   if (!evento) return c.json({ error: 'Evento não encontrado' }, 404)
+  if (!(await podeLerEvento(c, evento))) {
+    return c.json({ error: 'Acesso não autorizado para consultar refeições deste evento', code: 'FORBIDDEN' }, 403)
+  }
 
   const refeicoes = await db.select().from(eventoRefeicoes)
     .where(and(
