@@ -499,6 +499,23 @@ export function setupDb(sqlite: any) {
     CREATE INDEX IF NOT EXISTS idx_portaria_operador_membro
       ON portaria_operadores_evento (membro_id, ativo);
 
+    CREATE TABLE IF NOT EXISTS credenciais_operador_portaria_evento (
+      id text PRIMARY KEY NOT NULL,
+      evento_id text NOT NULL,
+      token_hash text NOT NULL UNIQUE,
+      expira_em text NOT NULL,
+      revogado_em text,
+      criado_por_membro_id text,
+      ultimo_acesso_em text,
+      ativo integer DEFAULT 1 NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (evento_id) REFERENCES eventos(id),
+      FOREIGN KEY (criado_por_membro_id) REFERENCES membros(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_credencial_operador_portaria_evento
+      ON credenciais_operador_portaria_evento (evento_id, ativo);
+
     CREATE TABLE IF NOT EXISTS convidados_evento (
       id text PRIMARY KEY NOT NULL,
       evento_id text NOT NULL,
