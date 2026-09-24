@@ -142,6 +142,41 @@ describe('PR-SEC-01 — leitura de séries por escopo sem N+1', () => {
     expect(titulos).not.toContain('Série Regional B')
   })
 
+  it('Gestor de Agenda em Administração não herda GTs da Administração', async () => {
+    const token = await criarSessao({
+      codigo: 'GESTOR_AGENDA',
+      escopoTipo: 'ADMINISTRACAO',
+      escopoId: ids.admA,
+    })
+
+    const res = await app.request('/api/v1/series-recorrencia', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(res.status).toBe(200)
+    const body = await res.json() as Array<{ titulo: string }>
+    const titulos = body.map(item => item.titulo)
+    expect(titulos).not.toContain('Série GT Adm A')
+    expect(titulos).not.toContain('Série GT Setor A')
+  })
+
+  it('Gestor de Agenda em Setor não herda GTs do Setor', async () => {
+    const token = await criarSessao({
+      codigo: 'GESTOR_AGENDA',
+      escopoTipo: 'SETOR',
+      escopoId: ids.setorA,
+    })
+
+    const res = await app.request('/api/v1/series-recorrencia', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(res.status).toBe(200)
+    const body = await res.json() as Array<{ titulo: string }>
+    const titulos = body.map(item => item.titulo)
+    expect(titulos).not.toContain('Série GT Setor A')
+  })
+
   it('Gestor de Agenda Regional também herda os descendentes da própria Regional', async () => {
     const token = await criarSessao({
       codigo: 'GESTOR_AGENDA',
