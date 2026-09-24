@@ -1,6 +1,6 @@
 /**
- * Gerador QR Code em modo byte, nível L, versões 1 a 4.
- * Suporta os identificadores e URLs curtas usados pelo sistema.
+ * Gerador QR Code em modo byte, nível L, versões 1 a 5.
+ * Suporta identificadores e URLs usadas nos ambientes Beta e produção.
  */
 
 const EXP_TABLE = new Uint8Array(256)
@@ -62,12 +62,26 @@ interface QRVersionConfig {
   alignPos: number[]
 }
 
+function cabeEmModoByte(dataLen: number, dataCodewords: number): boolean {
+  // Versões 1–9 usam 8 bits para o contador no modo byte.
+  // Reserva indicador (4), contador (8), dados e até 4 bits de terminador.
+  const payloadBits = 4 + 8 + dataLen * 8
+  const capacityBits = dataCodewords * 8
+  return payloadBits <= capacityBits && payloadBits + Math.min(4, capacityBits - payloadBits) <= capacityBits
+}
+
 function getVersionConfig(dataLen: number): QRVersionConfig {
-  const needed = dataLen + 3
-  if (needed <= 19) return { version: 1, size: 21, totalCodewords: 26, dataCodewords: 19, ecCodewords: 7, alignPos: [] }
-  if (needed <= 34) return { version: 2, size: 25, totalCodewords: 44, dataCodewords: 34, ecCodewords: 10, alignPos: [6, 18] }
-  if (needed <= 55) return { version: 3, size: 29, totalCodewords: 70, dataCodewords: 55, ecCodewords: 15, alignPos: [6, 22] }
-  if (needed <= 80) return { version: 4, size: 33, totalCodewords: 100, dataCodewords: 80, ecCodewords: 20, alignPos: [6, 26] }
+  const configs: QRVersionConfig[] = [
+    { version: 1, size: 21, totalCodewords: 26, dataCodewords: 19, ecCodewords: 7, alignPos: [] },
+    { version: 2, size: 25, totalCodewords: 44, dataCodewords: 34, ecCodewords: 10, alignPos: [6, 18] },
+    { version: 3, size: 29, totalCodewords: 70, dataCodewords: 55, ecCodewords: 15, alignPos: [6, 22] },
+    { version: 4, size: 33, totalCodewords: 100, dataCodewords: 80, ecCodewords: 20, alignPos: [6, 26] },
+    { version: 5, size: 37, totalCodewords: 134, dataCodewords: 108, ecCodewords: 26, alignPos: [6, 30] },
+  ]
+
+  const config = configs.find(item => cabeEmModoByte(dataLen, item.dataCodewords))
+  if (config) return config
+
   throw new Error('Conteúdo grande demais para o QR Code suportado.')
 }
 
