@@ -1,15 +1,14 @@
 import { Hono } from 'hono'
-import { eq, inArray, or } from 'drizzle-orm'
-import { administracoes, casas, membros, setores, vinculosFuncionais, tentativasAcesso } from '../db/schema'
+import { and, eq, inArray, or } from 'drizzle-orm'
+import { acessosConta, administracoes, casas, contasAcesso, membros, setores, tentativasAcesso } from '../db/schema'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { exigirMasterParaEscrita } from '../middleware/master-write'
 import { eMasterSistema, regionaisAdministradas } from '../security/permissoes'
+import { listarVinculosVisiveis } from './vinculos_funcionais'
 
 export const membrosRouter = new Hono<any>()
 
 membrosRouter.use('*', authMiddleware)
-membrosRouter.use('*', exigirMasterParaEscrita)
 
 const membroPublico = {
   id: membros.id,
@@ -35,6 +34,60 @@ function somenteCadastroInstitucional(membro: any) {
     createdAt: membro.createdAt,
     updatedAt: membro.updatedAt,
   }
+}
+
+async function regionalIdDaCasa(db: any, casaId: string): Promise<string | null> {
+  const row = await db
+    .select({ regionalId: administracoes.regionalId })
+    .from(casas)
+    .innerJoin(setores, eq(casas.setorId, setores.id))
+    .innerJoin(administracoes, eq(setores.administracaoId, administracoes.id))
+    .where(eq(casas.id, casaId))
+    .get()
+
+  return row?.regionalId ?? null
+}
+
+function podeAdministrarRegionalDoContexto(contexto: any, regionalId: string | null): boolean {
+  if (eMasterSistema(contexto)) return true
+  if (!regionalId) return false
+  return regionaisAdministradas(contexto).has(regionalId)
+}
+
+function podeEscreverMembros(contexto: any): boolean {
+  return eMasterSistema(contexto) || regionaisAdministradas(contexto).size > 0
+}
+
+async function membroPossuiMasterAtivo(db: any, membroId: string): Promise<boolean> {
+  const acesso = await db
+    .select({ id: acessosConta.id })
+    .from(acessosConta)
+    .innerJoin(contasAcesso, eq(acessosConta.contaAcessoId, contasAcesso.id))
+    .where(
+      and(
+        eq(contasAcesso.membroId, membroId),
+        eq(acessosConta.perfilCodigo, 'MASTER_SISTEMA'),
+        eq(acessosConta.ativo, true)
+      )
+    )
+    .get()
+
+  return Boolean(acesso)
+}
+
+async function podeAdministrarMembro(
+  c: any,
+  membro: { id: string; casaId: string }
+): Promise<boolean> {
+  const db = c.get('db')
+  const contexto = c.get('contextoPermissoes')
+  if (eMasterSistema(contexto)) return true
+
+  // Administrador Regional nunca pode alterar um membro que seja Master ativo.
+  if (await membroPossuiMasterAtivo(db, membro.id)) return false
+
+  const regionalId = await regionalIdDaCasa(db, membro.casaId)
+  return podeAdministrarRegionalDoContexto(contexto, regionalId)
 }
 
 async function idsMembrosVisiveis(c: any): Promise<Set<string> | null> {
@@ -76,12 +129,20 @@ membrosRouter.get('/', async (c) => {
   const ids = Array.from(idsVisiveis)
   if (ids.length === 0) return c.json([])
 
-  const data = await db
-    .select(membroPublico)
-    .from(membros)
-    .where(inArray(membros.id, ids))
-    .all()
+  const LIMITE_IDS_D1 = 90
+  const data: any[] = []
 
+  for (let i = 0; i < ids.length; i += LIMITE_IDS_D1) {
+    const lote = ids.slice(i, i + LIMITE_IDS_D1)
+    const parcial = await db
+      .select(membroPublico)
+      .from(membros)
+      .where(inArray(membros.id, lote))
+      .all()
+    data.push(...parcial)
+  }
+
+  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   return c.json(data)
 })
 
@@ -112,15 +173,25 @@ membrosRouter.get('/:id/vinculos', async (c) => {
     return c.json({ error: 'Acesso não autorizado para este membro', code: 'FORBIDDEN' }, 403)
   }
 
-  const data = await db.select().from(vinculosFuncionais).where(eq(vinculosFuncionais.membroId, id)).all()
+  const contexto = c.get('contextoPermissoes')
+  const data = await listarVinculosVisiveis(db, contexto, id)
   return c.json(data)
 })
 
 membrosRouter.post('/', async (c) => {
   const db = c.get('db')
+  if (!podeEscreverMembros(c.get('contextoPermissoes'))) {
+    return c.json({ error: 'Acesso não autorizado para administrar pessoas', code: 'FORBIDDEN' }, 403)
+  }
+
   try {
     const body = await c.req.json()
     const parsed = CreateMembroSchema.parse(body)
+
+    const regionalAlvo = await regionalIdDaCasa(db, parsed.casaId)
+    if (!podeAdministrarRegionalDoContexto(c.get('contextoPermissoes'), regionalAlvo)) {
+      return c.json({ error: 'Acesso não autorizado para administrar pessoas nesta Regional', code: 'FORBIDDEN' }, 403)
+    }
     
     const conflitoCarteirinha = await db
       .select({ id: membros.id })
@@ -163,12 +234,27 @@ membrosRouter.post('/', async (c) => {
 membrosRouter.patch('/:id', async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')
+  if (!podeEscreverMembros(c.get('contextoPermissoes'))) {
+    return c.json({ error: 'Acesso não autorizado para administrar pessoas', code: 'FORBIDDEN' }, 403)
+  }
+
   try {
     const body = await c.req.json()
     const parsed = UpdateMembroSchema.parse(body)
     
     const existing = await db.select().from(membros).where(eq(membros.id, id)).get()
     if (!existing) return c.json({ error: 'Membro não encontrado' }, 404)
+
+    if (!(await podeAdministrarMembro(c, existing))) {
+      return c.json({ error: 'Acesso não autorizado para administrar este membro', code: 'FORBIDDEN' }, 403)
+    }
+
+    if (parsed.casaId && parsed.casaId !== existing.casaId) {
+      const novaRegionalId = await regionalIdDaCasa(db, parsed.casaId)
+      if (!podeAdministrarRegionalDoContexto(c.get('contextoPermissoes'), novaRegionalId)) {
+        return c.json({ error: 'Acesso não autorizado para mover membro para outra Regional', code: 'FORBIDDEN' }, 403)
+      }
+    }
 
     if (
       parsed.codigoCarteirinha &&
