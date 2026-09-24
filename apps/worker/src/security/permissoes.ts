@@ -770,6 +770,7 @@ export interface CapacidadesMembro {
   podeVisualizarAuditoria: boolean
   podeOperarPortaria: boolean
   podeAdministrarAcessos: boolean
+  podeAdministrarRegionais: boolean
   podeAdministrarEstrutura: boolean
   podeAdministrarPessoas: boolean
   podeGerirAgenda: boolean
@@ -786,6 +787,7 @@ export async function obterCapacidadesMembro(
       podeVisualizarAuditoria: false,
       podeOperarPortaria: false,
       podeAdministrarAcessos: false,
+      podeAdministrarRegionais: false,
       podeAdministrarEstrutura: false,
       podeAdministrarPessoas: false,
       podeGerirAgenda: false
@@ -854,6 +856,7 @@ export async function obterCapacidadesMembro(
   const administraAlgumaRegional = regionaisAdministradas(contexto).size > 0
 
   const podeAdministrarAcessos = master || administraAlgumaRegional
+  const podeAdministrarRegionais = master
   const podeAdministrarEstrutura = master || administraAlgumaRegional
   // Pessoas já possuem autorização regional no backend; a capacidade será alinhada
   // no bloco específico de Pessoas/Vínculos.
@@ -876,6 +879,7 @@ export async function obterCapacidadesMembro(
     podeVisualizarAuditoria,
     podeOperarPortaria,
     podeAdministrarAcessos,
+    podeAdministrarRegionais,
     podeAdministrarEstrutura,
     podeAdministrarPessoas,
     podeGerirAgenda
