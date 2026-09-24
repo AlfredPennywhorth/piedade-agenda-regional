@@ -146,9 +146,20 @@ convocacoesRouter.post('/', async c => {
       updatedAt: nowIso,
     }
 
-    await executeAtomic(db, qdb => {
-      return [qdb.insert(convocacoes).values(resultConvocacao)]
-    })
+    const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+    await executarOperacaoComAudit(
+      db,
+      qdb => [qdb.insert(convocacoes).values(resultConvocacao)],
+      {
+        acao: 'CONVOCACAO_CRIADA',
+        atorMembroId: membroId,
+        recursoTipo: 'CONVOCACAO',
+        recursoId: convocacaoId,
+        escopoTipo,
+        escopoId,
+        contexto: { eventoId: parsed.eventoId },
+      }
+    )
 
     return c.json(resultConvocacao, 201)
   } catch (err: any) {
@@ -175,26 +186,48 @@ convocacoesRouter.patch('/:id', async c => {
       return c.json({ error: 'Apenas convocações em RASCUNHO podem ser alteradas' }, 400)
 
     const nowIso = new Date().toISOString()
-    const updated = await db
-      .update(convocacoes)
-      .set({ observacoes: parsed.observacoes, updatedAt: nowIso })
-      .where(
-        and(
-          eq(convocacoes.id, id),
-          eq(convocacoes.status, 'RASCUNHO'),
-          eq(convocacoes.updatedAt, convocacao.updatedAt)
-        )
-      )
-      .returning()
-      .get()
+    const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
-    if (!updated) {
-      return c.json(
-        { error: 'Conflito: a convocação deixou de ser um rascunho ou foi alterada por outra operação.' },
-        409
-      )
+    try {
+      await executeAtomic(db, qdb => [
+        qdb
+          .update(convocacoes)
+          .set({ observacoes: parsed.observacoes, updatedAt: nowIso })
+          .where(
+            and(
+              eq(convocacoes.id, id),
+              eq(convocacoes.status, 'RASCUNHO'),
+              eq(convocacoes.updatedAt, convocacao.updatedAt)
+            )
+          ),
+        criarAuditQuery(qdb, {
+          acao: 'CONVOCACAO_ATUALIZADA',
+          atorMembroId: membroId,
+          recursoTipo: 'CONVOCACAO',
+          recursoId: id,
+          escopoTipo,
+          escopoId,
+          contexto: { camposAlterados: Object.keys(parsed) },
+        }),
+        qdb
+          .update(convocacoes)
+          .set({
+            status:
+              sql`CASE WHEN ${convocacoes.updatedAt} = ${nowIso} THEN ${convocacoes.status} ELSE 'ABORT_OCC' END` as any,
+          })
+          .where(eq(convocacoes.id, id)),
+      ])
+    } catch (err: any) {
+      if (err.message && err.message.includes('check_status_convocacao')) {
+        return c.json(
+          { error: 'Conflito: a convocação deixou de ser um rascunho ou foi alterada por outra operação.' },
+          409
+        )
+      }
+      throw err
     }
 
+    const updated = await db.select().from(convocacoes).where(eq(convocacoes.id, id)).get()
     return c.json(updated)
   } catch (err: any) {
     return c.json({ error: err.issues || err.message }, 400)
@@ -254,9 +287,20 @@ convocacoesRouter.post('/:id/funcoes', async c => {
       createdAt: nowIso,
     }
 
-    await executeAtomic(db, qdb => {
-      return [qdb.insert(convocacaoFuncoes).values(resultFuncao)]
-    })
+    const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+    await executarOperacaoComAudit(
+      db,
+      qdb => [qdb.insert(convocacaoFuncoes).values(resultFuncao)],
+      {
+        acao: 'CONVOCACAO_FUNCAO_ADICIONADA',
+        atorMembroId: membroId,
+        recursoTipo: 'CONVOCACAO',
+        recursoId: id,
+        escopoTipo,
+        escopoId,
+        contexto: { funcaoId: parsed.funcaoId },
+      }
+    )
 
     return c.json(resultFuncao, 201)
   } catch (err: any) {
@@ -282,15 +326,26 @@ convocacoesRouter.delete('/:id/funcoes/:funcaoId', async c => {
   if (convocacao.status !== 'RASCUNHO')
     return c.json({ error: 'Não é possível remover funções fora do status RASCUNHO' }, 400)
 
-  await executeAtomic(db, qdb => {
-    return [
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+  await executarOperacaoComAudit(
+    db,
+    qdb => [
       qdb
         .delete(convocacaoFuncoes)
         .where(
           and(eq(convocacaoFuncoes.convocacaoId, id), eq(convocacaoFuncoes.funcaoId, funcaoId))
         ),
-    ]
-  })
+    ],
+    {
+      acao: 'CONVOCACAO_FUNCAO_REMOVIDA',
+      atorMembroId: membroId,
+      recursoTipo: 'CONVOCACAO',
+      recursoId: id,
+      escopoTipo,
+      escopoId,
+      contexto: { funcaoId },
+    }
+  )
 
   return c.json({ success: true })
 })
