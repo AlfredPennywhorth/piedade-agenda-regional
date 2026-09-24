@@ -5,6 +5,9 @@ export interface CapacidadesFrontend {
   podeVisualizarAuditoria?: boolean
   podeOperarPortaria?: boolean
   podeAdministrarAcessos?: boolean
+  podeAdministrarEstrutura?: boolean
+  podeAdministrarPessoas?: boolean
+  podeGerirAgenda?: boolean
 }
 
 interface MainLayoutProps {
@@ -21,6 +24,9 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
   const mostrarRelatorios = capacidades?.podeVisualizarRelatorios === true
   const mostrarAuditoria = capacidades?.podeVisualizarAuditoria === true
   const mostrarAdministracaoAcessos = capacidades?.podeAdministrarAcessos === true
+  const mostrarEstrutura = capacidades?.podeAdministrarEstrutura === true
+  const mostrarPessoas = capacidades?.podeAdministrarPessoas === true
+  const mostrarGestaoAgenda = capacidades?.podeGerirAgenda === true
   const [mostrarMais, setMostrarMais] = useState(false)
   const botaoMaisRef = useRef<HTMLButtonElement>(null)
 
@@ -117,7 +123,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
               <div>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Agenda e gestão</h3>
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => navegar('series')} className="rounded-lg bg-slate-50 p-3 text-left">Séries</button>
+                  {mostrarGestaoAgenda && <button onClick={() => navegar('series')} className="rounded-lg bg-slate-50 p-3 text-left">Séries</button>}
                   {mostrarRelatorios && <button onClick={() => navegar('relatorios')} className="rounded-lg bg-slate-50 p-3 text-left">Relatórios</button>}
                   <button onClick={() => navegar('avisos')} className="rounded-lg bg-slate-50 p-3 text-left">Avisos</button>
                   {mostrarPortaria && <button onClick={() => navegar('portaria')} className="rounded-lg bg-slate-50 p-3 text-left">Portaria</button>}
@@ -125,27 +131,31 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
                 </div>
               </div>
 
-              <div>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Administração</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => navegar('regionais')} className="rounded-lg bg-slate-50 p-3 text-left">Regionais</button>
-                  <button onClick={() => navegar('administracoes')} className="rounded-lg bg-slate-50 p-3 text-left">Administrações</button>
-                  <button onClick={() => navegar('setores')} className="rounded-lg bg-slate-50 p-3 text-left">Setores</button>
-                  <button onClick={() => navegar('casas')} className="rounded-lg bg-slate-50 p-3 text-left">Casas</button>
-                  <button onClick={() => navegar('grupos-trabalho')} className="rounded-lg bg-slate-50 p-3 text-left">Grupos de Trabalho</button>
-                  <button onClick={() => navegar('locais')} className="rounded-lg bg-slate-50 p-3 text-left">Locais</button>
+              {(mostrarEstrutura || mostrarGestaoAgenda) && (
+                <div>
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Administração</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {mostrarEstrutura && <button onClick={() => navegar('regionais')} className="rounded-lg bg-slate-50 p-3 text-left">Regionais</button>}
+                    {mostrarEstrutura && <button onClick={() => navegar('administracoes')} className="rounded-lg bg-slate-50 p-3 text-left">Administrações</button>}
+                    {mostrarEstrutura && <button onClick={() => navegar('setores')} className="rounded-lg bg-slate-50 p-3 text-left">Setores</button>}
+                    {mostrarEstrutura && <button onClick={() => navegar('casas')} className="rounded-lg bg-slate-50 p-3 text-left">Casas</button>}
+                    {mostrarEstrutura && <button onClick={() => navegar('grupos-trabalho')} className="rounded-lg bg-slate-50 p-3 text-left">Grupos de Trabalho</button>}
+                    {mostrarGestaoAgenda && <button onClick={() => navegar('locais')} className="rounded-lg bg-slate-50 p-3 text-left">Locais</button>}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Pessoas e acessos</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => navegar('membros')} className="rounded-lg bg-slate-50 p-3 text-left">Membros</button>
-                  <button onClick={() => navegar('funcoes')} className="rounded-lg bg-slate-50 p-3 text-left">Funções</button>
-                  <button onClick={() => navegar('vinculos-funcionais')} className="rounded-lg bg-slate-50 p-3 text-left">Vínculos</button>
-                  {mostrarAdministracaoAcessos && <button onClick={() => navegar('acessos')} className="rounded-lg bg-slate-50 p-3 text-left">Acessos</button>}
+              {(mostrarPessoas || mostrarAdministracaoAcessos) && (
+                <div>
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Pessoas e acessos</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {mostrarPessoas && <button onClick={() => navegar('membros')} className="rounded-lg bg-slate-50 p-3 text-left">Membros</button>}
+                    {mostrarPessoas && <button onClick={() => navegar('funcoes')} className="rounded-lg bg-slate-50 p-3 text-left">Funções</button>}
+                    {mostrarPessoas && <button onClick={() => navegar('vinculos-funcionais')} className="rounded-lg bg-slate-50 p-3 text-left">Vínculos</button>}
+                    {mostrarAdministracaoAcessos && <button onClick={() => navegar('acessos')} className="rounded-lg bg-slate-50 p-3 text-left">Acessos</button>}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Conta</h3>
@@ -161,15 +171,19 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
           <button onClick={() => navegar('agenda')} className={`flex flex-col items-center p-2 text-[10px] ${currentTab === 'agenda' ? 'text-brand-600' : 'text-slate-400'}`}>
             <span className="text-base">☰</span><span>Minha Agenda</span>
           </button>
-          <button onClick={() => navegar('eventos')} className={`flex flex-col items-center p-2 text-[10px] ${currentTab === 'eventos' ? 'text-brand-600' : 'text-slate-400'}`}>
-            <span className="text-base">▣</span><span>Eventos</span>
-          </button>
+          {mostrarGestaoAgenda ? (
+            <button onClick={() => navegar('eventos')} className={`flex flex-col items-center p-2 text-[10px] ${currentTab === 'eventos' ? 'text-brand-600' : 'text-slate-400'}`}>
+              <span className="text-base">▣</span><span>Eventos</span>
+            </button>
+          ) : <div />}
           <button onClick={() => navegar('calendario')} className={`flex flex-col items-center p-2 text-[10px] ${currentTab === 'calendario' ? 'text-brand-600' : 'text-slate-400'}`}>
             <span className="text-base">□</span><span>Calendário</span>
           </button>
-          <button onClick={() => navegar('convocacoes')} className={`flex flex-col items-center p-2 text-[10px] ${currentTab === 'convocacoes' ? 'text-brand-600' : 'text-slate-400'}`}>
-            <span className="text-base">♧</span><span>Convocações</span>
-          </button>
+          {mostrarGestaoAgenda ? (
+            <button onClick={() => navegar('convocacoes')} className={`flex flex-col items-center p-2 text-[10px] ${currentTab === 'convocacoes' ? 'text-brand-600' : 'text-slate-400'}`}>
+              <span className="text-base">♧</span><span>Convocações</span>
+            </button>
+          ) : <div />}
           <button ref={botaoMaisRef} onClick={() => setMostrarMais(true)} className={`flex flex-col items-center p-2 text-[10px] ${maisAtivo ? 'text-brand-600' : 'text-slate-400'}`}>
             <span className="text-base">•••</span><span>Mais</span>
           </button>
