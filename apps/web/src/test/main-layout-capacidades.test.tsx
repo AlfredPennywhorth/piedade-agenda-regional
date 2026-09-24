@@ -19,10 +19,10 @@ describe('MainLayout — capabilities', () => {
       </MainLayout>
     )
 
-    expect(screen.queryByRole('button', { name: 'Eventos' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Convocações' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Eventos$/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Convocações$/ })).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Mais' }))
+    fireEvent.click(screen.getByRole('button', { name: /Mais$/ }))
 
     expect(screen.queryByRole('button', { name: 'Regionais' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Membros' })).not.toBeInTheDocument()
@@ -46,10 +46,10 @@ describe('MainLayout — capabilities', () => {
       </MainLayout>
     )
 
-    expect(screen.getByRole('button', { name: 'Eventos' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Convocações' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Eventos$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Convocações$/ })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Mais' }))
+    fireEvent.click(screen.getByRole('button', { name: /Mais$/ }))
 
     expect(screen.getByRole('button', { name: 'Regionais' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Membros' })).toBeInTheDocument()
