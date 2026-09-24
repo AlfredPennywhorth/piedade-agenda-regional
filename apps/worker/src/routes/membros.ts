@@ -3,13 +3,11 @@ import { eq, inArray, or } from 'drizzle-orm'
 import { administracoes, casas, membros, setores, vinculosFuncionais, tentativasAcesso } from '../db/schema'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { exigirMasterParaEscrita } from '../middleware/master-write'
 import { eMasterSistema, regionaisAdministradas } from '../security/permissoes'
 
 export const membrosRouter = new Hono<any>()
 
 membrosRouter.use('*', authMiddleware)
-membrosRouter.use('*', exigirMasterParaEscrita)
 
 const membroPublico = {
   id: membros.id,
@@ -35,6 +33,32 @@ function somenteCadastroInstitucional(membro: any) {
     createdAt: membro.createdAt,
     updatedAt: membro.updatedAt,
   }
+}
+
+async function regionalIdDaCasa(db: any, casaId: string): Promise<string | null> {
+  const row = await db
+    .select({ regionalId: administracoes.regionalId })
+    .from(casas)
+    .innerJoin(setores, eq(casas.setorId, setores.id))
+    .innerJoin(administracoes, eq(setores.administracaoId, administracoes.id))
+    .where(eq(casas.id, casaId))
+    .get()
+
+  return row?.regionalId ?? null
+}
+
+function podeAdministrarRegionalDoContexto(contexto: any, regionalId: string | null): boolean {
+  if (!regionalId) return false
+  if (eMasterSistema(contexto)) return true
+  return regionaisAdministradas(contexto).has(regionalId)
+}
+
+async function podeAdministrarMembro(c: any, membro: { casaId: string }): Promise<boolean> {
+  const db = c.get('db')
+  const contexto = c.get('contextoPermissoes')
+  if (eMasterSistema(contexto)) return true
+  const regionalId = await regionalIdDaCasa(db, membro.casaId)
+  return podeAdministrarRegionalDoContexto(contexto, regionalId)
 }
 
 async function idsMembrosVisiveis(c: any): Promise<Set<string> | null> {
@@ -121,6 +145,11 @@ membrosRouter.post('/', async (c) => {
   try {
     const body = await c.req.json()
     const parsed = CreateMembroSchema.parse(body)
+
+    const regionalAlvo = await regionalIdDaCasa(db, parsed.casaId)
+    if (!podeAdministrarRegionalDoContexto(c.get('contextoPermissoes'), regionalAlvo)) {
+      return c.json({ error: 'Acesso não autorizado para administrar pessoas nesta Regional', code: 'FORBIDDEN' }, 403)
+    }
     
     const conflitoCarteirinha = await db
       .select({ id: membros.id })
@@ -169,6 +198,17 @@ membrosRouter.patch('/:id', async (c) => {
     
     const existing = await db.select().from(membros).where(eq(membros.id, id)).get()
     if (!existing) return c.json({ error: 'Membro não encontrado' }, 404)
+
+    if (!(await podeAdministrarMembro(c, existing))) {
+      return c.json({ error: 'Acesso não autorizado para administrar este membro', code: 'FORBIDDEN' }, 403)
+    }
+
+    if (parsed.casaId && parsed.casaId !== existing.casaId) {
+      const novaRegionalId = await regionalIdDaCasa(db, parsed.casaId)
+      if (!podeAdministrarRegionalDoContexto(c.get('contextoPermissoes'), novaRegionalId)) {
+        return c.json({ error: 'Acesso não autorizado para mover membro para outra Regional', code: 'FORBIDDEN' }, 403)
+      }
+    }
 
     if (
       parsed.codigoCarteirinha &&
