@@ -149,6 +149,33 @@ describe('PR-SEC-01 — escrita de Membros e Vínculos por Regional', () => {
     expect(res.status).toBe(403)
   })
 
+  it('Administrador Regional não altera membro que possua Master ativo', async () => {
+    const token = await criarSessaoAdminA()
+
+    const contaMasterId = '14141414-1414-4414-8414-141414141414'
+    const acessoMasterId = '15151515-1515-4515-8515-151515151515'
+
+    sqlite.prepare(
+      "INSERT INTO contas_acesso (id, membro_id, status, ativado_em) VALUES (?, ?, 'ATIVA', CURRENT_TIMESTAMP)"
+    ).run(contaMasterId, id.comumA)
+
+    sqlite.prepare(`
+      INSERT INTO acessos_conta
+        (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id, ativo)
+      VALUES (?, ?, 'MASTER_SISTEMA', 'GLOBAL', NULL, 1)
+    `).run(acessoMasterId, contaMasterId)
+
+    const res = await req(token, `/api/v1/membros/${id.comumA}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ativo: false }),
+    })
+
+    expect(res.status).toBe(403)
+
+    const membro = sqlite.prepare('SELECT ativo FROM membros WHERE id = ?').get(id.comumA) as { ativo: number }
+    expect(membro.ativo).toBe(1)
+  })
+
   it('Administrador Regional cria vínculo apenas quando membro e escopo pertencem à sua Regional', async () => {
     const token = await criarSessaoAdminA()
 
