@@ -24,10 +24,12 @@ import { ResponsabilidadeRegionalGate } from './components/governanca/Responsabi
 import { CadastroConvidadoView } from './components/portaria/CadastroConvidadoView'
 import { ContasAcessoView } from './components/acessos/ContasAcessoView'
 import { PerfilView } from './components/perfil/PerfilView'
+import { PortariaOperadorTemporarioView } from './components/portaria/PortariaOperadorTemporarioView'
 
 function App() {
   const paramsPublicos = new URLSearchParams(window.location.search)
   const tokenPortariaPublica = paramsPublicos.get('p') || paramsPublicos.get('portaria')
+  const tokenOperadorPortaria = paramsPublicos.get('op')
 
   const [currentTab, setCurrentTab] = useState<'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes' | 'acessos'>('agenda')
   const [capacidades, setCapacidades] = useState<CapacidadesFrontend>({})
@@ -109,6 +111,10 @@ function App() {
       setCurrentTab('agenda')
       setEstadoSessao('anonima')
     }
+  }
+
+  if (window.location.pathname === '/portaria-operador' && tokenOperadorPortaria) {
+    return <PortariaOperadorTemporarioView token={tokenOperadorPortaria} />
   }
 
   if ((window.location.pathname === '/c' || window.location.pathname === '/convidado') && tokenPortariaPublica) {
