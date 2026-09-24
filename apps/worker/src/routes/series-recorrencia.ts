@@ -613,7 +613,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
           recursoId: serieId,
           escopoTipo: escopo.escopoTipo,
           escopoId: escopo.escopoId,
-          contexto: { updateMode: 'THIS_AND_FUTURE', novaSerieId, fromEventId: parsed.fromEventId },
+          contexto: { updateMode: 'THIS_AND_FUTURE', novaSerieId: newSerieId, fromEventId: parsed.fromEventId },
         }))
         return queries
       })
