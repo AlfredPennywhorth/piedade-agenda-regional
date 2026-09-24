@@ -29,7 +29,9 @@ import { PortariaOperadorTemporarioView } from './components/portaria/PortariaOp
 function App() {
   const paramsPublicos = new URLSearchParams(window.location.search)
   const tokenPortariaPublica = paramsPublicos.get('p') || paramsPublicos.get('portaria')
-  const tokenOperadorPortaria = paramsPublicos.get('op')
+  const tokenOperadorPortaria = window.location.pathname.startsWith('/o/')
+    ? decodeURIComponent(window.location.pathname.slice(3))
+    : paramsPublicos.get('op')
 
   const [currentTab, setCurrentTab] = useState<'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes' | 'acessos'>('agenda')
   const [capacidades, setCapacidades] = useState<CapacidadesFrontend>({})
@@ -113,7 +115,7 @@ function App() {
     }
   }
 
-  if (window.location.pathname === '/portaria-operador' && tokenOperadorPortaria) {
+  if ((window.location.pathname === '/portaria-operador' || window.location.pathname.startsWith('/o/')) && tokenOperadorPortaria) {
     return <PortariaOperadorTemporarioView token={tokenOperadorPortaria} />
   }
 
