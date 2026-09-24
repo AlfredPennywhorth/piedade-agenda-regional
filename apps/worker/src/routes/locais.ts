@@ -42,6 +42,8 @@ locaisRouter.post('/', async (c) => {
         atorMembroId,
         recursoTipo: 'LOCAL',
         recursoId: id,
+        escopoTipo: 'GLOBAL',
+        escopoId: null,
         contexto: { nome: parsed.nome, cidade: parsed.cidade, uf: parsed.uf },
       }
     )
@@ -75,6 +77,8 @@ locaisRouter.patch('/:id', async (c) => {
         atorMembroId,
         recursoTipo: 'LOCAL',
         recursoId: id,
+        escopoTipo: 'GLOBAL',
+        escopoId: null,
         contexto: { camposAlterados: Object.keys(parsed) },
       }
     )
