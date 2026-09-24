@@ -826,6 +826,16 @@ export const portariasEvento = sqliteTable(
   })
 )
 
+export const portariaFechamentoLocks = sqliteTable(
+  'portaria_fechamento_locks',
+  {
+    eventoId: text('evento_id').primaryKey().references(() => eventos.id),
+    criadoEm: text('criado_em')
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  }
+)
+
 export const portariaOperadoresEvento = sqliteTable(
   'portaria_operadores_evento',
   {
