@@ -66,13 +66,13 @@ function converterHorarioLocalParaUtc(
   second: number,
   timeZone: string
 ): Date {
-  const alvoLocal = Date.UTC(year, month - 1, day, hour, minute, second)
-  const janelaInicio = alvoLocal - 15 * 60 * 60 * 1000
-  const janelaFim = alvoLocal + 15 * 60 * 60 * 1000
+  const alvoLocalNoMinuto = Date.UTC(year, month - 1, day, hour, minute, 0)
+  const janelaInicio = alvoLocalNoMinuto - 15 * 60 * 60 * 1000
+  const janelaFim = alvoLocalNoMinuto + 15 * 60 * 60 * 1000
   const correspondencias: number[] = []
 
-  // Procura todas as ocorrências possíveis do horário local em passos de 1 minuto.
-  // Em transições de offset, o mesmo horário local pode ocorrer duas vezes.
+  // Procura todas as ocorrências possíveis do horário local em passos de 1 minuto,
+  // sempre alinhadas em :00 para depois aplicar os segundos desejados.
   for (let instante = janelaInicio; instante <= janelaFim; instante += 60 * 1000) {
     const partes = obterPartesNoFuso(new Date(instante), timeZone)
     if (
