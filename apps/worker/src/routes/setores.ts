@@ -75,8 +75,8 @@ setoresRouter.post('/', async (c) => {
         atorMembroId: c.get('membroId') || null,
         recursoTipo: 'SETOR',
         recursoId: id,
-        escopoTipo: 'REGIONAL',
-        escopoId: regionalId,
+        escopoTipo: 'SETOR',
+        escopoId: id,
         contexto: { administracaoId: parsed.administracaoId },
       }
     )
@@ -154,8 +154,8 @@ setoresRouter.patch('/:id', async (c) => {
         atorMembroId: c.get('membroId') || null,
         recursoTipo: 'SETOR',
         recursoId: id,
-        escopoTipo: 'REGIONAL',
-        escopoId: regionalFinal,
+        escopoTipo: 'SETOR',
+        escopoId: id,
         contexto: { camposAlterados: Object.keys(parsed) },
       }
     )
