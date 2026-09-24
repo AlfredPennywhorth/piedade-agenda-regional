@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { CreateSetorSchema, UpdateSetorSchema } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import type { Administracao } from '../administracoes/AdministracoesView'
+import type { Regional } from '../regionais/RegionaisView'
 
 export interface Setor {
   id: string
@@ -16,11 +17,13 @@ export interface Setor {
 export function SetoresView() {
   const [setores, setSetores] = useState<Setor[]>([])
   const [administracoes, setAdministracoes] = useState<Administracao[]>([])
+  const [regionais, setRegionais] = useState<Regional[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [erro, setErro] = useState<string | null>(null)
   const [sucesso, setSucesso] = useState<string | null>(null)
 
-  // Filtro estritamente no cliente por Administração
+  // Filtro hierárquico no cliente: Regional → Administração → Setor
+  const [filtroRegionalId, setFiltroRegionalId] = useState<string>('')
   const [filtroAdministracaoId, setFiltroAdministracaoId] = useState<string>('')
 
   // Estado do formulário ('criar' | 'editar' | null)
@@ -33,6 +36,7 @@ export function SetoresView() {
   const [carregandoDetalheModal, setCarregandoDetalheModal] = useState<boolean>(false)
 
   // Campos do formulário
+  const [regionalId, setRegionalId] = useState<string>('')
   const [administracaoId, setAdministracaoId] = useState<string>('')
   const [nome, setNome] = useState<string>('')
   const [codigo, setCodigo] = useState<string>('')
@@ -44,12 +48,14 @@ export function SetoresView() {
     setLoading(true)
     setErro(null)
     try {
-      const [setoresData, admsData] = await Promise.all([
+      const [setoresData, admsData, regionaisData] = await Promise.all([
         fetchWithAuth<Setor[]>('/setores'),
         fetchWithAuth<Administracao[]>('/administracoes'),
+        fetchWithAuth<Regional[]>('/regionais'),
       ])
       setSetores(setoresData)
       setAdministracoes(admsData)
+      setRegionais(regionaisData)
     } catch (err: any) {
       setErro(err.message || 'Erro ao carregar os dados de setores e administrações.')
     } finally {
@@ -64,7 +70,18 @@ export function SetoresView() {
   const abrirFormCriar = () => {
     setModoForm('criar')
     setSetorEditandoId(null)
-    setAdministracaoId(filtroAdministracaoId || (administracoes.length > 0 ? administracoes[0].id : ''))
+    const regionalInicial =
+      filtroRegionalId ||
+      administracoes.find(adm => adm.id === filtroAdministracaoId)?.regionalId ||
+      regionais[0]?.id ||
+      ''
+    setRegionalId(regionalInicial)
+    const administracoesDaRegional = administracoes.filter(adm => adm.regionalId === regionalInicial)
+    setAdministracaoId(
+      filtroAdministracaoId && administracoesDaRegional.some(adm => adm.id === filtroAdministracaoId)
+        ? filtroAdministracaoId
+        : administracoesDaRegional[0]?.id || ''
+    )
     setNome('')
     setCodigo('')
     setAtivo(true)
@@ -83,6 +100,8 @@ export function SetoresView() {
 
     try {
       const item = await fetchWithAuth<Setor>(`/setores/${id}`)
+      const adm = administracoes.find(a => a.id === item.administracaoId)
+      setRegionalId(adm?.regionalId || '')
       setAdministracaoId(item.administracaoId || '')
       setNome(item.nome || '')
       setCodigo(item.codigo || '')
@@ -186,11 +205,31 @@ export function SetoresView() {
     }
   }
 
-  // Filtragem no cliente por Administração
+  const administracoesDoFiltro = administracoes.filter(
+    adm => !filtroRegionalId || adm.regionalId === filtroRegionalId
+  )
+
+  const administracoesDoFormulario = administracoes.filter(
+    adm => !regionalId || adm.regionalId === regionalId
+  )
+
+  // Filtragem hierárquica: Regional → Administração
   const setoresFiltrados = setores.filter((setor) => {
-    if (!filtroAdministracaoId) return true
-    return setor.administracaoId === filtroAdministracaoId
+    const adm = administracoes.find(item => item.id === setor.administracaoId)
+    if (filtroRegionalId && adm?.regionalId !== filtroRegionalId) return false
+    if (filtroAdministracaoId && setor.administracaoId !== filtroAdministracaoId) return false
+    return true
   })
+
+  const trocarFiltroRegional = (novoRegionalId: string) => {
+    setFiltroRegionalId(novoRegionalId)
+    setFiltroAdministracaoId('')
+  }
+
+  const trocarRegionalFormulario = (novoRegionalId: string) => {
+    setRegionalId(novoRegionalId)
+    setAdministracaoId('')
+  }
 
   const getAdministracaoNome = (admId: string) => {
     const adm = administracoes.find((a) => a.id === admId)
@@ -229,25 +268,48 @@ export function SetoresView() {
       )}
 
       {/* Bar de Filtros (Cliente) */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center space-x-2">
-          <label htmlFor="select-filtro-adm" className="text-xs font-semibold text-slate-700">
-            Filtrar por Administração:
-          </label>
-          <select
-            id="select-filtro-adm"
-            value={filtroAdministracaoId}
-            onChange={(e) => setFiltroAdministracaoId(e.target.value)}
-            className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-200"
-          >
-            <option value="">Todas as Administrações</option>
-            {administracoes.map((adm) => (
-              <option key={adm.id} value={adm.id}>
-                {adm.nome} {adm.codigo ? `(${adm.codigo})` : ''}
-              </option>
-            ))}
-          </select>
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="select-filtro-regional" className="block text-xs font-semibold text-slate-700 mb-1">
+              Regional
+            </label>
+            <select
+              id="select-filtro-regional"
+              value={filtroRegionalId}
+              onChange={(e) => trocarFiltroRegional(e.target.value)}
+              className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-200"
+            >
+              <option value="">Todas as Regionais</option>
+              {regionais.map((regional) => (
+                <option key={regional.id} value={regional.id}>
+                  {regional.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="select-filtro-adm" className="block text-xs font-semibold text-slate-700 mb-1">
+              Administração
+            </label>
+            <select
+              id="select-filtro-adm"
+              value={filtroAdministracaoId}
+              onChange={(e) => setFiltroAdministracaoId(e.target.value)}
+              className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-200"
+              disabled={!filtroRegionalId}
+            >
+              <option value="">Todas as Administrações</option>
+              {administracoesDoFiltro.map((adm) => (
+                <option key={adm.id} value={adm.id}>
+                  {adm.nome} {adm.codigo ? `(${adm.codigo})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
+
         <div className="text-xs text-slate-500 font-medium">
           Exibindo {setoresFiltrados.length} de {setores.length} setores
         </div>
@@ -272,29 +334,49 @@ export function SetoresView() {
             <div className="py-6 text-center text-slate-500 text-sm">Carregando dados do setor...</div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="input-administracao">
-                  Administração <span className="text-red-500">*</span>
-                </label>
-                <select
-                  id="input-administracao"
-                  value={administracaoId}
-                  onChange={(e) => setAdministracaoId(e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
-                    errosForm.administracaoId ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-brand-200'
-                  }`}
-                  disabled={salvando}
-                >
-                  <option value="">Selecione uma Administração...</option>
-                  {administracoes.map((adm) => (
-                    <option key={adm.id} value={adm.id}>
-                      {adm.nome} {adm.codigo ? `(${adm.codigo})` : ''}
-                    </option>
-                  ))}
-                </select>
-                {errosForm.administracaoId && (
-                  <p className="text-xs text-red-600 mt-1">{errosForm.administracaoId}</p>
-                )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="input-regional">
+                    Regional <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="input-regional"
+                    value={regionalId}
+                    onChange={(e) => trocarRegionalFormulario(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
+                    disabled={salvando}
+                  >
+                    <option value="">Selecione uma Regional...</option>
+                    {regionais.map((regional) => (
+                      <option key={regional.id} value={regional.id}>{regional.nome}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="input-administracao">
+                    Administração <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="input-administracao"
+                    value={administracaoId}
+                    onChange={(e) => setAdministracaoId(e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                      errosForm.administracaoId ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-brand-200'
+                    }`}
+                    disabled={salvando || !regionalId}
+                  >
+                    <option value="">Selecione uma Administração...</option>
+                    {administracoesDoFormulario.map((adm) => (
+                      <option key={adm.id} value={adm.id}>
+                        {adm.nome} {adm.codigo ? `(${adm.codigo})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {errosForm.administracaoId && (
+                    <p className="text-xs text-red-600 mt-1">{errosForm.administracaoId}</p>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -383,7 +465,9 @@ export function SetoresView() {
           <div className="p-8 text-center text-slate-400 text-sm">
             {filtroAdministracaoId
               ? 'Nenhum setor encontrado para a administração selecionada.'
-              : 'Nenhum setor cadastrado até o momento.'}
+              : filtroRegionalId
+                ? 'Nenhum setor encontrado para a regional selecionada.'
+                : 'Nenhum setor cadastrado até o momento.'}
           </div>
         ) : (
           <div className="overflow-x-auto">
