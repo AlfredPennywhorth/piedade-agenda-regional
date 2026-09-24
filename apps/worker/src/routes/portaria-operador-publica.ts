@@ -133,16 +133,20 @@ async function registrarCheckin(c: any, forma: 'QR' | 'MANUAL') {
     return c.json({ error: 'Requisição inválida', code: 'VALIDATION_ERROR' }, 400)
   }
 
-  const parsed = forma === 'QR'
-    ? CheckinQrSchema.safeParse(body)
-    : CheckinManualSchema.safeParse(body)
-  if (!parsed.success) {
-    return c.json({ error: 'Payload inválido', details: parsed.error.issues }, 400)
+  let destinatarioId: string
+  if (forma === 'QR') {
+    const parsed = CheckinQrSchema.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: 'Payload inválido', details: parsed.error.issues }, 400)
+    }
+    destinatarioId = parsed.data.qrToken.trim()
+  } else {
+    const parsed = CheckinManualSchema.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: 'Payload inválido', details: parsed.error.issues }, 400)
+    }
+    destinatarioId = parsed.data.convocacaoDestinatarioId
   }
-
-  const destinatarioId = forma === 'QR'
-    ? parsed.data.qrToken.trim()
-    : parsed.data.convocacaoDestinatarioId
 
   const dest = await ctx.db
     .select({
