@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
-import { eventos } from '../db/schema'
+import { eventos, funcoes, vinculosFuncionais } from '../db/schema'
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
-import { eGestorRelatoriosAutorizadoParaEvento, obterEscoposTerritoriaisVisiveis, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
+import { obterEscoposTerritoriaisVisiveis, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
 
 export const eventosRouter = new Hono<any>()
 
@@ -18,17 +18,93 @@ function eventoVisivelNoEscopo(evento: any, escopos: any): boolean {
   return false
 }
 
-async function eventoVisivelParaLeitura(
-  db: any,
-  membroId: string,
-  evento: any,
-  escopos: any
-): Promise<boolean> {
-  if (eventoVisivelNoEscopo(evento, escopos)) return true
+type EscoposRelatorios = {
+  regionaisIds: Set<string>
+  administracoesIds: Set<string>
+  setoresIds: Set<string>
+  casasIds: Set<string>
+  gruposTrabalhoIds: Set<string>
+}
 
-  // Compatibilidade com relatórios: organizador ou gestor de relatórios autorizado
-  // precisa continuar vendo o evento nos seletores de relatório.
-  return eGestorRelatoriosAutorizadoParaEvento(db, membroId, evento)
+async function carregarEscoposRelatorios(
+  db: any,
+  contexto: any,
+  membroId: string
+): Promise<EscoposRelatorios> {
+  const resultado: EscoposRelatorios = {
+    regionaisIds: new Set<string>(),
+    administracoesIds: new Set<string>(),
+    setoresIds: new Set<string>(),
+    casasIds: new Set<string>(),
+    gruposTrabalhoIds: new Set<string>(),
+  }
+
+  for (const acesso of contexto.acessosAtivos) {
+    if (
+      acesso.perfilCodigo !== 'GESTOR_RELATORIOS' ||
+      acesso.escopoTipo === 'GLOBAL' ||
+      !acesso.escopoId
+    ) continue
+
+    if (acesso.escopoTipo === 'REGIONAL') resultado.regionaisIds.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'ADMINISTRACAO') resultado.administracoesIds.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'SETOR') resultado.setoresIds.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'CASA') resultado.casasIds.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'GRUPO_TRABALHO') resultado.gruposTrabalhoIds.add(acesso.escopoId)
+  }
+
+  const vinculos = await db
+    .select({ vinculo: vinculosFuncionais })
+    .from(vinculosFuncionais)
+    .innerJoin(funcoes, eq(vinculosFuncionais.funcaoId, funcoes.id))
+    .where(
+      and(
+        eq(vinculosFuncionais.membroId, membroId),
+        eq(vinculosFuncionais.ativo, true),
+        eq(funcoes.ativo, true),
+        eq(funcoes.codigo, 'GESTOR_RELATORIOS')
+      )
+    )
+    .all()
+
+  for (const { vinculo } of vinculos) {
+    if (vinculo.regionalId) resultado.regionaisIds.add(vinculo.regionalId)
+    if (vinculo.administracaoId) resultado.administracoesIds.add(vinculo.administracaoId)
+    if (vinculo.setorId) resultado.setoresIds.add(vinculo.setorId)
+    if (vinculo.casaId) resultado.casasIds.add(vinculo.casaId)
+    if (vinculo.grupoTrabalhoId) resultado.gruposTrabalhoIds.add(vinculo.grupoTrabalhoId)
+  }
+
+  return resultado
+}
+
+function eventoAutorizadoParaRelatorios(
+  evento: any,
+  membroId: string,
+  escoposRelatorios: EscoposRelatorios
+): boolean {
+  if (evento.organizadorMembroId === membroId) return true
+  if (evento.regionalId && escoposRelatorios.regionaisIds.has(evento.regionalId)) return true
+  if (evento.administracaoId && escoposRelatorios.administracoesIds.has(evento.administracaoId)) return true
+  if (evento.setorId && escoposRelatorios.setoresIds.has(evento.setorId)) return true
+  if (evento.casaId && escoposRelatorios.casasIds.has(evento.casaId)) return true
+  if (
+    evento.grupoTrabalhoId &&
+    escoposRelatorios.gruposTrabalhoIds.has(evento.grupoTrabalhoId)
+  ) return true
+  return false
+}
+
+function eventoVisivelParaLeitura(
+  evento: any,
+  membroId: string,
+  escopos: any,
+  escoposRelatorios: EscoposRelatorios
+): boolean {
+  return (
+    eventoVisivelNoEscopo(evento, escopos) ||
+    eventoAutorizadoParaRelatorios(evento, membroId, escoposRelatorios)
+  )
 }
 
 eventosRouter.use('*', authMiddleware)
@@ -52,17 +128,18 @@ eventosRouter.get('/', async (c) => {
     ? await query.where(and(...conditions)).all()
     : await query.all()
 
-  const escopos = await obterEscoposTerritoriaisVisiveis(db, c.get('contextoPermissoes'))
+  const contexto = c.get('contextoPermissoes')
   const membroId = c.get('membroId')
-  const visiveis = []
+  const [escopos, escoposRelatorios] = await Promise.all([
+    obterEscoposTerritoriaisVisiveis(db, contexto),
+    carregarEscoposRelatorios(db, contexto, membroId),
+  ])
 
-  for (const evento of data) {
-    if (await eventoVisivelParaLeitura(db, membroId, evento, escopos)) {
-      visiveis.push(evento)
-    }
-  }
-
-  return c.json(visiveis)
+  return c.json(
+    data.filter((evento: any) =>
+      eventoVisivelParaLeitura(evento, membroId, escopos, escoposRelatorios)
+    )
+  )
 })
 
 eventosRouter.get('/:id', async (c) => {
@@ -72,8 +149,14 @@ eventosRouter.get('/:id', async (c) => {
   
   if (!data) return c.json({ error: 'Evento não encontrado' }, 404)
 
-  const escopos = await obterEscoposTerritoriaisVisiveis(db, c.get('contextoPermissoes'))
-  if (!(await eventoVisivelParaLeitura(db, c.get('membroId'), data, escopos))) {
+  const contexto = c.get('contextoPermissoes')
+  const membroId = c.get('membroId')
+  const [escopos, escoposRelatorios] = await Promise.all([
+    obterEscoposTerritoriaisVisiveis(db, contexto),
+    carregarEscoposRelatorios(db, contexto, membroId),
+  ])
+
+  if (!eventoVisivelParaLeitura(data, membroId, escopos, escoposRelatorios)) {
     return c.json({ error: 'Acesso não autorizado para este evento', code: 'FORBIDDEN' }, 403)
   }
 
