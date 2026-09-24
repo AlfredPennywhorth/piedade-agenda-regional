@@ -113,6 +113,22 @@ describe('PR-SEC-01 — leitura de Eventos e Convocações por escopo', () => {
     expect(fora.status).toBe(403)
   })
 
+  it('organizador continua vendo evento fora do escopo territorial para uso em relatórios', async () => {
+    const token = await criarSessao()
+
+    sqlite.prepare(
+      'UPDATE eventos SET organizador_membro_id = ? WHERE id = ?'
+    ).run(id.membroA, id.eventoB)
+
+    const lista = await req(token, '/api/v1/eventos')
+    expect(lista.status).toBe(200)
+    const eventos = await lista.json() as Array<{ id: string }>
+    expect(eventos.map(item => item.id)).toContain(id.eventoB)
+
+    const detalhe = await req(token, `/api/v1/eventos/${id.eventoB}`)
+    expect(detalhe.status).toBe(200)
+  })
+
   it('destinatário pode ler a própria convocação mesmo quando o evento está fora do escopo territorial', async () => {
     const token = await criarSessao()
 
