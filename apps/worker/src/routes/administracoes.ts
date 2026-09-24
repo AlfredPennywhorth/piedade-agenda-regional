@@ -3,11 +3,24 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { administracoes, setores, participacoesGruposTrabalho, gruposTrabalho } from '../db/schema'
 import { CreateAdministracaoSchema, UpdateAdministracaoSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo } from '../security/permissoes'
+import { eMasterSistema, obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo, regionaisAdministradas } from '../security/permissoes'
 
 export const administracoesRouter = new Hono<any>()
 
 administracoesRouter.use('*', authMiddleware)
+administracoesRouter.use('*', async (c, next) => {
+  if (c.req.method === 'GET' || c.req.method === 'HEAD' || c.req.method === 'OPTIONS') {
+    await next()
+    return
+  }
+
+  const contexto = c.get('contextoPermissoes')
+  if (!contexto || (!eMasterSistema(contexto) && regionaisAdministradas(contexto).size === 0)) {
+    return c.json({ error: 'Acesso não autorizado para administrar estrutura', code: 'FORBIDDEN' }, 403)
+  }
+
+  await next()
+})
 
 administracoesRouter.get('/', async (c) => {
   const db = c.get('db')
