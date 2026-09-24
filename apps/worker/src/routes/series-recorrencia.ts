@@ -1,16 +1,123 @@
 import { Hono } from 'hono'
-import { eq, and, gte, sql } from 'drizzle-orm'
-import { eventos, seriesRecorrencia } from '../db/schema'
+import { eq, and, gte, sql, inArray } from 'drizzle-orm'
+import { administracoes, casas, eventos, gruposTrabalho, membros, seriesRecorrencia, setores } from '../db/schema'
 import { SerieCreate, SerieUpdatePayload, generateOccurrences, getLocalDateFromUtc } from '@piedade/shared'
 import { EventoCreate } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
 import { authMiddleware } from '../middleware/auth'
-import { podeGerenciarAgendaNoEscopo } from '../security/permissoes'
+import { eMasterSistema, podeGerenciarAgendaNoEscopo, regionaisAdministradas } from '../security/permissoes'
 import { extrairEscopoDoEvento } from '../services/auditoria'
 
 export const seriesRecorrenciaRouter = new Hono<any>()
 
 seriesRecorrenciaRouter.use('*', authMiddleware)
+
+
+interface EscoposAgendaAutorizados {
+  tudo: boolean
+  regionaisIds: Set<string>
+  administracoesIds: Set<string>
+  setoresIds: Set<string>
+  casasIds: Set<string>
+  gruposTrabalhoIds: Set<string>
+}
+
+async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAutorizados> {
+  const db = c.get('db')
+  const contexto = c.get('contextoPermissoes')
+  const membroId = c.get('membroId')
+
+  const resultado: EscoposAgendaAutorizados = {
+    tudo: eMasterSistema(contexto),
+    regionaisIds: new Set<string>(),
+    administracoesIds: new Set<string>(),
+    setoresIds: new Set<string>(),
+    casasIds: new Set<string>(),
+    gruposTrabalhoIds: new Set<string>(),
+  }
+  if (resultado.tudo) return resultado
+
+  const regionaisAgenda = new Set<string>(regionaisAdministradas(contexto))
+  const administracoesAgenda = new Set<string>()
+  const setoresAgenda = new Set<string>()
+  const casasAgenda = new Set<string>()
+  const gtsAgenda = new Set<string>()
+
+  for (const acesso of contexto.acessosAtivos) {
+    if (
+      acesso.perfilCodigo !== 'GESTOR_AGENDA' ||
+      !acesso.escopoId ||
+      acesso.escopoTipo === 'GLOBAL'
+    ) continue
+
+    if (acesso.escopoTipo === 'REGIONAL') regionaisAgenda.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'ADMINISTRACAO') administracoesAgenda.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'SETOR') setoresAgenda.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'CASA') casasAgenda.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'GRUPO_TRABALHO') gtsAgenda.add(acesso.escopoId)
+  }
+
+  const membro = await db
+    .select({ casaId: membros.casaId })
+    .from(membros)
+    .where(eq(membros.id, membroId))
+    .get()
+  if (membro?.casaId) casasAgenda.add(membro.casaId)
+
+  const regionaisIds = Array.from(regionaisAgenda)
+  if (regionaisIds.length > 0) {
+    const adms = await db
+      .select({ id: administracoes.id })
+      .from(administracoes)
+      .where(inArray(administracoes.regionalId, regionaisIds))
+      .all()
+    adms.forEach((item: any) => administracoesAgenda.add(item.id))
+
+    const gts = await db
+      .select({ id: gruposTrabalho.id })
+      .from(gruposTrabalho)
+      .where(inArray(gruposTrabalho.regionalId, regionaisIds))
+      .all()
+    gts.forEach((item: any) => gtsAgenda.add(item.id))
+  }
+
+  const administracoesIds = Array.from(administracoesAgenda)
+  if (administracoesIds.length > 0) {
+    const itensSetor = await db
+      .select({ id: setores.id })
+      .from(setores)
+      .where(inArray(setores.administracaoId, administracoesIds))
+      .all()
+    itensSetor.forEach((item: any) => setoresAgenda.add(item.id))
+  }
+
+  const setoresIds = Array.from(setoresAgenda)
+  if (setoresIds.length > 0) {
+    const itensCasa = await db
+      .select({ id: casas.id })
+      .from(casas)
+      .where(inArray(casas.setorId, setoresIds))
+      .all()
+    itensCasa.forEach((item: any) => casasAgenda.add(item.id))
+  }
+
+  resultado.regionaisIds = regionaisAgenda
+  resultado.administracoesIds = administracoesAgenda
+  resultado.setoresIds = setoresAgenda
+  resultado.casasIds = casasAgenda
+  resultado.gruposTrabalhoIds = gtsAgenda
+  return resultado
+}
+
+function serieAutorizadaNoEscopo(serie: any, escopos: EscoposAgendaAutorizados): boolean {
+  if (escopos.tudo) return true
+  if (serie.regionalId && escopos.regionaisIds.has(serie.regionalId)) return true
+  if (serie.administracaoId && escopos.administracoesIds.has(serie.administracaoId)) return true
+  if (serie.setorId && escopos.setoresIds.has(serie.setorId)) return true
+  if (serie.casaId && escopos.casasIds.has(serie.casaId)) return true
+  if (serie.grupoTrabalhoId && escopos.gruposTrabalhoIds.has(serie.grupoTrabalhoId)) return true
+  return false
+}
 
 async function podeGerenciarEntidade(c: any, entidade: any): Promise<boolean> {
   const db = c.get('db')
@@ -41,12 +148,8 @@ seriesRecorrenciaRouter.get('/', async (c) => {
     ? await query.where(and(...conditions)).all()
     : await query.all()
 
-  const autorizadas = []
-  for (const serie of data) {
-    if (await podeGerenciarEntidade(c, serie)) autorizadas.push(serie)
-  }
-
-  return c.json(autorizadas)
+  const escoposAutorizados = await carregarEscoposAgendaAutorizados(c)
+  return c.json(data.filter((serie: any) => serieAutorizadaNoEscopo(serie, escoposAutorizados)))
 })
 
 seriesRecorrenciaRouter.get('/:id', async (c) => {
