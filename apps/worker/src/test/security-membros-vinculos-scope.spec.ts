@@ -25,6 +25,7 @@ describe('PR-SEC-01 — leitura de Membros e Vínculos por escopo', () => {
     funcao: 'funcao-1',
     vinculoA: 'vinculo-a',
     vinculoB: 'vinculo-b',
+    vinculoCruzado: 'vinculo-cruzado',
   }
 
   async function criarSessao(
@@ -103,7 +104,8 @@ describe('PR-SEC-01 — leitura de Membros e Vínculos por escopo', () => {
         (id, membro_id, funcao_id, regional_id, ativo)
       VALUES
         ('${ids.vinculoA}', '${ids.comumA}', '${ids.funcao}', '${ids.regionalA}', 1),
-        ('${ids.vinculoB}', '${ids.comumB}', '${ids.funcao}', '${ids.regionalB}', 1);
+        ('${ids.vinculoB}', '${ids.comumB}', '${ids.funcao}', '${ids.regionalB}', 1),
+        ('${ids.vinculoCruzado}', '${ids.comumA}', '${ids.funcao}', '${ids.regionalB}', 1);
     `)
   })
 
@@ -165,7 +167,7 @@ describe('PR-SEC-01 — leitura de Membros e Vínculos por escopo', () => {
     const lista = await req(token, '/api/v1/vinculos-funcionais')
     expect(lista.status).toBe(200)
     const vinculos = await lista.json() as Array<{ id: string }>
-    expect(vinculos.map(item => item.id)).toEqual([ids.vinculoA])
+    expect(new Set(vinculos.map(item => item.id))).toEqual(new Set([ids.vinculoA, ids.vinculoCruzado]))
 
     const outro = await req(token, `/api/v1/vinculos-funcionais/${ids.vinculoB}`)
     expect(outro.status).toBe(403)
@@ -187,5 +189,45 @@ describe('PR-SEC-01 — leitura de Membros e Vínculos por escopo', () => {
 
     const fora = await req(token, `/api/v1/vinculos-funcionais/${ids.vinculoB}`)
     expect(fora.status).toBe(403)
+  })
+
+  it('endpoint aninhado de membro não expõe vínculo de outra Regional ao Administrador', async () => {
+    const token = await criarSessao(
+      ids.adminA,
+      'token-vinculo-aninhado-admin',
+      'ADMINISTRADOR_SISTEMA',
+      'REGIONAL',
+      ids.regionalA
+    )
+
+    const res = await req(token, `/api/v1/membros/${ids.comumA}/vinculos`)
+    expect(res.status).toBe(200)
+
+    const vinculos = await res.json() as Array<{ id: string }>
+    expect(vinculos.map(item => item.id)).toEqual([ids.vinculoA])
+    expect(vinculos.some(item => item.id === ids.vinculoCruzado)).toBe(false)
+  })
+
+  it('lista de membros funciona em lotes acima de 90 IDs visíveis', async () => {
+    const token = await criarSessao(
+      ids.adminA,
+      'token-admin-lotes',
+      'ADMINISTRADOR_SISTEMA',
+      'REGIONAL',
+      ids.regionalA
+    )
+
+    const insert = sqlite.prepare(
+      'INSERT INTO membros (id, nome, casa_id, ativo) VALUES (?, ?, ?, 1)'
+    )
+    for (let i = 0; i < 120; i++) {
+      insert.run(`m-lote-${i}`, `Membro Lote ${i}`, ids.casaA)
+    }
+
+    const lista = await req(token, '/api/v1/membros')
+    expect(lista.status).toBe(200)
+    const pessoas = await lista.json() as Array<{ id: string }>
+    expect(pessoas.length).toBeGreaterThanOrEqual(122)
+    expect(pessoas.some(item => item.id === 'm-lote-119')).toBe(true)
   })
 })
