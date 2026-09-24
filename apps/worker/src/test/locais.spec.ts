@@ -41,6 +41,12 @@ describe('Locais API (S04)', () => {
     expect(json.id).toBeDefined()
     expect(json.nome).toBe('Local Teste')
     expect(json.ativo).toBe(true)
+
+    const audit = sqlite.prepare(
+      "SELECT acao, recurso_tipo, recurso_id FROM auditoria_logs WHERE recurso_id = ?"
+    ).get(json.id) as any
+    expect(audit.acao).toBe('LOCAL_CRIADO')
+    expect(audit.recurso_tipo).toBe('LOCAL')
   })
 
   it('2. obter local', async () => {
@@ -77,6 +83,11 @@ describe('Locais API (S04)', () => {
     const json = await res.json()
     expect(json.nome).toBe('Local Atualizado')
     expect(json.numero).toBe('s/n')
+
+    const audit = sqlite.prepare(
+      "SELECT acao FROM auditoria_logs WHERE recurso_id = ? ORDER BY criado_em DESC LIMIT 1"
+    ).get(id) as any
+    expect(audit.acao).toBe('LOCAL_ATUALIZADO')
   })
 
   it('4. inativar local', async () => {
