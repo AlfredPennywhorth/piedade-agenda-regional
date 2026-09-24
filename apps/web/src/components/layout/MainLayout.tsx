@@ -8,6 +8,7 @@ export interface CapacidadesFrontend {
   podeAdministrarRegionais?: boolean
   podeAdministrarEstrutura?: boolean
   podeAdministrarPessoas?: boolean
+  podeAdministrarFuncoes?: boolean
   podeGerirAgenda?: boolean
 }
 
@@ -27,6 +28,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
   const mostrarAdministracaoAcessos = capacidades?.podeAdministrarAcessos === true
   const mostrarEstrutura = capacidades?.podeAdministrarEstrutura === true
   const mostrarPessoas = capacidades?.podeAdministrarPessoas === true
+  const mostrarFuncoes = capacidades?.podeAdministrarFuncoes === true
   const mostrarGestaoAgenda = capacidades?.podeGerirAgenda === true
   const [mostrarMais, setMostrarMais] = useState(false)
   const botaoMaisRef = useRef<HTMLButtonElement>(null)
@@ -146,12 +148,12 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
                 </div>
               )}
 
-              {(mostrarPessoas || mostrarAdministracaoAcessos) && (
+              {(mostrarPessoas || mostrarFuncoes || mostrarAdministracaoAcessos) && (
                 <div>
                   <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Pessoas e acessos</h3>
                   <div className="grid grid-cols-2 gap-2">
                     {mostrarPessoas && <button onClick={() => navegar('membros')} className="rounded-lg bg-slate-50 p-3 text-left">Membros</button>}
-                    {mostrarPessoas && <button onClick={() => navegar('funcoes')} className="rounded-lg bg-slate-50 p-3 text-left">Funções</button>}
+                    {mostrarFuncoes && <button onClick={() => navegar('funcoes')} className="rounded-lg bg-slate-50 p-3 text-left">Funções</button>}
                     {mostrarPessoas && <button onClick={() => navegar('vinculos-funcionais')} className="rounded-lg bg-slate-50 p-3 text-left">Vínculos</button>}
                     {mostrarAdministracaoAcessos && <button onClick={() => navegar('acessos')} className="rounded-lg bg-slate-50 p-3 text-left">Acessos</button>}
                   </div>

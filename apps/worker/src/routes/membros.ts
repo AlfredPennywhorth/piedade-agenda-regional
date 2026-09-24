@@ -5,6 +5,7 @@ import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, regionaisAdministradas } from '../security/permissoes'
 import { listarVinculosVisiveis } from './vinculos_funcionais'
+import { executarOperacaoComAudit } from '../services/auditoria'
 
 export const membrosRouter = new Hono<any>()
 
@@ -221,7 +222,20 @@ membrosRouter.post('/', async (c) => {
     }
 
     const id = crypto.randomUUID()
-    const result = await db.insert(membros).values({ id, ...parsed }).returning().get()
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [qdb.insert(membros).values({ id, ...parsed })],
+      {
+        acao: 'MEMBRO_CRIADO',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'MEMBRO',
+        recursoId: id,
+        escopoTipo: 'CASA',
+        escopoId: parsed.casaId,
+        contexto: { campos: ['nome', 'dataOrdenacao', 'codigoCarteirinha', 'celular', 'casaId', 'ativo'] },
+      }
+    )
+    const result = await db.select().from(membros).where(eq(membros.id, id)).get()
     return c.json(somenteCadastroInstitucional(result), 201)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
@@ -287,11 +301,25 @@ membrosRouter.patch('/:id', async (c) => {
       }
     }
 
-    const updated = await db.update(membros)
-      .set({ ...parsed, updatedAt: new Date().toISOString() })
-      .where(eq(membros.id, id))
-      .returning().get()
-      
+    const casaFinalId = parsed.casaId ?? existing.casaId
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [
+        qdb.update(membros)
+          .set({ ...parsed, updatedAt: new Date().toISOString() })
+          .where(eq(membros.id, id))
+      ],
+      {
+        acao: 'MEMBRO_ATUALIZADO',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'MEMBRO',
+        recursoId: id,
+        escopoTipo: 'CASA',
+        escopoId: casaFinalId,
+        contexto: { camposAlterados: Object.keys(parsed) },
+      }
+    )
+    const updated = await db.select().from(membros).where(eq(membros.id, id)).get()
     return c.json(somenteCadastroInstitucional(updated))
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {

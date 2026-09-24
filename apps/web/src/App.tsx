@@ -76,9 +76,10 @@ function App() {
     if (['regionais', 'administracoes', 'setores', 'casas', 'grupos-trabalho'].includes(tab)) {
       return capacidades.podeAdministrarEstrutura === true
     }
-    if (['membros', 'funcoes', 'vinculos-funcionais'].includes(tab)) {
+    if (['membros', 'vinculos-funcionais'].includes(tab)) {
       return capacidades.podeAdministrarPessoas === true
     }
+    if (tab === 'funcoes') return capacidades.podeAdministrarFuncoes === true
     if (['eventos', 'series', 'convocacoes', 'locais'].includes(tab)) {
       return capacidades.podeGerirAgenda === true
     }
@@ -166,7 +167,7 @@ function App() {
       {currentTab === 'casas' && capacidades.podeAdministrarEstrutura === true && <CasasView />}
       {currentTab === 'grupos-trabalho' && capacidades.podeAdministrarEstrutura === true && <GruposTrabalhoView />}
       {currentTab === 'membros' && capacidades.podeAdministrarPessoas === true && <MembrosView />}
-      {currentTab === 'funcoes' && capacidades.podeAdministrarPessoas === true && <FuncoesView />}
+      {currentTab === 'funcoes' && capacidades.podeAdministrarFuncoes === true && <FuncoesView />}
       {currentTab === 'vinculos-funcionais' && capacidades.podeAdministrarPessoas === true && <VinculosFuncionaisView />}
       {currentTab === 'locais' && capacidades.podeGerirAgenda === true && <LocaisView />}
       {currentTab === 'acessos' && capacidades.podeAdministrarAcessos === true && <ContasAcessoView />}

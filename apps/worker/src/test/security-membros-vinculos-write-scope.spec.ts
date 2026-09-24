@@ -110,6 +110,15 @@ describe('PR-SEC-01 — escrita de Membros e Vínculos por Regional', () => {
       }),
     })
     expect(ok.status).toBe(201)
+    const membroCriado = await ok.json() as any
+    const auditMembro = sqlite.prepare(
+      "SELECT acao, escopo_tipo, escopo_id FROM auditoria_logs WHERE recurso_id = ?"
+    ).get(membroCriado.id) as any
+    expect(auditMembro).toMatchObject({
+      acao: 'MEMBRO_CRIADO',
+      escopo_tipo: 'CASA',
+      escopo_id: id.casaA,
+    })
 
     const fora = await req(token, '/api/v1/membros', {
       method: 'POST',
@@ -147,6 +156,10 @@ describe('PR-SEC-01 — escrita de Membros e Vínculos por Regional', () => {
       body: JSON.stringify({ casaId: id.casaB }),
     })
     expect(res.status).toBe(403)
+    const logsIndevidos = sqlite.prepare(
+      "SELECT COUNT(*) AS total FROM auditoria_logs WHERE recurso_id = ?"
+    ).get(id.comumA) as any
+    expect(logsIndevidos.total).toBe(0)
   })
 
   it('Administrador Regional não altera membro que possua Master ativo', async () => {
@@ -188,6 +201,15 @@ describe('PR-SEC-01 — escrita de Membros e Vínculos por Regional', () => {
       }),
     })
     expect(ok.status).toBe(201)
+    const vinculoCriado = await ok.json() as any
+    const auditVinculo = sqlite.prepare(
+      "SELECT acao, escopo_tipo, escopo_id FROM auditoria_logs WHERE recurso_id = ?"
+    ).get(vinculoCriado.id) as any
+    expect(auditVinculo).toMatchObject({
+      acao: 'VINCULO_FUNCIONAL_CRIADO',
+      escopo_tipo: 'REGIONAL',
+      escopo_id: id.regionalA,
+    })
 
     const membroFora = await req(token, '/api/v1/vinculos-funcionais', {
       method: 'POST',
