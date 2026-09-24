@@ -12,7 +12,7 @@ import {
 } from '../db/schema'
 import { CreateVinculoFuncionalSchema, UpdateVinculoFuncionalSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { eMasterSistema, obterEscoposTerritoriaisVisiveis, obterRegionalDoEscopo, regionaisAdministradas } from '../security/permissoes'
+import { eMasterSistema, obterRegionalDoEscopo, regionaisAdministradas } from '../security/permissoes'
 
 export const vinculosFuncionaisRouter = new Hono<any>()
 
@@ -107,6 +107,56 @@ async function podeAdministrarVinculo(db: any, contexto: any, vinculo: any): Pro
   return !!regionalEscopo && administradas.has(regionalEscopo) && regionalEscopo === regionalMembro
 }
 
+async function idsEscoposDasRegionaisAdministradas(db: any, contexto: any) {
+  const regionaisIds = Array.from(regionaisAdministradas(contexto))
+  const administracoesIds: string[] = []
+  const setoresIds: string[] = []
+  const casasIds: string[] = []
+  const gruposTrabalhoIds: string[] = []
+  const LIMITE_IDS_D1 = 90
+
+  for (let i = 0; i < regionaisIds.length; i += LIMITE_IDS_D1) {
+    const lote = regionaisIds.slice(i, i + LIMITE_IDS_D1)
+    if (lote.length === 0) continue
+
+    const adms = await db
+      .select({ id: administracoes.id })
+      .from(administracoes)
+      .where(inArray(administracoes.regionalId, lote))
+      .all()
+    administracoesIds.push(...adms.map((item: any) => item.id))
+
+    const gts = await db
+      .select({ id: gruposTrabalho.id })
+      .from(gruposTrabalho)
+      .where(inArray(gruposTrabalho.regionalId, lote))
+      .all()
+    gruposTrabalhoIds.push(...gts.map((item: any) => item.id))
+  }
+
+  for (let i = 0; i < administracoesIds.length; i += LIMITE_IDS_D1) {
+    const lote = administracoesIds.slice(i, i + LIMITE_IDS_D1)
+    const itens = await db
+      .select({ id: setores.id })
+      .from(setores)
+      .where(inArray(setores.administracaoId, lote))
+      .all()
+    setoresIds.push(...itens.map((item: any) => item.id))
+  }
+
+  for (let i = 0; i < setoresIds.length; i += LIMITE_IDS_D1) {
+    const lote = setoresIds.slice(i, i + LIMITE_IDS_D1)
+    const itens = await db
+      .select({ id: casas.id })
+      .from(casas)
+      .where(inArray(casas.setorId, lote))
+      .all()
+    casasIds.push(...itens.map((item: any) => item.id))
+  }
+
+  return { regionaisIds, administracoesIds, setoresIds, casasIds, gruposTrabalhoIds }
+}
+
 export async function listarVinculosVisiveis(db: any, contexto: any, membroId?: string) {
   if (eMasterSistema(contexto)) {
     const query = selecionarVinculosDetalhados(db)
@@ -116,12 +166,11 @@ export async function listarVinculosVisiveis(db: any, contexto: any, membroId?: 
   }
 
   const porId = new Map<string, any>()
-
   const incluir = (itens: any[]) => {
     for (const item of itens) porId.set(item.id, item)
   }
 
-  // O titular sempre pode ler os próprios vínculos.
+  // Usuário comum: somente os próprios vínculos.
   if (!membroId || membroId === contexto.membroId) {
     incluir(
       await selecionarVinculosDetalhados(db)
@@ -130,7 +179,12 @@ export async function listarVinculosVisiveis(db: any, contexto: any, membroId?: 
     )
   }
 
-  const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+  const administradas = regionaisAdministradas(contexto)
+  if (administradas.size === 0) {
+    return Array.from(porId.values())
+  }
+
+  const escopos = await idsEscoposDasRegionaisAdministradas(db, contexto)
   const LIMITE_IDS_D1 = 90
 
   const consultarEmLotes = async (coluna: any, ids: string[]) => {
@@ -138,22 +192,23 @@ export async function listarVinculosVisiveis(db: any, contexto: any, membroId?: 
       const lote = ids.slice(i, i + LIMITE_IDS_D1)
       if (lote.length === 0) continue
 
-      let query = selecionarVinculosDetalhados(db).where(inArray(coluna, lote))
-      const itens = await query.all()
+      const itens = await selecionarVinculosDetalhados(db)
+        .where(inArray(coluna, lote))
+        .all()
 
-      if (membroId) {
-        incluir(itens.filter((item: any) => item.membroId === membroId))
-      } else {
-        incluir(itens)
-      }
+      incluir(
+        membroId
+          ? itens.filter((item: any) => item.membroId === membroId)
+          : itens
+      )
     }
   }
 
-  await consultarEmLotes(vinculosFuncionais.regionalId, Array.from(visiveis.regionaisIds))
-  await consultarEmLotes(vinculosFuncionais.administracaoId, Array.from(visiveis.administracoesIds))
-  await consultarEmLotes(vinculosFuncionais.setorId, Array.from(visiveis.setoresIds))
-  await consultarEmLotes(vinculosFuncionais.casaId, Array.from(visiveis.casasIds))
-  await consultarEmLotes(vinculosFuncionais.grupoTrabalhoId, Array.from(visiveis.gruposTrabalhoIds))
+  await consultarEmLotes(vinculosFuncionais.regionalId, escopos.regionaisIds)
+  await consultarEmLotes(vinculosFuncionais.administracaoId, escopos.administracoesIds)
+  await consultarEmLotes(vinculosFuncionais.setorId, escopos.setoresIds)
+  await consultarEmLotes(vinculosFuncionais.casaId, escopos.casasIds)
+  await consultarEmLotes(vinculosFuncionais.grupoTrabalhoId, escopos.gruposTrabalhoIds)
 
   return Array.from(porId.values())
 }
