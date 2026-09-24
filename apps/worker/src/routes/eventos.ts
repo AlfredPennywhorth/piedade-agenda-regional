@@ -4,9 +4,19 @@ import { eventos } from '../db/schema'
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
-import { podeGerenciarAgendaNoEscopo } from '../security/permissoes'
+import { obterEscoposTerritoriaisVisiveis, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
 
 export const eventosRouter = new Hono<any>()
+
+function eventoVisivelNoEscopo(evento: any, escopos: any): boolean {
+  if (escopos.tudo) return true
+  if (evento.regionalId && escopos.regionaisIds.has(evento.regionalId)) return true
+  if (evento.administracaoId && escopos.administracoesIds.has(evento.administracaoId)) return true
+  if (evento.setorId && escopos.setoresIds.has(evento.setorId)) return true
+  if (evento.casaId && escopos.casasIds.has(evento.casaId)) return true
+  if (evento.grupoTrabalhoId && escopos.gruposTrabalhoIds.has(evento.grupoTrabalhoId)) return true
+  return false
+}
 
 eventosRouter.use('*', authMiddleware)
 
@@ -29,7 +39,8 @@ eventosRouter.get('/', async (c) => {
     ? await query.where(and(...conditions)).all()
     : await query.all()
 
-  return c.json(data)
+  const escopos = await obterEscoposTerritoriaisVisiveis(db, c.get('contextoPermissoes'))
+  return c.json(data.filter((evento: any) => eventoVisivelNoEscopo(evento, escopos)))
 })
 
 eventosRouter.get('/:id', async (c) => {
@@ -38,6 +49,12 @@ eventosRouter.get('/:id', async (c) => {
   const data = await db.select().from(eventos).where(eq(eventos.id, id)).get()
   
   if (!data) return c.json({ error: 'Evento não encontrado' }, 404)
+
+  const escopos = await obterEscoposTerritoriaisVisiveis(db, c.get('contextoPermissoes'))
+  if (!eventoVisivelNoEscopo(data, escopos)) {
+    return c.json({ error: 'Acesso não autorizado para este evento', code: 'FORBIDDEN' }, 403)
+  }
+
   return c.json(data)
 })
 
