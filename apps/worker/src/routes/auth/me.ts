@@ -328,5 +328,18 @@ meApp.post('/alterar-pin', async c => {
 
 meApp.get('/vinculos', async c => {
   const contextoPermissoes = c.get('contextoPermissoes')
-  return c.json(contextoPermissoes, 200)
+  return c.json(
+    {
+      membroId: contextoPermissoes.membroId,
+      vinculos: contextoPermissoes.vinculosAtivos.map(vinculo => ({
+        funcaoId: vinculo.funcaoId,
+        regionalId: vinculo.regionalId,
+        administracaoId: vinculo.administracaoId,
+        setorId: vinculo.setorId,
+        casaId: vinculo.casaId,
+        grupoTrabalhoId: vinculo.grupoTrabalhoId,
+      })),
+    },
+    200
+  )
 })
