@@ -57,19 +57,14 @@ async function idsConvocacoesDoDestinatario(db: any, membroId: string): Promise<
   return new Set(rows.map((row: { convocacaoId: string }) => row.convocacaoId))
 }
 
-async function podeLerConvocacao(
-  db: any,
-  membroId: string,
+function podeLerConvocacao(
   convocacao: any,
   evento: any,
-  escopos?: any,
-  destinatarias?: Set<string>
-): Promise<boolean> {
-  const escoposResolvidos = escopos ?? await obterEscoposTerritoriaisVisiveis(db, await import('../security/permissoes').then(m => m.carregarContextoPermissoes(db, membroId)))
-  if (evento && eventoVisivelNoEscopo(evento, escoposResolvidos)) return true
-
-  const ids = destinatarias ?? await idsConvocacoesDoDestinatario(db, membroId)
-  return ids.has(convocacao.id)
+  escopos: any,
+  destinatarias: Set<string>
+): boolean {
+  if (evento && eventoVisivelNoEscopo(evento, escopos)) return true
+  return destinatarias.has(convocacao.id)
 }
 
 async function podeGerirConvocacao(db: any, membroId: string, evento: any): Promise<boolean> {
@@ -116,7 +111,7 @@ convocacoesRouter.get('/:id', async c => {
   const escopos = await obterEscoposTerritoriaisVisiveis(db, c.get('contextoPermissoes'))
   const destinatarias = await idsConvocacoesDoDestinatario(db, c.get('membroId'))
 
-  if (!(await podeLerConvocacao(db, c.get('membroId'), data, evento, escopos, destinatarias))) {
+  if (!podeLerConvocacao(data, evento, escopos, destinatarias)) {
     return c.json({ error: 'Acesso não autorizado para esta convocação', code: 'FORBIDDEN' }, 403)
   }
 
@@ -209,6 +204,17 @@ convocacoesRouter.patch('/:id', async c => {
 convocacoesRouter.get('/:id/funcoes', async c => {
   const db = c.get('db')
   const id = c.req.param('id')
+
+  const convocacao = await db.select().from(convocacoes).where(eq(convocacoes.id, id)).get()
+  if (!convocacao) return c.json({ error: 'Convocação não encontrada' }, 404)
+
+  const evento = await db.select().from(eventos).where(eq(eventos.id, convocacao.eventoId)).get()
+  const escopos = await obterEscoposTerritoriaisVisiveis(db, c.get('contextoPermissoes'))
+  const destinatarias = await idsConvocacoesDoDestinatario(db, c.get('membroId'))
+  if (!podeLerConvocacao(convocacao, evento, escopos, destinatarias)) {
+    return c.json({ error: 'Acesso não autorizado para esta convocação', code: 'FORBIDDEN' }, 403)
+  }
+
   const data = await db
     .select()
     .from(convocacaoFuncoes)
