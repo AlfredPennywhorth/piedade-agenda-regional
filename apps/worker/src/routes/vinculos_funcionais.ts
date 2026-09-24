@@ -13,6 +13,7 @@ import {
 import { CreateVinculoFuncionalSchema, UpdateVinculoFuncionalSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, obterRegionalDoEscopo, regionaisAdministradas } from '../security/permissoes'
+import { executarOperacaoComAudit } from '../services/auditoria'
 
 export const vinculosFuncionaisRouter = new Hono<any>()
 
@@ -261,7 +262,24 @@ vinculosFuncionaisRouter.post('/', async (c) => {
     }
     
     const id = crypto.randomUUID()
-    const result = await db.insert(vinculosFuncionais).values({ id, ...parsed }).returning().get()
+    const escopo = escopoDoVinculo(parsed)
+    if (!escopo) {
+      return c.json({ error: 'O vínculo funcional deve possuir exatamente um escopo institucional.' }, 400)
+    }
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [qdb.insert(vinculosFuncionais).values({ id, ...parsed })],
+      {
+        acao: 'VINCULO_FUNCIONAL_CRIADO',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'VINCULO_FUNCIONAL',
+        recursoId: id,
+        escopoTipo: escopo.tipo,
+        escopoId: escopo.id,
+        contexto: { membroId: parsed.membroId, funcaoId: parsed.funcaoId },
+      }
+    )
+    const result = await db.select().from(vinculosFuncionais).where(eq(vinculosFuncionais.id, id)).get()
     return c.json(result, 201)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
@@ -331,11 +349,28 @@ vinculosFuncionaisRouter.patch('/:id', async (c) => {
       return c.json({ error: 'Acesso não autorizado para mover vínculo para outro escopo', code: 'FORBIDDEN' }, 403)
     }
 
-    const updated = await db.update(vinculosFuncionais)
-      .set({ ...parsed, updatedAt: new Date().toISOString() })
-      .where(eq(vinculosFuncionais.id, id))
-      .returning().get()
-      
+    const escopoFinal = escopoDoVinculo(vinculoResultante)
+    if (!escopoFinal) {
+      return c.json({ error: 'O vínculo funcional resultante deve possuir exatamente um escopo institucional.' }, 400)
+    }
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [
+        qdb.update(vinculosFuncionais)
+          .set({ ...parsed, updatedAt: new Date().toISOString() })
+          .where(eq(vinculosFuncionais.id, id))
+      ],
+      {
+        acao: 'VINCULO_FUNCIONAL_ATUALIZADO',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'VINCULO_FUNCIONAL',
+        recursoId: id,
+        escopoTipo: escopoFinal.tipo,
+        escopoId: escopoFinal.id,
+        contexto: { camposAlterados: Object.keys(parsed) },
+      }
+    )
+    const updated = await db.select().from(vinculosFuncionais).where(eq(vinculosFuncionais.id, id)).get()
     return c.json(updated)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
