@@ -1,8 +1,13 @@
 import { Hono } from 'hono'
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, gt, inArray } from 'drizzle-orm'
 import {
   administracoes,
   casas,
+  convocacaoDestinatarioEvidencias,
+  convocacaoDestinatarios,
+  convocacaoFuncoes,
+  convocacoes,
+  eventos,
   funcoes,
   gruposTrabalho,
   membros,
@@ -90,6 +95,96 @@ function escopoDoVinculo(vinculo: any): {
   if (vinculo.casaId) return { tipo: 'CASA', id: vinculo.casaId }
   if (vinculo.grupoTrabalhoId) return { tipo: 'GRUPO_TRABALHO', id: vinculo.grupoTrabalhoId }
   return null
+}
+
+function eventoCorrespondeAoVinculo(evento: any, vinculo: any): boolean {
+  if (vinculo.regionalId) return evento.regionalId === vinculo.regionalId
+  if (vinculo.administracaoId) return evento.administracaoId === vinculo.administracaoId
+  if (vinculo.setorId) return evento.setorId === vinculo.setorId
+  if (vinculo.casaId) return evento.casaId === vinculo.casaId
+  if (vinculo.grupoTrabalhoId) return evento.grupoTrabalhoId === vinculo.grupoTrabalhoId
+  return false
+}
+
+async function sincronizarConvocacoesPublicadasParaVinculo(db: any, vinculo: any) {
+  if (!vinculo?.ativo) return
+
+  const agoraIso = new Date().toISOString()
+  const candidatas = await db
+    .select({
+      convocacaoId: convocacoes.id,
+      evento: eventos,
+    })
+    .from(convocacoes)
+    .innerJoin(
+      convocacaoFuncoes,
+      and(
+        eq(convocacaoFuncoes.convocacaoId, convocacoes.id),
+        eq(convocacaoFuncoes.funcaoId, vinculo.funcaoId)
+      )
+    )
+    .innerJoin(eventos, eq(convocacoes.eventoId, eventos.id))
+    .where(
+      and(
+        eq(convocacoes.status, 'PUBLICADA'),
+        eq(convocacoes.ativo, true),
+        eq(eventos.ativo, true),
+        gt(eventos.fimEm, agoraIso)
+      )
+    )
+    .all()
+
+  for (const candidata of candidatas) {
+    if (!eventoCorrespondeAoVinculo(candidata.evento, vinculo)) continue
+
+    let destinatario = await db
+      .select({ id: convocacaoDestinatarios.id })
+      .from(convocacaoDestinatarios)
+      .where(
+        and(
+          eq(convocacaoDestinatarios.convocacaoId, candidata.convocacaoId),
+          eq(convocacaoDestinatarios.membroId, vinculo.membroId)
+        )
+      )
+      .get()
+
+    if (!destinatario) {
+      const destinatarioId = crypto.randomUUID()
+      await db
+        .insert(convocacaoDestinatarios)
+        .values({
+          id: destinatarioId,
+          convocacaoId: candidata.convocacaoId,
+          membroId: vinculo.membroId,
+          createdAt: agoraIso,
+        })
+        .onConflictDoNothing()
+
+      destinatario = await db
+        .select({ id: convocacaoDestinatarios.id })
+        .from(convocacaoDestinatarios)
+        .where(
+          and(
+            eq(convocacaoDestinatarios.convocacaoId, candidata.convocacaoId),
+            eq(convocacaoDestinatarios.membroId, vinculo.membroId)
+          )
+        )
+        .get()
+    }
+
+    if (!destinatario) continue
+
+    await db
+      .insert(convocacaoDestinatarioEvidencias)
+      .values({
+        id: crypto.randomUUID(),
+        convocacaoDestinatarioId: destinatario.id,
+        funcaoId: vinculo.funcaoId,
+        vinculoFuncionalId: vinculo.id,
+        createdAt: agoraIso,
+      })
+      .onConflictDoNothing()
+  }
 }
 
 function podeEscreverVinculos(contexto: any): boolean {
@@ -280,6 +375,7 @@ vinculosFuncionaisRouter.post('/', async (c) => {
       }
     )
     const result = await db.select().from(vinculosFuncionais).where(eq(vinculosFuncionais.id, id)).get()
+    await sincronizarConvocacoesPublicadasParaVinculo(db, result)
     return c.json(result, 201)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
@@ -418,6 +514,7 @@ vinculosFuncionaisRouter.patch('/:id', async (c) => {
       )
     }
     const updated = await db.select().from(vinculosFuncionais).where(eq(vinculosFuncionais.id, id)).get()
+    await sincronizarConvocacoesPublicadasParaVinculo(db, updated)
     return c.json(updated)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
