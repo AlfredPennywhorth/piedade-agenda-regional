@@ -254,6 +254,22 @@ describe('PORT-03 — fechamento e lista final consolidada', () => {
     ]))
   })
 
+  it('o mesmo membro não pode solicitar e confirmar o próprio encerramento', async () => {
+    await prepararPorteiro()
+
+    const solicitarComoMaster = await app.request('/api/v1/portaria/eventos/evento-1/solicitar-fechamento', {
+      method: 'POST',
+      headers: auth('token-master'),
+    })
+    expect(solicitarComoMaster.status).toBe(202)
+
+    const confirmarComoMaster = await confirmarFechamento()
+    expect(confirmarComoMaster.status).toBe(409)
+    expect(await confirmarComoMaster.json()).toMatchObject({
+      code: 'DUPLA_CONFIRMACAO_NECESSARIA',
+    })
+  })
+
   it('gestor não confirma encerramento sem solicitação prévia do porteiro', async () => {
     await prepararPorteiro()
 
