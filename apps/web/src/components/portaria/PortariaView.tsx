@@ -54,6 +54,13 @@ interface CredencialCadastroConvidado {
   }
 }
 
+interface EstadoFechamentoPortaria {
+  statusPortaria: 'ABERTA' | 'FECHADA'
+  solicitada: boolean
+  solicitadoEm: string | null
+  podeConfirmar: boolean
+}
+
 export function PortariaView() {
   const [eventosDisponiveis, setEventosDisponiveis] = useState<PortariaEventoItem[]>([])
   const [isLoadingEventos, setIsLoadingEventos] = useState(true)
@@ -65,6 +72,7 @@ export function PortariaView() {
   const [mensagem, setMensagem] = useState<{ tipo: 'sucesso' | 'aviso' | 'erro'; texto: string } | null>(null)
   const [convidados, setConvidados] = useState<ConvidadoPortaria[]>([])
   const [cadastroQrUrl, setCadastroQrUrl] = useState<string | null>(null)
+  const [estadoFechamento, setEstadoFechamento] = useState<EstadoFechamentoPortaria | null>(null)
 
   const [ultimoCheckinId, setUltimoCheckinId] = useState<string | null>(null)
   const [modalRetificacao, setModalRetificacao] = useState<{isOpen: boolean; checkinId: string; participanteNome: string; motivo: string; error: string | null; isSubmitting: boolean} | null>(null)
@@ -140,12 +148,28 @@ export function PortariaView() {
     }
   }
 
+  const carregarEstadoFechamento = async (evId: string) => {
+    try {
+      const data = await apiClient.fetchWithAuth<EstadoFechamentoPortaria>(
+        `/portaria/eventos/${evId}/fechamento-solicitacao`
+      )
+      if (currentEvIdRef.current === evId) {
+        setEstadoFechamento(data)
+      }
+    } catch {
+      if (currentEvIdRef.current === evId) {
+        setEstadoFechamento(null)
+      }
+    }
+  }
+
   const handleSelecionarEvento = (evId: string) => {
     setEventoIdAtual(evId)
     currentEvIdRef.current = evId
     setParticipantes([])
     setConvidados([])
     setCadastroQrUrl(null)
+    setEstadoFechamento(null)
     setBuscaNome('')
     setQrTokenInput('')
     setMensagem(null)
@@ -153,7 +177,11 @@ export function PortariaView() {
     if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
 
     if (evId) {
-      void carregarParticipantes(evId).then(() => carregarConvidados(evId))
+      void Promise.all([
+        carregarParticipantes(evId),
+        carregarConvidados(evId),
+        carregarEstadoFechamento(evId),
+      ])
     }
   }
 
@@ -269,11 +297,34 @@ export function PortariaView() {
     }
   }
 
-  const handleFecharPortaria = async () => {
+  const handleSolicitarFechamento = async () => {
     if (!eventoIdAtual) return
 
     const confirmou = window.confirm(
-      'Fechar esta Portaria? Após o fechamento, novos check-ins e autocadastros de convidados serão bloqueados.'
+      'Solicitar o encerramento desta Portaria? Ela continuará aberta até a confirmação do gestor da reunião.'
+    )
+    if (!confirmou) return
+
+    setLoading(true)
+    setMensagem(null)
+
+    try {
+      await apiClient.postWithAuth(`/portaria/eventos/${eventoIdAtual}/solicitar-fechamento`, {})
+      setMensagem({ tipo: 'aviso', texto: 'Encerramento solicitado. Aguardando confirmação do gestor da reunião.' })
+      await carregarEstadoFechamento(eventoIdAtual)
+    } catch (err: unknown) {
+      const texto = err instanceof Error ? err.message : 'Falha ao solicitar o encerramento da Portaria.'
+      setMensagem({ tipo: 'erro', texto })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleConfirmarFechamento = async () => {
+    if (!eventoIdAtual) return
+
+    const confirmou = window.confirm(
+      'Confirmar definitivamente o encerramento desta Portaria? Esta ação consolida a presença e revoga os acessos temporários.'
     )
     if (!confirmou) return
 
@@ -282,19 +333,21 @@ export function PortariaView() {
 
     try {
       await apiClient.postWithAuth(`/portaria/eventos/${eventoIdAtual}/fechar`, {})
-      setMensagem({ tipo: 'sucesso', texto: 'Portaria fechada e lista final consolidada com sucesso.' })
+      setMensagem({ tipo: 'sucesso', texto: 'Portaria encerrada e lista final consolidada com sucesso.' })
       setEventosDisponiveis(prev => prev.filter(evento => evento.id !== eventoIdAtual))
       setEventoIdAtual('')
       currentEvIdRef.current = ''
       setParticipantes([])
       setConvidados([])
       setCadastroQrUrl(null)
+      setEstadoFechamento(null)
       setBuscaNome('')
       setQrTokenInput('')
       setUltimoCheckinId(null)
     } catch (err: unknown) {
-      const texto = err instanceof Error ? err.message : 'Falha ao fechar a Portaria.'
+      const texto = err instanceof Error ? err.message : 'Falha ao confirmar o encerramento da Portaria.'
       setMensagem({ tipo: 'erro', texto })
+      await carregarEstadoFechamento(eventoIdAtual)
     } finally {
       setLoading(false)
     }
@@ -429,17 +482,44 @@ export function PortariaView() {
           <div>
             <h3 className="text-sm font-semibold text-slate-800">Encerramento da Portaria</h3>
             <p className="text-xs text-slate-500 mt-1">
-              Use somente ao final da recepção. O fechamento bloqueia novos registros e consolida a lista final.
+              O porteiro solicita o encerramento; somente o gestor autorizado da reunião confirma definitivamente.
             </p>
+            {estadoFechamento?.solicitada && (
+              <p className="mt-2 text-xs font-semibold text-amber-700">
+                Encerramento solicitado{estadoFechamento.solicitadoEm ? ` em ${new Date(estadoFechamento.solicitadoEm).toLocaleString('pt-BR')}` : ''}.
+              </p>
+            )}
           </div>
-          <button
-            type="button"
-            onClick={() => void handleFecharPortaria()}
-            disabled={loading}
-            className="px-4 py-2.5 bg-red-600 text-white font-semibold rounded-lg text-sm hover:bg-red-700 disabled:opacity-50"
-          >
-            Fechar Portaria
-          </button>
+
+          {estadoFechamento?.solicitada ? (
+            estadoFechamento.podeConfirmar ? (
+              <button
+                type="button"
+                onClick={() => void handleConfirmarFechamento()}
+                disabled={loading}
+                className="px-4 py-2.5 bg-red-600 text-white font-semibold rounded-lg text-sm hover:bg-red-700 disabled:opacity-50"
+              >
+                Confirmar encerramento
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="px-4 py-2.5 bg-amber-100 text-amber-800 font-semibold rounded-lg text-sm"
+              >
+                Aguardando gestor
+              </button>
+            )
+          ) : (
+            <button
+              type="button"
+              onClick={() => void handleSolicitarFechamento()}
+              disabled={loading}
+              className="px-4 py-2.5 bg-amber-600 text-white font-semibold rounded-lg text-sm hover:bg-amber-700 disabled:opacity-50"
+            >
+              Solicitar encerramento
+            </button>
+          )}
         </div>
       )}
 
