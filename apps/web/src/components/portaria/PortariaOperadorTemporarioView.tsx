@@ -244,17 +244,13 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
     }
   }
 
-  const fecharPortaria = async () => {
-    if (!window.confirm('Encerrar esta Portaria? Depois do fechamento não serão aceitos novos registros.')) return
+  const solicitarFechamento = async () => {
+    if (!window.confirm('Solicitar o encerramento desta Portaria ao gestor da reunião? A Portaria continuará aberta até a confirmação.')) return
     setMensagem('')
     setErro('')
     try {
-      await chamadaOperador(token, '/fechar', { method: 'POST' })
-      pararCamera()
-      setMensagem('Portaria encerrada com sucesso.')
-      setSessao(null)
-      setParticipantes([])
-      setConvidados([])
+      await chamadaOperador(token, '/solicitar-fechamento', { method: 'POST' })
+      setMensagem('Solicitação enviada. Aguarde a confirmação do gestor da reunião.')
     } catch (err) {
       setErro((err as Error).message)
     }
@@ -407,14 +403,14 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
         </section>
 
         <section className="rounded-xl border border-red-200 bg-white p-5">
-          <h2 className="font-semibold text-slate-900">Encerrar Portaria</h2>
-          <p className="mt-1 text-xs text-slate-500">O fechamento revoga todos os acessos temporários desta reunião e consolida a presença.</p>
+          <h2 className="font-semibold text-slate-900">Solicitar encerramento</h2>
+          <p className="mt-1 text-xs text-slate-500">Envie a solicitação ao gestor da reunião. A Portaria continuará aberta até a confirmação definitiva.</p>
           <button
             type="button"
-            onClick={() => void fecharPortaria()}
+            onClick={() => void solicitarFechamento()}
             className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white"
           >
-            Fechar Portaria
+            Solicitar encerramento
           </button>
         </section>
       </div>
