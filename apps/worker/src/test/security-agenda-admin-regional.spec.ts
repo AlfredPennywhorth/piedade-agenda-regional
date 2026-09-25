@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { createApp } from '../index'
 import { setupDb } from './setup'
 import { hashToken } from '../security/tokens'
+import { registrarCienciaPmo } from './responsabilidade-pmo-test-helper'
 
 describe('PR-SEC-01 — Administrador Regional na gestão da Agenda', () => {
   let sqlite: any
@@ -30,9 +31,11 @@ describe('PR-SEC-01 — Administrador Regional na gestão da Agenda', () => {
       "INSERT INTO contas_acesso (id, membro_id, status, ativado_em) VALUES (?, ?, 'ATIVA', CURRENT_TIMESTAMP)"
     ).run(contaId, ids.membroAdminA)
 
+    const acessoId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
     sqlite.prepare(
       "INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, 'ADMINISTRADOR_SISTEMA', 'REGIONAL', ?)"
-    ).run('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', contaId, ids.regionalA)
+    ).run(acessoId, contaId, ids.regionalA)
+    registrarCienciaPmo(sqlite, contaId, acessoId)
 
     sqlite.prepare(`
       INSERT INTO sessoes
