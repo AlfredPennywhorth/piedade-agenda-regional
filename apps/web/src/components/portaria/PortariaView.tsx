@@ -30,6 +30,8 @@ interface PortariaEventoItem {
   inicioEm: string
   fimEm: string
   modalidade: string
+  statusPortaria?: 'ABERTA' | 'FECHADA'
+  podeConfirmarFechamento?: boolean
 }
 
 interface ConvidadoPortaria {
@@ -177,11 +179,16 @@ export function PortariaView() {
     if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
 
     if (evId) {
-      void Promise.all([
-        carregarParticipantes(evId),
-        carregarConvidados(evId),
-        carregarEstadoFechamento(evId),
-      ])
+      const eventoSelecionado = eventosDisponiveis.find(evento => evento.id === evId)
+      if (eventoSelecionado?.statusPortaria === 'FECHADA') {
+        void carregarEstadoFechamento(evId)
+      } else {
+        void Promise.all([
+          carregarParticipantes(evId),
+          carregarConvidados(evId),
+          carregarEstadoFechamento(evId),
+        ])
+      }
     }
   }
 
@@ -353,6 +360,47 @@ export function PortariaView() {
     }
   }
 
+  const handleReabrirPortaria = async () => {
+    if (!eventoIdAtual) return
+
+    const motivo = window.prompt(
+      'Informe o motivo da reabertura (ex.: participante chegou após o fechamento ou presença não registrada):'
+    )
+    if (motivo === null) return
+    const motivoNormalizado = motivo.trim()
+    if (motivoNormalizado.length < 5 || motivoNormalizado.length > 200) {
+      setMensagem({ tipo: 'erro', texto: 'Informe um motivo entre 5 e 200 caracteres para reabrir a Portaria.' })
+      return
+    }
+
+    setLoading(true)
+    setMensagem(null)
+    try {
+      await apiClient.postWithAuth(`/portaria/eventos/${eventoIdAtual}/reabrir`, {
+        motivo: motivoNormalizado,
+      })
+      setMensagem({
+        tipo: 'sucesso',
+        texto: 'Portaria reaberta. Os acessos temporários anteriores permanecem revogados; habilite novos porteiros se necessário.',
+      })
+      setEventosDisponiveis(prev =>
+        prev.map(evento =>
+          evento.id === eventoIdAtual ? { ...evento, statusPortaria: 'ABERTA' as const } : evento
+        )
+      )
+      await Promise.all([
+        carregarParticipantes(eventoIdAtual),
+        carregarConvidados(eventoIdAtual),
+        carregarEstadoFechamento(eventoIdAtual),
+      ])
+    } catch (err: unknown) {
+      const texto = err instanceof Error ? err.message : 'Falha ao reabrir a Portaria.'
+      setMensagem({ tipo: 'erro', texto })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const formatarDataHora = (isoStr: string) => {
     const d = new Date(isoStr)
     return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -423,6 +471,7 @@ export function PortariaView() {
   const totalEsperado = participantes.length
   const presentes = participantes.filter(p => p.checkin !== null).length
   const pendentes = totalEsperado - presentes
+  const portariaFechada = estadoFechamento?.statusPortaria === 'FECHADA'
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
@@ -481,17 +530,36 @@ export function PortariaView() {
         <div className="bg-white p-4 rounded-xl border border-red-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-slate-800">Encerramento da Portaria</h3>
-            <p className="text-xs text-slate-500 mt-1">
-              O porteiro solicita o encerramento; somente o gestor autorizado da reunião confirma definitivamente.
-            </p>
-            {estadoFechamento?.solicitada && (
-              <p className="mt-2 text-xs font-semibold text-amber-700">
-                Encerramento solicitado{estadoFechamento.solicitadoEm ? ` em ${new Date(estadoFechamento.solicitadoEm).toLocaleString('pt-BR')}` : ''}.
+            {portariaFechada ? (
+              <p className="text-xs text-slate-500 mt-1">
+                Esta Portaria está encerrada. O gestor pode reabri-la em caso excepcional para corrigir a presença.
               </p>
+            ) : (
+              <>
+                <p className="text-xs text-slate-500 mt-1">
+                  O porteiro solicita o encerramento; somente o gestor autorizado da reunião confirma definitivamente.
+                </p>
+                {estadoFechamento?.solicitada && (
+                  <p className="mt-2 text-xs font-semibold text-amber-700">
+                    Encerramento solicitado{estadoFechamento.solicitadoEm ? ` em ${new Date(estadoFechamento.solicitadoEm).toLocaleString('pt-BR')}` : ''}.
+                  </p>
+                )}
+              </>
             )}
           </div>
 
-          {estadoFechamento?.solicitada ? (
+          {portariaFechada ? (
+            estadoFechamento?.podeConfirmar ? (
+              <button
+                type="button"
+                onClick={() => void handleReabrirPortaria()}
+                disabled={loading}
+                className="px-4 py-2.5 bg-amber-600 text-white font-semibold rounded-lg text-sm hover:bg-amber-700 disabled:opacity-50"
+              >
+                Reabrir Portaria
+              </button>
+            ) : null
+          ) : estadoFechamento?.solicitada ? (
             estadoFechamento.podeConfirmar ? (
               <button
                 type="button"
@@ -524,7 +592,7 @@ export function PortariaView() {
       )}
 
       {/* Leitura por QR Code */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+      {!portariaFechada && <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
         <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
           <svg className="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
@@ -550,9 +618,9 @@ export function PortariaView() {
             Confirmar QR
           </button>
         </form>
-      </div>
+      </div>}
 
-      {eventoIdAtual && (
+      {eventoIdAtual && !portariaFechada && (
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row justify-between gap-3 sm:items-center">
             <div>
@@ -675,7 +743,7 @@ export function PortariaView() {
       )}
 
       {/* Check-in Manual / Busca por Participantes */}
-      {eventoIdAtual && (
+      {eventoIdAtual && !portariaFechada && (
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h3 className="text-base font-semibold text-slate-800">4. Fila de Participantes</h3>
