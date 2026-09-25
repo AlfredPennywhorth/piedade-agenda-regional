@@ -5,6 +5,7 @@ import { createApp } from '../index'
 import * as schema from '../db/schema'
 import { hashToken } from '../security/tokens'
 import { setupDb } from './setup'
+import { registrarCienciaPmo } from './responsabilidade-pmo-test-helper'
 import {
   RESPONSABILIDADE_PMO_TEXTO,
   RESPONSABILIDADE_PMO_VERSAO,
@@ -306,6 +307,7 @@ describe('Perfis, escopos e governança — PR-ACC-03', () => {
       INSERT INTO bootstrap_master (id, conta_acesso_id)
       VALUES ('PRIMEIRO_MASTER', 'conta-master');
     `)
+    registrarCienciaPmo(sqlite, 'conta-pmo', 'acesso-admin')
 
     const agora = new Date().toISOString()
     const tokenAdmin = 'token-pmo-admin'
