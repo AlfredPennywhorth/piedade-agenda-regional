@@ -262,6 +262,58 @@ describe('PORT-03 — fechamento e lista final consolidada', () => {
     expect(await fechar.json()).toMatchObject({ code: 'SOLICITACAO_FECHAMENTO_NECESSARIA' })
   })
 
+  it('gestor pode reabrir excepcionalmente e o novo fechamento exige nova solicitação', async () => {
+    await prepararPorteiro()
+    await solicitarFechamento()
+    const primeiroFechamento = await confirmarFechamento()
+    expect(primeiroFechamento.status).toBe(200)
+
+    const reabrir = await app.request('/api/v1/portaria/eventos/evento-1/reabrir', {
+      method: 'POST',
+      headers: auth('token-master', true),
+      body: JSON.stringify({ motivo: 'Participante chegou após o fechamento' }),
+    })
+    expect(reabrir.status).toBe(200)
+    expect(await reabrir.json()).toMatchObject({ status: 'ABERTA' })
+
+    const estado = sqlite.prepare(
+      'SELECT status, fechada_em, fechada_por_membro_id FROM portarias_evento WHERE evento_id = ?'
+    ).get('evento-1') as any
+    expect(estado.status).toBe('ABERTA')
+    expect(estado.fechada_em).toBeNull()
+    expect(estado.fechada_por_membro_id).toBeNull()
+
+    const snapshotAnterior = sqlite.prepare(
+      'SELECT id FROM portaria_fechamentos WHERE evento_id = ?'
+    ).get('evento-1')
+    expect(snapshotAnterior).toBeUndefined()
+
+    const reabertura = sqlite.prepare(
+      'SELECT motivo, reaberta_por_membro_id FROM portaria_reaberturas WHERE evento_id = ?'
+    ).get('evento-1') as any
+    expect(reabertura).toMatchObject({
+      motivo: 'Participante chegou após o fechamento',
+      reaberta_por_membro_id: 'master',
+    })
+
+    const fecharSemNovaSolicitacao = await confirmarFechamento()
+    expect(fecharSemNovaSolicitacao.status).toBe(409)
+    expect(await fecharSemNovaSolicitacao.json()).toMatchObject({
+      code: 'SOLICITACAO_FECHAMENTO_NECESSARIA',
+    })
+
+    const novaConcessao = await app.request('/api/v1/portaria/eventos/evento-1/operadores', {
+      method: 'POST',
+      headers: auth('token-master', true),
+      body: JSON.stringify({ membroId: 'porteiro' }),
+    })
+    expect(novaConcessao.status).toBe(201)
+
+    await solicitarFechamento()
+    const segundoFechamento = await confirmarFechamento()
+    expect(segundoFechamento.status).toBe(200)
+  })
+
   it('segundo fechamento é recusado', async () => {
     await prepararPorteiro()
 
