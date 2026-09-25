@@ -402,7 +402,8 @@ describe('PortariaView', () => {
       expect(alert).toHaveTextContent('Destinatário não encontrado')
     })
   })
-  it('fecha a Portaria pela interface após confirmação', async () => {
+  it('solicita o encerramento e exige confirmação do gestor antes de fechar', async () => {
+    let solicitada = false
     mockFetchWithAuth.mockImplementation(async (url) => {
       if (url === '/portaria/eventos') {
         return {
@@ -411,28 +412,55 @@ describe('PortariaView', () => {
       }
       if (url.includes('/participantes')) return { participantes: [] }
       if (url.includes('/convidados')) return { data: [] }
+      if (url.includes('/fechamento-solicitacao')) {
+        return {
+          statusPortaria: 'ABERTA',
+          solicitada,
+          solicitadoEm: solicitada ? '2026-10-01T16:01:00Z' : null,
+          podeConfirmar: true,
+        }
+      }
       return {}
     })
-    mockPostWithAuth.mockResolvedValueOnce({
-      fechamento: { id: 'fech-1', eventoId: UUID_EVT1 },
-      resumo: { totalPresentes: 0 },
-      itens: [],
+    mockPostWithAuth.mockImplementation(async (url) => {
+      if (url.endsWith('/solicitar-fechamento')) {
+        solicitada = true
+        return { status: 'AGUARDANDO_CONFIRMACAO' } as any
+      }
+      if (url.endsWith('/fechar')) {
+        return {
+          fechamento: { id: 'fech-1', eventoId: UUID_EVT1 },
+          resumo: { totalPresentes: 0 },
+          itens: [],
+        } as any
+      }
+      return {} as any
     })
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
 
     render(<PortariaView />)
     await waitFor(() => screen.getByRole('combobox'))
 
     fireEvent.change(screen.getByRole('combobox'), { target: { value: UUID_EVT1 } })
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Fechar Portaria' })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Solicitar encerramento' })).toBeInTheDocument())
 
-    fireEvent.click(screen.getByRole('button', { name: 'Fechar Portaria' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Solicitar encerramento' }))
+
+    await waitFor(() => {
+      expect(mockPostWithAuth).toHaveBeenCalledWith(
+        `/portaria/eventos/${UUID_EVT1}/solicitar-fechamento`,
+        {}
+      )
+      expect(screen.getByRole('button', { name: 'Confirmar encerramento' })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar encerramento' }))
 
     await waitFor(() => {
       expect(mockPostWithAuth).toHaveBeenCalledWith(`/portaria/eventos/${UUID_EVT1}/fechar`, {})
-      expect(screen.getByText(/Portaria fechada e lista final consolidada com sucesso/i)).toBeInTheDocument()
+      expect(screen.getByText(/Portaria encerrada e lista final consolidada com sucesso/i)).toBeInTheDocument()
     })
-    expect(screen.queryByRole('button', { name: 'Fechar Portaria' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirmar encerramento' })).not.toBeInTheDocument()
   })
 
     const getMockParticipantes = () => ({
