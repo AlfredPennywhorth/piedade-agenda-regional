@@ -32,8 +32,8 @@ describe('S07 - Minha Agenda', () => {
       INSERT INTO setores (id, administracao_id, nome) VALUES ('set-1', 'adm-1', 'Set 1');
       INSERT INTO casas (id, setor_id, nome) VALUES ('casa-1', 'set-1', 'Casa 1');
       
-      INSERT INTO membros (id, nome, celular, data_nascimento, casa_id, ativo)
-      VALUES ('${membroId}', 'João Silva', '11999999999', '1990-01-01', 'casa-1', 1);
+      INSERT INTO membros (id, nome, celular, casa_id, ativo)
+      VALUES ('${membroId}', 'João Silva', '11999999999', 'casa-1', 1);
       
       INSERT INTO funcoes (id, nome) VALUES ('func-1', 'Função 1');
       INSERT INTO vinculos_funcionais (id, membro_id, funcao_id, regional_id, ativo) VALUES ('vinc-1', '${membroId}', 'func-1', 'reg-1', 1);
@@ -58,7 +58,7 @@ describe('S07 - Minha Agenda', () => {
     const resAtivar = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: tokenAtivacao, celular: '11999999999', dataNascimento: '1990-01-01', pin: '123456', confirmacaoPin: '123456' })
+      body: JSON.stringify({ token: tokenAtivacao, celular: '11999999999', pin: '123456', confirmacaoPin: '123456' })
     })
     const ativarJson = await resAtivar.json() as any
     sessionToken = ativarJson.sessionToken
