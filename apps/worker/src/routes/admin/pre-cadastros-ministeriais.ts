@@ -10,6 +10,11 @@ import {
   obterRegionalDoEscopo,
 } from '../../security/permissoes'
 
+function normalizarNome(nome: string): string {
+  return nome.trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR')
+}
+
+
 export const adminPreCadastrosMinisteriaisApp = new Hono<{ Variables: Variables }>()
 
 function escaparPadraoLike(valor: string) {
@@ -222,6 +227,26 @@ adminPreCadastrosMinisteriaisApp.post('/:id/finalizar', async c => {
 
   if (!parsed.success) {
     return c.json({ error: parsed.error.issues, code: 'VALIDATION_ERROR' }, 400)
+  }
+
+  const membrosNaCasa = await db
+    .select({ nome: schema.membros.nome })
+    .from(schema.membros)
+    .where(eq(schema.membros.casaId, parsed.data.casaId))
+    .all()
+
+  if (
+    membrosNaCasa.some(
+      (item: { nome: string }) => normalizarNome(item.nome) === normalizarNome(parsed.data.nome)
+    )
+  ) {
+    return c.json(
+      {
+        error: 'Já existe um membro com este nome nesta Casa de Oração',
+        code: 'NOME_JA_VINCULADO_NA_CASA',
+      },
+      409
+    )
   }
 
   const conflitoCarteirinha = await db
