@@ -178,6 +178,9 @@ describe('Perfis, escopos e governança — PR-ACC-03', () => {
       'Content-Type': 'application/json',
     }
 
+    const bloqueadoAntesDaCiencia = await requisicao('/api/v1/admin/acessos', { headers })
+    expect(bloqueadoAntesDaCiencia.status).toBe(403)
+
     const consulta = await requisicao(
       '/api/v1/governanca/responsabilidade-regional',
       { headers }
@@ -212,6 +215,9 @@ describe('Perfis, escopos e governança — PR-ACC-03', () => {
     expect(registro.versao_texto).toBe(RESPONSABILIDADE_PMO_VERSAO)
     expect(registro.texto_hash).toMatch(/^[a-f0-9]{64}$/)
     expect(registro.ciente_em).toBeTruthy()
+
+    const liberadoAposCiencia = await requisicao('/api/v1/admin/acessos', { headers })
+    expect(liberadoAposCiencia.status).toBe(200)
 
     const repetida = await requisicao(
       '/api/v1/governanca/responsabilidade-regional/ciencia',
