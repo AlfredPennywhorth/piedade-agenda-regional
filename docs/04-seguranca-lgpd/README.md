@@ -12,7 +12,6 @@ Este diretório contém a documentação de segurança e conformidade LGPD do pr
 - Chaves privadas (RSA, EC, etc.)
 - Dados reais de membros
 - CPF real
-- Data de nascimento real
 - Telefone real
 - Qualquer dado pessoal de pessoa real
 
@@ -36,9 +35,12 @@ Este diretório contém a documentação de segurança e conformidade LGPD do pr
 | Não discriminação | Sem uso de dados para fins discriminatórios |
 | Responsabilização | Registro de acessos e alterações |
 
-## Dados sensíveis previstos
+## Dados pessoais previstos
 
-- Data de nascimento (apenas para validação de identidade na ativação — ver ADR-001)
-- Número de celular (opcional, sem SMS obrigatório)
+- Nome completo
+- Número de celular
+- Código institucional da carteirinha
+- Data de ordenação
+- Vínculos institucionais necessários ao controle de acesso e à agenda
 
 > **Status:** Política de LGPD a ser detalhada pelo PMO. Framework de segurança estabelecido na S00.
