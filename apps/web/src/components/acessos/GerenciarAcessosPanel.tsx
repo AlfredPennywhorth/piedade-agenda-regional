@@ -28,7 +28,6 @@ const PERFIS = [
   ['OPERADOR_PORTARIA_PERMANENTE', 'Operador de Portaria'],
   ['GESTOR_RELATORIOS', 'Gestor de Relatórios'],
   ['AUDITOR', 'Auditor'],
-  ['USUARIO_COMUM', 'Usuário comum'],
   ['MASTER_SISTEMA', 'Master do Sistema'],
 ] as const
 
@@ -56,9 +55,18 @@ function niveisPermitidos(perfil: string) {
   return NIVEIS.map(([codigo]) => codigo)
 }
 
-function rotuloUnidade(unidade: Unidade) {
-  const codigo = unidade.codigo ? ` (${unidade.codigo})` : ''
-  return `${unidade.nome}${codigo} · ${unidade.id.slice(0, 8)}`
+function nomeDuplicado(unidade: Unidade, todas: Unidade[]) {
+  return todas.filter(item => item.nome.trim().toLocaleLowerCase('pt-BR') === unidade.nome.trim().toLocaleLowerCase('pt-BR')).length > 1
+}
+
+function unidadeAmbigua(unidade: Unidade, todas: Unidade[]) {
+  return nomeDuplicado(unidade, todas) && !unidade.codigo
+}
+
+function rotuloUnidade(unidade: Unidade, todas: Unidade[] = []) {
+  if (unidade.codigo) return `${unidade.nome} · ${unidade.codigo}`
+  if (todas.length > 0 && nomeDuplicado(unidade, todas)) return `${unidade.nome} · código institucional necessário`
+  return unidade.nome
 }
 
 export function GerenciarAcessosPanel({
@@ -77,6 +85,7 @@ export function GerenciarAcessosPanel({
   const [erro, setErro] = useState<string | null>(null)
   const [mensagem, setMensagem] = useState<string | null>(null)
   const [rotulosAcessos, setRotulosAcessos] = useState<Record<string, string>>({})
+  const [escoposAmbiguos, setEscoposAmbiguos] = useState<Set<string>>(new Set())
   const requisicaoUnidadesRef = useRef(0)
 
   const permitidos = useMemo(() => niveisPermitidos(perfil), [perfil])
@@ -107,7 +116,7 @@ export function GerenciarAcessosPanel({
       .then(data => {
         if (requisicaoAtual !== requisicaoUnidadesRef.current) return
         const ordenadas = [...data].sort((a, b) =>
-          rotuloUnidade(a).localeCompare(rotuloUnidade(b), 'pt-BR')
+          rotuloUnidade(a, data).localeCompare(rotuloUnidade(b, data), 'pt-BR')
         )
         setUnidades(ordenadas)
       })
@@ -135,14 +144,22 @@ export function GerenciarAcessosPanel({
         if (!endpoint) return [] as Array<[string, string]>
         try {
           const itens = await fetchWithAuth<Unidade[]>(endpoint)
-          return itens.map(item => [`${tipo}:${item.id}`, rotuloUnidade(item)] as [string, string])
+          return itens.map(item => [`${tipo}:${item.id}`, rotuloUnidade(item, itens)] as [string, string])
         } catch {
           return [] as Array<[string, string]>
         }
       })
     ).then(grupos => {
       if (!ativo) return
-      setRotulosAcessos(Object.fromEntries(grupos.flat()))
+      const pares = grupos.flat()
+      setRotulosAcessos(Object.fromEntries(pares))
+      setEscoposAmbiguos(
+        new Set(
+          pares
+            .filter(([, rotulo]) => rotulo.endsWith('código institucional necessário'))
+            .map(([chave]) => chave)
+        )
+      )
     })
 
     return () => {
@@ -204,7 +221,7 @@ export function GerenciarAcessosPanel({
         <div>
           <h4 className="font-semibold text-slate-900">Gerenciar acessos</h4>
           <p className="text-xs text-slate-600">
-            Atribua perfil e escopo institucional para {nomePessoa}.
+            Usuário Comum é o acesso padrão. Use esta área apenas para atribuir perfis especiais a {nomePessoa}.
           </p>
         </div>
         <button type="button" onClick={onFechar} className="text-xs font-semibold text-slate-600 hover:text-slate-900">
@@ -264,8 +281,21 @@ export function GerenciarAcessosPanel({
               className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
             >
               <option value="">{carregandoUnidades ? 'Carregando...' : 'Selecione...'}</option>
-              {unidades.map(unidade => <option key={unidade.id} value={unidade.id}>{rotuloUnidade(unidade)}</option>)}
+              {unidades.map(unidade => (
+                <option
+                  key={unidade.id}
+                  value={unidade.id}
+                  disabled={unidadeAmbigua(unidade, unidades)}
+                >
+                  {rotuloUnidade(unidade, unidades)}
+                </option>
+              ))}
             </select>
+            {unidades.some(unidade => unidadeAmbigua(unidade, unidades)) && (
+              <p className="mt-1 text-xs text-amber-700">
+                Unidades com nome repetido e sem código institucional ficam bloqueadas para evitar atribuição ao escopo errado.
+              </p>
+            )}
           </label>
         )}
       </div>
@@ -298,14 +328,21 @@ export function GerenciarAcessosPanel({
                         'sem identificador'
                   }
                 </span>
-                <button
-                  type="button"
-                  onClick={() => void revogar(acesso)}
-                  disabled={processando}
-                  className="rounded border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 disabled:opacity-50"
-                >
-                  Revogar
-                </button>
+                {acesso.perfilCodigo === 'USUARIO_COMUM' ? (
+                  <span className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-600">
+                    Padrão
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void revogar(acesso)}
+                    disabled={processando || escoposAmbiguos.has(`${acesso.escopoTipo}:${acesso.escopoId}`)}
+                    title={escoposAmbiguos.has(`${acesso.escopoTipo}:${acesso.escopoId}`) ? 'Cadastre um código institucional para desambiguar este escopo antes de revogar.' : undefined}
+                    className="rounded border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 disabled:opacity-50"
+                  >
+                    Revogar
+                  </button>
+                )}
               </li>
             ))}
           </ul>
