@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { createApp } from '../index'
 import { setupDb } from './setup'
 import { hashToken } from '../security/tokens'
+import { registrarCienciaPmo } from './responsabilidade-pmo-test-helper'
 
 describe('PR-SEC-01 — leitura de Membros e Vínculos por escopo', () => {
   let sqlite: any
@@ -48,6 +49,9 @@ describe('PR-SEC-01 — leitura de Membros e Vínculos por escopo', () => {
           (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id, ativo)
         VALUES (?, ?, ?, ?, ?, 1)
       `).run(`acesso-${membroId}`, contaId, perfilCodigo, escopoTipo, escopoId ?? null)
+      if (perfilCodigo === 'ADMINISTRADOR_SISTEMA' && escopoTipo === 'REGIONAL') {
+        registrarCienciaPmo(sqlite, contaId, `acesso-${membroId}`)
+      }
     }
 
     sqlite.prepare(`
