@@ -38,14 +38,14 @@ describe('Autenticação e Sessões S03', () => {
       INSERT INTO setores (id, administracao_id, nome) VALUES ('${setorId}', '${admId}', 'Set 1');
       INSERT INTO casas (id, setor_id, nome) VALUES ('${casaId}', '${setorId}', 'Casa 1');
       
-      INSERT INTO membros (id, nome, celular, data_nascimento, casa_id, ativo)
-      VALUES ('${membroId}', 'João Silva', '11999999999', '1990-01-01', '${casaId}', 1);
+      INSERT INTO membros (id, nome, celular, casa_id, ativo)
+      VALUES ('${membroId}', 'João Silva', '11999999999', '${casaId}', 1);
 
-      INSERT INTO membros (id, nome, celular, data_nascimento, casa_id, ativo)
-      VALUES ('${membroInativoId}', 'Maria Silva', '11988888888', '1990-01-01', '${casaId}', 0);
+      INSERT INTO membros (id, nome, celular, casa_id, ativo)
+      VALUES ('${membroInativoId}', 'Maria Silva', '11988888888', '${casaId}', 0);
       
-      INSERT INTO membros (id, nome, celular, data_nascimento, casa_id, ativo)
-      VALUES ('${membroAtivoNormalizadoId}', 'Pedro Normalizado', '11977777777', '1990-01-01', '${casaId}', 1);
+      INSERT INTO membros (id, nome, celular, casa_id, ativo)
+      VALUES ('${membroAtivoNormalizadoId}', 'Pedro Normalizado', '11977777777', '${casaId}', 1);
       
       INSERT INTO funcoes (id, nome) VALUES ('func-1', 'Função 1');
       INSERT INTO vinculos_funcionais (id, membro_id, funcao_id, regional_id, ativo) VALUES ('vinc-1', '${membroId}', 'func-1', '${regionalId}', 1);
@@ -100,7 +100,6 @@ describe('Autenticação e Sessões S03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         celular: '11999999999',
-        dataNascimento: '1990-01-01',
         pin: '123456',
         confirmacaoPin: '123456',
       }),
@@ -115,7 +114,6 @@ describe('Autenticação e Sessões S03', () => {
       body: JSON.stringify({
         token: '',
         celular: '11999999999',
-        dataNascimento: '1990-01-01',
         pin: '123456',
         confirmacaoPin: '123456',
       }),
@@ -130,7 +128,6 @@ describe('Autenticação e Sessões S03', () => {
       body: JSON.stringify({
         token: 'inexistente12345678',
         celular: '11999999999',
-        dataNascimento: '1990-01-01',
         pin: '123456',
         confirmacaoPin: '123456',
       }),
@@ -144,7 +141,6 @@ describe('Autenticação e Sessões S03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
-        dataNascimento: '1990-01-01',
         pin: '123456',
         confirmacaoPin: '123456',
       }),
@@ -159,7 +155,6 @@ describe('Autenticação e Sessões S03', () => {
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
         celular: '11000000000',
-        dataNascimento: '1990-01-01',
         pin: '123456',
         confirmacaoPin: '123456',
       }),
@@ -197,7 +192,6 @@ describe('Autenticação e Sessões S03', () => {
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
         celular: '11999999999',
-        dataNascimento: '1990-01-01',
         confirmacaoPin: '123456',
       }),
     })
@@ -211,7 +205,6 @@ describe('Autenticação e Sessões S03', () => {
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
         celular: '11999999999',
-        dataNascimento: '1990-01-01',
         pin: '12345',
         confirmacaoPin: '12345',
       }),
@@ -226,7 +219,6 @@ describe('Autenticação e Sessões S03', () => {
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
         celular: '11999999999',
-        dataNascimento: '1990-01-01',
         pin: '123456',
       }),
     })
@@ -240,7 +232,6 @@ describe('Autenticação e Sessões S03', () => {
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
         celular: '11999999999',
-        dataNascimento: '1990-01-01',
         pin: '123456',
         confirmacaoPin: '654321',
       }),
@@ -256,7 +247,6 @@ describe('Autenticação e Sessões S03', () => {
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
         celular: '11999999999',
-        dataNascimento: '1990-01-01',
         pin: '123456',
         confirmacaoPin: '123456',
       }),
@@ -275,7 +265,6 @@ describe('Autenticação e Sessões S03', () => {
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
         celular: '11999999999',
-        dataNascimento: '1990-01-01',
         pin: '123456',
         confirmacaoPin: '123456',
       }),
@@ -296,7 +285,6 @@ describe('Autenticação e Sessões S03', () => {
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
         celular: '11999999999',
-        dataNascimento: '1990-01-01',
         pin: '123456',
         confirmacaoPin: '123456',
       }),
@@ -313,7 +301,6 @@ describe('Autenticação e Sessões S03', () => {
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
         celular: '11999999999',
-        dataNascimento: '1990-01-01',
         pin: '123456',
         confirmacaoPin: '123456',
       }),
@@ -373,7 +360,6 @@ describe('Autenticação e Sessões S03', () => {
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
         celular: '11999999999',
-        dataNascimento: '1990-01-01',
         pin: '123456',
         confirmacaoPin: '123456',
       }),
@@ -680,7 +666,6 @@ describe('Autenticação e Sessões S03', () => {
       body: JSON.stringify({
         token,
         celular: '11999999999',
-        dataNascimento: '1990-01-01',
         pin: '654321',
         confirmacaoPin: '654321',
       }),
@@ -768,7 +753,6 @@ describe('Autenticação e Sessões S03', () => {
       body: JSON.stringify({
         token,
         celular: '11977777777',
-        dataNascimento: '1990-01-01',
         pin: '654321',
         confirmacaoPin: '654321',
       }),

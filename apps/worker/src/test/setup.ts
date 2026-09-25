@@ -9,7 +9,6 @@ export function setupDb(sqlite: any) {
     CREATE TABLE IF NOT EXISTS membros (
       id text PRIMARY KEY NOT NULL,
       nome text NOT NULL,
-      data_nascimento text,
       data_ordenacao text,
       codigo_carteirinha text UNIQUE,
       celular text UNIQUE,

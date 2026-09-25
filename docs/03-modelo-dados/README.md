@@ -26,7 +26,6 @@ Campos principais:
 
 - `id` — UUID textual
 - `nome`
-- `data_nascimento`
 - `celular`
 - `casa_id` — Casa de Oração principal do membro
 - `ativo`

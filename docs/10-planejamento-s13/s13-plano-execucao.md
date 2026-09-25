@@ -27,7 +27,7 @@ Este documento traduz o backlog da S13 em um plano técnico de execução sequen
   - Logout rigoroso e revogação em redefinição de PIN.
   - Anti-enumeração e roteamento unificado de erro 401.
   - Rate limiting contra Brute Force (5 falhas = 429 progressivo; 10 = 15m), baseado em Identidade + Janela Temporal (IP auxiliar), sem `sleep` ativo (usando KV/D1/Rate Limit nativo).
-  - Recuperação de acesso baseada no fluxo de ativação (se seguro).
+  - Recuperação de acesso por solicitação neutra vinculada ao celular e redefinição administrativa autorizada, sem data de nascimento.
 * **Arquivos Prováveis:** `auth.ts`, `login.ts`, `middleware/auth.ts`, `apiClient.ts`.
 * **Testes:** Unitários de middleware, automação E2E testando bloqueio (HTTP 429) e anti-enumeração de respostas.
 * **Evidência:** Retorno neutro no login; header `Retry-After`; sessão expirada após 12h simuladas; DB refletindo revogação.

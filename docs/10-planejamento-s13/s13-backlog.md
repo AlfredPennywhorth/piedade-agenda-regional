@@ -26,8 +26,8 @@ A S13 está dividida em blocos priorizados (P0 a P3). Cada item dentro dos bloco
 *   **Armazenamento de Token:** O armazenamento do token em localStorage aumenta o impacto de uma XSS. A S13 deverá avaliar o risco e as alternativas (ex: Cookie HttpOnly), considerando CORS, CSRF, PWA e complexidade técnica. **[B]**
 *   **Proteção contra Força Bruta (Brute Force):** Aplicar atraso progressivo após 5 falhas consecutivas; após 10 falhas curtas, suspender por 15 minutos (baseline ajustável). PIN não pode ser armazenado em claro ou escrito em log. O mecanismo não usará `sleep` ativo (limitação do Cloudflare); deve usar estado de segurança devolvendo imediatamente HTTP 429 com `Retry-After`. A política prioriza a **identidade alvo** e o **histórico temporal**, usando IP/Origem apenas como sinal auxiliar, para evitar o bloqueio de redes compartilhadas. **[A]**
     *   *Alternativa Técnica:* Tecnologia de rate limit/persistência de estado (ex: Cloudflare D1, Workers KV ou Rate Limiting nativo). Deve priorizar consistência, baixo custo (compatibilidade com plano zero), resistência a abusos e simplicidade operacional. **[B]**
-*   **Proteção contra Enumeração:** Respostas externas obrigatoriamente neutras nos fluxos de ativação, login e recuperação. Não revelar desnecessariamente se celular, data de nascimento, conta ou PIN exato existem ou estão corretos individualmente. **[A]**
-*   **Recuperação de Acesso:** Reutilizar o fluxo de identificação base (celular + data de nascimento) acrescido dos controles anti-enumeração para autorizar redefinição de PIN. Etapas obrigatórias: permitir novo PIN, revogar as sessões antigas, gerar sessão nova apenas no final do fluxo com sucesso, e logar na auditoria (sem o PIN). *Se a análise técnica S13 julgar celular+nascimento insuficiente, o PMO deve ser acionado com alternativas antes de inventar outro fator (SMS, etc).* **[A]**
+*   **Proteção contra Enumeração:** Respostas externas obrigatoriamente neutras nos fluxos de ativação, login e recuperação. Não revelar desnecessariamente se celular, conta ou PIN exato existem ou estão corretos individualmente. **[A]**
+*   **Recuperação de Acesso:** Manter o fluxo de solicitação por celular com resposta neutra e tratamento administrativo de redefinição de PIN. A recuperação não utiliza data de nascimento. Etapas obrigatórias: redefinir o PIN somente por fluxo autorizado, revogar sessões antigas e registrar auditoria sem o PIN. Qualquer novo fator adicional (SMS, e-mail, documento civil ou outro dado) depende de decisão expressa do PMO antes de implementação. **[A]**
 *   **WebAuthn / Passkeys:** A S13 não requer implementação imediata, mas o desenho do hardening não deve bloquear ou dificultar a adoção futura desta arquitetura. **[B]**
 
 ### S13.02 — Segurança HTTP e Aplicação [P1]
@@ -49,7 +49,7 @@ A S13 está dividida em blocos priorizados (P0 a P3). Cada item dentro dos bloco
 
 ### S13.05 — LGPD: Minimização e Relatórios [P1]
 *   **Decisão Aprovada do PMO (Relatórios):** O celular **NÃO** deve ser exibido por padrão em relatórios nominais, auditoria ou outras superfícies não essenciais. Para relatórios nominais de presença, manter preferencialmente: Nome, Casa, RSVP, Presença, e Forma de check-in. O celular permanece apenas como dado cadastral e operacional para identificação, autenticação e comunicações autorizadas. **[A]**
-*   **Inventário Base:** Verificar no código atual todos os lugares em que celular, data de nascimento e demais dados são retornados desnecessariamente, ajustando-os conforme a nova decisão aprovada. **[A]**
+*   **Inventário Base:** Verificar no código atual todos os lugares em que celular e demais dados são retornados desnecessariamente, ajustando-os conforme a nova decisão aprovada. **[A]**
 
 ### S13.06 — LGPD: Transparência, Base Legal e Retenção [P2]
 *   **Diretriz Jurídica:** Definir, com a Comissão LGPD, finalidade, base legal, transparência, retenção e direitos aplicáveis a cada categoria de dado. O consentimento só será implementado onde for efetivamente a base legal definida. **[D]**
@@ -66,7 +66,6 @@ A S13 está dividida em blocos priorizados (P0 a P3). Cada item dentro dos bloco
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | Nome | `membros` | Interfaces, Relatórios, Auditoria | Identificação do usuário | Autenticados, Gestores, Operadores, Auditores | Baixa | A validar (Comissão LGPD) |
 | Celular | `membros` | Acesso Operacional | Ativação/Contato | Sistema, Fluxos de Comunicação | Alta (Ocultar por padrão via decisão PMO) | A validar (Comissão LGPD) |
-| Data de Nasc. | `membros` | Ativação | Autenticação secundária | Apenas validação | Alta (Não trafegar após) | A validar (Comissão LGPD) |
 | Casa (Escopo) | `membros` | Relatórios, Admin | Segregação institucional | Auditores, Gestores, Operadores | Baixa | A validar (Comissão LGPD) |
 | Funções/Vínculos | `vinculos_funcionais` | Backend (Auth/ACL) | Autorização | Usuário logado, Auditores | Baixa | A validar (Comissão LGPD) |
 | Presença / RSVP | `checkins`, `rsvp` | Relatórios, Agenda | Gestão do Evento | Gestores, Operadores, Titular | Média | A validar (Comissão LGPD) |

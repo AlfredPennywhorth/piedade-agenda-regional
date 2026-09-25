@@ -37,25 +37,25 @@ describe('S09 - Eventos e Refeicoes', () => {
       INSERT INTO casas (id, setor_id, nome) VALUES ('casa-1', 'set-1', 'Casa 1');
       INSERT INTO locais (id, nome, endereco, numero, cidade, uf) VALUES ('${localId}', 'Local 1', 'Rua de Teste', '100', 'São Paulo', 'SP');
       
-      INSERT INTO membros (id, nome, celular, data_nascimento, casa_id, ativo)
+      INSERT INTO membros (id, nome, celular, casa_id, ativo)
       VALUES 
-        ('${membroId}', 'Admin', '11999999999', '1990-01-01', 'casa-1', 1);
+        ('${membroId}', 'Admin', '11999999999', 'casa-1', 1);
     `
     sqlite.exec(baseSql)
 
-    const genSession = async (mid: string, cel: string, dataNascimento: string) => {
+    const genSession = async (mid: string, cel: string) => {
       const resLink = await req(`/api/v1/admin/membros/${mid}/link-ativacao`, { method: 'POST' })
       const linkJson = await resLink.json() as any
       const resAtivar = await req('/api/v1/auth/ativar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: linkJson.token, celular: cel, dataNascimento, pin: '123456', confirmacaoPin: '123456' })
+        body: JSON.stringify({ token: linkJson.token, celular: cel, pin: '123456', confirmacaoPin: '123456' })
       })
       const ativarJson = await resAtivar.json() as any
       return ativarJson.sessionToken
     }
 
-    sessionToken = await genSession(membroId, '11999999999', '1990-01-01')
+    sessionToken = await genSession(membroId, '11999999999')
     const conta = sqlite.prepare(
       'SELECT id FROM contas_acesso WHERE membro_id = ?'
     ).get(membroId) as { id: string }

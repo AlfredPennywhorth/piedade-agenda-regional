@@ -119,8 +119,6 @@ const timestampsS02 = {
 export const membros = sqliteTable('membros', {
   id: text('id').primaryKey(), // UUID
   nome: text('nome').notNull(),
-  // Legado: será removido após a regularização dos dados institucionais.
-  dataNascimento: text('data_nascimento'),
   dataOrdenacao: text('data_ordenacao'),
   codigoCarteirinha: text('codigo_carteirinha').unique(),
   celular: text('celular').unique(),
