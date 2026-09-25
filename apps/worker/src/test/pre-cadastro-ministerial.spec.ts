@@ -5,6 +5,7 @@ import { createApp } from '../index'
 import * as schema from '../db/schema'
 import { hashToken } from '../security/tokens'
 import { setupDb } from './setup'
+import { registrarCienciaPmo } from './responsabilidade-pmo-test-helper'
 
 describe('DATA-04A — pré-cadastro ministerial', () => {
   let sqlite: Database.Database
@@ -71,6 +72,7 @@ describe('DATA-04A — pré-cadastro ministerial', () => {
          'Administração A', 'BR-21-0001 - Casa A', 'BR-21-0001', 'casa-a',
          '2015-01-01', 'Inativo', NULL, 0);
     `)
+    registrarCienciaPmo(sqlite, 'c-admin-a', 'a-admin-a')
   })
 
   async function sessao(id: string, contaId: string, membroId: string, token: string) {
