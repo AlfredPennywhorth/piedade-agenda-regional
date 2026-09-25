@@ -1160,6 +1160,7 @@ portariaRouter.get('/eventos', async (c) => {
           fimEm: evento.fimEm,
           modalidade: evento.modalidade,
           statusPortaria: estadoPortaria?.status ?? 'ABERTA',
+          podeOperarPortaria: isAuthorized,
           podeConfirmarFechamento: isGestor,
         })
       }
