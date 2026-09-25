@@ -288,4 +288,34 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
     expect(screen.queryByText('João Antigo')).not.toBeInTheDocument()
     expect(screen.getByText('Maria Atual')).toBeInTheDocument()
   })
+
+  it('9. Excluir: remove cadastro indevido após confirmação', async () => {
+    mockEstrutura([mockMembros[0]])
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string, options?: RequestInit) => {
+      if (endpoint === `/membros/${MEMBRO_1_ID}` && options?.method === 'DELETE') {
+        return { message: 'Membro excluído', id: MEMBRO_1_ID } as any
+      }
+      if (endpoint === '/membros') return [mockMembros[0]] as any
+      if (endpoint === '/casas') return mockCasas as any
+      if (endpoint === '/setores') return mockSetores as any
+      if (endpoint === '/administracoes') return mockAdministracoes as any
+      if (endpoint === '/regionais') return mockRegionais as any
+      throw new Error(`Not found: ${endpoint}`)
+    })
+
+    render(<MembrosView />)
+    await screen.findByText('João da Silva')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir' }))
+
+    await waitFor(() => {
+      expect(apiClient.fetchWithAuth).toHaveBeenCalledWith(
+        `/membros/${MEMBRO_1_ID}`,
+        { method: 'DELETE' }
+      )
+    })
+    expect(window.confirm).toHaveBeenCalled()
+  })
+
 })
