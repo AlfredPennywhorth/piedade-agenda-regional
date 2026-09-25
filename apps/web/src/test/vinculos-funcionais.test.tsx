@@ -262,24 +262,30 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
     fireEvent.change(screen.getByLabelText(/Função \*/i), { target: { value: FUNCAO_ID } })
     fireEvent.click(screen.getByLabelText(/Casa de Oração/i, { selector: 'input[type="radio"]' }))
 
-    const regional = await screen.findByLabelText('Regional')
+    const regional = await screen.findByRole('combobox', { name: 'Regional' })
     fireEvent.change(regional, { target: { value: REGIONAL_ID } })
 
-    const administracao = screen.getByLabelText('Administração')
+    const administracao = screen.getByRole('combobox', { name: 'Administração' })
     fireEvent.change(administracao, { target: { value: ADMINISTRACAO_ID } })
 
-    const setor = screen.getByLabelText('Setor')
+    const setor = screen.getByRole('combobox', { name: 'Setor' })
     fireEvent.change(setor, { target: { value: SETOR_ID } })
 
-    const casa = screen.getByLabelText(/Casa de Oração Selecionada/i) as HTMLSelectElement
+    const casa = screen.getByRole('combobox', {
+      name: /Casa de Oração Selecionada/i,
+    }) as HTMLSelectElement
     expect(Array.from(casa.options).some(option => option.text === 'Casa A')).toBe(true)
     expect(Array.from(casa.options).some(option => option.text === 'Casa B')).toBe(false)
 
     fireEvent.change(casa, { target: { value: CASA_ID } })
     fireEvent.change(setor, { target: { value: SETOR_ID_2 } })
 
-    expect((screen.getByLabelText(/Casa de Oração Selecionada/i) as HTMLSelectElement).value).toBe('')
-    const casaAposTroca = screen.getByLabelText(/Casa de Oração Selecionada/i) as HTMLSelectElement
+    expect((screen.getByRole('combobox', {
+      name: /Casa de Oração Selecionada/i,
+    }) as HTMLSelectElement).value).toBe('')
+    const casaAposTroca = screen.getByRole('combobox', {
+      name: /Casa de Oração Selecionada/i,
+    }) as HTMLSelectElement
     expect(Array.from(casaAposTroca.options).some(option => option.text === 'Casa A')).toBe(false)
     expect(Array.from(casaAposTroca.options).some(option => option.text === 'Casa B')).toBe(true)
   })
