@@ -26,7 +26,6 @@ Campos principais:
 
 - `id` — UUID textual
 - `nome`
-- `data_nascimento` — **legado**, sem uso funcional vigente; mantido temporariamente até saneamento/migração de remoção
 - `celular`
 - `casa_id` — Casa de Oração principal do membro
 - `ativo`
