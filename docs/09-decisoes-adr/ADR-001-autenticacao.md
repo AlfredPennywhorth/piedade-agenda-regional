@@ -4,7 +4,7 @@
 |---|---|
 | **ID** | ADR-001 |
 | **Título** | Mecanismo de Autenticação |
-| **Status** | **DECIDIDO** (PMO-001 — 2026-08-31) |
+| **Status** | **DECIDIDO** (PMO-001 — 2026-08-31; revisado em 2026-09-25) |
 | **Proposto por** | Lead Dev (Sprint S00) |
 | **Decidido por** | PMO |
 | **Data da decisão** | 2026-08-31 |
@@ -51,7 +51,7 @@ Autenticação gerenciada pelo Cloudflare Zero Trust. Os usuários se autenticar
 | Localização | Backend Cloudflare Worker |
 | Persistência | Cloudflare D1 |
 | Ativação | Link individual por membro |
-| Validação inicial | Celular + Data de nascimento |
+| Validação inicial | Celular cadastrado + link individual |
 | Mecanismo de sessão | Próprio e seguro (a definir na S01) |
 | Contingência | PIN |
 | Evolução futura | Arquitetura preparada para Passkeys / WebAuthn |
@@ -88,8 +88,7 @@ O Cloudflare Access **poderá ser avaliado posteriormente** somente para:
   - `sessoes` — tokens de sessão, expiração, IP/User-Agent
   - `links_ativacao` — links individuais, status, expiração
   - `tentativas_acesso` — auditoria de tentativas (LGPD)
-- **Dados sensíveis**: Data de nascimento usada apenas para validação de identidade na ativação.
-  Verificar com PMO se deve ser armazenada após ativação (LGPD — princípio da necessidade).
+- **Minimização de dados**: a revisão de 25/09/2026 removeu a data de nascimento do modelo e dos fluxos de autenticação. A ativação utiliza link individual e confirmação do celular cadastrado.
 
 ---
 
