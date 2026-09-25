@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, fetchWithAuth, postWithAuth } from '../../api/apiClient'
 
 type Acesso = {
@@ -11,6 +11,7 @@ type Acesso = {
 type Unidade = {
   id: string
   nome: string
+  codigo?: string | null
 }
 
 type Props = {
@@ -55,6 +56,11 @@ function niveisPermitidos(perfil: string) {
   return NIVEIS.map(([codigo]) => codigo)
 }
 
+function rotuloUnidade(unidade: Unidade) {
+  const codigo = unidade.codigo ? ` (${unidade.codigo})` : ''
+  return `${unidade.nome}${codigo} · ${unidade.id.slice(0, 8)}`
+}
+
 export function GerenciarAcessosPanel({
   contaAcessoId,
   nomePessoa,
@@ -70,6 +76,8 @@ export function GerenciarAcessosPanel({
   const [processando, setProcessando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [mensagem, setMensagem] = useState<string | null>(null)
+  const [rotulosAcessos, setRotulosAcessos] = useState<Record<string, string>>({})
+  const requisicaoUnidadesRef = useRef(0)
 
   const permitidos = useMemo(() => niveisPermitidos(perfil), [perfil])
 
@@ -83,8 +91,11 @@ export function GerenciarAcessosPanel({
     setMensagem(null)
     setEscopoId('')
 
+    const requisicaoAtual = ++requisicaoUnidadesRef.current
+
     if (nivel === 'GLOBAL') {
       setUnidades([])
+      setCarregandoUnidades(false)
       return
     }
 
@@ -94,15 +105,50 @@ export function GerenciarAcessosPanel({
     setCarregandoUnidades(true)
     void fetchWithAuth<Unidade[]>(endpoint)
       .then(data => {
-        const ordenadas = [...data].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+        if (requisicaoAtual !== requisicaoUnidadesRef.current) return
+        const ordenadas = [...data].sort((a, b) =>
+          rotuloUnidade(a).localeCompare(rotuloUnidade(b), 'pt-BR')
+        )
         setUnidades(ordenadas)
       })
       .catch(error => {
+        if (requisicaoAtual !== requisicaoUnidadesRef.current) return
         setUnidades([])
         setErro(error instanceof ApiError ? error.message : 'Não foi possível carregar os escopos.')
       })
-      .finally(() => setCarregandoUnidades(false))
+      .finally(() => {
+        if (requisicaoAtual === requisicaoUnidadesRef.current) {
+          setCarregandoUnidades(false)
+        }
+      })
   }, [nivel])
+
+  useEffect(() => {
+    let ativo = true
+    const tipos = Array.from(
+      new Set(acessos.map(acesso => acesso.escopoTipo).filter(tipo => tipo !== 'GLOBAL'))
+    )
+
+    void Promise.all(
+      tipos.map(async tipo => {
+        const endpoint = endpointDoNivel(tipo)
+        if (!endpoint) return [] as Array<[string, string]>
+        try {
+          const itens = await fetchWithAuth<Unidade[]>(endpoint)
+          return itens.map(item => [`${tipo}:${item.id}`, rotuloUnidade(item)] as [string, string])
+        } catch {
+          return [] as Array<[string, string]>
+        }
+      })
+    ).then(grupos => {
+      if (!ativo) return
+      setRotulosAcessos(Object.fromEntries(grupos.flat()))
+    })
+
+    return () => {
+      ativo = false
+    }
+  }, [acessos])
 
   const conceder = async () => {
     if (nivel !== 'GLOBAL' && !escopoId) {
@@ -130,7 +176,13 @@ export function GerenciarAcessosPanel({
   }
 
   const revogar = async (acesso: Acesso) => {
-    if (!window.confirm(`Revogar o acesso ${acesso.perfilCodigo} de ${nomePessoa}?`)) return
+    const escopo =
+      acesso.escopoTipo === 'GLOBAL'
+        ? 'Global'
+        : rotulosAcessos[`${acesso.escopoTipo}:${acesso.escopoId}`] ??
+          `${acesso.escopoTipo} · ${acesso.escopoId ?? 'sem identificador'}`
+
+    if (!window.confirm(`Revogar o acesso ${acesso.perfilCodigo} de ${nomePessoa} no escopo ${escopo}?`)) return
 
     setProcessando(true)
     setErro(null)
@@ -212,7 +264,7 @@ export function GerenciarAcessosPanel({
               className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
             >
               <option value="">{carregandoUnidades ? 'Carregando...' : 'Selecione...'}</option>
-              {unidades.map(unidade => <option key={unidade.id} value={unidade.id}>{unidade.nome}</option>)}
+              {unidades.map(unidade => <option key={unidade.id} value={unidade.id}>{rotuloUnidade(unidade)}</option>)}
             </select>
           </label>
         )}
@@ -237,7 +289,15 @@ export function GerenciarAcessosPanel({
           <ul className="space-y-2">
             {acessos.map(acesso => (
               <li key={acesso.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-                <span className="text-xs text-slate-700">{acesso.perfilCodigo} · {acesso.escopoTipo}</span>
+                <span className="text-xs text-slate-700">
+                  {acesso.perfilCodigo} · {acesso.escopoTipo} · {
+                    acesso.escopoTipo === 'GLOBAL'
+                      ? 'Global'
+                      : rotulosAcessos[`${acesso.escopoTipo}:${acesso.escopoId}`] ??
+                        acesso.escopoId ??
+                        'sem identificador'
+                  }
+                </span>
                 <button
                   type="button"
                   onClick={() => void revogar(acesso)}
