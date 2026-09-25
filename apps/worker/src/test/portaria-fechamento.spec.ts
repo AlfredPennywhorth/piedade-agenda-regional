@@ -278,6 +278,19 @@ describe('PORT-03 — fechamento e lista final consolidada', () => {
     expect(await fechar.json()).toMatchObject({ code: 'SOLICITACAO_FECHAMENTO_NECESSARIA' })
   })
 
+  it('recusa confirmação concorrente quando o lock de fechamento já está adquirido', async () => {
+    await prepararPorteiro()
+    await solicitarFechamento()
+
+    sqlite.prepare(
+      'INSERT INTO portaria_fechamento_locks (evento_id, criado_em) VALUES (?, ?)'
+    ).run('evento-1', new Date().toISOString())
+
+    const fechar = await confirmarFechamento()
+    expect(fechar.status).toBe(409)
+    expect(await fechar.json()).toMatchObject({ code: 'PORTARIA_FECHANDO' })
+  })
+
   it('gestor pode reabrir excepcionalmente e o novo fechamento exige nova solicitação', async () => {
     await prepararPorteiro()
     await solicitarFechamento()
