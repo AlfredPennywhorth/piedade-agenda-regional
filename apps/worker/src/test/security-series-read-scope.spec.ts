@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { createApp } from '../index'
 import { setupDb } from './setup'
 import { hashToken } from '../security/tokens'
+import { registrarCienciaPmo } from './responsabilidade-pmo-test-helper'
 
 describe('PR-SEC-01 — leitura de séries por escopo sem N+1', () => {
   let sqlite: any
@@ -35,9 +36,13 @@ describe('PR-SEC-01 — leitura de séries por escopo sem N+1', () => {
     ).run(contaId, ids.membroA)
 
     if (perfil) {
+      const acessoId = crypto.randomUUID()
       sqlite.prepare(
         'INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, ?, ?, ?)'
-      ).run(crypto.randomUUID(), contaId, perfil.codigo, perfil.escopoTipo, perfil.escopoId)
+      ).run(acessoId, contaId, perfil.codigo, perfil.escopoTipo, perfil.escopoId)
+      if (perfil.codigo === 'ADMINISTRADOR_SISTEMA' && perfil.escopoTipo === 'REGIONAL') {
+        registrarCienciaPmo(sqlite, contaId, acessoId)
+      }
     }
 
     sqlite.prepare(`
