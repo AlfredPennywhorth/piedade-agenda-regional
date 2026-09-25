@@ -316,7 +316,6 @@ pnpm --filter @piedade/worker db:migrate:local
 - Secrets de API (Cloudflare, GitHub, etc.)
 - Dados reais de membros
 - CPF real
-- Data de nascimento real
 - Telefone real
 
 Use apenas **dados sintéticos** para desenvolvimento e testes.
