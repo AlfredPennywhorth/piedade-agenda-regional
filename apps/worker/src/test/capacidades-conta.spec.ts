@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import * as schema from '../db/schema'
 import { obterCapacidadesMembro } from '../security/permissoes'
 import { setupDb } from './setup'
+import { registrarCienciaPmo } from './responsabilidade-pmo-test-helper'
 
 describe('ACC-11 — capacidades consolidadas da conta', () => {
   let sqlite: Database.Database
@@ -131,6 +132,7 @@ describe('ACC-11 — capacidades consolidadas da conta', () => {
       VALUES
         ('acesso-admin', 'conta-1', 'ADMINISTRADOR_SISTEMA', 'REGIONAL', 'regional-1');
     `)
+    registrarCienciaPmo(sqlite, 'conta-1', 'acesso-admin')
 
     const capacidades = await obterCapacidadesMembro(db, 'membro-1', 'conta-1')
     expect(capacidades.podeAdministrarAcessos).toBe(true)

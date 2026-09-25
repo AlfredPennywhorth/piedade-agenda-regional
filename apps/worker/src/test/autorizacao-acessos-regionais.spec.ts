@@ -5,6 +5,7 @@ import { createApp } from '../index'
 import * as schema from '../db/schema'
 import { hashToken } from '../security/tokens'
 import { setupDb } from './setup'
+import { registrarCienciaPmo } from './responsabilidade-pmo-test-helper'
 
 describe('ACC-10 — segregação de administração de acessos entre Regionais', () => {
   let sqlite: Database.Database
@@ -51,6 +52,7 @@ describe('ACC-10 — segregação de administração de acessos entre Regionais'
         ('acesso-master', 'conta-master', 'MASTER_SISTEMA', 'GLOBAL', NULL),
         ('acesso-admin-a', 'conta-admin-a', 'ADMINISTRADOR_SISTEMA', 'REGIONAL', 'regional-a');
     `)
+    registrarCienciaPmo(sqlite, 'conta-admin-a', 'acesso-admin-a')
   })
 
   async function criarSessao(

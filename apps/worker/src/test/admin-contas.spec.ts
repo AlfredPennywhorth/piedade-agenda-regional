@@ -5,6 +5,7 @@ import { createApp } from '../index'
 import * as schema from '../db/schema'
 import { hashToken } from '../security/tokens'
 import { setupDb } from './setup'
+import { registrarCienciaPmo } from './responsabilidade-pmo-test-helper'
 
 describe('Administração de contas — PR-ACC-05', () => {
   let sqlite: Database.Database
@@ -56,6 +57,7 @@ describe('Administração de contas — PR-ACC-05', () => {
         ('acesso-master', 'conta-master', 'MASTER_SISTEMA', 'GLOBAL', NULL),
         ('acesso-comum', 'conta-comum', 'USUARIO_COMUM', 'CASA', 'casa-1');
     `)
+    registrarCienciaPmo(sqlite, 'conta-admin', 'acesso-admin')
   })
 
   async function requisicao(path: string, init?: RequestInit) {

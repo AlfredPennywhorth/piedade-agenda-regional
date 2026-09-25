@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { createApp } from '../index'
 import { setupDb } from './setup'
 import { hashToken } from '../security/tokens'
+import { registrarCienciaPmo } from './responsabilidade-pmo-test-helper'
 
 describe('PR-SEC-01 — escrita territorial por Regional', () => {
   let sqlite: any
@@ -35,9 +36,11 @@ describe('PR-SEC-01 — escrita territorial por Regional', () => {
         "INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, 'MASTER_SISTEMA', 'GLOBAL', NULL)"
       ).run(crypto.randomUUID(), contaId)
     } else {
+      const acessoId = crypto.randomUUID()
       sqlite.prepare(
         "INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, 'ADMINISTRADOR_SISTEMA', 'REGIONAL', ?)"
-      ).run(crypto.randomUUID(), contaId, ids.regionalA)
+      ).run(acessoId, contaId, ids.regionalA)
+      registrarCienciaPmo(sqlite, contaId, acessoId)
     }
 
     sqlite.prepare(`

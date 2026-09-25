@@ -143,7 +143,7 @@ function App() {
   }
 
   return (
-    <ResponsabilidadeRegionalGate>
+    <ResponsabilidadeRegionalGate onCienciaRegistrada={carregarIdentidade}>
     <MainLayout
       currentTab={currentTab}
       onTabChange={alterarAba}

@@ -18,9 +18,10 @@ interface Responsabilidade {
 
 interface Props {
   children: ReactNode
+  onCienciaRegistrada?: () => Promise<void> | void
 }
 
-export function ResponsabilidadeRegionalGate({ children }: Props) {
+export function ResponsabilidadeRegionalGate({ children, onCienciaRegistrada }: Props) {
   const [responsabilidade, setResponsabilidade] = useState<Responsabilidade | null>(null)
   const [verificado, setVerificado] = useState(false)
   const [confirmado, setConfirmado] = useState(false)
@@ -75,6 +76,7 @@ export function ResponsabilidadeRegionalGate({ children }: Props) {
         versao: responsabilidadeAtual.versao,
         ciente: true,
       })
+      await onCienciaRegistrada?.()
       await consultar()
     } catch (error) {
       setErro(error instanceof ApiError ? error.message : 'Não foi possível registrar a ciência.')

@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 import * as schema from '../db/schema'
 import { obterCapacidadesMembro } from '../security/permissoes'
 import { setupDb } from './setup'
+import { registrarCienciaPmo } from './responsabilidade-pmo-test-helper'
 
 describe('QA-AUTH-01 — matriz de capacidades por perfil técnico', () => {
   let sqlite: Database.Database
@@ -50,6 +51,7 @@ describe('QA-AUTH-01 — matriz de capacidades por perfil técnico', () => {
         ('a-admin', 'c-admin', 'ADMINISTRADOR_SISTEMA', 'REGIONAL', 'regional-1'),
         ('a-master', 'c-master', 'MASTER_SISTEMA', 'GLOBAL', NULL);
     `)
+    registrarCienciaPmo(sqlite, 'c-admin', 'a-admin')
   })
 
   it.each([

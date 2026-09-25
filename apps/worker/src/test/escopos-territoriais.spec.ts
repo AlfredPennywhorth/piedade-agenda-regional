@@ -7,6 +7,7 @@ import {
   obterEscoposTerritoriaisVisiveis,
 } from '../security/permissoes'
 import { setupDb } from './setup'
+import { registrarCienciaPmo } from './responsabilidade-pmo-test-helper'
 
 describe('SEC — visibilidade territorial', () => {
   let sqlite: Database.Database
@@ -58,6 +59,7 @@ describe('SEC — visibilidade territorial', () => {
         ('a-admin', 'c-admin', 'ADMINISTRADOR_SISTEMA', 'REGIONAL', 'regional-1'),
         ('a-master', 'c-master', 'MASTER_SISTEMA', 'GLOBAL', NULL);
     `)
+    registrarCienciaPmo(sqlite, 'c-admin', 'a-admin')
   })
 
   it('usuário comum enxerga somente a própria Casa e sua cadeia ancestral', async () => {

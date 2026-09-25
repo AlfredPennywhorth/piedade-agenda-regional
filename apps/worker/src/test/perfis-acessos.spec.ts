@@ -5,6 +5,7 @@ import { createApp } from '../index'
 import * as schema from '../db/schema'
 import { hashToken } from '../security/tokens'
 import { setupDb } from './setup'
+import { registrarCienciaPmo } from './responsabilidade-pmo-test-helper'
 import {
   RESPONSABILIDADE_PMO_TEXTO,
   RESPONSABILIDADE_PMO_VERSAO,
@@ -178,6 +179,9 @@ describe('Perfis, escopos e governança — PR-ACC-03', () => {
       'Content-Type': 'application/json',
     }
 
+    const bloqueadoAntesDaCiencia = await requisicao('/api/v1/admin/acessos', { headers })
+    expect(bloqueadoAntesDaCiencia.status).toBe(403)
+
     const consulta = await requisicao(
       '/api/v1/governanca/responsabilidade-regional',
       { headers }
@@ -212,6 +216,9 @@ describe('Perfis, escopos e governança — PR-ACC-03', () => {
     expect(registro.versao_texto).toBe(RESPONSABILIDADE_PMO_VERSAO)
     expect(registro.texto_hash).toMatch(/^[a-f0-9]{64}$/)
     expect(registro.ciente_em).toBeTruthy()
+
+    const liberadoAposCiencia = await requisicao('/api/v1/admin/acessos', { headers })
+    expect(liberadoAposCiencia.status).toBe(200)
 
     const repetida = await requisicao(
       '/api/v1/governanca/responsabilidade-regional/ciencia',
@@ -300,6 +307,7 @@ describe('Perfis, escopos e governança — PR-ACC-03', () => {
       INSERT INTO bootstrap_master (id, conta_acesso_id)
       VALUES ('PRIMEIRO_MASTER', 'conta-master');
     `)
+    registrarCienciaPmo(sqlite, 'conta-pmo', 'acesso-admin')
 
     const agora = new Date().toISOString()
     const tokenAdmin = 'token-pmo-admin'
