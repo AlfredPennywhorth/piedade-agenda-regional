@@ -1,8 +1,13 @@
 import { Hono } from 'hono'
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, gt, inArray } from 'drizzle-orm'
 import {
   administracoes,
   casas,
+  convocacaoDestinatarioEvidencias,
+  convocacaoDestinatarios,
+  convocacaoFuncoes,
+  convocacoes,
+  eventos,
   funcoes,
   gruposTrabalho,
   membros,
@@ -90,6 +95,118 @@ function escopoDoVinculo(vinculo: any): {
   if (vinculo.casaId) return { tipo: 'CASA', id: vinculo.casaId }
   if (vinculo.grupoTrabalhoId) return { tipo: 'GRUPO_TRABALHO', id: vinculo.grupoTrabalhoId }
   return null
+}
+
+function eventoCorrespondeAoVinculo(evento: any, vinculo: any): boolean {
+  if (vinculo.regionalId) return evento.regionalId === vinculo.regionalId
+  if (vinculo.administracaoId) return evento.administracaoId === vinculo.administracaoId
+  if (vinculo.setorId) return evento.setorId === vinculo.setorId
+  if (vinculo.casaId) return evento.casaId === vinculo.casaId
+  if (vinculo.grupoTrabalhoId) return evento.grupoTrabalhoId === vinculo.grupoTrabalhoId
+  return false
+}
+
+type SincronizacaoConvocacao = {
+  convocacaoId: string
+  destinatarioId: string
+  destinatarioNovo: boolean
+}
+
+async function prepararSincronizacaoConvocacoes(db: any, vinculo: any): Promise<SincronizacaoConvocacao[]> {
+  if (!vinculo?.ativo) return []
+
+  const membro = await db
+    .select({ ativo: membros.ativo })
+    .from(membros)
+    .where(eq(membros.id, vinculo.membroId))
+    .get()
+  if (!membro?.ativo) return []
+
+  const agoraIso = new Date().toISOString()
+  const candidatas = await db
+    .select({
+      convocacaoId: convocacoes.id,
+      evento: eventos,
+    })
+    .from(convocacoes)
+    .innerJoin(
+      convocacaoFuncoes,
+      and(
+        eq(convocacaoFuncoes.convocacaoId, convocacoes.id),
+        eq(convocacaoFuncoes.funcaoId, vinculo.funcaoId)
+      )
+    )
+    .innerJoin(eventos, eq(convocacoes.eventoId, eventos.id))
+    .where(
+      and(
+        eq(convocacoes.status, 'PUBLICADA'),
+        eq(convocacoes.ativo, true),
+        eq(eventos.ativo, true),
+        gt(eventos.fimEm, agoraIso)
+      )
+    )
+    .all()
+
+  const resultado: SincronizacaoConvocacao[] = []
+  for (const candidata of candidatas) {
+    if (!eventoCorrespondeAoVinculo(candidata.evento, vinculo)) continue
+
+    const existente = await db
+      .select({ id: convocacaoDestinatarios.id })
+      .from(convocacaoDestinatarios)
+      .where(
+        and(
+          eq(convocacaoDestinatarios.convocacaoId, candidata.convocacaoId),
+          eq(convocacaoDestinatarios.membroId, vinculo.membroId)
+        )
+      )
+      .get()
+
+    resultado.push({
+      convocacaoId: candidata.convocacaoId,
+      destinatarioId: existente?.id ?? crypto.randomUUID(),
+      destinatarioNovo: !existente,
+    })
+  }
+
+  return resultado
+}
+
+function queriesSincronizacaoConvocacoes(
+  qdb: any,
+  vinculo: any,
+  sincronizacoes: SincronizacaoConvocacao[],
+  agoraIso: string
+) {
+  const queries: any[] = []
+
+  for (const item of sincronizacoes) {
+    if (item.destinatarioNovo) {
+      queries.push(
+        qdb.insert(convocacaoDestinatarios).values({
+          id: item.destinatarioId,
+          convocacaoId: item.convocacaoId,
+          membroId: vinculo.membroId,
+          createdAt: agoraIso,
+        })
+      )
+    }
+
+    queries.push(
+      qdb
+        .insert(convocacaoDestinatarioEvidencias)
+        .values({
+          id: crypto.randomUUID(),
+          convocacaoDestinatarioId: item.destinatarioId,
+          funcaoId: vinculo.funcaoId,
+          vinculoFuncionalId: vinculo.id,
+          createdAt: agoraIso,
+        })
+        .onConflictDoNothing()
+    )
+  }
+
+  return queries
 }
 
 function podeEscreverVinculos(contexto: any): boolean {
@@ -266,9 +383,17 @@ vinculosFuncionaisRouter.post('/', async (c) => {
     if (!escopo) {
       return c.json({ error: 'O vínculo funcional deve possuir exatamente um escopo institucional.' }, 400)
     }
+
+    const vinculoNovo = { id, ...parsed }
+    const agoraIso = new Date().toISOString()
+    const sincronizacoes = await prepararSincronizacaoConvocacoes(db, vinculoNovo)
+
     await executarOperacaoComAudit(
       db,
-      (qdb) => [qdb.insert(vinculosFuncionais).values({ id, ...parsed })],
+      (qdb) => [
+        qdb.insert(vinculosFuncionais).values(vinculoNovo),
+        ...queriesSincronizacaoConvocacoes(qdb, vinculoNovo, sincronizacoes, agoraIso),
+      ],
       {
         acao: 'VINCULO_FUNCIONAL_CRIADO',
         atorMembroId: c.get('membroId') || null,
@@ -276,7 +401,11 @@ vinculosFuncionaisRouter.post('/', async (c) => {
         recursoId: id,
         escopoTipo: escopo.tipo,
         escopoId: escopo.id,
-        contexto: { membroId: parsed.membroId, funcaoId: parsed.funcaoId },
+        contexto: {
+          membroId: parsed.membroId,
+          funcaoId: parsed.funcaoId,
+          convocacoesSincronizadas: sincronizacoes.length,
+        },
       }
     )
     const result = await db.select().from(vinculosFuncionais).where(eq(vinculosFuncionais.id, id)).get()
@@ -358,14 +487,17 @@ vinculosFuncionaisRouter.patch('/:id', async (c) => {
     const atorMembroId = c.get('membroId') || null
     const camposAlterados = Object.keys(parsed)
     const moveuEscopo = escopoOrigem.tipo !== escopoFinal.tipo || escopoOrigem.id !== escopoFinal.id
+    const agoraAtualizacao = new Date().toISOString()
+    const sincronizacoes = await prepararSincronizacaoConvocacoes(db, vinculoResultante)
 
     if (moveuEscopo) {
       await executarOperacaoComAudits(
         db,
         (qdb) => [
           qdb.update(vinculosFuncionais)
-            .set({ ...parsed, updatedAt: new Date().toISOString() })
-            .where(eq(vinculosFuncionais.id, id))
+            .set({ ...parsed, updatedAt: agoraAtualizacao })
+            .where(eq(vinculosFuncionais.id, id)),
+          ...queriesSincronizacaoConvocacoes(qdb, vinculoResultante, sincronizacoes, agoraAtualizacao),
         ],
         [
           {
@@ -403,8 +535,9 @@ vinculosFuncionaisRouter.patch('/:id', async (c) => {
         db,
         (qdb) => [
           qdb.update(vinculosFuncionais)
-            .set({ ...parsed, updatedAt: new Date().toISOString() })
-            .where(eq(vinculosFuncionais.id, id))
+            .set({ ...parsed, updatedAt: agoraAtualizacao })
+            .where(eq(vinculosFuncionais.id, id)),
+          ...queriesSincronizacaoConvocacoes(qdb, vinculoResultante, sincronizacoes, agoraAtualizacao),
         ],
         {
           acao: 'VINCULO_FUNCIONAL_ATUALIZADO',

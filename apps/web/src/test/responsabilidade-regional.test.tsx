@@ -50,6 +50,7 @@ describe('ResponsabilidadeRegionalGate', () => {
           {
             acessoContaId: 'acesso-pmo',
             regionalId: 'regional-1',
+            regionalNome: 'Regional São Paulo',
             ciente: false,
             cienteEm: null,
           },
@@ -64,6 +65,7 @@ describe('ResponsabilidadeRegionalGate', () => {
           {
             acessoContaId: 'acesso-pmo',
             regionalId: 'regional-1',
+            regionalNome: 'Regional São Paulo',
             ciente: true,
             cienteEm: '2026-09-21T12:00:00Z',
           },
@@ -79,6 +81,7 @@ describe('ResponsabilidadeRegionalGate', () => {
 
     expect(await screen.findByText('Ciência do responsável PMO')).toBeDefined()
     expect(screen.getByText('Texto integral das responsabilidades.')).toBeDefined()
+    expect(screen.getByText('Regional vinculada: Regional São Paulo')).toBeDefined()
     expect(screen.queryByText('Conteúdo autorizado')).toBeNull()
 
     fireEvent.click(

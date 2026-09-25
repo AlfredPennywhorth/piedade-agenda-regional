@@ -37,6 +37,29 @@ function somenteCadastroInstitucional(membro: any) {
   }
 }
 
+function normalizarNome(nome: string): string {
+  return nome.trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR')
+}
+
+async function existeMesmoNomeNaCasa(
+  db: any,
+  nome: string,
+  casaId: string,
+  ignorarMembroId?: string
+): Promise<boolean> {
+  const candidatos = await db
+    .select({ id: membros.id, nome: membros.nome })
+    .from(membros)
+    .where(eq(membros.casaId, casaId))
+    .all()
+
+  const alvo = normalizarNome(nome)
+  return candidatos.some(
+    (item: { id: string; nome: string }) =>
+      item.id !== ignorarMembroId && normalizarNome(item.nome) === alvo
+  )
+}
+
 async function regionalIdDaCasa(db: any, casaId: string): Promise<string | null> {
   const row = await db
     .select({ regionalId: administracoes.regionalId })
@@ -193,6 +216,16 @@ membrosRouter.post('/', async (c) => {
     if (!podeAdministrarRegionalDoContexto(c.get('contextoPermissoes'), regionalAlvo)) {
       return c.json({ error: 'Acesso não autorizado para administrar pessoas nesta Regional', code: 'FORBIDDEN' }, 403)
     }
+
+    if (await existeMesmoNomeNaCasa(db, parsed.nome, parsed.casaId)) {
+      return c.json(
+        {
+          error: 'Já existe um membro com este nome nesta Casa de Oração',
+          code: 'NOME_JA_VINCULADO_NA_CASA',
+        },
+        409
+      )
+    }
     
     const conflitoCarteirinha = await db
       .select({ id: membros.id })
@@ -268,6 +301,18 @@ membrosRouter.patch('/:id', async (c) => {
       if (!podeAdministrarRegionalDoContexto(c.get('contextoPermissoes'), novaRegionalId)) {
         return c.json({ error: 'Acesso não autorizado para mover membro para outra Regional', code: 'FORBIDDEN' }, 403)
       }
+    }
+
+    const nomeFinal = parsed.nome ?? existing.nome
+    const casaFinalParaValidacao = parsed.casaId ?? existing.casaId
+    if (await existeMesmoNomeNaCasa(db, nomeFinal, casaFinalParaValidacao, id)) {
+      return c.json(
+        {
+          error: 'Já existe um membro com este nome nesta Casa de Oração',
+          code: 'NOME_JA_VINCULADO_NA_CASA',
+        },
+        409
+      )
     }
 
     if (
@@ -405,3 +450,59 @@ membrosRouter.patch('/:id', async (c) => {
     return c.json({ error: err.issues || err.message }, 400)
   }
 })
+
+membrosRouter.delete('/:id', async (c) => {
+  const db = c.get('db')
+  const id = c.req.param('id')
+
+  if (!podeEscreverMembros(c.get('contextoPermissoes'))) {
+    return c.json({ error: 'Acesso não autorizado para administrar pessoas', code: 'FORBIDDEN' }, 403)
+  }
+
+  const existing = await db.select().from(membros).where(eq(membros.id, id)).get()
+  if (!existing) return c.json({ error: 'Membro não encontrado' }, 404)
+
+  if (!(await podeAdministrarMembro(c, existing))) {
+    return c.json({ error: 'Acesso não autorizado para excluir este membro', code: 'FORBIDDEN' }, 403)
+  }
+
+  if (id === c.get('membroId')) {
+    return c.json(
+      { error: 'Não é permitido excluir o próprio cadastro', code: 'AUTO_EXCLUSAO_NAO_PERMITIDA' },
+      409
+    )
+  }
+
+  try {
+    await executarOperacaoComAudit(
+      db,
+      qdb => [qdb.delete(membros).where(eq(membros.id, id))],
+      {
+        acao: 'MEMBRO_EXCLUIDO',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'MEMBRO',
+        recursoId: id,
+        escopoTipo: 'CASA',
+        escopoId: existing.casaId,
+        contexto: {
+          motivoOperacional: 'Exclusão administrativa de cadastro indevido sem dependências',
+        },
+      }
+    )
+
+    return c.json({ message: 'Membro excluído', id })
+  } catch (err: any) {
+    if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
+      return c.json(
+        {
+          error:
+            'Este membro já possui conta, vínculo, convocação ou outro histórico relacionado. Inative o cadastro em vez de excluí-lo.',
+          code: 'MEMBRO_POSSUI_DEPENDENCIAS',
+        },
+        409
+      )
+    }
+    return c.json({ error: 'Não foi possível excluir o membro' }, 400)
+  }
+})
+

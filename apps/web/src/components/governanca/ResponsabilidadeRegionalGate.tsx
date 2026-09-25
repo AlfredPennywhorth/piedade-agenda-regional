@@ -4,6 +4,7 @@ import { ApiError, fetchWithAuth, postWithAuth } from '../../api/apiClient'
 interface AcessoResponsabilidade {
   acessoContaId: string
   regionalId: string
+  regionalNome?: string | null
   ciente: boolean
   cienteEm: string | null
 }
@@ -96,7 +97,7 @@ export function ResponsabilidadeRegionalGate({ children, onCienciaRegistrada }: 
             Ciência do responsável PMO
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Regional vinculada: {pendente.regionalId}
+            Regional vinculada: {pendente.regionalNome || pendente.regionalId}
           </p>
         </header>
 

@@ -237,4 +237,75 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
       .get()
     expect(tentativa).toBeDefined()
   })
+
+  it('23. Deve bloquear mesmo nome na mesma Casa de Oração', async () => {
+    const res = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: '  Pessoa   Teste Base ',
+        dataOrdenacao: '2001-01-01',
+        codigoCarteirinha: 'TESTE-23',
+        casaId,
+        celular: '11966666666',
+      }),
+    })
+
+    const json = await res.json() as any
+    expect(res.status).toBe(409)
+    expect(json.code).toBe('NOME_JA_VINCULADO_NA_CASA')
+  })
+
+  it('24. Deve permitir mesmo nome em Casa diferente', async () => {
+    const res = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'Pessoa Teste Base',
+        dataOrdenacao: '2001-01-01',
+        codigoCarteirinha: 'TESTE-24',
+        casaId: casaId2,
+        celular: '11965555555',
+      }),
+    })
+
+    expect(res.status).toBe(201)
+  })
+
+  it('25. Deve excluir cadastro indevido sem dependências', async () => {
+    const resCreate = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'Cadastro Duplicado Indevido',
+        dataOrdenacao: '2002-01-01',
+        codigoCarteirinha: 'TESTE-25',
+        casaId,
+        celular: '11964444444',
+      }),
+    })
+    expect(resCreate.status).toBe(201)
+    const criado = await resCreate.json() as any
+
+    const resDelete = await req(`/api/v1/membros/${criado.id}`, {
+      method: 'DELETE',
+    })
+
+    expect(resDelete.status).toBe(200)
+    const restante = await db.select().from(schema.membros).where(eq(schema.membros.id, criado.id)).get()
+    expect(restante).toBeUndefined()
+  })
+
+  it('26. Deve bloquear exclusão quando o membro possui dependências', async () => {
+    sqlite.exec(`
+      INSERT INTO contas_acesso (id, membro_id, status)
+      VALUES ('conta-dependente-exclusao', '${membroId}', 'PENDENTE_ATIVACAO');
+    `)
+
+    const resDelete = await req(`/api/v1/membros/${membroId}`, {
+      method: 'DELETE',
+    })
+
+    const json = await resDelete.json() as any
+    expect(resDelete.status).toBe(409)
+    expect(json.code).toBe('MEMBRO_POSSUI_DEPENDENCIAS')
+  })
+
 })
