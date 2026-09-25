@@ -130,4 +130,63 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     })
     expect(await screen.findByText('Todas as sessões da conta foram revogadas.')).toBeDefined()
   })
+
+  it('atribui Administrador do Sistema a uma Regional', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva] as any
+      if (endpoint === '/regionais') return [
+        { id: 'regional-1', nome: 'Regional São Paulo' },
+      ] as any
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      id: 'novo-acesso',
+      contaAcessoId: 'conta-1',
+      perfilCodigo: 'ADMINISTRADOR_SISTEMA',
+      escopoTipo: 'REGIONAL',
+      escopoId: 'regional-1',
+      ativo: true,
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Gerenciar acessos' }))
+
+    const unidade = await screen.findByLabelText('Unidade territorial')
+    fireEvent.change(unidade, { target: { value: 'regional-1' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Atribuir acesso' }))
+
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith('/admin/acessos', {
+        contaAcessoId: 'conta-1',
+        perfilCodigo: 'ADMINISTRADOR_SISTEMA',
+        escopoTipo: 'REGIONAL',
+        escopoId: 'regional-1',
+      })
+    })
+  })
+
+  it('revoga acesso existente pela gestão de acessos', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string, options?: RequestInit) => {
+      if (endpoint === '/admin/acessos/acesso-1' && options?.method === 'DELETE') {
+        return { message: 'Acesso revogado', id: 'acesso-1' } as any
+      }
+      if (endpoint === '/admin/acessos') return [contaAtiva] as any
+      if (endpoint === '/regionais') return [
+        { id: 'regional-1', nome: 'Regional São Paulo' },
+      ] as any
+      return [] as any
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Gerenciar acessos' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Revogar' }))
+
+    await waitFor(() => {
+      expect(apiClient.fetchWithAuth).toHaveBeenCalledWith(
+        '/admin/acessos/acesso-1',
+        { method: 'DELETE' }
+      )
+    })
+  })
+
 })

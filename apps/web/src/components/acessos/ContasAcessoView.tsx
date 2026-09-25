@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ApiError, fetchWithAuth, patchWithAuth, postWithAuth } from '../../api/apiClient'
+import { GerenciarAcessosPanel } from './GerenciarAcessosPanel'
 
 interface Acesso {
   id: string
@@ -42,6 +43,7 @@ export function ContasAcessoView() {
   const [erro, setErro] = useState<string | null>(null)
   const [mensagem, setMensagem] = useState<string | null>(null)
   const [linkTemporario, setLinkTemporario] = useState<string | null>(null)
+  const [gerenciandoMembroId, setGerenciandoMembroId] = useState<string | null>(null)
 
   const carregar = async () => {
     setErro(null)
@@ -203,6 +205,16 @@ export function ContasAcessoView() {
                     Gerar ativação
                   </button>
                 )}
+                {conta.contaAcessoId && (
+                  <button
+                    type="button"
+                    disabled={processando === conta.membroId}
+                    onClick={() => setGerenciandoMembroId(atual => atual === conta.membroId ? null : conta.membroId)}
+                    className="rounded-lg border border-slate-400 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                  >
+                    Gerenciar acessos
+                  </button>
+                )}
                 {conta.contaAcessoId && conta.status !== 'BLOQUEADA' && conta.status !== 'DESATIVADA' && (
                   <button
                     type="button"
@@ -253,6 +265,15 @@ export function ContasAcessoView() {
                   </li>
                 ))}
               </ul>
+            )}
+            {conta.contaAcessoId && gerenciandoMembroId === conta.membroId && (
+              <GerenciarAcessosPanel
+                contaAcessoId={conta.contaAcessoId}
+                nomePessoa={conta.nome}
+                acessos={conta.acessos}
+                onAtualizado={carregar}
+                onFechar={() => setGerenciandoMembroId(null)}
+              />
             )}
           </article>
         ))}
