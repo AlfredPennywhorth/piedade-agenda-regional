@@ -300,4 +300,62 @@ describe('Testes de Vínculos Funcionais', () => {
     expect(res.status).toBe(400)
     expect(json.error).toContain('exatamente um escopo')
   })
+
+  it('22. novo vínculo recebe convocações futuras já publicadas para a função', async () => {
+    const membroNovoId = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa'
+    const eventoId = 'bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb'
+    const convocacaoId = 'cccccccc-1111-4111-8111-cccccccccccc'
+
+    sqlite.exec(`
+      INSERT INTO membros (id, nome, casa_id, ativo)
+      VALUES ('${membroNovoId}', 'Novo Diácono', '${casaId}', 1);
+
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo)
+      VALUES
+        ('${eventoId}', 'Reunião futura da função', 'PRESENCIAL',
+         '2027-03-10T22:00:00.000Z', '2027-03-10T23:00:00.000Z', '${regId}', 1);
+
+      INSERT INTO convocacoes
+        (id, evento_id, status, ativo, publicada_em)
+      VALUES
+        ('${convocacaoId}', '${eventoId}', 'PUBLICADA', 1, CURRENT_TIMESTAMP);
+
+      INSERT INTO convocacao_funcoes
+        (id, convocacao_id, funcao_id)
+      VALUES
+        ('dddddddd-1111-4111-8111-dddddddddddd', '${convocacaoId}', '${funcaoId2}');
+    `)
+
+    const res = await req('/api/v1/vinculos-funcionais', {
+      method: 'POST',
+      body: JSON.stringify({
+        membroId: membroNovoId,
+        funcaoId: funcaoId2,
+        regionalId: regId,
+      }),
+    })
+
+    expect(res.status).toBe(201)
+    const vinculo = (await res.json()) as VinculoResponse
+
+    const destinatario = sqlite.prepare(
+      `SELECT id FROM convocacao_destinatarios
+       WHERE convocacao_id = ? AND membro_id = ?`
+    ).get(convocacaoId, membroNovoId) as { id: string } | undefined
+
+    expect(destinatario).toBeDefined()
+
+    const evidencia = sqlite.prepare(
+      `SELECT funcao_id, vinculo_funcional_id
+       FROM convocacao_destinatario_evidencias
+       WHERE convocacao_destinatario_id = ?`
+    ).get(destinatario!.id) as { funcao_id: string; vinculo_funcional_id: string } | undefined
+
+    expect(evidencia).toMatchObject({
+      funcao_id: funcaoId2,
+      vinculo_funcional_id: vinculo.id,
+    })
+  })
+
 })
