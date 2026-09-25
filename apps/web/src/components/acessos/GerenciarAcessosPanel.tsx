@@ -197,7 +197,7 @@ export function GerenciarAcessosPanel({
       acesso.escopoTipo === 'GLOBAL'
         ? 'Global'
         : rotulosAcessos[`${acesso.escopoTipo}:${acesso.escopoId}`] ??
-          `${acesso.escopoTipo} · ${acesso.escopoId ?? 'sem identificador'}`
+          `${acesso.escopoTipo} · unidade não identificada`
 
     if (!window.confirm(`Revogar o acesso ${acesso.perfilCodigo} de ${nomePessoa} no escopo ${escopo}?`)) return
 
@@ -324,8 +324,7 @@ export function GerenciarAcessosPanel({
                     acesso.escopoTipo === 'GLOBAL'
                       ? 'Global'
                       : rotulosAcessos[`${acesso.escopoTipo}:${acesso.escopoId}`] ??
-                        acesso.escopoId ??
-                        'sem identificador'
+                        'unidade não identificada'
                   }
                 </span>
                 {acesso.perfilCodigo === 'USUARIO_COMUM' ? (
@@ -336,7 +335,11 @@ export function GerenciarAcessosPanel({
                   <button
                     type="button"
                     onClick={() => void revogar(acesso)}
-                    disabled={processando || escoposAmbiguos.has(`${acesso.escopoTipo}:${acesso.escopoId}`)}
+                    disabled={
+                      processando ||
+                      escoposAmbiguos.has(`${acesso.escopoTipo}:${acesso.escopoId}`) ||
+                      (acesso.escopoTipo !== 'GLOBAL' && !rotulosAcessos[`${acesso.escopoTipo}:${acesso.escopoId}`])
+                    }
                     title={escoposAmbiguos.has(`${acesso.escopoTipo}:${acesso.escopoId}`) ? 'Cadastre um código institucional para desambiguar este escopo antes de revogar.' : undefined}
                     className="rounded border border-red-300 px-2 py-1 text-xs font-semibold text-red-700 disabled:opacity-50"
                   >
