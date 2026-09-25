@@ -406,7 +406,6 @@ portariaRouter.get('/eventos/:eventoId/fechamento-solicitacao', async c => {
 portariaRouter.post('/eventos/:eventoId/solicitar-fechamento', async c => {
   const db = c.get('db')
   const atorMembroId = c.get('membroId')
-  const contexto = c.get('contextoPermissoes')
   const eventoId = c.req.param('eventoId')
 
   const evento = await db.select().from(eventos)
