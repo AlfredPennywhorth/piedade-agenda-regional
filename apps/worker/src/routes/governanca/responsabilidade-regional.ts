@@ -3,8 +3,9 @@ import { and, eq } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { authMiddleware, Variables } from '../../middleware/auth'
 import { executeAtomic } from '../../db/batch'
+import { RESPONSABILIDADE_PMO_VERSAO_ATUAL } from '../../security/responsabilidade-pmo'
 
-export const RESPONSABILIDADE_PMO_VERSAO = '2026-09-21.v1'
+export const RESPONSABILIDADE_PMO_VERSAO = RESPONSABILIDADE_PMO_VERSAO_ATUAL
 
 export const RESPONSABILIDADE_PMO_TEXTO = `Ao assumir a responsabilidade de PMO da Regional, declaro ciência de que devo: utilizar os dados exclusivamente para finalidades institucionais autorizadas; respeitar a necessidade de acesso e o menor privilégio; manter os cadastros corretos e atualizados; conceder, revisar, bloquear e revogar acessos de forma tempestiva; não compartilhar credenciais, PINs, links de ativação ou exportações não autorizadas; preservar a confidencialidade de dados pessoais, relatórios nominais e registros de auditoria; priorizar dados agregados sempre que a identificação não for necessária; comunicar incidentes ou suspeitas de uso indevido; e observar as regras institucionais, a LGPD e os procedimentos de auditoria aplicáveis. Esta marcação registra ciência das responsabilidades e não constitui consentimento para tratamento de dados pessoais.`
 
