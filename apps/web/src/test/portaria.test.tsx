@@ -463,6 +463,54 @@ describe('PortariaView', () => {
     expect(screen.queryByRole('button', { name: 'Confirmar encerramento' })).not.toBeInTheDocument()
   })
 
+  it('permite ao gestor reabrir Portaria fechada com motivo', async () => {
+    mockFetchWithAuth.mockImplementation(async (url) => {
+      if (url === '/portaria/eventos') {
+        return {
+          data: [{
+            id: UUID_EVT1,
+            titulo: 'Evt encerrado',
+            inicioEm: '2026-10-01T14:00:00Z',
+            fimEm: '2026-10-01T16:00:00Z',
+            modalidade: 'PRESENCIAL',
+            statusPortaria: 'FECHADA',
+            podeOperarPortaria: false,
+            podeConfirmarFechamento: true,
+          }]
+        }
+      }
+      if (url.includes('/fechamento-solicitacao')) {
+        return {
+          statusPortaria: 'FECHADA',
+          solicitada: false,
+          solicitadoEm: null,
+          podeConfirmar: true,
+        }
+      }
+      if (url.includes('/participantes')) return { participantes: [] }
+      if (url.includes('/convidados')) return { data: [] }
+      return {}
+    })
+    mockPostWithAuth.mockResolvedValueOnce({ status: 'ABERTA' } as any)
+    vi.spyOn(window, 'prompt').mockReturnValueOnce('Participante chegou após o fechamento')
+
+    render(<PortariaView />)
+    await waitFor(() => screen.getByRole('combobox'))
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: UUID_EVT1 } })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Reabrir Portaria' })).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reabrir Portaria' }))
+
+    await waitFor(() => {
+      expect(mockPostWithAuth).toHaveBeenCalledWith(
+        `/portaria/eventos/${UUID_EVT1}/reabrir`,
+        { motivo: 'Participante chegou após o fechamento' }
+      )
+      expect(screen.getByText(/Portaria reaberta/i)).toBeInTheDocument()
+    })
+  })
+
     const getMockParticipantes = () => ({
       participantes: [
         {
