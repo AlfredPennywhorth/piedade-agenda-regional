@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento, convidadosEvento, credenciaisCadastroPortariaEvento, credenciaisOperadorPortariaEvento, presencasConvidadoEvento, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento, convidadosEvento, credenciaisCadastroPortariaEvento, credenciaisOperadorPortariaEvento, presencasConvidadoEvento, portariaFechamentos, portariaFechamentoItens, portariaSolicitacoesFechamento } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eMasterSistema, eOperadorPortariaAutorizado, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
@@ -370,6 +370,117 @@ portariaRouter.delete('/eventos/:eventoId/operadores/:membroId', async c => {
   return c.json({ message: 'Autorização temporária revogada' }, 200)
 })
 
+// GET /api/v1/portaria/eventos/:eventoId/fechamento-solicitacao
+portariaRouter.get('/eventos/:eventoId/fechamento-solicitacao', async c => {
+  const db = c.get('db')
+  const atorMembroId = c.get('membroId')
+  const contexto = c.get('contextoPermissoes')
+  const eventoId = c.req.param('eventoId')
+
+  const evento = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
+  if (!evento) return c.json({ error: 'Evento não encontrado', code: 'NOT_FOUND' }, 404)
+
+  const operador = await eOperadorPortariaAutorizado(db, atorMembroId, evento)
+  const gestor = Boolean(
+    atorMembroId && await podeGerarCredencialOperador(db, atorMembroId, contexto, evento)
+  )
+  if (!operador && !gestor) {
+    return c.json({ error: 'Acesso não autorizado', code: 'FORBIDDEN' }, 403)
+  }
+
+  const solicitacao = await db.select().from(portariaSolicitacoesFechamento)
+    .where(eq(portariaSolicitacoesFechamento.eventoId, eventoId)).get()
+  const estado = await db.select().from(portariasEvento)
+    .where(eq(portariasEvento.eventoId, eventoId)).get()
+
+  return c.json({
+    statusPortaria: estado?.status ?? 'ABERTA',
+    solicitada: Boolean(solicitacao && !solicitacao.confirmadoEm),
+    solicitadoEm: solicitacao?.solicitadoEm ?? null,
+    podeConfirmar: gestor,
+  }, 200)
+})
+
+// POST /api/v1/portaria/eventos/:eventoId/solicitar-fechamento
+portariaRouter.post('/eventos/:eventoId/solicitar-fechamento', async c => {
+  const db = c.get('db')
+  const atorMembroId = c.get('membroId')
+  const contexto = c.get('contextoPermissoes')
+  const eventoId = c.req.param('eventoId')
+
+  const evento = await db.select().from(eventos)
+    .where(and(eq(eventos.id, eventoId), eq(eventos.ativo, true))).get()
+  if (!evento) return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
+
+  const operador = await eOperadorPortariaAutorizado(db, atorMembroId, evento)
+  const gestor = Boolean(
+    atorMembroId && await podeGerarCredencialOperador(db, atorMembroId, contexto, evento)
+  )
+  if (!operador && !gestor) {
+    return c.json({ error: 'Acesso não autorizado para solicitar encerramento', code: 'FORBIDDEN' }, 403)
+  }
+
+  const estado = await db.select().from(portariasEvento)
+    .where(eq(portariasEvento.eventoId, eventoId)).get()
+  if (estado?.status === 'FECHADA') {
+    return c.json({ error: 'A Portaria já está fechada', code: 'PORTARIA_FECHADA' }, 409)
+  }
+
+  const existente = await db.select().from(portariaSolicitacoesFechamento)
+    .where(eq(portariaSolicitacoesFechamento.eventoId, eventoId)).get()
+  if (existente && !existente.confirmadoEm) {
+    return c.json({
+      status: 'AGUARDANDO_CONFIRMACAO',
+      solicitadoEm: existente.solicitadoEm,
+      message: 'Encerramento já solicitado e aguardando confirmação do gestor.',
+    }, 200)
+  }
+
+  const agora = new Date().toISOString()
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+
+  await executarOperacaoComAudit(
+    db,
+    qdb => [
+      qdb.insert(portariaSolicitacoesFechamento).values({
+        eventoId,
+        solicitadoPorMembroId: atorMembroId,
+        solicitadoPorCredencialId: null,
+        solicitadoEm: agora,
+        confirmadoPorMembroId: null,
+        confirmadoEm: null,
+        createdAt: agora,
+        updatedAt: agora,
+      }).onConflictDoUpdate({
+        target: portariaSolicitacoesFechamento.eventoId,
+        set: {
+          solicitadoPorMembroId: atorMembroId,
+          solicitadoPorCredencialId: null,
+          solicitadoEm: agora,
+          confirmadoPorMembroId: null,
+          confirmadoEm: null,
+          updatedAt: agora,
+        },
+      }),
+    ],
+    {
+      acao: 'PORTARIA_FECHAMENTO_SOLICITADO',
+      atorMembroId,
+      recursoTipo: 'PORTARIA',
+      recursoId: eventoId,
+      escopoTipo,
+      escopoId,
+      contexto: { eventoId },
+    }
+  )
+
+  return c.json({
+    status: 'AGUARDANDO_CONFIRMACAO',
+    solicitadoEm: agora,
+    message: 'Solicitação enviada ao gestor da reunião.',
+  }, 202)
+})
+
 // POST /api/v1/portaria/eventos/:eventoId/fechar
 portariaRouter.post('/eventos/:eventoId/fechar', async c => {
   const db = c.get('db')
@@ -388,9 +499,24 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
     return c.json({ error: 'A Portaria já está fechada', code: 'PORTARIA_FECHADA' }, 409)
   }
 
-  const autorizado = await eOperadorPortariaAutorizado(db, atorMembroId, evento)
+  const contexto = c.get('contextoPermissoes')
+  const autorizado =
+    Boolean(atorMembroId) &&
+    await podeGerarCredencialOperador(db, atorMembroId, contexto, evento)
   if (!autorizado) {
-    return c.json({ error: 'Operador não autorizado para fechar esta Portaria', code: 'FORBIDDEN' }, 403)
+    return c.json(
+      { error: 'Somente o gestor autorizado da reunião pode confirmar o encerramento', code: 'FORBIDDEN' },
+      403
+    )
+  }
+
+  const solicitacao = await db.select().from(portariaSolicitacoesFechamento)
+    .where(eq(portariaSolicitacoesFechamento.eventoId, eventoId)).get()
+  if (!solicitacao || solicitacao.confirmadoEm) {
+    return c.json(
+      { error: 'O encerramento precisa ser solicitado pelo porteiro antes da confirmação', code: 'SOLICITACAO_FECHAMENTO_NECESSARIA' },
+      409
+    )
   }
 
   const existente = await db.select({ id: portariaFechamentos.id })
@@ -461,6 +587,17 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
         ))
       )
 
+      queries.push(
+        qdb.update(portariaSolicitacoesFechamento).set({
+          confirmadoPorMembroId: atorMembroId,
+          confirmadoEm: agora,
+          updatedAt: agora,
+        }).where(and(
+          eq(portariaSolicitacoesFechamento.eventoId, eventoId),
+          eq(portariaSolicitacoesFechamento.solicitadoEm, solicitacao.solicitadoEm)
+        ))
+      )
+
       queries.push(qdb.insert(portariaFechamentos).values({
         id: fechamentoId,
         eventoId,
@@ -500,6 +637,7 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
       escopoId,
       contexto: {
         eventoId,
+        solicitadoEm: solicitacao.solicitadoEm,
         ...snapshot.resumo,
       },
     }
