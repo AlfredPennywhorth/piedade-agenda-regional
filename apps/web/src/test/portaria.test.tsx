@@ -463,7 +463,8 @@ describe('PortariaView', () => {
     expect(screen.queryByRole('button', { name: 'Confirmar encerramento' })).not.toBeInTheDocument()
   })
 
-  it('permite ao gestor reabrir Portaria fechada com motivo', async () => {
+  it('permite ao gestor reabrir sem carregar endpoints exclusivos do porteiro', async () => {
+    let statusPortaria: 'ABERTA' | 'FECHADA' = 'FECHADA'
     mockFetchWithAuth.mockImplementation(async (url) => {
       if (url === '/portaria/eventos') {
         return {
@@ -473,7 +474,7 @@ describe('PortariaView', () => {
             inicioEm: '2026-10-01T14:00:00Z',
             fimEm: '2026-10-01T16:00:00Z',
             modalidade: 'PRESENCIAL',
-            statusPortaria: 'FECHADA',
+            statusPortaria,
             podeOperarPortaria: false,
             podeConfirmarFechamento: true,
           }]
@@ -481,17 +482,20 @@ describe('PortariaView', () => {
       }
       if (url.includes('/fechamento-solicitacao')) {
         return {
-          statusPortaria: 'FECHADA',
+          statusPortaria,
           solicitada: false,
           solicitadoEm: null,
           podeConfirmar: true,
         }
       }
-      if (url.includes('/participantes')) return { participantes: [] }
-      if (url.includes('/convidados')) return { data: [] }
+      if (url.includes('/participantes')) throw new Error('gestor não deveria carregar participantes')
+      if (url.includes('/convidados')) throw new Error('gestor não deveria carregar convidados')
       return {}
     })
-    mockPostWithAuth.mockResolvedValueOnce({ status: 'ABERTA' } as any)
+    mockPostWithAuth.mockImplementationOnce(async () => {
+      statusPortaria = 'ABERTA'
+      return { status: 'ABERTA' } as any
+    })
     vi.spyOn(window, 'prompt').mockReturnValueOnce('Participante chegou após o fechamento')
 
     render(<PortariaView />)
@@ -509,6 +513,13 @@ describe('PortariaView', () => {
       )
       expect(screen.getByText(/Portaria reaberta/i)).toBeInTheDocument()
     })
+
+    expect(mockFetchWithAuth).not.toHaveBeenCalledWith(
+      `/portaria/eventos/${UUID_EVT1}/participantes`
+    )
+    expect(mockFetchWithAuth).not.toHaveBeenCalledWith(
+      `/portaria/eventos/${UUID_EVT1}/convidados`
+    )
   })
 
     const getMockParticipantes = () => ({
