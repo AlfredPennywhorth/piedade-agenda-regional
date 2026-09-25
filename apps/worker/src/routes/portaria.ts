@@ -1,12 +1,13 @@
 import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento, convidadosEvento, credenciaisCadastroPortariaEvento, credenciaisOperadorPortariaEvento, presencasConvidadoEvento, portariaFechamentos, portariaFechamentoItens, portariaSolicitacoesFechamento, portariaReaberturas } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento, convidadosEvento, credenciaisCadastroPortariaEvento, credenciaisOperadorPortariaEvento, presencasConvidadoEvento, portariaFechamentos, portariaFechamentoItens, portariaSolicitacoesFechamento, portariaReaberturas, portariaFechamentoLocks } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eMasterSistema, eOperadorPortariaAutorizado, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
 import { PortariaEventosQuerySchema, getSaoPauloDateString, getSaoPauloEndOfDayIso } from '@piedade/shared'
 import { gerarTokenAleatorio, hashToken } from '../security/tokens'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
+import { executeAtomic } from '../db/batch'
 
 export const portariaRouter = new Hono<{ Variables: Variables }>()
 
@@ -532,12 +533,33 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
     return c.json({ error: 'Fechamento final já materializado', code: 'FECHAMENTO_EXISTENTE' }, 409)
   }
 
-  const snapshot = await montarSnapshotFechamentoPortaria(db, eventoId)
+  try {
+    await executeAtomic(db, qdb => [
+      qdb.insert(portariaFechamentoLocks).values({
+        eventoId,
+        criadoEm: new Date().toISOString(),
+      }),
+    ])
+  } catch {
+    return c.json({ error: 'A Portaria já está sendo encerrada', code: 'PORTARIA_FECHANDO' }, 409)
+  }
+
+  let snapshot
+  try {
+    snapshot = await montarSnapshotFechamentoPortaria(db, eventoId)
+  } catch (err) {
+    await db.delete(portariaFechamentoLocks)
+      .where(eq(portariaFechamentoLocks.eventoId, eventoId))
+      .execute()
+    throw err
+  }
+
   const agora = new Date().toISOString()
   const fechamentoId = crypto.randomUUID()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
-  await executarOperacaoComAudit(
+  try {
+    await executarOperacaoComAudit(
     db,
     qdb => {
       const queries = []
@@ -632,6 +654,11 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
         }))
       }
 
+      queries.push(
+        qdb.delete(portariaFechamentoLocks)
+          .where(eq(portariaFechamentoLocks.eventoId, eventoId))
+      )
+
       return queries
     },
     {
@@ -648,6 +675,12 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
       },
     }
   )
+  } catch (err) {
+    await db.delete(portariaFechamentoLocks)
+      .where(eq(portariaFechamentoLocks.eventoId, eventoId))
+      .execute()
+    throw err
+  }
 
   return c.json({
     status: 'FECHADA',
