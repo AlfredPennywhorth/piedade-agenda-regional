@@ -304,7 +304,11 @@ adminAcessosApp.post('/membros/:id/link-ativacao', async c => {
   }
 
   const membro = await db
-    .select({ id: schema.membros.id, ativo: schema.membros.ativo })
+    .select({
+      id: schema.membros.id,
+      ativo: schema.membros.ativo,
+      casaId: schema.membros.casaId,
+    })
     .from(schema.membros)
     .where(eq(schema.membros.id, membroId))
     .get()
@@ -320,6 +324,22 @@ adminAcessosApp.post('/membros/:id/link-ativacao', async c => {
   if (contaExistente?.status === 'BLOQUEADA' || contaExistente?.status === 'DESATIVADA') {
     return c.json({ error: 'Conta indisponível para ativação', code: 'CONTA_INDISPONIVEL' }, 409)
   }
+
+  const acessoComumExistente = contaExistente
+    ? await db
+        .select({ id: schema.acessosConta.id })
+        .from(schema.acessosConta)
+        .where(
+          and(
+            eq(schema.acessosConta.contaAcessoId, contaExistente.id),
+            eq(schema.acessosConta.perfilCodigo, 'USUARIO_COMUM'),
+            eq(schema.acessosConta.escopoTipo, 'CASA'),
+            eq(schema.acessosConta.escopoId, membro.casaId),
+            eq(schema.acessosConta.ativo, true)
+          )
+        )
+        .get()
+    : null
 
   const agora = new Date()
   const agoraIso = agora.toISOString()
@@ -337,6 +357,34 @@ adminAcessosApp.post('/membros/:id/link-ativacao', async c => {
         id: contaAcessoId,
         membroId,
         status: 'PENDENTE_ATIVACAO',
+        createdAt: agoraIso,
+        updatedAt: agoraIso,
+      }))
+    }
+    if (!acessoComumExistente) {
+      queries.push(
+        tx.update(schema.acessosConta)
+          .set({
+            ativo: false,
+            revogadoEm: agoraIso,
+            revogadoPorContaId: atorContaAcessoId,
+            updatedAt: agoraIso,
+          })
+          .where(
+            and(
+              eq(schema.acessosConta.contaAcessoId, contaAcessoId),
+              eq(schema.acessosConta.perfilCodigo, 'USUARIO_COMUM'),
+              eq(schema.acessosConta.ativo, true)
+            )
+          )
+      )
+      queries.push(tx.insert(schema.acessosConta).values({
+        id: crypto.randomUUID(),
+        contaAcessoId,
+        perfilCodigo: 'USUARIO_COMUM',
+        escopoTipo: 'CASA',
+        escopoId: membro.casaId,
+        concedidoPorContaId: atorContaAcessoId,
         createdAt: agoraIso,
         updatedAt: agoraIso,
       }))
@@ -610,6 +658,13 @@ adminAcessosApp.post('/', async c => {
     return c.json({ error: 'Perfil ou escopo inválido', code: 'VALIDATION_ERROR' }, 400)
   }
 
+  if (body.perfilCodigo === 'USUARIO_COMUM') {
+    return c.json(
+      { error: 'Usuário Comum é atribuído automaticamente pela Casa de Oração do membro', code: 'ACESSO_PADRAO_AUTOMATICO' },
+      409
+    )
+  }
+
   const escopoId = body.escopoTipo === 'GLOBAL' ? null : body.escopoId ?? null
   const regionalId =
     body.escopoTipo === 'GLOBAL' || !escopoId
@@ -758,6 +813,32 @@ adminAcessosApp.delete('/:id', async c => {
     ))
   ) {
     return c.json({ error: 'Acesso não autorizado para o escopo', code: 'FORBIDDEN' }, 403)
+  }
+
+  if (acesso.perfilCodigo === 'USUARIO_COMUM') {
+    const contaDoAcesso = await db
+      .select({ membroId: schema.contasAcesso.membroId })
+      .from(schema.contasAcesso)
+      .where(eq(schema.contasAcesso.id, acesso.contaAcessoId))
+      .get()
+    const membroDoAcesso = contaDoAcesso
+      ? await db
+          .select({ casaId: schema.membros.casaId })
+          .from(schema.membros)
+          .where(eq(schema.membros.id, contaDoAcesso.membroId))
+          .get()
+      : null
+    const acessoPadraoCanonico =
+      acesso.escopoTipo === 'CASA' &&
+      Boolean(membroDoAcesso?.casaId) &&
+      acesso.escopoId === membroDoAcesso?.casaId
+
+    if (acessoPadraoCanonico) {
+      return c.json(
+        { error: 'O acesso padrão de Usuário Comum não pode ser revogado', code: 'ACESSO_PADRAO' },
+        409
+      )
+    }
   }
 
   if (acesso.perfilCodigo === 'MASTER_SISTEMA') {

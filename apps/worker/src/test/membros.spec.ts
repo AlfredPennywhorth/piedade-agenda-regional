@@ -101,7 +101,17 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     expect(json.error).toContain('Casa vinculada não existe')
   })
 
-  it('3. Deve alterar Casa principal preservando ID', async () => {
+  it('3. Deve alterar Casa principal preservando ID e sincronizar Usuário Comum', async () => {
+    sqlite.exec(`
+      INSERT INTO contas_acesso (id, membro_id, status)
+      VALUES ('conta-membro-base', '${membroId}', 'ATIVA');
+
+      INSERT INTO acessos_conta
+        (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id, ativo)
+      VALUES
+        ('acesso-comum-antigo', 'conta-membro-base', 'USUARIO_COMUM', 'CASA', '${casaId}', 1);
+    `)
+
     const resPatch = await req(`/api/v1/membros/${membroId}`, {
       method: 'PATCH',
       body: JSON.stringify({
@@ -114,6 +124,21 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     expect(resPatch.status).toBe(200)
     expect(json.id).toBe(membroId)
     expect(json.casaId).toBe(casaId2)
+
+    const acessos = sqlite.prepare(
+      `SELECT escopo_tipo, escopo_id, ativo
+       FROM acessos_conta
+       WHERE conta_acesso_id = 'conta-membro-base'
+         AND perfil_codigo = 'USUARIO_COMUM'
+       ORDER BY created_at`
+    ).all() as Array<{ escopo_tipo: string; escopo_id: string; ativo: number }>
+
+    expect(acessos.some(acesso => acesso.escopo_id === casaId && acesso.ativo === 0)).toBe(true)
+    expect(acessos.some(acesso =>
+      acesso.escopo_tipo === 'CASA' &&
+      acesso.escopo_id === casaId2 &&
+      acesso.ativo === 1
+    )).toBe(true)
   })
 
   it('4. Deve inativar membro (ativo = false)', async () => {
