@@ -824,19 +824,6 @@ export const portariasEvento = sqliteTable(
   })
 )
 
-export const portariaSolicitacoesFechamento = sqliteTable(
-  'portaria_solicitacoes_fechamento',
-  {
-    eventoId: text('evento_id').primaryKey().references(() => eventos.id),
-    solicitadoPorMembroId: text('solicitado_por_membro_id').references(() => membros.id),
-    solicitadoPorCredencialId: text('solicitado_por_credencial_id').references(() => credenciaisOperadorPortariaEvento.id),
-    solicitadoEm: text('solicitado_em').notNull(),
-    confirmadoPorMembroId: text('confirmado_por_membro_id').references(() => membros.id),
-    confirmadoEm: text('confirmado_em'),
-    ...timestampsS02,
-  }
-)
-
 export const portariaFechamentoLocks = sqliteTable(
   'portaria_fechamento_locks',
   {
@@ -883,6 +870,35 @@ export const credenciaisOperadorPortariaEvento = sqliteTable(
   table => ({
     idxEvento: index('idx_credencial_operador_portaria_evento')
       .on(table.eventoId, table.ativo),
+  })
+)
+
+export const portariaSolicitacoesFechamento = sqliteTable(
+  'portaria_solicitacoes_fechamento',
+  {
+    eventoId: text('evento_id').primaryKey().references(() => eventos.id),
+    solicitadoPorMembroId: text('solicitado_por_membro_id').references(() => membros.id),
+    solicitadoPorCredencialId: text('solicitado_por_credencial_id').references(() => credenciaisOperadorPortariaEvento.id),
+    solicitadoEm: text('solicitado_em').notNull(),
+    confirmadoPorMembroId: text('confirmado_por_membro_id').references(() => membros.id),
+    confirmadoEm: text('confirmado_em'),
+    ...timestampsS02,
+  }
+)
+
+export const portariaReaberturas = sqliteTable(
+  'portaria_reaberturas',
+  {
+    id: text('id').primaryKey(),
+    eventoId: text('evento_id').notNull().references(() => eventos.id),
+    fechamentoAnteriorId: text('fechamento_anterior_id').notNull(),
+    reabertaPorMembroId: text('reaberta_por_membro_id').notNull().references(() => membros.id),
+    motivo: text('motivo').notNull(),
+    reabertaEm: text('reaberta_em').notNull(),
+    ...timestampsS02,
+  },
+  table => ({
+    idxEvento: index('idx_portaria_reabertura_evento').on(table.eventoId, table.reabertaEm),
   })
 )
 
