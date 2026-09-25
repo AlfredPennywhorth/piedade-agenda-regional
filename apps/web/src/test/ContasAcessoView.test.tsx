@@ -35,6 +35,12 @@ const contaAtiva = {
       escopoTipo: 'CASA',
       escopoId: 'casa-1',
     },
+    {
+      id: 'acesso-2',
+      perfilCodigo: 'GESTOR_AGENDA',
+      escopoTipo: 'REGIONAL',
+      escopoId: 'regional-1',
+    },
   ],
 }
 
@@ -167,8 +173,8 @@ describe('ContasAcessoView — PR-ACC-05', () => {
 
   it('revoga acesso existente pela gestão de acessos', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string, options?: RequestInit) => {
-      if (endpoint === '/admin/acessos/acesso-1' && options?.method === 'DELETE') {
-        return { message: 'Acesso revogado', id: 'acesso-1' } as any
+      if (endpoint === '/admin/acessos/acesso-2' && options?.method === 'DELETE') {
+        return { message: 'Acesso revogado', id: 'acesso-2' } as any
       }
       if (endpoint === '/admin/acessos') return [contaAtiva] as any
       if (endpoint === '/regionais') return [
@@ -183,7 +189,7 @@ describe('ContasAcessoView — PR-ACC-05', () => {
 
     await waitFor(() => {
       expect(apiClient.fetchWithAuth).toHaveBeenCalledWith(
-        '/admin/acessos/acesso-1',
+        '/admin/acessos/acesso-2',
         { method: 'DELETE' }
       )
     })
