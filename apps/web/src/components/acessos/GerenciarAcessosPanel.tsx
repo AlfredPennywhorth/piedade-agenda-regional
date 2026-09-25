@@ -91,8 +91,9 @@ export function GerenciarAcessosPanel({
   const permitidos = useMemo(() => niveisPermitidos(perfil), [perfil])
 
   useEffect(() => {
-    const proximoNivel = permitidos[0]
-    if (proximoNivel !== nivel) setNivel(proximoNivel)
+    if (!permitidos.includes(nivel)) {
+      setNivel(permitidos[0])
+    }
   }, [permitidos, nivel])
 
   useEffect(() => {
