@@ -50,6 +50,9 @@ export const PortariaEventoItemSchema = z.object({
   inicioEm: z.string(),
   fimEm: z.string(),
   modalidade: z.enum(['PRESENCIAL', 'ONLINE', 'HIBRIDO']),
+  statusPortaria: z.enum(['ABERTA', 'FECHADA']).optional(),
+  podeOperarPortaria: z.boolean().optional(),
+  podeConfirmarFechamento: z.boolean().optional(),
 }).strict()
 
 export const PortariaEventosResponseSchema = z.object({
