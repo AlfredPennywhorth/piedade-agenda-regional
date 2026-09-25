@@ -358,4 +358,50 @@ describe('Testes de Vínculos Funcionais', () => {
     })
   })
 
+
+  it('23. vínculo ativo de membro inativo não materializa destinatário retroativo', async () => {
+    const membroInativoId = 'eeeeeeee-1111-4111-8111-eeeeeeeeeeee'
+    const eventoId = 'ffffffff-1111-4111-8111-ffffffffffff'
+    const convocacaoId = '12121212-1111-4111-8111-121212121212'
+
+    sqlite.exec(`
+      INSERT INTO membros (id, nome, casa_id, ativo)
+      VALUES ('${membroInativoId}', 'Membro Inativo', '${casaId}', 0);
+
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo)
+      VALUES
+        ('${eventoId}', 'Reunião futura para inativo', 'PRESENCIAL',
+         '2027-04-10T22:00:00.000Z', '2027-04-10T23:00:00.000Z', '${regId}', 1);
+
+      INSERT INTO convocacoes
+        (id, evento_id, status, ativo, publicada_em)
+      VALUES
+        ('${convocacaoId}', '${eventoId}', 'PUBLICADA', 1, CURRENT_TIMESTAMP);
+
+      INSERT INTO convocacao_funcoes
+        (id, convocacao_id, funcao_id)
+      VALUES
+        ('13131313-1111-4111-8111-131313131313', '${convocacaoId}', '${funcaoId2}');
+    `)
+
+    const res = await req('/api/v1/vinculos-funcionais', {
+      method: 'POST',
+      body: JSON.stringify({
+        membroId: membroInativoId,
+        funcaoId: funcaoId2,
+        regionalId: regId,
+      }),
+    })
+
+    expect(res.status).toBe(201)
+
+    const destinatario = sqlite.prepare(
+      `SELECT id FROM convocacao_destinatarios
+       WHERE convocacao_id = ? AND membro_id = ?`
+    ).get(convocacaoId, membroInativoId)
+
+    expect(destinatario).toBeUndefined()
+  })
+
 })
