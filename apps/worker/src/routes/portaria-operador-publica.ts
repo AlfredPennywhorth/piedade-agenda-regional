@@ -10,7 +10,6 @@ import {
   convidadosEvento,
   presencasConvidadoEvento,
   credenciaisCadastroPortariaEvento,
-  credenciaisOperadorPortariaEvento,
   portariaSolicitacoesFechamento,
 } from '../db/schema'
 import { CheckinManualSchema, CheckinQrSchema, getSaoPauloEndOfDayIso } from '@piedade/shared'
