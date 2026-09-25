@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento, convidadosEvento, credenciaisCadastroPortariaEvento, credenciaisOperadorPortariaEvento, presencasConvidadoEvento, portariaFechamentos, portariaFechamentoItens, portariaSolicitacoesFechamento } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento, convidadosEvento, credenciaisCadastroPortariaEvento, credenciaisOperadorPortariaEvento, presencasConvidadoEvento, portariaFechamentos, portariaFechamentoItens, portariaSolicitacoesFechamento, portariaReaberturas } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eMasterSistema, eOperadorPortariaAutorizado, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
@@ -656,6 +656,111 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
   }, 200)
 })
 
+// POST /api/v1/portaria/eventos/:eventoId/reabrir
+portariaRouter.post('/eventos/:eventoId/reabrir', async c => {
+  const db = c.get('db')
+  const atorMembroId = c.get('membroId')
+  const contexto = c.get('contextoPermissoes')
+  const eventoId = c.req.param('eventoId')
+
+  const evento = await db.select().from(eventos)
+    .where(and(eq(eventos.id, eventoId), eq(eventos.ativo, true))).get()
+  if (!evento) {
+    return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
+  }
+
+  if (!atorMembroId || !(await podeGerarCredencialOperador(db, atorMembroId, contexto, evento))) {
+    return c.json(
+      { error: 'Somente o gestor autorizado da reunião pode reabrir a Portaria', code: 'FORBIDDEN' },
+      403
+    )
+  }
+
+  const estado = await db.select().from(portariasEvento)
+    .where(eq(portariasEvento.eventoId, eventoId)).get()
+  if (estado?.status !== 'FECHADA') {
+    return c.json({ error: 'A Portaria não está fechada', code: 'PORTARIA_NAO_FECHADA' }, 409)
+  }
+
+  const fechamento = await db.select().from(portariaFechamentos)
+    .where(eq(portariaFechamentos.eventoId, eventoId)).get()
+  if (!fechamento) {
+    return c.json({ error: 'Fechamento final não encontrado', code: 'FECHAMENTO_NAO_ENCONTRADO' }, 409)
+  }
+
+  let body: { motivo?: string }
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Requisição inválida', code: 'VALIDATION_ERROR' }, 400)
+  }
+  const motivo = body.motivo?.trim() ?? ''
+  if (motivo.length < 5 || motivo.length > 200) {
+    return c.json(
+      { error: 'Informe um motivo entre 5 e 200 caracteres para reabrir a Portaria', code: 'VALIDATION_ERROR' },
+      400
+    )
+  }
+
+  const agora = new Date().toISOString()
+  const reaberturaId = crypto.randomUUID()
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+
+  await executarOperacaoComAudit(
+    db,
+    qdb => [
+      qdb.delete(portariaFechamentoItens)
+        .where(eq(portariaFechamentoItens.fechamentoId, fechamento.id)),
+      qdb.delete(portariaFechamentos)
+        .where(eq(portariaFechamentos.id, fechamento.id)),
+      qdb.delete(portariaSolicitacoesFechamento)
+        .where(eq(portariaSolicitacoesFechamento.eventoId, eventoId)),
+      qdb.update(portariasEvento).set({
+        status: 'ABERTA',
+        fechadaEm: null,
+        fechadaPorMembroId: null,
+        updatedAt: agora,
+      }).where(eq(portariasEvento.eventoId, eventoId)),
+      qdb.insert(portariaReaberturas).values({
+        id: reaberturaId,
+        eventoId,
+        fechamentoAnteriorId: fechamento.id,
+        reabertaPorMembroId: atorMembroId,
+        motivo,
+        reabertaEm: agora,
+        createdAt: agora,
+        updatedAt: agora,
+      }),
+    ],
+    {
+      acao: 'PORTARIA_REABERTA',
+      atorMembroId,
+      recursoTipo: 'PORTARIA',
+      recursoId: eventoId,
+      escopoTipo,
+      escopoId,
+      contexto: {
+        eventoId,
+        fechamentoAnteriorId: fechamento.id,
+        motivo,
+        credenciaisTemporariasReativadas: false,
+      },
+    }
+  )
+
+  return c.json({
+    status: 'ABERTA',
+    reabertura: {
+      id: reaberturaId,
+      eventoId,
+      reabertaEm: agora,
+      reabertaPorMembroId: atorMembroId,
+      motivo,
+    },
+    message: 'Portaria reaberta. Habilite novos porteiros se necessário e faça novo fechamento ao final.',
+  }, 200)
+})
+
 // GET /api/v1/portaria/eventos/:eventoId/fechamento
 portariaRouter.get('/eventos/:eventoId/fechamento', async c => {
   const db = c.get('db')
@@ -1035,19 +1140,27 @@ portariaRouter.get('/eventos', async (c) => {
         continue
       }
 
+      const contexto = c.get('contextoPermissoes')
       const isAuthorized = await eOperadorPortariaAutorizado(
         db,
         membroSessaoId,
         evento,
-        c.get('contextoPermissoes')
+        contexto
       )
-      if (isAuthorized) {
+      const isGestor = await podeGerarCredencialOperador(db, membroSessaoId, contexto, evento)
+      if (isAuthorized || isGestor) {
+        const estadoPortaria = await db.select({ status: portariasEvento.status })
+          .from(portariasEvento)
+          .where(eq(portariasEvento.eventoId, evento.id))
+          .get()
         authorizedEvents.push({
           id: evento.id,
           titulo: evento.titulo,
           inicioEm: evento.inicioEm,
           fimEm: evento.fimEm,
-          modalidade: evento.modalidade
+          modalidade: evento.modalidade,
+          statusPortaria: estadoPortaria?.status ?? 'ABERTA',
+          podeConfirmarFechamento: isGestor,
         })
       }
     }
