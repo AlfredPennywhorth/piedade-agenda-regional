@@ -106,8 +106,21 @@ function eventoCorrespondeAoVinculo(evento: any, vinculo: any): boolean {
   return false
 }
 
-async function sincronizarConvocacoesPublicadasParaVinculo(db: any, vinculo: any) {
-  if (!vinculo?.ativo) return
+type SincronizacaoConvocacao = {
+  convocacaoId: string
+  destinatarioId: string
+  destinatarioNovo: boolean
+}
+
+async function prepararSincronizacaoConvocacoes(db: any, vinculo: any): Promise<SincronizacaoConvocacao[]> {
+  if (!vinculo?.ativo) return []
+
+  const membro = await db
+    .select({ ativo: membros.ativo })
+    .from(membros)
+    .where(eq(membros.id, vinculo.membroId))
+    .get()
+  if (!membro?.ativo) return []
 
   const agoraIso = new Date().toISOString()
   const candidatas = await db
@@ -134,10 +147,11 @@ async function sincronizarConvocacoesPublicadasParaVinculo(db: any, vinculo: any
     )
     .all()
 
+  const resultado: SincronizacaoConvocacao[] = []
   for (const candidata of candidatas) {
     if (!eventoCorrespondeAoVinculo(candidata.evento, vinculo)) continue
 
-    let destinatario = await db
+    const existente = await db
       .select({ id: convocacaoDestinatarios.id })
       .from(convocacaoDestinatarios)
       .where(
@@ -148,43 +162,51 @@ async function sincronizarConvocacoesPublicadasParaVinculo(db: any, vinculo: any
       )
       .get()
 
-    if (!destinatario) {
-      const destinatarioId = crypto.randomUUID()
-      await db
-        .insert(convocacaoDestinatarios)
-        .values({
-          id: destinatarioId,
-          convocacaoId: candidata.convocacaoId,
+    resultado.push({
+      convocacaoId: candidata.convocacaoId,
+      destinatarioId: existente?.id ?? crypto.randomUUID(),
+      destinatarioNovo: !existente,
+    })
+  }
+
+  return resultado
+}
+
+function queriesSincronizacaoConvocacoes(
+  qdb: any,
+  vinculo: any,
+  sincronizacoes: SincronizacaoConvocacao[],
+  agoraIso: string
+) {
+  const queries: any[] = []
+
+  for (const item of sincronizacoes) {
+    if (item.destinatarioNovo) {
+      queries.push(
+        qdb.insert(convocacaoDestinatarios).values({
+          id: item.destinatarioId,
+          convocacaoId: item.convocacaoId,
           membroId: vinculo.membroId,
           createdAt: agoraIso,
         })
-        .onConflictDoNothing()
-
-      destinatario = await db
-        .select({ id: convocacaoDestinatarios.id })
-        .from(convocacaoDestinatarios)
-        .where(
-          and(
-            eq(convocacaoDestinatarios.convocacaoId, candidata.convocacaoId),
-            eq(convocacaoDestinatarios.membroId, vinculo.membroId)
-          )
-        )
-        .get()
+      )
     }
 
-    if (!destinatario) continue
-
-    await db
-      .insert(convocacaoDestinatarioEvidencias)
-      .values({
-        id: crypto.randomUUID(),
-        convocacaoDestinatarioId: destinatario.id,
-        funcaoId: vinculo.funcaoId,
-        vinculoFuncionalId: vinculo.id,
-        createdAt: agoraIso,
-      })
-      .onConflictDoNothing()
+    queries.push(
+      qdb
+        .insert(convocacaoDestinatarioEvidencias)
+        .values({
+          id: crypto.randomUUID(),
+          convocacaoDestinatarioId: item.destinatarioId,
+          funcaoId: vinculo.funcaoId,
+          vinculoFuncionalId: vinculo.id,
+          createdAt: agoraIso,
+        })
+        .onConflictDoNothing()
+    )
   }
+
+  return queries
 }
 
 function podeEscreverVinculos(contexto: any): boolean {
@@ -361,9 +383,17 @@ vinculosFuncionaisRouter.post('/', async (c) => {
     if (!escopo) {
       return c.json({ error: 'O vínculo funcional deve possuir exatamente um escopo institucional.' }, 400)
     }
+
+    const vinculoNovo = { id, ...parsed }
+    const agoraIso = new Date().toISOString()
+    const sincronizacoes = await prepararSincronizacaoConvocacoes(db, vinculoNovo)
+
     await executarOperacaoComAudit(
       db,
-      (qdb) => [qdb.insert(vinculosFuncionais).values({ id, ...parsed })],
+      (qdb) => [
+        qdb.insert(vinculosFuncionais).values(vinculoNovo),
+        ...queriesSincronizacaoConvocacoes(qdb, vinculoNovo, sincronizacoes, agoraIso),
+      ],
       {
         acao: 'VINCULO_FUNCIONAL_CRIADO',
         atorMembroId: c.get('membroId') || null,
@@ -371,11 +401,14 @@ vinculosFuncionaisRouter.post('/', async (c) => {
         recursoId: id,
         escopoTipo: escopo.tipo,
         escopoId: escopo.id,
-        contexto: { membroId: parsed.membroId, funcaoId: parsed.funcaoId },
+        contexto: {
+          membroId: parsed.membroId,
+          funcaoId: parsed.funcaoId,
+          convocacoesSincronizadas: sincronizacoes.length,
+        },
       }
     )
     const result = await db.select().from(vinculosFuncionais).where(eq(vinculosFuncionais.id, id)).get()
-    await sincronizarConvocacoesPublicadasParaVinculo(db, result)
     return c.json(result, 201)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
@@ -454,14 +487,17 @@ vinculosFuncionaisRouter.patch('/:id', async (c) => {
     const atorMembroId = c.get('membroId') || null
     const camposAlterados = Object.keys(parsed)
     const moveuEscopo = escopoOrigem.tipo !== escopoFinal.tipo || escopoOrigem.id !== escopoFinal.id
+    const agoraAtualizacao = new Date().toISOString()
+    const sincronizacoes = await prepararSincronizacaoConvocacoes(db, vinculoResultante)
 
     if (moveuEscopo) {
       await executarOperacaoComAudits(
         db,
         (qdb) => [
           qdb.update(vinculosFuncionais)
-            .set({ ...parsed, updatedAt: new Date().toISOString() })
-            .where(eq(vinculosFuncionais.id, id))
+            .set({ ...parsed, updatedAt: agoraAtualizacao })
+            .where(eq(vinculosFuncionais.id, id)),
+          ...queriesSincronizacaoConvocacoes(qdb, vinculoResultante, sincronizacoes, agoraAtualizacao),
         ],
         [
           {
@@ -499,8 +535,9 @@ vinculosFuncionaisRouter.patch('/:id', async (c) => {
         db,
         (qdb) => [
           qdb.update(vinculosFuncionais)
-            .set({ ...parsed, updatedAt: new Date().toISOString() })
-            .where(eq(vinculosFuncionais.id, id))
+            .set({ ...parsed, updatedAt: agoraAtualizacao })
+            .where(eq(vinculosFuncionais.id, id)),
+          ...queriesSincronizacaoConvocacoes(qdb, vinculoResultante, sincronizacoes, agoraAtualizacao),
         ],
         {
           acao: 'VINCULO_FUNCIONAL_ATUALIZADO',
@@ -514,7 +551,6 @@ vinculosFuncionaisRouter.patch('/:id', async (c) => {
       )
     }
     const updated = await db.select().from(vinculosFuncionais).where(eq(vinculosFuncionais.id, id)).get()
-    await sincronizarConvocacoesPublicadasParaVinculo(db, updated)
     return c.json(updated)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
