@@ -11,17 +11,11 @@ import {
   presencasConvidadoEvento,
   credenciaisCadastroPortariaEvento,
   credenciaisOperadorPortariaEvento,
-  portariasEvento,
-  portariaFechamentos,
-  portariaFechamentoItens,
-  portariaFechamentoLocks,
   portariaSolicitacoesFechamento,
 } from '../db/schema'
 import { CheckinManualSchema, CheckinQrSchema, getSaoPauloEndOfDayIso } from '@piedade/shared'
 import { gerarTokenAleatorio, hashToken } from '../security/tokens'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
-import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
-import { executeAtomic } from '../db/batch'
 import { validarCredencialOperadorPortaria } from '../services/portaria-operador-temporario'
 
 export const portariaOperadorPublicaRouter = new Hono<any>()
