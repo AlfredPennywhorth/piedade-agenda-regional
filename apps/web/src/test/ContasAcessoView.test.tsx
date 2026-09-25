@@ -195,4 +195,28 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     })
   })
 
+
+  it('mantém o nível territorial escolhido quando ele é permitido para o perfil', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva] as any
+      if (endpoint === '/regionais') return [{ id: 'regional-1', nome: 'Regional São Paulo' }] as any
+      if (endpoint === '/administracoes') return [{ id: 'adm-1', nome: 'Administração Centro' }] as any
+      return [] as any
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Gerenciar acessos' }))
+
+    fireEvent.change(screen.getByLabelText('Perfil de acesso'), {
+      target: { value: 'GESTOR_AGENDA' },
+    })
+    const nivel = screen.getByLabelText('Nível territorial') as HTMLSelectElement
+    fireEvent.change(nivel, { target: { value: 'ADMINISTRACAO' } })
+
+    await waitFor(() => {
+      expect(nivel.value).toBe('ADMINISTRACAO')
+    })
+    expect(await screen.findByText('Administração Centro')).toBeDefined()
+  })
+
 })
