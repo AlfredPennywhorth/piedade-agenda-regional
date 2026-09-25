@@ -57,6 +57,9 @@ export function VinculosFuncionaisView() {
   const [ativo, setAtivo] = useState<boolean>(true)
   const [tipoEscopo, setTipoEscopo] = useState<TipoEscopo>('')
   const [escopoId, setEscopoId] = useState<string>('')
+  const [filtroRegionalCasaId, setFiltroRegionalCasaId] = useState<string>('')
+  const [filtroAdministracaoCasaId, setFiltroAdministracaoCasaId] = useState<string>('')
+  const [filtroSetorCasaId, setFiltroSetorCasaId] = useState<string>('')
   
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
   const [salvando, setSalvando] = useState<boolean>(false)
@@ -118,6 +121,11 @@ export function VinculosFuncionaisView() {
   const handleChangeTipoEscopo = (novoTipo: TipoEscopo) => {
     setTipoEscopo(novoTipo)
     setEscopoId('')
+    if (novoTipo !== 'casa') {
+      setFiltroRegionalCasaId('')
+      setFiltroAdministracaoCasaId('')
+      setFiltroSetorCasaId('')
+    }
   }
 
   const abrirFormCriar = () => {
@@ -128,6 +136,9 @@ export function VinculosFuncionaisView() {
     setAtivo(true)
     setTipoEscopo('')
     setEscopoId('')
+    setFiltroRegionalCasaId('')
+    setFiltroAdministracaoCasaId('')
+    setFiltroSetorCasaId('')
     setErrosForm({})
     setErro(null)
     setSucesso(null)
@@ -159,8 +170,24 @@ export function VinculosFuncionaisView() {
       setMembroId(item.membroId)
       setFuncaoId(item.funcaoId)
       setAtivo(item.ativo ?? true)
-      setTipoEscopo(getTipoEscopoAtual(item))
+      const tipoAtual = getTipoEscopoAtual(item)
+      setTipoEscopo(tipoAtual)
       setEscopoId(getEscopoIdAtual(item))
+
+      if (tipoAtual === 'casa' && item.casaId) {
+        const casa = casas.find(casaItem => casaItem.id === item.casaId)
+        const setor = casa ? setores.find(setorItem => setorItem.id === casa.setorId) : undefined
+        const administracao = setor
+          ? administracoes.find(admItem => admItem.id === setor.administracaoId)
+          : undefined
+        setFiltroSetorCasaId(setor?.id || '')
+        setFiltroAdministracaoCasaId(administracao?.id || '')
+        setFiltroRegionalCasaId(administracao?.regionalId || '')
+      } else {
+        setFiltroRegionalCasaId('')
+        setFiltroAdministracaoCasaId('')
+        setFiltroSetorCasaId('')
+      }
     } catch (err: any) {
       setErro(err.message || 'Erro ao carregar os detalhes do vínculo.')
       setModoForm(null)
@@ -278,6 +305,18 @@ export function VinculosFuncionaisView() {
 
   const getFuncaoNome = (v: VinculoFuncional) =>
     v.funcao?.nome || funcoes.find(item => item.id === v.funcaoId)?.nome || 'Função não encontrada'
+
+  const administracoesCasa = administracoes
+    .filter(item => !filtroRegionalCasaId || item.regionalId === filtroRegionalCasaId)
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+
+  const setoresCasa = setores
+    .filter(item => !filtroAdministracaoCasaId || item.administracaoId === filtroAdministracaoCasaId)
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+
+  const casasDoSetor = casas
+    .filter(item => Boolean(filtroSetorCasaId) && item.setorId === filtroSetorCasaId)
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
 
   const renderNomeEscopo = (v: VinculoFuncional) => {
     if (v.regional) return `Regional: ${v.regional.nome}`
@@ -521,20 +560,88 @@ export function VinculosFuncionaisView() {
                   </div>
                 )}
                 {tipoEscopo === 'casa' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="input-casa">
-                      Casa de Oração Selecionada
-                    </label>
-                    <select
-                      id="input-casa"
-                      value={escopoId}
-                      onChange={(e) => setEscopoId(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
-                      disabled={salvando}
-                    >
-                      <option value="">Selecione...</option>
-                      {casas.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                    </select>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="filtro-regional-casa">
+                          Regional
+                        </label>
+                        <select
+                          id="filtro-regional-casa"
+                          value={filtroRegionalCasaId}
+                          onChange={(e) => {
+                            setFiltroRegionalCasaId(e.target.value)
+                            setFiltroAdministracaoCasaId('')
+                            setFiltroSetorCasaId('')
+                            setEscopoId('')
+                          }}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
+                          disabled={salvando}
+                        >
+                          <option value="">Selecione...</option>
+                          {[...regionais].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(r => (
+                            <option key={r.id} value={r.id}>{r.nome}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="filtro-administracao-casa">
+                          Administração
+                        </label>
+                        <select
+                          id="filtro-administracao-casa"
+                          value={filtroAdministracaoCasaId}
+                          onChange={(e) => {
+                            setFiltroAdministracaoCasaId(e.target.value)
+                            setFiltroSetorCasaId('')
+                            setEscopoId('')
+                          }}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
+                          disabled={salvando || !filtroRegionalCasaId}
+                        >
+                          <option value="">Selecione...</option>
+                          {administracoesCasa.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="filtro-setor-casa">
+                          Setor
+                        </label>
+                        <select
+                          id="filtro-setor-casa"
+                          value={filtroSetorCasaId}
+                          onChange={(e) => {
+                            setFiltroSetorCasaId(e.target.value)
+                            setEscopoId('')
+                          }}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
+                          disabled={salvando || !filtroAdministracaoCasaId}
+                        >
+                          <option value="">Selecione...</option>
+                          {setoresCasa.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="input-casa">
+                        Casa de Oração Selecionada
+                      </label>
+                      <select
+                        id="input-casa"
+                        value={escopoId}
+                        onChange={(e) => setEscopoId(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
+                        disabled={salvando || !filtroSetorCasaId}
+                      >
+                        <option value="">
+                          {filtroSetorCasaId ? 'Selecione...' : 'Selecione primeiro o Setor'}
+                        </option>
+                        {casasDoSetor.map(casa => <option key={casa.id} value={casa.id}>{casa.nome}</option>)}
+                      </select>
+                    </div>
                   </div>
                 )}
                 {tipoEscopo === 'gt' && (
