@@ -384,16 +384,21 @@ export function PortariaView() {
         tipo: 'sucesso',
         texto: 'Portaria reaberta. Os acessos temporários anteriores permanecem revogados; habilite novos porteiros se necessário.',
       })
+      const eventoAntesDaReabertura = eventosDisponiveis.find(evento => evento.id === eventoIdAtual)
       setEventosDisponiveis(prev =>
         prev.map(evento =>
           evento.id === eventoIdAtual ? { ...evento, statusPortaria: 'ABERTA' as const } : evento
         )
       )
-      await Promise.all([
-        carregarParticipantes(eventoIdAtual),
-        carregarConvidados(eventoIdAtual),
-        carregarEstadoFechamento(eventoIdAtual),
-      ])
+      if (eventoAntesDaReabertura?.podeOperarPortaria === false) {
+        await carregarEstadoFechamento(eventoIdAtual)
+      } else {
+        await Promise.all([
+          carregarParticipantes(eventoIdAtual),
+          carregarConvidados(eventoIdAtual),
+          carregarEstadoFechamento(eventoIdAtual),
+        ])
+      }
     } catch (err: unknown) {
       const texto = err instanceof Error ? err.message : 'Falha ao reabrir a Portaria.'
       setMensagem({ tipo: 'erro', texto })
