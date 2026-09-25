@@ -66,6 +66,7 @@ A S13 está dividida em blocos priorizados (P0 a P3). Cada item dentro dos bloco
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | Nome | `membros` | Interfaces, Relatórios, Auditoria | Identificação do usuário | Autenticados, Gestores, Operadores, Auditores | Baixa | A validar (Comissão LGPD) |
 | Celular | `membros` | Acesso Operacional | Ativação/Contato | Sistema, Fluxos de Comunicação | Alta (Ocultar por padrão via decisão PMO) | A validar (Comissão LGPD) |
+| Data de Nasc. (legado) | `membros.data_nascimento` | Não deve ser exibido nem usado em autenticação | Campo residual legado, sem finalidade funcional vigente | Nenhum fluxo novo deve consumir | Máxima — remover após saneamento/migração | Finalidade, retenção até remoção e descarte a validar (Comissão LGPD) |
 | Casa (Escopo) | `membros` | Relatórios, Admin | Segregação institucional | Auditores, Gestores, Operadores | Baixa | A validar (Comissão LGPD) |
 | Funções/Vínculos | `vinculos_funcionais` | Backend (Auth/ACL) | Autorização | Usuário logado, Auditores | Baixa | A validar (Comissão LGPD) |
 | Presença / RSVP | `checkins`, `rsvp` | Relatórios, Agenda | Gestão do Evento | Gestores, Operadores, Titular | Média | A validar (Comissão LGPD) |
