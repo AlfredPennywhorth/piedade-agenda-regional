@@ -28,10 +28,15 @@ responsabilidadeRegionalApp.get('/', async c => {
     .select({
       acessoContaId: schema.acessosConta.id,
       regionalId: schema.acessosConta.escopoId,
+      regionalNome: schema.regionais.nome,
       cienteEm: schema.cienciasResponsabilidade.cienteEm,
       versaoRegistrada: schema.cienciasResponsabilidade.versaoTexto,
     })
     .from(schema.acessosConta)
+    .leftJoin(
+      schema.regionais,
+      eq(schema.regionais.id, schema.acessosConta.escopoId)
+    )
     .leftJoin(
       schema.cienciasResponsabilidade,
       and(
@@ -63,6 +68,7 @@ responsabilidadeRegionalApp.get('/', async c => {
     acessos: acessos.map((acesso: any) => ({
       acessoContaId: acesso.acessoContaId,
       regionalId: acesso.regionalId,
+      regionalNome: acesso.regionalNome,
       ciente: Boolean(acesso.cienteEm),
       cienteEm: acesso.cienteEm,
       versaoRegistrada: acesso.versaoRegistrada,
