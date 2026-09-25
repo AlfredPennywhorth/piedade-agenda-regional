@@ -479,6 +479,21 @@ export function setupDb(sqlite: any) {
       FOREIGN KEY (confirmado_por_membro_id) REFERENCES membros(id)
     );
 
+    CREATE TABLE IF NOT EXISTS portaria_reaberturas (
+      id text PRIMARY KEY NOT NULL,
+      evento_id text NOT NULL,
+      fechamento_anterior_id text NOT NULL,
+      reaberta_por_membro_id text NOT NULL,
+      motivo text NOT NULL,
+      reaberta_em text NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (evento_id) REFERENCES eventos(id),
+      FOREIGN KEY (reaberta_por_membro_id) REFERENCES membros(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_portaria_reabertura_evento
+      ON portaria_reaberturas (evento_id, reaberta_em);
+
     CREATE TABLE IF NOT EXISTS portaria_fechamento_locks (
       evento_id text PRIMARY KEY NOT NULL,
       criado_em text DEFAULT CURRENT_TIMESTAMP NOT NULL,
