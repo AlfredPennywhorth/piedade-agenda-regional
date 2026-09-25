@@ -303,17 +303,59 @@ membrosRouter.patch('/:id', async (c) => {
 
     const casaFinalId = parsed.casaId ?? existing.casaId
     const atorMembroId = c.get('membroId') || null
+    const atorContaAcessoId = c.get('contaAcessoId') || null
     const camposAlterados = Object.keys(parsed)
     const moveuCasa = casaFinalId !== existing.casaId
+    const agoraAtualizacao = new Date().toISOString()
+    const contaDoMembro = moveuCasa
+      ? await db
+          .select({ id: contasAcesso.id })
+          .from(contasAcesso)
+          .where(eq(contasAcesso.membroId, id))
+          .get()
+      : null
 
     if (moveuCasa) {
       await executarOperacaoComAudits(
         db,
-        (qdb) => [
-          qdb.update(membros)
-            .set({ ...parsed, updatedAt: new Date().toISOString() })
-            .where(eq(membros.id, id))
-        ],
+        (qdb) => {
+          const queries = [
+            qdb.update(membros)
+              .set({ ...parsed, updatedAt: agoraAtualizacao })
+              .where(eq(membros.id, id))
+          ]
+
+          if (contaDoMembro) {
+            queries.push(
+              qdb.update(acessosConta)
+                .set({
+                  ativo: false,
+                  revogadoEm: agoraAtualizacao,
+                  revogadoPorContaId: atorContaAcessoId,
+                  updatedAt: agoraAtualizacao,
+                })
+                .where(
+                  and(
+                    eq(acessosConta.contaAcessoId, contaDoMembro.id),
+                    eq(acessosConta.perfilCodigo, 'USUARIO_COMUM'),
+                    eq(acessosConta.ativo, true)
+                  )
+                ),
+              qdb.insert(acessosConta).values({
+                id: crypto.randomUUID(),
+                contaAcessoId: contaDoMembro.id,
+                perfilCodigo: 'USUARIO_COMUM',
+                escopoTipo: 'CASA',
+                escopoId: casaFinalId,
+                concedidoPorContaId: atorContaAcessoId,
+                createdAt: agoraAtualizacao,
+                updatedAt: agoraAtualizacao,
+              })
+            )
+          }
+
+          return queries
+        },
         [
           {
             acao: 'MEMBRO_ATUALIZADO',
@@ -340,7 +382,7 @@ membrosRouter.patch('/:id', async (c) => {
         db,
         (qdb) => [
           qdb.update(membros)
-            .set({ ...parsed, updatedAt: new Date().toISOString() })
+            .set({ ...parsed, updatedAt: agoraAtualizacao })
             .where(eq(membros.id, id))
         ],
         {
