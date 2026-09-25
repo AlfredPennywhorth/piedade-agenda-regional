@@ -413,11 +413,11 @@ portariaRouter.post('/eventos/:eventoId/solicitar-fechamento', async c => {
   if (!evento) return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
 
   const operador = await eOperadorPortariaAutorizado(db, atorMembroId, evento)
-  const gestor = Boolean(
-    atorMembroId && await podeGerarCredencialOperador(db, atorMembroId, contexto, evento)
-  )
-  if (!operador && !gestor) {
-    return c.json({ error: 'Acesso não autorizado para solicitar encerramento', code: 'FORBIDDEN' }, 403)
+  if (!operador) {
+    return c.json(
+      { error: 'Somente um porteiro autorizado pode solicitar o encerramento', code: 'FORBIDDEN' },
+      403
+    )
   }
 
   const estado = await db.select().from(portariasEvento)
@@ -515,6 +515,12 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
   if (!solicitacao || solicitacao.confirmadoEm) {
     return c.json(
       { error: 'O encerramento precisa ser solicitado pelo porteiro antes da confirmação', code: 'SOLICITACAO_FECHAMENTO_NECESSARIA' },
+      409
+    )
+  }
+  if (solicitacao.solicitadoPorMembroId && solicitacao.solicitadoPorMembroId === atorMembroId) {
+    return c.json(
+      { error: 'Quem solicitou o encerramento não pode confirmar o próprio pedido', code: 'DUPLA_CONFIRMACAO_NECESSARIA' },
       409
     )
   }
