@@ -1,5 +1,6 @@
 import { eq, and, inArray, or, isNull } from 'drizzle-orm'
 import * as schema from '../db/schema'
+import { RESPONSABILIDADE_PMO_VERSAO_ATUAL } from './responsabilidade-pmo'
 
 export interface AcessoTecnico {
   id: string
@@ -72,10 +73,53 @@ export async function carregarContextoPermissoes(
         .all()
     : []
 
+  let acessosAutorizados = acessos as AcessoTecnico[]
+
+  if (contaId) {
+    const acessosAdminRegional = acessosAutorizados.filter(
+      acesso =>
+        acesso.perfilCodigo === 'ADMINISTRADOR_SISTEMA' &&
+        acesso.escopoTipo === 'REGIONAL' &&
+        acesso.escopoId !== null
+    )
+
+    if (acessosAdminRegional.length > 0) {
+      const ciencias = await db
+        .select({ acessoContaId: schema.cienciasResponsabilidade.acessoContaId })
+        .from(schema.cienciasResponsabilidade)
+        .where(
+          and(
+            eq(schema.cienciasResponsabilidade.contaAcessoId, contaId),
+            eq(schema.cienciasResponsabilidade.tipo, 'RESPONSAVEL_REGIONAL_PMO'),
+            eq(schema.cienciasResponsabilidade.versaoTexto, RESPONSABILIDADE_PMO_VERSAO_ATUAL),
+            inArray(
+              schema.cienciasResponsabilidade.acessoContaId,
+              acessosAdminRegional.map(acesso => acesso.id)
+            )
+          )
+        )
+        .all()
+
+      const acessosComCiencia = new Set(
+        ciencias.map((ciencia: any) => ciencia.acessoContaId)
+      )
+
+      acessosAutorizados = acessosAutorizados.filter(
+        acesso =>
+          !(
+            acesso.perfilCodigo === 'ADMINISTRADOR_SISTEMA' &&
+            acesso.escopoTipo === 'REGIONAL' &&
+            acesso.escopoId !== null &&
+            !acessosComCiencia.has(acesso.id)
+          )
+      )
+    }
+  }
+
   return {
     membroId,
     contaAcessoId: contaId,
-    acessosAtivos: acessos as AcessoTecnico[],
+    acessosAtivos: acessosAutorizados,
     vinculosAtivos: vinculos,
   }
 }
