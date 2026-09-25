@@ -64,6 +64,7 @@ export function MembrosView() {
   const [membroEditandoId, setMembroEditandoId] = useState<string | null>(null)
   const [carregandoDetalhes, setCarregandoDetalhes] = useState(false)
   const [salvando, setSalvando] = useState(false)
+  const [excluindoId, setExcluindoId] = useState<string | null>(null)
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
 
   const [regionalId, setRegionalId] = useState('')
@@ -388,6 +389,35 @@ export function MembrosView() {
       }
     } finally {
       setSalvando(false)
+    }
+  }
+
+  const excluirMembro = async (membro: Membro) => {
+    if (
+      !window.confirm(
+        `Excluir definitivamente o cadastro de ${membro.nome}? Esta ação só será permitida se o membro ainda não possuir conta, vínculo, convocação ou outro histórico relacionado.`
+      )
+    ) {
+      return
+    }
+
+    setExcluindoId(membro.id)
+    setErro(null)
+    setSucesso(null)
+
+    try {
+      await fetchWithAuth(`/membros/${membro.id}`, { method: 'DELETE' })
+      setSucesso('Membro excluído com sucesso.')
+      if (membroEditandoId === membro.id) fecharForm()
+      await carregarDados()
+    } catch (err: any) {
+      if (err instanceof ApiError && err.body?.error) {
+        setErro(typeof err.body.error === 'string' ? err.body.error : 'Não foi possível excluir o membro.')
+      } else {
+        setErro(err.message || 'Não foi possível excluir o membro.')
+      }
+    } finally {
+      setExcluindoId(null)
     }
   }
 
@@ -837,12 +867,22 @@ export function MembrosView() {
                       </span>
                     </td>
                     <td className="p-3 text-right">
-                      <button
-                        onClick={() => abrirFormEditar(membro.id)}
-                        className="text-xs text-brand-600 hover:text-brand-800 font-medium px-2 py-1 bg-brand-50 hover:bg-brand-100 rounded"
-                      >
-                        Editar
-                      </button>
+                      <div className="inline-flex gap-2">
+                        <button
+                          onClick={() => abrirFormEditar(membro.id)}
+                          disabled={excluindoId === membro.id}
+                          className="text-xs text-brand-600 hover:text-brand-800 font-medium px-2 py-1 bg-brand-50 hover:bg-brand-100 rounded disabled:opacity-50"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => void excluirMembro(membro)}
+                          disabled={excluindoId === membro.id}
+                          className="text-xs text-red-700 hover:text-red-900 font-medium px-2 py-1 bg-red-50 hover:bg-red-100 rounded disabled:opacity-50"
+                        >
+                          {excluindoId === membro.id ? 'Excluindo...' : 'Excluir'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
