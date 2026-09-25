@@ -581,7 +581,7 @@ export function PortariaView() {
                 Aguardando gestor
               </button>
             )
-          ) : (
+          ) : podeOperarEvento ? (
             <button
               type="button"
               onClick={() => void handleSolicitarFechamento()}
@@ -589,6 +589,14 @@ export function PortariaView() {
               className="px-4 py-2.5 bg-amber-600 text-white font-semibold rounded-lg text-sm hover:bg-amber-700 disabled:opacity-50"
             >
               Solicitar encerramento
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="px-4 py-2.5 bg-slate-100 text-slate-600 font-semibold rounded-lg text-sm"
+            >
+              Aguardando solicitação do porteiro
             </button>
           )}
         </div>
