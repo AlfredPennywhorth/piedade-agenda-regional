@@ -48,10 +48,10 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
       INSERT INTO casas (id, setor_id, nome) VALUES ('casa-1', 'set-1', 'Casa 1');
       INSERT INTO locais (id, nome, endereco, numero, cidade, uf) VALUES ('${localId}', 'Local 1', 'Rua de Teste', '100', 'São Paulo', 'SP');
       
-      INSERT INTO membros (id, nome, celular, data_nascimento, casa_id, ativo)
+      INSERT INTO membros (id, nome, celular, casa_id, ativo)
       VALUES 
-        ('${membroId}', 'João Silva', '11999999999', '1990-01-01', 'casa-1', 1),
-        ('${membroIdOutro}', 'Maria Souza', '11888888888', '1990-01-02', 'casa-1', 1);
+        ('${membroId}', 'João Silva', '11999999999', 'casa-1', 1),
+        ('${membroIdOutro}', 'Maria Souza', '11888888888', 'casa-1', 1);
       
       -- Eventos Lote 1/S08 (inserção direta SQL, não passa por Zod)
       INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo, possui_manha, possui_tarde)
@@ -75,20 +75,20 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     `
     sqlite.exec(baseSql)
 
-    const genSession = async (mid: string, cel: string, dataNascimento: string) => {
+    const genSession = async (mid: string, cel: string) => {
       const resLink = await req(`/api/v1/admin/membros/${mid}/link-ativacao`, { method: 'POST' })
       const linkJson = await resLink.json() as any
       const resAtivar = await req('/api/v1/auth/ativar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: linkJson.token, celular: cel, dataNascimento, pin: '123456', confirmacaoPin: '123456' })
+        body: JSON.stringify({ token: linkJson.token, celular: cel, pin: '123456', confirmacaoPin: '123456' })
       })
       const ativarJson = await resAtivar.json() as any
       return ativarJson.sessionToken
     }
 
-    sessionToken = await genSession(membroId, '11999999999', '1990-01-01')
-    sessionTokenOutro = await genSession(membroIdOutro, '11888888888', '1990-01-02')
+    sessionToken = await genSession(membroId, '11999999999')
+    sessionTokenOutro = await genSession(membroIdOutro, '11888888888')
     const conta = sqlite.prepare(
       'SELECT id FROM contas_acesso WHERE membro_id = ?'
     ).get(membroId) as { id: string }
