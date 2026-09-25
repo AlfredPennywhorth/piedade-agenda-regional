@@ -203,6 +203,18 @@ describe('Administração de contas — PR-ACC-05', () => {
     expect(conta.pin_hash).toBeNull()
     expect(conta.pin_salt).toBeNull()
 
+    const acessoPadrao = sqlite.prepare(
+      `SELECT perfil_codigo, escopo_tipo, escopo_id, ativo
+       FROM acessos_conta
+       WHERE conta_acesso_id = ? AND perfil_codigo = 'USUARIO_COMUM'`
+    ).get(conta.id) as any
+    expect(acessoPadrao).toMatchObject({
+      perfil_codigo: 'USUARIO_COMUM',
+      escopo_tipo: 'CASA',
+      escopo_id: 'casa-1',
+      ativo: 1,
+    })
+
     const link = sqlite.prepare(
       'SELECT token_hash, utilizado_em, revogado_em FROM links_ativacao WHERE conta_acesso_id = ?'
     ).get(conta.id) as any
@@ -548,6 +560,25 @@ describe('Administração de contas — PR-ACC-05', () => {
       `SELECT status, pin_hash FROM contas_acesso WHERE id = 'conta-master'`
     ).get() as any
     expect(conta).toMatchObject({ status: 'ATIVA', pin_hash: 'hash-master' })
+  })
+
+
+  it('protege o acesso padrão de Usuário Comum contra revogação', async () => {
+    const tokenMaster = 'token-master-protege-comum'
+    await criarSessao('sessao-master-protege-comum', 'conta-master', 'membro-master', tokenMaster)
+
+    const response = await requisicao('/api/v1/admin/acessos/acesso-comum', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${tokenMaster}` },
+    })
+
+    expect(response.status).toBe(409)
+    expect((await response.json()) as any).toMatchObject({ code: 'ACESSO_PADRAO' })
+
+    const acesso = sqlite.prepare(
+      `SELECT ativo FROM acessos_conta WHERE id = 'acesso-comum'`
+    ).get() as { ativo: number }
+    expect(acesso.ativo).toBe(1)
   })
 
 })
