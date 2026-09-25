@@ -294,6 +294,11 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
   })
 
   it('26. Deve bloquear exclusão quando o membro possui dependências', async () => {
+    sqlite.exec(`
+      INSERT INTO contas_acesso (id, membro_id, status)
+      VALUES ('conta-dependente-exclusao', '${membroId}', 'PENDENTE_ATIVACAO');
+    `)
+
     const resDelete = await req(`/api/v1/membros/${membroId}`, {
       method: 'DELETE',
     })
