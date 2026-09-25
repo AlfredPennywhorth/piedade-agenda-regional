@@ -581,4 +581,29 @@ describe('Administração de contas — PR-ACC-05', () => {
     expect(acesso.ativo).toBe(1)
   })
 
+
+  it('rejeita concessão manual de Usuário Comum fora do fluxo automático', async () => {
+    const tokenMaster = 'token-master-comum-manual'
+    await criarSessao('sessao-master-comum-manual', 'conta-master', 'membro-master', tokenMaster)
+
+    const response = await requisicao('/api/v1/admin/acessos', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${tokenMaster}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contaAcessoId: 'conta-reset',
+        perfilCodigo: 'USUARIO_COMUM',
+        escopoTipo: 'REGIONAL',
+        escopoId: 'regional-1',
+      }),
+    })
+
+    expect(response.status).toBe(409)
+    expect((await response.json()) as any).toMatchObject({
+      code: 'ACESSO_PADRAO_AUTOMATICO',
+    })
+  })
+
 })
