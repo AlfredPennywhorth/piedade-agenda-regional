@@ -531,7 +531,16 @@ describe('S11 - Portaria e Check-in', () => {
       const ev = json.data.find((e: PortariaEventoItem) => e.id === evHojeDentroId)
       expect(ev).toBeDefined()
       if (ev) {
-        expect(Object.keys(ev).sort()).toEqual(['fimEm', 'id', 'inicioEm', 'modalidade', 'titulo'])
+        expect(Object.keys(ev).sort()).toEqual([
+          'fimEm',
+          'id',
+          'inicioEm',
+          'modalidade',
+          'podeConfirmarFechamento',
+          'podeOperarPortaria',
+          'statusPortaria',
+          'titulo',
+        ])
       }
     })
 
