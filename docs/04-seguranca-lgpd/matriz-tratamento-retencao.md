@@ -27,7 +27,7 @@
 | Presença | `checkins`, snapshots/relatórios de presença | comprovar participação e gerar relatórios | sem purge automático | fim da finalidade administrativa do histórico | prazo institucional + anonimização/eliminação | **PENDENTE — definir prazo institucional** |
 | Convidados | `convidados_evento` e credenciais de cadastro | permitir admissão de pessoa não prevista | vinculados ao evento; sem purge automático global | fechamento do evento e fim da necessidade de conferência | eliminar dados identificáveis após prazo operacional homologado | **PENDENTE — prioridade alta** |
 | Portaria | operadores, credenciais temporárias, solicitações, reaberturas | controlar entrada, fechamento e retificação | credenciais revogadas no fechamento; histórico sem purge automático | fechamento definitivo e término da necessidade de auditoria | excluir credenciais temporárias após janela técnica; manter apenas trilha necessária | **PENDENTE** |
-| Push | `push_subscriptions` | entrega de notificações | enquanto assinatura estiver ativa | revogação, endpoint inválido ou desativação do usuário | desativar e remover chaves/endpoint quando não necessários | **PENDENTE** |
+| Push | `push_subscriptions` | entrega de notificações | assinaturas ativas permanecem em uso; ao cancelar ou receber 404/410, o sistema hoje apenas marca `ativo=false` e mantém `endpoint`, `p256dh`, `auth` e `User-Agent`; não há purge automático | revogação, endpoint inválido ou desativação do usuário | implementar eliminação das credenciais/metadados inativos após prazo operacional homologado | **PENDENTE — retenção residual sem purge automático** |
 
 ## Prazos técnicos já implementados
 
