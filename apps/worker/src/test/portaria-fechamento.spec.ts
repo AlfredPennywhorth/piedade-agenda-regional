@@ -244,8 +244,9 @@ describe('PORT-03 — fechamento e lista final consolidada', () => {
       .run('Convidado Alterado Depois', 'guest-ok')
 
     const lista = await app.request('/api/v1/portaria/eventos/evento-1/fechamento', {
-      headers: auth('token-porteiro'),
+      headers: auth('token-master'),
     })
+    expect(lista.status).toBe(200)
 
     const body = (await lista.json()) as any
     expect(body.itens).toEqual(expect.arrayContaining([
