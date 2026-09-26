@@ -676,6 +676,36 @@ describe('PortariaView', () => {
         await waitFor(() => expect(qrInput).toHaveFocus())
       })
 
+      it('mantém o foco dentro do diálogo enquanto todos os controles estão desabilitados', async () => {
+        mockFetchWithAuth.mockImplementation(async (url) => {
+          if (url.includes('/eventos/11111111-1111-1111-1111-111111111111/participantes')) return getMockParticipantes()
+          return mockEventos
+        })
+
+        let resolvePost: ((value: unknown) => void) | undefined
+        mockPostWithAuth.mockImplementationOnce(
+          () => new Promise(resolve => { resolvePost = resolve })
+        )
+
+        render(<PortariaView />)
+        await flushPromises()
+        fireEvent.change(screen.getByRole('combobox'), { target: { value: '11111111-1111-1111-1111-111111111111' } })
+        await flushPromises()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Retificar check-in' }))
+        fireEvent.change(screen.getByLabelText(/Motivo da retificação/), { target: { value: 'Motivo válido' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Confirmar retificação' }))
+
+        await waitFor(() => expect(screen.getByText('Confirmando...')).toBeDisabled())
+
+        const dialog = screen.getByRole('dialog')
+        fireEvent.keyDown(dialog, { key: 'Tab' })
+        expect(dialog).toHaveFocus()
+
+        resolvePost?.({ success: true })
+        await flushPromises()
+      })
+
       it('mantém loading impedindo duplo clique e mostra mensagem do ApiError ao receber erro (ex: 409)', async () => {
         mockFetchWithAuth.mockImplementation(async (url) => {
           if (url.includes('/eventos/11111111-1111-1111-1111-111111111111/participantes')) return getMockParticipantes()
