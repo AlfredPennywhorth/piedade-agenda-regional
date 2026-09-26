@@ -131,6 +131,9 @@ export function PortariaView() {
     setBuscaNome('')
     setQrTokenInput('')
     setUltimoCheckinId(null)
+    setModalRetificacao(null)
+    retificarTriggerRef.current = null
+    setLoading(false)
     setMensagem({
       tipo: 'aviso',
       texto: err.status === 403
@@ -198,6 +201,13 @@ export function PortariaView() {
     const intervalo = window.setInterval(() => {
       const evId = currentEvIdRef.current
       if (!evId) return
+
+      const eventoSelecionado = eventosDisponiveis.find(evento => evento.id === evId)
+      if (eventoSelecionado?.podeOperarPortaria === false) {
+        void carregarEstadoFechamento(evId, true)
+        return
+      }
+
       void Promise.all([
         carregarParticipantes(evId, true),
         carregarConvidados(evId, true),
@@ -206,7 +216,7 @@ export function PortariaView() {
     }, 8000)
 
     return () => window.clearInterval(intervalo)
-  }, [eventoIdAtual])
+  }, [eventoIdAtual, eventosDisponiveis])
 
   const handleSelecionarEvento = (evId: string) => {
     setEventoIdAtual(evId)
