@@ -52,10 +52,11 @@ Autenticação gerenciada pelo Cloudflare Zero Trust. Os usuários se autenticar
 | Persistência | Cloudflare D1 |
 | Ativação | Link individual por membro |
 | Validação inicial | Celular cadastrado + link individual |
-| Mecanismo de sessão | Próprio e seguro (a definir na S01) |
-| Contingência | PIN |
+| Mecanismo de sessão | Token aleatório; somente hash persistido no backend |
+| Sessão | 12 h de inatividade máxima e 30 dias de validade absoluta |
+| Contingência | PIN de 6 dígitos, armazenado somente por hash |
 | Evolução futura | Arquitetura preparada para Passkeys / WebAuthn |
-| Recuperação | Administrativa (sem auto-serviço de reset) |
+| Recuperação | Solicitação pelo usuário + redefinição administrativa por link individual |
 | SMS | Não obrigatório |
 | E-mail | Não obrigatório |
 
@@ -85,9 +86,9 @@ O Cloudflare Access **poderá ser avaliado posteriormente** somente para:
 
 ### Impacto no modelo de dados
 - Tabelas a criar (Sprint S01+):
-  - `sessoes` — tokens de sessão, expiração, IP/User-Agent
-  - `links_ativacao` — links individuais, status, expiração
-  - `tentativas_acesso` — auditoria de tentativas (LGPD)
+  - `sessoes` — hash do token, expiração, último acesso e User-Agent
+  - `links_ativacao` — hash do token, status e expiração
+  - `tentativas_acesso` — eventos mínimos necessários para segurança e recuperação
 - **Minimização de dados**: a revisão de 25/09/2026 removeu a data de nascimento do modelo e dos fluxos de autenticação. A ativação utiliza link individual e confirmação do celular cadastrado.
 
 ---
@@ -100,15 +101,19 @@ O Cloudflare Access **poderá ser avaliado posteriormente** somente para:
 
 ---
 
-## Próximos passos (Sprint S01+)
+## Estado implementado
 
-- [ ] Definir schema de `sessoes`, `links_ativacao` e `tentativas_acesso`
-- [ ] Definir algoritmo de geração e validação de links individuais
-- [ ] Definir tempo de expiração de sessão e política de renovação
-- [ ] Definir estrutura do PIN (tamanho, hash, tentativas máximas)
-- [ ] Avaliar biblioteca criptográfica compatível com Cloudflare Workers
-- [ ] Documentar fluxo de ativação com o PMO
-- [ ] Definir processo de recuperação administrativa
+- [x] Schema de `sessoes`, `links_ativacao` e `tentativas_acesso`
+- [x] Tokens aleatórios com persistência apenas do hash
+- [x] Sessão com máximo de 12 h de inatividade e 30 dias absolutos
+- [x] PIN de 6 dígitos com hash e proteção contra tentativas sucessivas
+- [x] Link individual de ativação/reset com validade de 7 dias
+- [x] Revogação de sessões em logout, bloqueio e redefinição de PIN
+- [x] Recuperação iniciada pelo usuário com resposta anti-enumeração e tratamento administrativo
+- [x] Fluxos compatíveis com Cloudflare Worker/D1
 
-> **NÃO IMPLEMENTAR nesta Sprint S00.**
-> Implementação aguarda autorização formal do PMO para Sprint S01.
+## Retenção
+
+Os prazos acima são limites de validade funcional das credenciais, não autorização para conservar indefinidamente seus registros históricos.
+
+A política de descarte dos registros expirados/revogados e dos eventos de tentativa deve seguir a matriz de tratamento e retenção em `docs/04-seguranca-lgpd/matriz-tratamento-retencao.md`. Prazos institucionais ainda não homologados permanecem explicitamente pendentes.
