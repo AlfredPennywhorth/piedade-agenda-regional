@@ -219,6 +219,16 @@ describe('Perfis, escopos e governança — PR-ACC-03', () => {
 
     const liberadoAposCiencia = await requisicao('/api/v1/admin/acessos', { headers })
     expect(liberadoAposCiencia.status).toBe(200)
+    const contasAdministradas = (await liberadoAposCiencia.json()) as any[]
+    expect(contasAdministradas.length).toBeGreaterThan(0)
+    for (const contaAdministrada of contasAdministradas) {
+      expect(contaAdministrada).not.toHaveProperty('dataOrdenacao')
+      expect(contaAdministrada).not.toHaveProperty('regionalId')
+      expect(contaAdministrada).not.toHaveProperty('pinHash')
+      expect(contaAdministrada).not.toHaveProperty('pinSalt')
+      expect(contaAdministrada).not.toHaveProperty('bloqueadoAte')
+      expect(contaAdministrada).not.toHaveProperty('tentativasPin')
+    }
 
     const repetida = await requisicao(
       '/api/v1/governanca/responsabilidade-regional/ciencia',
