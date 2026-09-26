@@ -258,10 +258,23 @@ adminAcessosApp.get('/', async c => {
     recuperacaoPorMembro.set(item.membroId, atual)
   }
 
-  const acessosPorConta = new Map<string, typeof acessosVisiveis>()
+  const acessosPorConta = new Map<
+    string,
+    Array<{
+      id: string
+      perfilCodigo: string
+      escopoTipo: string
+      escopoId: string | null
+    }>
+  >()
   for (const acesso of acessosVisiveis) {
     const atuais = acessosPorConta.get(acesso.contaAcessoId) ?? []
-    atuais.push(acesso)
+    atuais.push({
+      id: acesso.id,
+      perfilCodigo: acesso.perfilCodigo,
+      escopoTipo: acesso.escopoTipo,
+      escopoId: acesso.escopoId,
+    })
     acessosPorConta.set(acesso.contaAcessoId, atuais)
   }
 
