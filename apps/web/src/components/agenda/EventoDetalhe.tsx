@@ -145,6 +145,13 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
       }
       
       setRespostaLocal(resposta)
+      setConvidadosConvocacao(prev =>
+        prev?.map(convidado =>
+          convidado.destinatarioId === item.destinatarioId
+            ? { ...convidado, respostaRsvp: resposta }
+            : convidado
+        ) ?? null
+      )
       if (onRsvpUpdated) {
         onRsvpUpdated(item.destinatarioId, rsvpAtualizado)
       }
