@@ -74,11 +74,18 @@ Não registrar token, PIN, telefone real ou outro dado pessoal em evidências p�
 
 ## 6. Pages Produção
 
-Executar **Deploy Pages — Produção** a partir de `main`, com:
+Executar **Deploy Pages — Produção** a partir de `main`, somente após o Worker do mesmo SHA concluir com sucesso e o smoke do Worker ser aprovado, com:
 
-- `confirm_release = true`.
+- `confirm_release = true`;
+- `confirm_worker_smoke = true`.
 
-O workflow valida `PROD_API_URL`, gera o bundle usando essa API e publica a branch `main` do projeto Pages.
+O workflow:
+- compartilha o grupo de concorrência `production-release` com o Worker, impedindo execução simultânea;
+- consulta os runs do workflow **Deploy Worker — Produção**;
+- exige um run `workflow_dispatch` concluído com sucesso no mesmo `github.sha`;
+- valida `PROD_API_URL`;
+- gera o bundle usando essa API;
+- publica a branch `main` do projeto Pages.
 
 ## 7. Smoke pós-produção
 
