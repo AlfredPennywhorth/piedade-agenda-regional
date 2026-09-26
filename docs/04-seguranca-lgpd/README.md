@@ -21,26 +21,73 @@ Este diretório contém a documentação de segurança e conformidade LGPD do pr
 - Secrets de CI/CD: GitHub Actions Secrets
 - Variáveis não-secretas: `wrangler.toml` (seção `[vars]`)
 
-## LGPD — Princípios aplicáveis
+## LGPD — princípios aplicáveis
 
-| Princípio | Aplicação prevista |
+| Princípio | Aplicação no projeto |
 |---|---|
-| Finalidade | Dados coletados somente para gestão de reuniões regionais |
-| Necessidade | Coletar apenas dados estritamente necessários |
-| Livre acesso | Membro pode solicitar seus dados |
-| Qualidade | Dados atualizados e corretos |
-| Transparência | Informar o membro sobre uso dos dados |
-| Segurança | Autenticação própria + sessões seguras (ADR-001) |
-| Prevenção | Não armazenar dados desnecessários |
-| Não discriminação | Sem uso de dados para fins discriminatórios |
-| Responsabilização | Registro de acessos e alterações |
+| Finalidade | Dados somente para gestão institucional, agenda, acesso, presença, Portaria e segurança |
+| Necessidade | Coletar e retornar somente o mínimo necessário |
+| Livre acesso | Processo institucional deve permitir solicitação de informações pelo titular |
+| Qualidade | Dados devem ser atualizáveis e vinculados à estrutura institucional correta |
+| Transparência | Finalidades, retenção e canal do titular devem ser informados |
+| Segurança | Autenticação própria, tokens armazenados por hash, segregação de escopo e trilha de auditoria |
+| Prevenção | Não coletar documentos civis nem dados sem finalidade homologada |
+| Não discriminação | Dados não podem ser utilizados para fins discriminatórios |
+| Responsabilização | Operações administrativas relevantes possuem auditoria |
 
-## Dados pessoais previstos
+## Dados pessoais atualmente tratados
 
-- Nome completo
-- Número de celular
-- Código institucional da carteirinha
-- Data de ordenação
-- Vínculos institucionais necessários ao controle de acesso e à agenda
+O cadastro-base utiliza:
 
-> **Status:** Política de LGPD a ser detalhada pelo PMO. Framework de segurança estabelecido na S00.
+- nome completo;
+- número de celular;
+- código institucional da carteirinha;
+- data de ordenação;
+- Casa de Oração e vínculos institucionais;
+- dados necessários à conta e aos perfis de acesso.
+
+Fluxos específicos também tratam dados de convocação, RSVP, presença, convidados, Portaria e notificações.
+
+**Não são coletados no cadastro-base: CPF, documento civil ou data de nascimento.**
+
+### Atenção ao contexto institucional
+
+Mesmo quando um campo isolado parece comum, o conjunto de dados desta aplicação pode revelar vínculo com organização religiosa. Por isso, a definição das hipóteses legais aplicáveis não deve ser feita automaticamente pelo software. Deve ser validada formalmente pelo controlador considerando as regras da LGPD para dados pessoais e, quando aplicável, dados pessoais sensíveis.
+
+## Finalidade e retenção
+
+A LGPD não é tratada no projeto como uma autorização para retenção indefinida.
+
+Cada categoria de dado deve possuir:
+
+1. finalidade específica;
+2. acesso compatível com a função;
+3. hipótese legal validada pelo controlador;
+4. evento de término do tratamento;
+5. prazo ou critério de retenção;
+6. regra de eliminação ou anonimização quando cabível.
+
+A matriz técnica vigente está em:
+
+- [Matriz técnica de tratamento e retenção](./matriz-tratamento-retencao.md)
+
+Prazos ainda não homologados são registrados como **pendentes**, e não como retenção permanente.
+
+## Ciência de responsabilidade
+
+A ciência exigida do responsável Regional/PMO registra que a pessoa recebeu e compreendeu responsabilidades de governança. **Ela não é consentimento para tratamento de dados pessoais.**
+
+## Regra para evolução do schema
+
+Nenhuma nova categoria de dado pessoal deve ser incluída sem registrar finalidade, necessidade, acesso, hipótese legal validada, retenção e descarte.
+
+## Referências oficiais
+
+- Lei nº 13.709/2018 (LGPD):
+  https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709compilado.htm
+- ANPD — Perguntas frequentes:
+  https://www.gov.br/anpd/pt-br/acesso-a-informacao/perguntas-frequentes/perguntas-frequentes
+- ANPD — materiais educativos e publicações:
+  https://www.gov.br/anpd/pt-br/centrais-de-conteudo/materiais-educativos-e-publicacoes
+
+> **Status S13.06:** inventário técnico e critérios de retenção documentados. Bases legais e prazos institucionais indicados como pendentes quando dependem de validação formal do controlador/jurídico.
