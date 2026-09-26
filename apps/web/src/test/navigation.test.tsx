@@ -103,3 +103,47 @@ describe('Navegação e Visibilidade de Permissões — S12 Frontend', () => {
     expect(menu.queryByRole('button', { name: /Auditoria/i })).toBeNull()
   })
 })
+
+
+  it('6. identifica a aba principal ativa com aria-current', () => {
+    render(
+      <MainLayout currentTab="agenda" onTabChange={() => {}} capacidades={{}}>
+        <div>Conteúdo Principal</div>
+      </MainLayout>
+    )
+
+    const nav = within(screen.getByRole('navigation', { name: /navegação móvel principal/i }))
+    expect(nav.getByRole('button', { name: /Minha Agenda/i })).toHaveAttribute('aria-current', 'page')
+    expect(nav.getByRole('button', { name: /Calendário/i })).not.toHaveAttribute('aria-current')
+  })
+
+  it('7. move o foco para o conteúdo principal ao trocar de módulo', () => {
+    const { rerender } = render(
+      <MainLayout currentTab="agenda" onTabChange={() => {}} capacidades={{}}>
+        <div>Agenda</div>
+      </MainLayout>
+    )
+
+    const main = screen.getByRole('main', { name: /conteúdo principal/i })
+    expect(main).not.toHaveFocus()
+
+    rerender(
+      <MainLayout currentTab="calendario" onTabChange={() => {}} capacidades={{}}>
+        <div>Calendário</div>
+      </MainLayout>
+    )
+
+    expect(main).toHaveFocus()
+  })
+
+  it('8. oferece link de salto para o conteúdo principal', () => {
+    render(
+      <MainLayout currentTab="agenda" onTabChange={() => {}} capacidades={{}}>
+        <div>Agenda</div>
+      </MainLayout>
+    )
+
+    expect(screen.getByRole('link', { name: /ir para o conteúdo principal/i }))
+      .toHaveAttribute('href', '#conteudo-principal')
+  })
+})
