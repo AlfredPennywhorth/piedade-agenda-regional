@@ -238,9 +238,15 @@ describe('PORT-02 — autocadastro de convidados e validação pelo porteiro', (
     await prepararPorteiro()
     const gerada = await gerarCredencial()
 
-    const fechar = await app.request('/api/v1/portaria/eventos/evento-1/fechar', {
+    const solicitar = await app.request('/api/v1/portaria/eventos/evento-1/solicitar-fechamento', {
       method: 'POST',
       headers: auth('token-porteiro'),
+    })
+    expect(solicitar.status).toBe(202)
+
+    const fechar = await app.request('/api/v1/portaria/eventos/evento-1/fechar', {
+      method: 'POST',
+      headers: auth('token-master'),
     })
     expect(fechar.status).toBe(200)
 
