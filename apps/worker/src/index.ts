@@ -60,7 +60,15 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   const app = new Hono<{ Bindings: Env; Variables: { db: any } }>()
 
   // Middlewares globais
-  app.use('*', logger())
+  // Evita registrar URLs de credenciais/tokens em Beta e produção.
+  const developmentLogger = logger()
+  app.use('*', async (c, next) => {
+    if (c.env?.APP_ENV === 'development') {
+      return developmentLogger(c, next)
+    }
+    await next()
+  })
+
   app.use('*', async (c, next) => {
     c.header(
       'Content-Security-Policy',
@@ -73,6 +81,13 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
     c.header('X-Frame-Options', 'DENY')
     await next()
   })
+  const noStore = async (c: any, next: any) => {
+    c.header('Cache-Control', 'no-store')
+    c.header('Pragma', 'no-cache')
+    await next()
+  }
+  app.use('/api/*', noStore)
+
   app.use(
     '/api/*',
     cors({
@@ -89,28 +104,11 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
         return origin && allowed.includes(origin) ? origin : ''
       },
       allowMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+      allowHeaders: ['Authorization', 'Content-Type'],
+      exposeHeaders: ['Retry-After'],
+      maxAge: 600,
     })
   )
-
-  const noStore = async (c: any, next: any) => {
-    c.header('Cache-Control', 'no-store')
-    c.header('Pragma', 'no-cache')
-    await next()
-  }
-  app.use('/api/v1/auth/*', noStore)
-  app.use('/api/v1/membros/*', noStore)
-  app.use('/api/v1/convocacoes/*', noStore)
-  app.use('/api/v1/minha-agenda/*', noStore)
-  app.use('/api/v1/checkin/*', noStore)
-  app.use('/api/v1/portaria/*', noStore)
-  app.use('/api/v1/portaria-publica/*', noStore)
-  app.use('/api/v1/portaria-operador-publica/*', noStore)
-  app.use('/api/v1/relatorios/*', noStore)
-  app.use('/api/v1/auditoria/*', noStore)
-  app.use('/api/v1/bootstrap/*', noStore)
-  app.use('/api/v1/governanca/*', noStore)
-  app.use('/api/v1/admin/acessos/*', noStore)
-  app.use('/api/v1/admin/pre-cadastros-ministeriais/*', noStore)
 
   // ============================================================
   // Rotas de infraestrutura — S00
@@ -214,7 +212,7 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
 
   // 404 padrão
   app.notFound(c => {
-    return c.json({ error: 'Rota não encontrada' }, 404)
+    return c.json({ error: 'Rota não encontrada', code: 'NOT_FOUND' }, 404)
   })
 
   app.onError((_error, c) => {

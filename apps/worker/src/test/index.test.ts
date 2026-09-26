@@ -68,6 +68,10 @@ describe('Worker — Rotas de infraestrutura', () => {
       expect(res.headers.get('access-control-allow-origin')).toBe('http://localhost:5173')
       expect(res.headers.get('access-control-allow-methods')).toContain('PUT')
       expect(res.headers.get('access-control-allow-methods')).toContain('DELETE')
+      expect(res.headers.get('access-control-allow-headers')).toContain('Authorization')
+      expect(res.headers.get('access-control-allow-headers')).toContain('Content-Type')
+      expect(res.headers.get('access-control-expose-headers')).toContain('Retry-After')
+      expect(res.headers.get('access-control-max-age')).toBe('600')
     })
 
     it('aceita origem adicional configurada via CORS_ORIGIN (ex: Codespaces)', async () => {
@@ -172,11 +176,34 @@ describe('Worker — Rotas de infraestrutura', () => {
     expect(res.headers.get('x-frame-options')).toBe('DENY')
   })
 
-  it('protege respostas de autenticação contra cache', async () => {
-    const res = await app.request('/api/v1/auth/login', { method: 'POST' }, env)
+  it('protege toda a API contra cache, inclusive respostas 404', async () => {
+    const res = await app.request('/api/v1/rota-inexistente', {}, env)
 
+    expect(res.status).toBe(404)
     expect(res.headers.get('cache-control')).toBe('no-store')
     expect(res.headers.get('pragma')).toBe('no-cache')
+
+    const json = (await res.json()) as Record<string, unknown>
+    expect(json).toEqual({ error: 'Rota não encontrada', code: 'NOT_FOUND' })
+  })
+
+  it('não executa logger de requisição em Beta', async () => {
+    const log = console.log
+    let chamadas = 0
+    console.log = () => {
+      chamadas += 1
+    }
+
+    try {
+      await app.request(
+        '/api/v1/portaria-publica/cadastro/token-que-nao-deve-ser-logado',
+        {},
+        { ...env, APP_ENV: 'beta' }
+      )
+      expect(chamadas).toBe(0)
+    } finally {
+      console.log = log
+    }
   })
 
   it('sanitiza exceções sem expor detalhes internos', async () => {
