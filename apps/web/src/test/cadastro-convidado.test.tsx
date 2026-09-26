@@ -112,7 +112,7 @@ describe('CadastroConvidadoView — PORT-02', () => {
 
     expect(await screen.findByText('Cadastro enviado')).toBeInTheDocument()
     expect(
-      screen.getByText(/Apresente-se ao porteiro para validar sua presença/i)
-    ).toBeInTheDocument()
+      screen.getByRole('status')
+    ).toHaveTextContent(/Apresente-se ao porteiro para validar sua presença/i)
   })
 })
