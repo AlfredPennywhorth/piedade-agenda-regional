@@ -209,7 +209,15 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
               <span className="text-base">♧</span><span>Convocações</span>
             </button>
           ) : <div />}
-          <button type="button" ref={botaoMaisRef} aria-expanded={mostrarMais} aria-haspopup="dialog" onClick={() => setMostrarMais(true)} className={`flex flex-col items-center p-2 text-[10px] ${maisAtivo ? 'text-brand-600' : 'text-slate-400'}`}>
+          <button
+            type="button"
+            ref={botaoMaisRef}
+            aria-current={maisAtivo ? 'page' : undefined}
+            aria-expanded={mostrarMais}
+            aria-haspopup="dialog"
+            onClick={() => setMostrarMais(true)}
+            className={`flex flex-col items-center p-2 text-[10px] ${maisAtivo ? 'text-brand-600' : 'text-slate-400'}`}
+          >
             <span className="text-base">•••</span><span>Mais</span>
           </button>
         </div>
