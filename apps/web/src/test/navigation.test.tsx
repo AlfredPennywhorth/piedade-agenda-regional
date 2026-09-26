@@ -134,7 +134,23 @@ describe('Navegação e Visibilidade de Permissões — S12 Frontend', () => {
     expect(main).toHaveFocus()
   })
 
-  it('8. oferece link de salto para o conteúdo principal', () => {
+  it('8. marca Mais como localização atual para módulos agrupados', () => {
+    render(
+      <MainLayout
+        currentTab="relatorios"
+        onTabChange={() => {}}
+        capacidades={{ podeVisualizarRelatorios: true }}
+      >
+        <div>Relatórios</div>
+      </MainLayout>
+    )
+
+    const nav = within(screen.getByRole('navigation', { name: /navegação móvel principal/i }))
+    expect(nav.getByRole('button', { name: /Mais/i })).toHaveAttribute('aria-current', 'page')
+    expect(nav.getByRole('button', { name: /Mais/i })).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('9. oferece link de salto para o conteúdo principal', () => {
     render(
       <MainLayout currentTab="agenda" onTabChange={() => {}} capacidades={{}}>
         <div>Agenda</div>
