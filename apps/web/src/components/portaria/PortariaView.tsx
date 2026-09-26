@@ -472,7 +472,11 @@ export function PortariaView() {
     const foco = event.currentTarget.querySelectorAll<HTMLElement>(
       'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
     )
-    if (!foco.length) return
+    if (!foco.length) {
+      event.preventDefault()
+      event.currentTarget.focus()
+      return
+    }
     const primeiro = foco[0]
     const ultimo = foco[foco.length - 1]
 
@@ -900,6 +904,7 @@ export function PortariaView() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-retificar-title"
+            tabIndex={-1}
             className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden"
             onKeyDown={conterFocoRetificacao}
           >
