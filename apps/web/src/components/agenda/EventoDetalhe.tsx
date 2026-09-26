@@ -48,7 +48,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
 
     const carregarConvidados = async () => {
       try {
-        const response = await apiClient.fetchWithAuth<{
+        type AcompanhamentoResponse = {
           data: Array<{
             destinatarioId: string
             membroId: string
@@ -56,10 +56,22 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
             respostaRsvp: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI' | 'SEM_RESPOSTA'
           }>
           meta: { total: number; page: number; lastPage: number }
-        }>(`/convocacoes/${item.convocacao.id}/acompanhamento-rsvp?limit=100&page=1`)
+        }
+
+        const primeiraPagina = await apiClient.fetchWithAuth<AcompanhamentoResponse>(
+          `/convocacoes/${item.convocacao.id}/acompanhamento-rsvp?limit=100&page=1`
+        )
+        const todos = [...primeiraPagina.data]
+
+        for (let pagina = 2; pagina <= primeiraPagina.meta.lastPage; pagina++) {
+          const resposta = await apiClient.fetchWithAuth<AcompanhamentoResponse>(
+            `/convocacoes/${item.convocacao.id}/acompanhamento-rsvp?limit=100&page=${pagina}`
+          )
+          todos.push(...resposta.data)
+        }
 
         if (ativo) {
-          setConvidadosConvocacao(response.data)
+          setConvidadosConvocacao(todos)
         }
       } catch (err) {
         if (!ativo) return
