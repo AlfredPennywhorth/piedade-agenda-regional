@@ -21,7 +21,7 @@
 | Conta e perfis de acesso | `contas_acesso`, `acessos_conta` | autenticação e autorização | registros permanecem enquanto necessários para segurança e governança | desativação da conta e término da necessidade de trilha | revogação/inativação; prazo histórico a homologar | **PENDENTE** |
 | Sessões | `sessoes` | manter sessão autenticada | expiração funcional por 12 h de inatividade ou 30 dias absolutos; registros expirados não possuem purge automático | expiração, logout, bloqueio, reset de PIN ou revogação | excluir registros expirados/revogados após janela de segurança a homologar | hipótese de segurança/autenticação a validar |
 | Links de ativação/reset | `links_ativacao` | ativar ou redefinir acesso | validade funcional de 7 dias; revogação do link anterior | uso, revogação ou expiração | excluir hashes e metadados após janela de auditoria a homologar | hipótese de segurança/autenticação a validar |
-| Tentativas/rate limit | `tentativas_acesso`, `rate_limits_autenticacao` | segurança, antifraude e recuperação | rate limit de login: janela técnica de 24 h; logs de tentativa sem purge automático | fim da janela de segurança / perda de finalidade | rate limit expira; logs históricos exigem prazo homologado | hipótese de segurança e prevenção a fraude a validar |
+| Tentativas/rate limit | `tentativas_acesso`, `rate_limits_autenticacao` | segurança, antifraude e recuperação | a chave de rate limit possui janela funcional de 24 h, mas não há purge automático ao expirar; o registro é removido após login bem-sucedido ou sobrescrito se o mesmo identificador voltar a ser usado; `tentativas_acesso` também não possui purge automático | fim da janela de segurança / perda de finalidade | implementar eliminação periódica de entradas expiradas e homologar prazo para logs históricos | hipótese de segurança e prevenção a fraude a validar |
 | Auditoria | `auditoria_logs`, ciências de responsabilidade | responsabilização, investigação de alteração e governança | sem purge automático | fim do período necessário à responsabilização institucional | retenção por prazo formal + eliminação/anonimização | **PENDENTE — definir prazo institucional** |
 | Convocações e RSVP | convocações, destinatários, evidências, `rsvp` | organizar participação em reuniões | sem purge automático | encerramento do ciclo administrativo da reunião | histórico mínimo ou anonimização conforme finalidade | **PENDENTE** |
 | Presença | `checkins`, snapshots/relatórios de presença | comprovar participação e gerar relatórios | sem purge automático | fim da finalidade administrativa do histórico | prazo institucional + anonimização/eliminação | **PENDENTE — definir prazo institucional** |
@@ -37,7 +37,7 @@ Esses prazos são controles de funcionamento e segurança; não são, por si só
 - sessão: 30 dias de validade absoluta máxima;
 - atualização de atividade da sessão: no máximo a cada 5 minutos;
 - link de ativação/reset: 7 dias;
-- rate limit de login: retenção técnica de 24 horas para a chave hash;
+- rate limit de login: janela funcional de 24 horas; **não há purge automático garantido após a expiração**;
 - recuperação de PIN: janela de throttle de 15 minutos.
 
 ## Pendências obrigatórias antes da política final
