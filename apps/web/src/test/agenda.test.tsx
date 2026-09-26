@@ -10,7 +10,17 @@ vi.mock('../api/apiClient', () => ({
   postWithAuth: vi.fn(),
   limparTokenSessao: vi.fn(() => localStorage.removeItem('session_token')),
   possuiTokenSessao: vi.fn(() => Boolean(localStorage.getItem('session_token'))),
-  API_BASE_URL: 'http://test'
+  API_BASE_URL: 'http://test',
+  ApiError: class ApiError extends Error {
+    status: number
+    body: unknown
+    constructor(status: number, message: string, body: unknown) {
+      super(message)
+      this.name = 'ApiError'
+      this.status = status
+      this.body = body
+    }
+  }
 }))
 
 const TEST_NOW = Date.parse('2026-09-23T15:00:00.000Z')
@@ -95,6 +105,9 @@ describe('S07 - Minha Agenda e Calendário', () => {
       if (endpoint === '/governanca/responsabilidade-regional') {
         return { versao: 'teste', texto: 'Responsabilidades', acessos: [] }
       }
+      if (endpoint.includes('/convocacoes/') && endpoint.includes('/acompanhamento-rsvp')) {
+        return { data: [], meta: { total: 0, page: 1, lastPage: 1 } }
+      }
       return dados
     })
   }
@@ -104,6 +117,9 @@ describe('S07 - Minha Agenda e Calendário', () => {
       if (endpoint === '/auth/me') return { nome: 'Pessoa Teste', capacidades: {} }
       if (endpoint === '/governanca/responsabilidade-regional') {
         return { versao: 'teste', texto: 'Responsabilidades', acessos: [] }
+      }
+      if (endpoint.includes('/convocacoes/') && endpoint.includes('/acompanhamento-rsvp')) {
+        throw new (apiClient.ApiError as any)(403, 'Acesso não autorizado', {})
       }
       throw erro
     })
