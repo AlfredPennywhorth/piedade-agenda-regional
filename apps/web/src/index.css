@@ -16,6 +16,15 @@
   *::after {
     box-sizing: border-box;
   }
+
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 3px solid currentColor;
+    outline-offset: 3px;
+  }
+
+  :where(button, input, select, textarea):disabled {
+    cursor: not-allowed;
+  }
 }
 
 
