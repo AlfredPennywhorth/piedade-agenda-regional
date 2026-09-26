@@ -118,8 +118,8 @@ export function PortariaView() {
     }
   }, [eventoIdAtual, loading])
 
-  const carregarParticipantes = async (evId: string) => {
-    setLoading(true)
+  const carregarParticipantes = async (evId: string, silencioso = false) => {
+    if (!silencioso) setLoading(true)
     try {
       const data = await apiClient.fetchWithAuth<{ participantes: Participante[] }>(`/portaria/eventos/${evId}/participantes`)
       if (currentEvIdRef.current === evId) {
@@ -131,7 +131,7 @@ export function PortariaView() {
         setMensagem({ tipo: 'erro', texto: errorMessage })
       }
     } finally {
-      if (currentEvIdRef.current === evId) {
+      if (!silencioso && currentEvIdRef.current === evId) {
         setLoading(false)
       }
     }
@@ -166,6 +166,22 @@ export function PortariaView() {
       }
     }
   }
+
+  useEffect(() => {
+    if (!eventoIdAtual) return
+
+    const intervalo = window.setInterval(() => {
+      const evId = currentEvIdRef.current
+      if (!evId) return
+      void Promise.all([
+        carregarParticipantes(evId, true),
+        carregarConvidados(evId),
+        carregarEstadoFechamento(evId),
+      ])
+    }, 8000)
+
+    return () => window.clearInterval(intervalo)
+  }, [eventoIdAtual])
 
   const handleSelecionarEvento = (evId: string) => {
     setEventoIdAtual(evId)
@@ -714,7 +730,7 @@ export function PortariaView() {
                 <div className="bg-white p-3 rounded-xl border border-slate-200 shrink-0" data-testid="qr-autocadastro-convidados">
                   <svg
                     viewBox={`0 0 ${qrViewSize} ${qrViewSize}`}
-                    className="w-60 h-60 bg-white"
+                    className="w-72 h-72 max-w-full bg-white"
                     shapeRendering="crispEdges"
                     role="img"
                     aria-label="QR Code para autocadastro de convidados"
