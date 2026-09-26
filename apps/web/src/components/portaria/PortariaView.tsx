@@ -140,6 +140,30 @@ export function PortariaView() {
     return true
   }
 
+  const invalidarEventoSeTerminal = (evId: string, err: unknown) => {
+    if (
+      currentEvIdRef.current === evId &&
+      err instanceof apiClient.ApiError &&
+      (err.status === 403 || err.status === 404)
+    ) {
+      currentEvIdRef.current = ''
+      setEventoIdAtual('')
+      setParticipantes([])
+      setConvidados([])
+      setEstadoFechamento(null)
+      setCadastroQrUrl(null)
+      setQrTokenInput('')
+      setMensagem({
+        tipo: 'aviso',
+        texto: err.status === 403
+          ? 'Seu acesso a esta Portaria não está mais autorizado.'
+          : 'Esta Portaria não está mais disponível.',
+      })
+      return true
+    }
+    return false
+  }
+
   const carregarParticipantes = async (evId: string, silencioso = false) => {
     if (!silencioso) setLoading(true)
     try {
