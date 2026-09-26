@@ -137,7 +137,7 @@ export function PortariaView() {
     }
   }
 
-  const carregarConvidados = async (evId: string) => {
+  const carregarConvidados = async (evId: string, silencioso = false) => {
     try {
       const data = await apiClient.fetchWithAuth<{ data: ConvidadoPortaria[] }>(
         `/portaria/eventos/${evId}/convidados`
@@ -146,13 +146,13 @@ export function PortariaView() {
         setConvidados(data.data || [])
       }
     } catch {
-      if (currentEvIdRef.current === evId) {
+      if (!silencioso && currentEvIdRef.current === evId) {
         setConvidados([])
       }
     }
   }
 
-  const carregarEstadoFechamento = async (evId: string) => {
+  const carregarEstadoFechamento = async (evId: string, silencioso = false) => {
     try {
       const data = await apiClient.fetchWithAuth<EstadoFechamentoPortaria>(
         `/portaria/eventos/${evId}/fechamento-solicitacao`
@@ -161,7 +161,7 @@ export function PortariaView() {
         setEstadoFechamento(data)
       }
     } catch {
-      if (currentEvIdRef.current === evId) {
+      if (!silencioso && currentEvIdRef.current === evId) {
         setEstadoFechamento(null)
       }
     }
@@ -175,8 +175,8 @@ export function PortariaView() {
       if (!evId) return
       void Promise.all([
         carregarParticipantes(evId, true),
-        carregarConvidados(evId),
-        carregarEstadoFechamento(evId),
+        carregarConvidados(evId, true),
+        carregarEstadoFechamento(evId, true),
       ])
     }, 8000)
 
