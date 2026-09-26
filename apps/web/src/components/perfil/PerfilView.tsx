@@ -131,13 +131,17 @@ export function PerfilView() {
   }
 
   if (loading) {
-    return <div className="p-8 text-center text-sm text-slate-500">Carregando seu cadastro...</div>
+    return (
+      <div role="status" aria-live="polite" className="p-8 text-center text-sm text-slate-500">
+        Carregando seu cadastro...
+      </div>
+    )
   }
 
   if (!perfil) {
     return (
       <div className="p-6">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {erro || 'Perfil indisponível.'}
         </div>
       </div>
@@ -160,7 +164,11 @@ export function PerfilView() {
       )}
 
       {sucesso && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+        <div
+          role="status"
+          aria-live="polite"
+          className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"
+        >
           {sucesso}
         </div>
       )}
@@ -220,6 +228,7 @@ export function PerfilView() {
               id="perfil-celular"
               type="tel"
               inputMode="tel"
+              autoComplete="tel"
               value={celular}
               onChange={event => setCelular(event.target.value)}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
@@ -235,6 +244,7 @@ export function PerfilView() {
               id="perfil-pin-celular"
               type="password"
               inputMode="numeric"
+              autoComplete="current-password"
               maxLength={6}
               value={pinAtualCelular}
               onChange={event => setPinAtualCelular(event.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -270,6 +280,7 @@ export function PerfilView() {
               id="perfil-pin-atual"
               type="password"
               inputMode="numeric"
+              autoComplete="current-password"
               maxLength={6}
               value={pinAtual}
               onChange={event => setPinAtual(event.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -286,6 +297,7 @@ export function PerfilView() {
               id="perfil-novo-pin"
               type="password"
               inputMode="numeric"
+              autoComplete="new-password"
               maxLength={6}
               value={novoPin}
               onChange={event => setNovoPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -302,6 +314,7 @@ export function PerfilView() {
               id="perfil-confirmar-pin"
               type="password"
               inputMode="numeric"
+              autoComplete="new-password"
               maxLength={6}
               value={confirmacaoNovoPin}
               onChange={event => setConfirmacaoNovoPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
