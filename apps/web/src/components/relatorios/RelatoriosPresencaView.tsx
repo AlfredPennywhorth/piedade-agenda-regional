@@ -264,13 +264,17 @@ export function RelatoriosPresencaView() {
 
   return (
     <section className="space-y-5">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Visão do relatório">
         {[
           ['evento', 'Reunião específica'],
           ['membro', 'Histórico do membro'],
           ['periodo', 'Período / escopo'],
         ].map(([id, label]) => (
-          <button key={id} onClick={() => setAba(id as typeof aba)}
+          <button
+            key={id}
+            type="button"
+            aria-pressed={aba === id}
+            onClick={() => setAba(id as typeof aba)}
             className={`rounded-lg px-3 py-2 text-sm font-medium ${aba === id ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
             {label}
           </button>
@@ -278,6 +282,11 @@ export function RelatoriosPresencaView() {
       </div>
 
       {erro && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
+      {carregando && (
+        <div role="status" aria-live="polite" className="sr-only">
+          Carregando relatório...
+        </div>
+      )}
 
       {aba === 'evento' && (
         <div className="space-y-5">
@@ -312,6 +321,7 @@ export function RelatoriosPresencaView() {
             </div>
             <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
               <table className="w-full text-sm">
+                <caption className="sr-only">Participantes e situação de presença da reunião selecionada</caption>
                 <thead className="bg-slate-50 text-left text-slate-600"><tr>
                   <th className="p-3">Nome</th><th className="p-3">Tipo</th><th className="p-3">Localidade</th><th className="p-3">Situação</th><th className="p-3">RSVP</th>
                 </tr></thead>
