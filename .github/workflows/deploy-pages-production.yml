@@ -8,13 +8,19 @@ on:
         required: true
         type: boolean
         default: false
+      confirm_worker_smoke:
+        description: 'Confirmo que o Worker deste mesmo SHA foi publicado e passou no smoke'
+        required: true
+        type: boolean
+        default: false
 
 concurrency:
-  group: pages-production
+  group: production-release
   cancel-in-progress: false
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   deploy:
@@ -30,12 +36,14 @@ jobs:
         shell: bash
         env:
           CONFIRM_RELEASE: ${{ inputs.confirm_release }}
+          CONFIRM_WORKER_SMOKE: ${{ inputs.confirm_worker_smoke }}
           PROD_API_URL: ${{ vars.PROD_API_URL }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           test "$GITHUB_REF" = "refs/heads/main"
           test "$CONFIRM_RELEASE" = "true"
+          test "$CONFIRM_WORKER_SMOKE" = "true"
           test -n "$PROD_API_URL"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test -n "$CLOUDFLARE_API_TOKEN"
@@ -43,6 +51,21 @@ jobs:
             https://*/api/v1) ;;
             *) echo "PROD_API_URL deve usar HTTPS e terminar em /api/v1"; exit 1 ;;
           esac
+
+      - name: Verify successful Worker release for the same SHA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          run_id="$(
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy-worker-production.yml/runs?branch=main&status=success&per_page=50"               --jq '.workflow_runs[] | select(.head_sha == env.RELEASE_SHA and .event == "workflow_dispatch") | .id'               | head -n 1
+          )"
+          test -n "$run_id" || {
+            echo "Nenhum Deploy Worker — Produção bem-sucedido encontrado para o SHA $RELEASE_SHA"
+            exit 1
+          }
+          echo "Worker production run verificado: $run_id"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
