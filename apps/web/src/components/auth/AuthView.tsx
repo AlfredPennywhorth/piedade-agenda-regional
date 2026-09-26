@@ -118,7 +118,11 @@ export function AuthView({
           )}
 
           {mensagem && (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+            <div
+              role="status"
+              aria-live="polite"
+              className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"
+            >
               {mensagem}
             </div>
           )}
