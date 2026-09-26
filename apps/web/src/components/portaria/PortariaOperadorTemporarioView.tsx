@@ -102,11 +102,20 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
         setConvidados(convidadosData.data || [])
       } catch (err) {
         const apiErr = err as ApiError<any>
-        if (apiErr.body?.code === 'PORTARIA_FECHADA' || apiErr.status === 401 || apiErr.status === 403) {
+        if (
+          apiErr.body?.code === 'PORTARIA_FECHADA' ||
+          apiErr.body?.code === 'CREDENCIAL_EXPIRADA' ||
+          apiErr.status === 401 ||
+          apiErr.status === 403 ||
+          apiErr.status === 410
+        ) {
+          pararCamera()
           setSessao(null)
           setErro(apiErr.body?.code === 'PORTARIA_FECHADA'
             ? 'Esta Portaria já foi encerrada.'
-            : 'Este acesso temporário não está mais disponível.')
+            : apiErr.body?.code === 'CREDENCIAL_EXPIRADA' || apiErr.status === 410
+              ? 'Este acesso temporário expirou.'
+              : 'Este acesso temporário não está mais disponível.')
         }
       }
     }
@@ -139,8 +148,18 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
       setMensagem(`Presença registrada: ${participante.membro.nome}.`)
       await carregar()
     } catch (err) {
-      setErro((err as Error).message)
-      await carregar()
+      const mensagemErro = (err as Error).message
+      try {
+        const [participantesData, convidadosData] = await Promise.all([
+          chamadaOperador<{ participantes: Participante[] }>(token, '/participantes'),
+          chamadaOperador<{ data: Convidado[] }>(token, '/convidados'),
+        ])
+        setParticipantes(participantesData.participantes || [])
+        setConvidados(convidadosData.data || [])
+      } catch {
+        // O erro original da ação continua sendo o feedback prioritário.
+      }
+      setErro(mensagemErro)
     }
   }
 
@@ -159,8 +178,18 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
       setMensagem('Presença registrada pelo QR Code.')
       await carregar()
     } catch (err) {
-      setErro((err as Error).message)
-      await carregar()
+      const mensagemErro = (err as Error).message
+      try {
+        const [participantesData, convidadosData] = await Promise.all([
+          chamadaOperador<{ participantes: Participante[] }>(token, '/participantes'),
+          chamadaOperador<{ data: Convidado[] }>(token, '/convidados'),
+        ])
+        setParticipantes(participantesData.participantes || [])
+        setConvidados(convidadosData.data || [])
+      } catch {
+        // O erro original da ação continua sendo o feedback prioritário.
+      }
+      setErro(mensagemErro)
     }
   }
 
