@@ -81,6 +81,7 @@ export function PortariaView() {
   const [modalRetificacao, setModalRetificacao] = useState<{isOpen: boolean; checkinId: string; participanteNome: string; motivo: string; error: string | null; isSubmitting: boolean} | null>(null)
 
   const qrInputRef = useRef<HTMLInputElement>(null)
+  const retificarTriggerRef = useRef<HTMLElement | null>(null)
   const currentEvIdRef = useRef('')
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -437,10 +438,51 @@ export function PortariaView() {
   const handleCloseModal = () => {
     setModalRetificacao(null)
     setTimeout(() => {
-      if (!loading && eventoIdAtual) {
+      const trigger = retificarTriggerRef.current
+      if (trigger?.isConnected) {
+        trigger.focus()
+      } else if (!loading && eventoIdAtual) {
         qrInputRef.current?.focus()
       }
+      retificarTriggerRef.current = null
     }, 10)
+  }
+
+  const abrirModalRetificacao = (checkinId: string, participanteNome: string) => {
+    retificarTriggerRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null
+    setModalRetificacao({
+      isOpen: true,
+      checkinId,
+      participanteNome,
+      motivo: '',
+      error: null,
+      isSubmitting: false,
+    })
+  }
+
+  const conterFocoRetificacao = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape' && !modalRetificacao?.isSubmitting) {
+      event.preventDefault()
+      handleCloseModal()
+      return
+    }
+    if (event.key !== 'Tab') return
+
+    const foco = event.currentTarget.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+    )
+    if (!foco.length) return
+    const primeiro = foco[0]
+    const ultimo = foco[foco.length - 1]
+
+    if (event.shiftKey && document.activeElement === primeiro) {
+      event.preventDefault()
+      ultimo.focus()
+    } else if (!event.shiftKey && document.activeElement === ultimo) {
+      event.preventDefault()
+      primeiro.focus()
+    }
   }
 
   const handleRetificarSubmit = async () => {
@@ -482,7 +524,7 @@ export function PortariaView() {
   const podeOperarEvento = eventoSelecionado?.podeOperarPortaria !== false
 
   return (
-    <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6" aria-busy={loading}>
       <div className="bg-brand-900 text-white p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold">Operação de Portaria</h2>
@@ -494,7 +536,7 @@ export function PortariaView() {
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
         <h3 className="text-base font-semibold text-slate-800">1. Selecionar Evento</h3>
         {isLoadingEventos ? (
-          <p className="text-slate-500 text-sm">Carregando eventos autorizados...</p>
+          <p role="status" aria-live="polite" className="text-slate-500 text-sm">Carregando eventos autorizados...</p>
         ) : eventosDisponiveis.length === 0 ? (
           <div role="alert" className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium text-center">
             Nenhum evento ativo com autorização de operação encontrado para hoje
@@ -502,6 +544,7 @@ export function PortariaView() {
         ) : (
           <div className="flex gap-2">
             <select
+              aria-label="Selecionar evento para operar a Portaria"
               value={eventoIdAtual}
               onChange={(e) => handleSelecionarEvento(e.target.value)}
               disabled={loading}
@@ -521,7 +564,8 @@ export function PortariaView() {
       {/* Feedback Visual Inequívoco */}
       {mensagem && (
         <div
-          role="alert"
+          role={mensagem.tipo === 'erro' ? 'alert' : 'status'}
+          aria-live={mensagem.tipo === 'erro' ? 'assertive' : 'polite'}
           className={`p-4 rounded-xl text-base font-semibold border text-center animate-in fade-in ${
             mensagem.tipo === 'sucesso'
               ? 'bg-green-100 border-green-300 text-green-900'
@@ -618,6 +662,7 @@ export function PortariaView() {
         <form onSubmit={handleCheckinQr} className="flex gap-2">
           <input
             type="text"
+            aria-label="Código QR do participante"
             ref={qrInputRef}
             autoFocus
             value={qrTokenInput}
@@ -772,6 +817,7 @@ export function PortariaView() {
 
           <input
             type="text"
+            aria-label="Buscar participante por nome ou Casa de Oração"
             value={buscaNome}
             onChange={(e) => setBuscaNome(e.target.value)}
             placeholder="Buscar por nome do participante ou casa..."
