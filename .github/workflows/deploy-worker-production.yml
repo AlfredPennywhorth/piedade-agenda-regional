@@ -2,9 +2,20 @@ name: Deploy Worker — Produção
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm_release:
+        description: 'Confirmo que o SHA em main foi homologado e autorizado para produção'
+        required: true
+        type: boolean
+        default: false
+      confirm_backup:
+        description: 'Confirmo que o ponto de restauração/backup do D1 foi verificado antes das migrations'
+        required: true
+        type: boolean
+        default: false
 
 concurrency:
-  group: worker-production
+  group: production-release
   cancel-in-progress: false
 
 permissions:
@@ -12,13 +23,33 @@ permissions:
 
 jobs:
   deploy:
-    name: Migrate D1 · Deploy Worker · Configure secret
+    name: Validate · Migrate D1 · Deploy Worker · Configure secrets
     runs-on: ubuntu-latest
     environment: production
 
     steps:
-      - name: Checkout
+      - name: Checkout release
         uses: actions/checkout@v4
+
+      - name: Validate production gate
+        shell: bash
+        env:
+          CONFIRM_RELEASE: ${{ inputs.confirm_release }}
+          CONFIRM_BACKUP: ${{ inputs.confirm_backup }}
+          D1_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_DATABASE_ID }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PIN_PEPPER: ${{ secrets.PIN_PEPPER }}
+          MASTER_BOOTSTRAP_SECRET: ${{ secrets.MASTER_BOOTSTRAP_SECRET }}
+        run: |
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$CONFIRM_RELEASE" = "true"
+          test "$CONFIRM_BACKUP" = "true"
+          test -n "$D1_DATABASE_ID"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$PIN_PEPPER"
+          test -n "$MASTER_BOOTSTRAP_SECRET"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -39,7 +70,6 @@ jobs:
         env:
           D1_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_DATABASE_ID }}
         run: |
-          test -n "$D1_DATABASE_ID"
           sed -i "s|__D1_DATABASE_ID__|$D1_DATABASE_ID|" apps/worker/wrangler.toml
           grep -q "$D1_DATABASE_ID" apps/worker/wrangler.toml
 
@@ -49,11 +79,11 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: pnpm --filter @piedade/worker exec wrangler d1 migrations apply piedade-agenda-db-prod --remote --env production
 
-      - name: Deploy Worker
+      - name: Deploy Worker production
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: pnpm --filter @piedade/worker deploy
+        run: pnpm --filter @piedade/worker exec wrangler deploy --env production
 
       - name: Configure PIN_PEPPER
         env:
@@ -61,3 +91,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           PIN_PEPPER: ${{ secrets.PIN_PEPPER }}
         run: printf '%s' "$PIN_PEPPER" | pnpm --filter @piedade/worker exec wrangler secret put PIN_PEPPER --env production
+
+      - name: Configure MASTER_BOOTSTRAP_SECRET
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          MASTER_BOOTSTRAP_SECRET: ${{ secrets.MASTER_BOOTSTRAP_SECRET }}
+        run: printf '%s' "$MASTER_BOOTSTRAP_SECRET" | pnpm --filter @piedade/worker exec wrangler secret put MASTER_BOOTSTRAP_SECRET --env production
