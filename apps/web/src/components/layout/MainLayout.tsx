@@ -34,6 +34,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
   const [mostrarMais, setMostrarMais] = useState(false)
   const botaoMaisRef = useRef<HTMLButtonElement>(null)
   const conteudoPrincipalRef = useRef<HTMLElement>(null)
+  const abaAnteriorRef = useRef(currentTab)
 
   const maisAtivo = mostrarMais || !['agenda', 'eventos', 'calendario', 'convocacoes'].includes(currentTab)
 
@@ -48,7 +49,10 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
   }
 
   useEffect(() => {
-    conteudoPrincipalRef.current?.focus()
+    if (abaAnteriorRef.current !== currentTab) {
+      conteudoPrincipalRef.current?.focus()
+      abaAnteriorRef.current = currentTab
+    }
   }, [currentTab])
 
   const conterFocoNoMais = (event: React.KeyboardEvent<HTMLElement>) => {
