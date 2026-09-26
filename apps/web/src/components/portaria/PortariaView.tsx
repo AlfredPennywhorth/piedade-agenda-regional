@@ -867,14 +867,8 @@ export function PortariaView() {
                               Confirmado
                             </span>
                             <button
-                              onClick={() => setModalRetificacao({
-                                isOpen: true,
-                                checkinId: p.checkin!.id,
-                                participanteNome: p.membro.nome,
-                                motivo: '',
-                                error: null,
-                                isSubmitting: false
-                              })}
+                              type="button"
+                              onClick={() => abrirModalRetificacao(p.checkin!.id, p.membro.nome)}
                               disabled={loading}
                               className="text-xs font-medium text-slate-500 hover:text-slate-700 underline"
                             >
@@ -883,6 +877,7 @@ export function PortariaView() {
                           </>
                         ) : (
                         <button
+                          type="button"
                           onClick={() => handleCheckinManual(p.convocacaoDestinatarioId, p.membro.nome)}
                           disabled={loading}
                           className="px-5 py-2.5 bg-brand-600 text-white font-medium rounded-lg text-sm hover:bg-brand-700 disabled:opacity-50 transition-colors shadow-sm whitespace-nowrap"
@@ -901,7 +896,13 @@ export function PortariaView() {
 
       {modalRetificacao && modalRetificacao.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div role="dialog" aria-modal="true" aria-labelledby="modal-retificar-title" className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-retificar-title"
+            className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden"
+            onKeyDown={conterFocoRetificacao}
+          >
             <div className="p-6 space-y-4">
               <h2 id="modal-retificar-title" className="text-lg font-semibold text-slate-900">
                 Retificar Check-in
@@ -938,6 +939,7 @@ export function PortariaView() {
 
             <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 border-t border-slate-100">
               <button
+                type="button"
                 onClick={handleCloseModal}
                 disabled={modalRetificacao.isSubmitting}
                 className="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 bg-slate-100 rounded-lg transition-colors"
@@ -945,6 +947,7 @@ export function PortariaView() {
                 Cancelar
               </button>
               <button
+                type="button"
                 onClick={handleRetificarSubmit}
                 disabled={modalRetificacao.isSubmitting}
                 className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
