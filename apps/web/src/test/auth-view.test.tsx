@@ -83,6 +83,24 @@ describe('AuthView — ativação e login', () => {
     expect(autenticado).toHaveBeenCalled()
   })
 
+  it('anuncia a confirmação da recuperação de PIN como status', async () => {
+    vi.mocked(apiClient.postPublic).mockResolvedValue({
+      message: 'Se os dados estiverem cadastrados, a solicitação será encaminhada.',
+    })
+
+    render(<AuthView onAuthenticated={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Esqueci meu PIN' }))
+    fireEvent.change(screen.getByLabelText('Celular'), {
+      target: { value: '11999999999' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Solicitar redefinição' }))
+
+    const status = await screen.findByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+    expect(status).toHaveTextContent(/solicitação será encaminhada/i)
+  })
+
   it('não envia PIN fora do padrão de seis dígitos', async () => {
     render(<AuthView onAuthenticated={vi.fn()} />)
 
