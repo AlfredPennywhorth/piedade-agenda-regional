@@ -93,7 +93,6 @@ adminPreCadastrosMinisteriaisApp.get('/', async c => {
       codigoCasaReferencia: schema.preCadastrosMinisteriais.codigoCasaReferencia,
       casaId: schema.preCadastrosMinisteriais.casaId,
       dataOrdenacao: schema.preCadastrosMinisteriais.dataOrdenacao,
-      statusOrigem: schema.preCadastrosMinisteriais.statusOrigem,
       membroId: schema.preCadastrosMinisteriais.membroId,
     })
     .from(schema.preCadastrosMinisteriais)
@@ -104,7 +103,16 @@ adminPreCadastrosMinisteriaisApp.get('/', async c => {
 
   return c.json({
     data: registros.map((registro: typeof registros[number]) => ({
-      ...registro,
+      id: registro.id,
+      nome: registro.nome,
+      ministerio: registro.ministerio,
+      rrm: registro.rrm,
+      regionalId: registro.regionalId,
+      administracaoOrigem: registro.administracaoOrigem,
+      localidadeOrigem: registro.localidadeOrigem,
+      codigoCasaReferencia: registro.codigoCasaReferencia,
+      casaId: registro.casaId,
+      dataOrdenacao: registro.dataOrdenacao,
       vinculado: registro.membroId !== null,
     })),
     meta: {
