@@ -568,7 +568,9 @@ describe('PortariaView', () => {
         fireEvent.change(screen.getByRole('combobox'), { target: { value: '11111111-1111-1111-1111-111111111111' } })
         await flushPromises()
 
-        fireEvent.click(screen.getByText('Retificar check-in'))
+        const botaoRetificar = screen.getByRole('button', { name: 'Retificar check-in' })
+        botaoRetificar.focus()
+        fireEvent.click(botaoRetificar)
 
         const dialog = screen.getByRole('dialog')
         expect(dialog).toBeInTheDocument()
@@ -586,8 +588,30 @@ describe('PortariaView', () => {
         })
         expect(mockPostWithAuth).not.toHaveBeenCalled()
 
-        const qrInput = screen.getByPlaceholderText(/Aproxime o leitor/i)
-        await waitFor(() => expect(qrInput).toHaveFocus())
+        await waitFor(() => expect(botaoRetificar).toHaveFocus())
+      })
+
+      it('fecha o modal com Escape e devolve foco ao acionador', async () => {
+        mockFetchWithAuth.mockImplementation(async (url) => {
+          if (url.includes('/eventos/11111111-1111-1111-1111-111111111111/participantes')) return getMockParticipantes()
+          return mockEventos
+        })
+        render(<PortariaView />)
+        await flushPromises()
+        fireEvent.change(screen.getByRole('combobox'), { target: { value: '11111111-1111-1111-1111-111111111111' } })
+        await flushPromises()
+
+        const botaoRetificar = screen.getByRole('button', { name: 'Retificar check-in' })
+        botaoRetificar.focus()
+        fireEvent.click(botaoRetificar)
+
+        const dialog = screen.getByRole('dialog')
+        await waitFor(() => expect(screen.getByLabelText(/Motivo da retificação/)).toHaveFocus())
+
+        fireEvent.keyDown(dialog, { key: 'Escape' })
+
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+        await waitFor(() => expect(botaoRetificar).toHaveFocus())
       })
 
       it('impede submissão de motivo inválido exibindo alert local sem disparar POST', async () => {
@@ -643,13 +667,43 @@ describe('PortariaView', () => {
 
         expect(mockPostWithAuth).toHaveBeenCalledWith('/checkin/chk1/retificar', { motivo: 'Duplo clique no QR' })
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-        expect(screen.getByRole('alert')).toHaveTextContent(/Check-in retificado com sucesso/)
+        expect(screen.getByRole('status')).toHaveTextContent(/Check-in retificado com sucesso/)
 
         const cards = screen.getAllByTestId(/row-/)
         expect(cards[0]).toHaveTextContent('Registrar Presença')
 
         const qrInput = screen.getByPlaceholderText(/Aproxime o leitor/i)
         await waitFor(() => expect(qrInput).toHaveFocus())
+      })
+
+      it('mantém o foco dentro do diálogo enquanto todos os controles estão desabilitados', async () => {
+        mockFetchWithAuth.mockImplementation(async (url) => {
+          if (url.includes('/eventos/11111111-1111-1111-1111-111111111111/participantes')) return getMockParticipantes()
+          return mockEventos
+        })
+
+        let resolvePost: ((value: unknown) => void) | undefined
+        mockPostWithAuth.mockImplementationOnce(
+          () => new Promise(resolve => { resolvePost = resolve })
+        )
+
+        render(<PortariaView />)
+        await flushPromises()
+        fireEvent.change(screen.getByRole('combobox'), { target: { value: '11111111-1111-1111-1111-111111111111' } })
+        await flushPromises()
+
+        fireEvent.click(screen.getByRole('button', { name: 'Retificar check-in' }))
+        fireEvent.change(screen.getByLabelText(/Motivo da retificação/), { target: { value: 'Motivo válido' } })
+        fireEvent.click(screen.getByRole('button', { name: 'Confirmar retificação' }))
+
+        await waitFor(() => expect(screen.getByText('Confirmando...')).toBeDisabled())
+
+        const dialog = screen.getByRole('dialog')
+        fireEvent.keyDown(dialog, { key: 'Tab' })
+        expect(dialog).toHaveFocus()
+
+        resolvePost?.({ success: true })
+        await flushPromises()
       })
 
       it('mantém loading impedindo duplo clique e mostra mensagem do ApiError ao receber erro (ex: 409)', async () => {

@@ -21,6 +21,24 @@ const lookups: Record<string, unknown> = {
 describe('REL-PRES-03 — seletores amigáveis dos relatórios de presença', () => {
   beforeEach(() => vi.resetAllMocks())
 
+  it('expõe a visão selecionada de forma programática', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url: string) => {
+      if (url in lookups) return lookups[url]
+      return {}
+    })
+
+    render(<RelatoriosPresencaView />)
+
+    const grupo = screen.getByRole('group', { name: 'Visão do relatório' })
+    expect(grupo).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reunião específica' })).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Histórico do membro' }))
+
+    expect(screen.getByRole('button', { name: 'Reunião específica' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Histórico do membro' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('pesquisa e seleciona reunião por nome antes de consultar', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url: string) => {
       if (url in lookups) return lookups[url]
