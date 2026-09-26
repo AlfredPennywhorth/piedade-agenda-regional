@@ -14,8 +14,6 @@ interface ContaAdministrada {
   nome: string
   celular: string | null
   codigoCarteirinha: string | null
-  dataOrdenacao: string | null
-  regionalId: string
   contaAcessoId: string | null
   status: string | null
   ativadoEm: string | null
