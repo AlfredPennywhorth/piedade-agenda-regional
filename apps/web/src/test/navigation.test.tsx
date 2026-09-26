@@ -102,8 +102,6 @@ describe('Navegação e Visibilidade de Permissões — S12 Frontend', () => {
     expect(menu.getByRole('button', { name: /Relatórios/i })).toBeDefined()
     expect(menu.queryByRole('button', { name: /Auditoria/i })).toBeNull()
   })
-})
-
 
   it('6. identifica a aba principal ativa com aria-current', () => {
     render(
