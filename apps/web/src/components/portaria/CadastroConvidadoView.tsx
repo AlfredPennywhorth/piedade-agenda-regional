@@ -112,7 +112,7 @@ export function CadastroConvidadoView({ token }: CadastroConvidadoProps) {
   if (carregando) {
     return (
       <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <p className="text-sm text-slate-600">Abrindo cadastro da reunião...</p>
+        <p role="status" aria-live="polite" className="text-sm text-slate-600">Abrindo cadastro da reunião...</p>
       </main>
     )
   }
@@ -133,7 +133,7 @@ export function CadastroConvidadoView({ token }: CadastroConvidadoProps) {
       <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-sm border border-slate-200 text-center">
           <h1 className="text-xl font-semibold text-slate-900">Cadastro enviado</h1>
-          <p className="mt-3 text-sm text-slate-600">
+          <p role="status" aria-live="polite" className="mt-3 text-sm text-slate-600">
             Seus dados foram recebidos. Apresente-se ao porteiro para validar sua presença.
           </p>
           <p className="mt-4 text-sm font-medium text-slate-800">{info.evento.titulo}</p>
