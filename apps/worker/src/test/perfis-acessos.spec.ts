@@ -228,6 +228,13 @@ describe('Perfis, escopos e governança — PR-ACC-03', () => {
       expect(contaAdministrada).not.toHaveProperty('pinSalt')
       expect(contaAdministrada).not.toHaveProperty('bloqueadoAte')
       expect(contaAdministrada).not.toHaveProperty('tentativasPin')
+      for (const acesso of contaAdministrada.acessos ?? []) {
+        expect(acesso).not.toHaveProperty('contaAcessoId')
+        expect(acesso).not.toHaveProperty('regionalId')
+        expect(Object.keys(acesso).sort()).toEqual(
+          ['escopoId', 'escopoTipo', 'id', 'perfilCodigo'].sort()
+        )
+      }
     }
 
     const repetida = await requisicao(
