@@ -206,9 +206,10 @@ describe('DATA-04A — pré-cadastro ministerial', () => {
     const body = (await response.json()) as any
     expect(body.data[0]).toMatchObject({
       id: 'pre-a2',
-      membroId: 'm-vinculado',
       vinculado: true,
     })
+    expect(body.data[0]).not.toHaveProperty('membroId')
+    expect(body.data[0]).not.toHaveProperty('statusOrigem')
   })
 
   it('não retorna registros inativos', async () => {

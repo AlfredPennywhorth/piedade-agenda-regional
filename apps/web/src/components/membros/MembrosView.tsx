@@ -29,8 +29,6 @@ interface PreCadastroMinisterial {
   codigoCasaReferencia: string | null
   casaId: string | null
   dataOrdenacao: string | null
-  statusOrigem: string | null
-  membroId: string | null
   vinculado: boolean
 }
 

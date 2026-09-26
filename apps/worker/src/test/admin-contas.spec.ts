@@ -118,14 +118,14 @@ describe('Administração de contas — PR-ACC-05', () => {
     expect(response.status).toBe(200)
     const pessoas = (await response.json()) as Array<{
       membroId: string
-      regionalId: string
       pinHash?: string
       pinSalt?: string
+      regionalId?: string
     }>
 
     expect(pessoas.length).toBeGreaterThan(0)
-    expect(pessoas.every(pessoa => pessoa.regionalId === 'regional-1')).toBe(true)
     expect(pessoas.some(pessoa => pessoa.membroId === 'membro-outra-regional')).toBe(false)
+    expect(pessoas.every(pessoa => !('regionalId' in pessoa))).toBe(true)
     expect(pessoas.every(pessoa => !('pinHash' in pessoa) && !('pinSalt' in pessoa))).toBe(true)
   })
 
