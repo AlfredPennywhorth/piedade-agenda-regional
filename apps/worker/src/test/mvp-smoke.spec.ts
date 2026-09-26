@@ -207,11 +207,20 @@ describe('QA-MVP-01 — smoke test API ponta a ponta do fluxo principal', () => 
       forma: 'QR',
     })
 
+    const solicitarFechamento = await app.request(
+      `/api/v1/portaria/eventos/${evento.id}/solicitar-fechamento`,
+      {
+        method: 'POST',
+        headers: headers('token-00000000-0000-4000-8000-000000000008'),
+      }
+    )
+    expect(solicitarFechamento.status).toBe(202)
+
     const fechar = await app.request(
       `/api/v1/portaria/eventos/${evento.id}/fechar`,
       {
         method: 'POST',
-        headers: headers('token-00000000-0000-4000-8000-000000000008'),
+        headers: headers('token-00000000-0000-4000-8000-000000000006'),
       }
     )
     expect(fechar.status).toBe(200)

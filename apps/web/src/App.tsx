@@ -69,7 +69,9 @@ function App() {
   }, [])
 
   const podeAcessarAba = (tab: typeof currentTab) => {
-    if (tab === 'portaria') return capacidades.podeOperarPortaria === true
+    if (tab === 'portaria') {
+      return capacidades.podeOperarPortaria === true || capacidades.podeGerirAgenda === true
+    }
     if (tab === 'relatorios') return capacidades.podeVisualizarRelatorios === true
     if (tab === 'auditoria') return capacidades.podeVisualizarAuditoria === true
     if (tab === 'acessos') return capacidades.podeAdministrarAcessos === true
@@ -156,7 +158,10 @@ function App() {
       {currentTab === 'series' && capacidades.podeGerirAgenda === true && <SeriesView />}
       {currentTab === 'convocacoes' && capacidades.podeGerirAgenda === true && <ConvocacoesView />}
       {currentTab === 'calendario' && <CalendarioView />}
-      {currentTab === 'portaria' && capacidades.podeOperarPortaria === true && <PortariaView />}
+      {currentTab === 'portaria' &&
+        (capacidades.podeOperarPortaria === true || capacidades.podeGerirAgenda === true) && (
+          <PortariaView />
+        )}
       {currentTab === 'relatorios' && capacidades.podeVisualizarRelatorios === true && <RelatoriosView />}
       {currentTab === 'auditoria' && capacidades.podeVisualizarAuditoria === true && <AuditoriaView />}
       {currentTab === 'regionais' && capacidades.podeAdministrarEstrutura === true && (

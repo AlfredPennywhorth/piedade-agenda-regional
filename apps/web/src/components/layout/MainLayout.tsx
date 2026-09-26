@@ -22,7 +22,8 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ children, currentTab, onTabChange, capacidades, nomeUsuario, onLogout }: MainLayoutProps) {
-  const mostrarPortaria = capacidades?.podeOperarPortaria === true
+  const mostrarPortaria =
+    capacidades?.podeOperarPortaria === true || capacidades?.podeGerirAgenda === true
   const mostrarRelatorios = capacidades?.podeVisualizarRelatorios === true
   const mostrarAuditoria = capacidades?.podeVisualizarAuditoria === true
   const mostrarAdministracaoAcessos = capacidades?.podeAdministrarAcessos === true

@@ -5,16 +5,19 @@ import * as schema from '../db/schema'
 import { setupDb } from './setup'
 import { hashToken } from '../security/tokens'
 import { validarCredencialOperadorPortaria } from '../services/portaria-operador-temporario'
+import { createApp } from '../index'
 
 describe('PORT — credencial temporária do operador', () => {
   let sqlite: Database.Database
   let db: ReturnType<typeof drizzle>
+  let app: ReturnType<typeof createApp>
 
   beforeEach(async () => {
     sqlite = new Database(':memory:')
     sqlite.pragma('foreign_keys = ON')
     setupDb(sqlite)
     db = drizzle(sqlite, { schema })
+    app = createApp(db)
 
     sqlite.exec(`
       INSERT INTO regionais (id, nome) VALUES ('regional-1', 'Regional 1');
@@ -75,6 +78,27 @@ describe('PORT — credencial temporária do operador', () => {
       status: 401,
       code: 'CREDENCIAL_INVALIDA',
     })
+  })
+
+  it('credencial temporária solicita fechamento sem encerrar a Portaria', async () => {
+    const resposta = await app.request('/api/v1/portaria-operador-publica/solicitar-fechamento', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer token-operador-valido' },
+    })
+
+    expect(resposta.status).toBe(202)
+    expect(await resposta.json()).toMatchObject({ status: 'AGUARDANDO_CONFIRMACAO' })
+
+    const solicitacao = sqlite.prepare(
+      'SELECT solicitado_por_credencial_id, confirmado_em FROM portaria_solicitacoes_fechamento WHERE evento_id = ?'
+    ).get('evento-1') as any
+    expect(solicitacao.solicitado_por_credencial_id).toBe('cred-1')
+    expect(solicitacao.confirmado_em).toBeNull()
+
+    const fechamento = sqlite.prepare(
+      'SELECT id FROM portaria_fechamentos WHERE evento_id = ?'
+    ).get('evento-1')
+    expect(fechamento).toBeUndefined()
   })
 
   it('rejeita acesso depois do fechamento da Portaria', async () => {

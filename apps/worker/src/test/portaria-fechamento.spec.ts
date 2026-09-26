@@ -113,13 +113,27 @@ describe('PORT-03 — fechamento e lista final consolidada', () => {
     expect(concessao.status).toBe(201)
   }
 
-  it('fecha e consolida convocados únicos, convidados e totais', async () => {
-    await prepararPorteiro()
-
-    const fechar = await app.request('/api/v1/portaria/eventos/evento-1/fechar', {
+  async function solicitarFechamento() {
+    const solicitar = await app.request('/api/v1/portaria/eventos/evento-1/solicitar-fechamento', {
       method: 'POST',
       headers: auth('token-porteiro'),
     })
+    expect(solicitar.status).toBe(202)
+    return solicitar
+  }
+
+  async function confirmarFechamento() {
+    return app.request('/api/v1/portaria/eventos/evento-1/fechar', {
+      method: 'POST',
+      headers: auth('token-master'),
+    })
+  }
+
+  it('fecha e consolida convocados únicos, convidados e totais', async () => {
+    await prepararPorteiro()
+
+    await solicitarFechamento()
+    const fechar = await confirmarFechamento()
 
     expect(fechar.status).toBe(200)
     const body = (await fechar.json()) as any
@@ -176,10 +190,8 @@ describe('PORT-03 — fechamento e lista final consolidada', () => {
          'porteiro', 1);
     `)
 
-    const fechar = await app.request('/api/v1/portaria/eventos/evento-1/fechar', {
-      method: 'POST',
-      headers: auth('token-porteiro'),
-    })
+    await solicitarFechamento()
+    const fechar = await confirmarFechamento()
     expect(fechar.status).toBe(200)
 
     const credencial = sqlite.prepare(
@@ -190,20 +202,29 @@ describe('PORT-03 — fechamento e lista final consolidada', () => {
     expect(credencial.revogado_em).toBeTruthy()
   })
 
-  it('o porteiro que fechou continua podendo consultar a lista final após perder autorização temporária', async () => {
+  it('somente o gestor confirma; após o fechamento o porteiro perde a autorização temporária', async () => {
     await prepararPorteiro()
+    await solicitarFechamento()
 
-    await app.request('/api/v1/portaria/eventos/evento-1/fechar', {
+    const tentativaPorteiro = await app.request('/api/v1/portaria/eventos/evento-1/fechar', {
       method: 'POST',
       headers: auth('token-porteiro'),
     })
+    expect(tentativaPorteiro.status).toBe(403)
 
-    const lista = await app.request('/api/v1/portaria/eventos/evento-1/fechamento', {
-      headers: auth('token-porteiro'),
+    const fechar = await confirmarFechamento()
+    expect(fechar.status).toBe(200)
+
+    const autorizacao = sqlite.prepare(
+      'SELECT ativo FROM portaria_operadores_evento WHERE evento_id = ? AND membro_id = ?'
+    ).get('evento-1', 'porteiro') as { ativo: number }
+    expect(autorizacao.ativo).toBe(0)
+
+    const listaGestor = await app.request('/api/v1/portaria/eventos/evento-1/fechamento', {
+      headers: auth('token-master'),
     })
-
-    expect(lista.status).toBe(200)
-    const body = (await lista.json()) as any
+    expect(listaGestor.status).toBe(200)
+    const body = (await listaGestor.json()) as any
     expect(body.resumo.totalPresentes).toBe(2)
     expect(body.itens).toHaveLength(4)
   })
@@ -211,10 +232,9 @@ describe('PORT-03 — fechamento e lista final consolidada', () => {
   it('snapshot permanece imutável mesmo se dados operacionais forem alterados depois', async () => {
     await prepararPorteiro()
 
-    await app.request('/api/v1/portaria/eventos/evento-1/fechar', {
-      method: 'POST',
-      headers: auth('token-porteiro'),
-    })
+    await solicitarFechamento()
+    const fechamento = await confirmarFechamento()
+    expect(fechamento.status).toBe(200)
 
     sqlite.prepare('UPDATE membros SET nome = ? WHERE id = ?')
       .run('Nome Alterado Depois', 'm1')
@@ -224,8 +244,9 @@ describe('PORT-03 — fechamento e lista final consolidada', () => {
       .run('Convidado Alterado Depois', 'guest-ok')
 
     const lista = await app.request('/api/v1/portaria/eventos/evento-1/fechamento', {
-      headers: auth('token-porteiro'),
+      headers: auth('token-master'),
     })
+    expect(lista.status).toBe(200)
 
     const body = (await lista.json()) as any
     expect(body.itens).toEqual(expect.arrayContaining([
@@ -234,18 +255,105 @@ describe('PORT-03 — fechamento e lista final consolidada', () => {
     ]))
   })
 
+  it('o mesmo membro não pode solicitar e confirmar o próprio encerramento', async () => {
+    await prepararPorteiro()
+
+    const solicitarComoMaster = await app.request('/api/v1/portaria/eventos/evento-1/solicitar-fechamento', {
+      method: 'POST',
+      headers: auth('token-master'),
+    })
+    expect(solicitarComoMaster.status).toBe(202)
+
+    const confirmarComoMaster = await confirmarFechamento()
+    expect(confirmarComoMaster.status).toBe(409)
+    expect(await confirmarComoMaster.json()).toMatchObject({
+      code: 'DUPLA_CONFIRMACAO_NECESSARIA',
+    })
+  })
+
+  it('gestor não confirma encerramento sem solicitação prévia do porteiro', async () => {
+    await prepararPorteiro()
+
+    const fechar = await confirmarFechamento()
+    expect(fechar.status).toBe(409)
+    expect(await fechar.json()).toMatchObject({ code: 'SOLICITACAO_FECHAMENTO_NECESSARIA' })
+  })
+
+  it('recusa confirmação concorrente quando o lock de fechamento já está adquirido', async () => {
+    await prepararPorteiro()
+    await solicitarFechamento()
+
+    sqlite.prepare(
+      'INSERT INTO portaria_fechamento_locks (evento_id, criado_em) VALUES (?, ?)'
+    ).run('evento-1', new Date().toISOString())
+
+    const fechar = await confirmarFechamento()
+    expect(fechar.status).toBe(409)
+    expect(await fechar.json()).toMatchObject({ code: 'PORTARIA_FECHANDO' })
+  })
+
+  it('gestor pode reabrir excepcionalmente e o novo fechamento exige nova solicitação', async () => {
+    await prepararPorteiro()
+    await solicitarFechamento()
+    const primeiroFechamento = await confirmarFechamento()
+    expect(primeiroFechamento.status).toBe(200)
+
+    const reabrir = await app.request('/api/v1/portaria/eventos/evento-1/reabrir', {
+      method: 'POST',
+      headers: auth('token-master', true),
+      body: JSON.stringify({ motivo: 'Participante chegou após o fechamento' }),
+    })
+    expect(reabrir.status).toBe(200)
+    expect(await reabrir.json()).toMatchObject({ status: 'ABERTA' })
+
+    const estado = sqlite.prepare(
+      'SELECT status, fechada_em, fechada_por_membro_id FROM portarias_evento WHERE evento_id = ?'
+    ).get('evento-1') as any
+    expect(estado.status).toBe('ABERTA')
+    expect(estado.fechada_em).toBeNull()
+    expect(estado.fechada_por_membro_id).toBeNull()
+
+    const snapshotAnterior = sqlite.prepare(
+      'SELECT id FROM portaria_fechamentos WHERE evento_id = ?'
+    ).get('evento-1')
+    expect(snapshotAnterior).toBeUndefined()
+
+    const reabertura = sqlite.prepare(
+      'SELECT motivo, reaberta_por_membro_id FROM portaria_reaberturas WHERE evento_id = ?'
+    ).get('evento-1') as any
+    expect(reabertura).toMatchObject({
+      motivo: 'Participante chegou após o fechamento',
+      reaberta_por_membro_id: 'master',
+    })
+
+    const fecharSemNovaSolicitacao = await confirmarFechamento()
+    expect(fecharSemNovaSolicitacao.status).toBe(409)
+    expect(await fecharSemNovaSolicitacao.json()).toMatchObject({
+      code: 'SOLICITACAO_FECHAMENTO_NECESSARIA',
+    })
+
+    const novaConcessao = await app.request('/api/v1/portaria/eventos/evento-1/operadores', {
+      method: 'POST',
+      headers: auth('token-master', true),
+      body: JSON.stringify({ membroId: 'porteiro' }),
+    })
+    expect(novaConcessao.status).toBe(201)
+
+    await solicitarFechamento()
+    const segundoFechamento = await confirmarFechamento()
+    expect(segundoFechamento.status).toBe(200)
+  })
+
   it('segundo fechamento é recusado', async () => {
     await prepararPorteiro()
 
-    const primeiro = await app.request('/api/v1/portaria/eventos/evento-1/fechar', {
-      method: 'POST',
-      headers: auth('token-porteiro'),
-    })
+    await solicitarFechamento()
+    const primeiro = await confirmarFechamento()
     expect(primeiro.status).toBe(200)
 
     const segundo = await app.request('/api/v1/portaria/eventos/evento-1/fechar', {
       method: 'POST',
-      headers: auth('token-porteiro'),
+      headers: auth('token-master'),
     })
     expect(segundo.status).toBe(409)
     expect(await segundo.json()).toMatchObject({ code: 'PORTARIA_FECHADA' })

@@ -159,7 +159,7 @@ describe('PORT-01 — operadores temporários por evento', () => {
     expect(await res.json()).toMatchObject({ code: 'CONTA_INDISPONIVEL' })
   })
 
-  it('porteiro temporário pode fechar a Portaria e isso encerra todos os operadores temporários', async () => {
+  it('porteiro temporário solicita e somente o gestor confirma o fechamento', async () => {
     await sessao('sessao-master', 'conta-master', 'membro-master', 'token-master')
     await sessao('sessao-p1', 'conta-p1', 'porteiro-1', 'token-p1')
 
@@ -172,11 +172,27 @@ describe('PORT-01 — operadores temporários por evento', () => {
       expect(res.status).toBe(201)
     }
 
-    const fechar = await app.request(`/api/v1/portaria/eventos/${eventoId}/fechar`, {
+    const solicitar = await app.request(`/api/v1/portaria/eventos/${eventoId}/solicitar-fechamento`, {
       method: 'POST',
       headers: auth('token-p1'),
     })
+    expect(solicitar.status).toBe(202)
 
+    const aindaAberta = sqlite.prepare(
+      'SELECT status FROM portarias_evento WHERE evento_id = ?'
+    ).get(eventoId) as any
+    expect(aindaAberta.status).toBe('ABERTA')
+
+    const tentativaPorteiro = await app.request(`/api/v1/portaria/eventos/${eventoId}/fechar`, {
+      method: 'POST',
+      headers: auth('token-p1'),
+    })
+    expect(tentativaPorteiro.status).toBe(403)
+
+    const fechar = await app.request(`/api/v1/portaria/eventos/${eventoId}/fechar`, {
+      method: 'POST',
+      headers: auth('token-master'),
+    })
     expect(fechar.status).toBe(200)
     expect(await fechar.json()).toMatchObject({ status: 'FECHADA' })
 
@@ -184,7 +200,7 @@ describe('PORT-01 — operadores temporários por evento', () => {
       'SELECT status, fechada_por_membro_id FROM portarias_evento WHERE evento_id = ?'
     ).get(eventoId) as any
     expect(estado.status).toBe('FECHADA')
-    expect(estado.fechada_por_membro_id).toBe('porteiro-1')
+    expect(estado.fechada_por_membro_id).toBe('membro-master')
 
     const ativos = sqlite.prepare(
       'SELECT COUNT(*) AS total FROM portaria_operadores_evento WHERE evento_id = ? AND ativo = 1'
@@ -202,9 +218,15 @@ describe('PORT-01 — operadores temporários por evento', () => {
       body: JSON.stringify({ membroId: 'porteiro-1' }),
     })
 
-    const fechar = await app.request(`/api/v1/portaria/eventos/${eventoId}/fechar`, {
+    const solicitar = await app.request(`/api/v1/portaria/eventos/${eventoId}/solicitar-fechamento`, {
       method: 'POST',
       headers: auth('token-p1'),
+    })
+    expect(solicitar.status).toBe(202)
+
+    const fechar = await app.request(`/api/v1/portaria/eventos/${eventoId}/fechar`, {
+      method: 'POST',
+      headers: auth('token-master'),
     })
     expect(fechar.status).toBe(200)
 
