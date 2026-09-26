@@ -91,7 +91,32 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
 
   useEffect(() => {
     void carregar()
-    return () => pararCamera()
+
+    const sincronizar = async () => {
+      try {
+        const [participantesData, convidadosData] = await Promise.all([
+          chamadaOperador<{ participantes: Participante[] }>(token, '/participantes'),
+          chamadaOperador<{ data: Convidado[] }>(token, '/convidados'),
+        ])
+        setParticipantes(participantesData.participantes || [])
+        setConvidados(convidadosData.data || [])
+      } catch (err) {
+        const apiErr = err as ApiError<any>
+        if (apiErr.body?.code === 'PORTARIA_FECHADA' || apiErr.status === 401 || apiErr.status === 403) {
+          setSessao(null)
+          setErro(apiErr.body?.code === 'PORTARIA_FECHADA'
+            ? 'Esta Portaria já foi encerrada.'
+            : 'Este acesso temporário não está mais disponível.')
+        }
+      }
+    }
+
+    const intervalo = window.setInterval(() => void sincronizar(), 8000)
+
+    return () => {
+      window.clearInterval(intervalo)
+      pararCamera()
+    }
   }, [token])
 
   const participantesFiltrados = useMemo(() => {
@@ -115,6 +140,7 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
       await carregar()
     } catch (err) {
       setErro((err as Error).message)
+      await carregar()
     }
   }
 
@@ -134,6 +160,7 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
       await carregar()
     } catch (err) {
       setErro((err as Error).message)
+      await carregar()
     }
   }
 
@@ -352,7 +379,7 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
             const size = matrix.length + quiet * 2
             return (
               <div className="rounded-xl bg-slate-50 p-4">
-                <svg viewBox={`0 0 ${size} ${size}`} role="img" aria-label="QR Code para autocadastro de convidados" className="mx-auto h-56 w-56 bg-white" shapeRendering="crispEdges">
+                <svg viewBox={`0 0 ${size} ${size}`} role="img" aria-label="QR Code para autocadastro de convidados" className="mx-auto h-72 w-72 max-w-full bg-white" shapeRendering="crispEdges">
                   <rect width={size} height={size} fill="#fff" />
                   {matrix.map((row, r) => row.map((cell, col) => cell
                     ? <rect key={`${r}-${col}`} x={col + quiet} y={r + quiet} width="1" height="1" fill="#000" />
