@@ -29,6 +29,12 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
   
   const [isLoadingRsvp, setIsLoadingRsvp] = useState(false)
   const [rsvpError, setRsvpError] = useState('')
+  const [convidadosConvocacao, setConvidadosConvocacao] = useState<Array<{
+    destinatarioId: string
+    membroId: string
+    membroNome: string
+    respostaRsvp: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI' | 'SEM_RESPOSTA'
+  }> | null>(null)
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -36,6 +42,53 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
       dialog.showModal()
     }
   }, [])
+
+  useEffect(() => {
+    let ativo = true
+
+    const carregarConvidados = async () => {
+      try {
+        type AcompanhamentoResponse = {
+          data: Array<{
+            destinatarioId: string
+            membroId: string
+            membroNome: string
+            respostaRsvp: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI' | 'SEM_RESPOSTA'
+          }>
+          meta: { total: number; page: number; lastPage: number }
+        }
+
+        const primeiraPagina = await apiClient.fetchWithAuth<AcompanhamentoResponse>(
+          `/convocacoes/${item.convocacao.id}/acompanhamento-rsvp?limit=100&page=1`
+        )
+        const todos = [...primeiraPagina.data]
+
+        for (let pagina = 2; pagina <= primeiraPagina.meta.lastPage; pagina++) {
+          const resposta = await apiClient.fetchWithAuth<AcompanhamentoResponse>(
+            `/convocacoes/${item.convocacao.id}/acompanhamento-rsvp?limit=100&page=${pagina}`
+          )
+          todos.push(...resposta.data)
+        }
+
+        if (ativo) {
+          setConvidadosConvocacao(todos)
+        }
+      } catch (err) {
+        if (!ativo) return
+        if (err instanceof apiClient.ApiError && err.status === 403) {
+          setConvidadosConvocacao(null)
+          return
+        }
+        setConvidadosConvocacao(null)
+      }
+    }
+
+    void carregarConvidados()
+
+    return () => {
+      ativo = false
+    }
+  }, [item.convocacao.id])
 
   const handleClose = () => {
     if (dialogRef.current) {
@@ -92,6 +145,13 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
       }
       
       setRespostaLocal(resposta)
+      setConvidadosConvocacao(prev =>
+        prev?.map(convidado =>
+          convidado.destinatarioId === item.destinatarioId
+            ? { ...convidado, respostaRsvp: resposta }
+            : convidado
+        ) ?? null
+      )
       if (onRsvpUpdated) {
         onRsvpUpdated(item.destinatarioId, rsvpAtualizado)
       }
@@ -233,6 +293,41 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
             <div className="bg-amber-50 text-amber-900 border border-amber-200 rounded-lg p-4 text-sm whitespace-pre-wrap">
               {item.convocacao.observacoes}
             </div>
+          </div>
+        )}
+
+        {convidadosConvocacao && (
+          <div className="border-t border-slate-100 pt-6">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Membros convocados</h3>
+              <span className="text-xs font-semibold text-slate-600">
+                {convidadosConvocacao.length} {convidadosConvocacao.length === 1 ? 'membro' : 'membros'}
+              </span>
+            </div>
+            {convidadosConvocacao.length === 0 ? (
+              <p className="text-sm text-slate-500">Nenhum membro convocado.</p>
+            ) : (
+              <div className="max-h-64 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100 bg-white">
+                {convidadosConvocacao.map(convidado => {
+                  const status = convidado.respostaRsvp === 'PARTICIPAREI'
+                    ? { label: 'Confirmado', classe: 'bg-green-100 text-green-800' }
+                    : convidado.respostaRsvp === 'NAO_PARTICIPAREI'
+                      ? { label: 'Não participará', classe: 'bg-red-100 text-red-800' }
+                      : convidado.respostaRsvp === 'NAO_SEI'
+                        ? { label: 'Não sabe ainda', classe: 'bg-amber-100 text-amber-800' }
+                        : { label: 'Sem resposta', classe: 'bg-slate-100 text-slate-700' }
+
+                  return (
+                    <div key={convidado.destinatarioId} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                      <span className="text-sm font-medium text-slate-900">{convidado.membroNome}</span>
+                      <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${status.classe}`}>
+                        {status.label}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 
