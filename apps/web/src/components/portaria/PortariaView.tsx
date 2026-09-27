@@ -118,6 +118,31 @@ export function PortariaView() {
     }
   }, [eventoIdAtual, loading])
 
+  const invalidarEventoAtualSeTerminal = (evId: string, err: unknown) => {
+    if (currentEvIdRef.current !== evId) return false
+    if (!(err instanceof apiClient.ApiError) || (err.status !== 403 && err.status !== 404)) return false
+
+    currentEvIdRef.current = ''
+    setEventoIdAtual('')
+    setParticipantes([])
+    setConvidados([])
+    setCadastroQrUrl(null)
+    setEstadoFechamento(null)
+    setBuscaNome('')
+    setQrTokenInput('')
+    setUltimoCheckinId(null)
+    setModalRetificacao(null)
+    retificarTriggerRef.current = null
+    setLoading(false)
+    setMensagem({
+      tipo: 'aviso',
+      texto: err.status === 403
+        ? 'Seu acesso a esta Portaria não está mais disponível.'
+        : 'Esta Portaria não está mais disponível.',
+    })
+    return true
+  }
+
   const carregarParticipantes = async (evId: string, silencioso = false) => {
     if (!silencioso) setLoading(true)
     try {
@@ -126,7 +151,8 @@ export function PortariaView() {
         setParticipantes(data.participantes || [])
       }
     } catch (err: unknown) {
-      if (currentEvIdRef.current === evId) {
+      if (invalidarEventoAtualSeTerminal(evId, err)) return
+      if (!silencioso && currentEvIdRef.current === evId) {
         const errorMessage = err instanceof Error ? err.message : 'Erro ao carregar participantes do evento.'
         setMensagem({ tipo: 'erro', texto: errorMessage })
       }
@@ -145,7 +171,8 @@ export function PortariaView() {
       if (currentEvIdRef.current === evId) {
         setConvidados(data.data || [])
       }
-    } catch {
+    } catch (err: unknown) {
+      if (invalidarEventoAtualSeTerminal(evId, err)) return
       if (!silencioso && currentEvIdRef.current === evId) {
         setConvidados([])
       }
@@ -160,7 +187,8 @@ export function PortariaView() {
       if (currentEvIdRef.current === evId) {
         setEstadoFechamento(data)
       }
-    } catch {
+    } catch (err: unknown) {
+      if (invalidarEventoAtualSeTerminal(evId, err)) return
       if (!silencioso && currentEvIdRef.current === evId) {
         setEstadoFechamento(null)
       }
@@ -173,6 +201,13 @@ export function PortariaView() {
     const intervalo = window.setInterval(() => {
       const evId = currentEvIdRef.current
       if (!evId) return
+
+      const eventoSelecionado = eventosDisponiveis.find(evento => evento.id === evId)
+      if (eventoSelecionado?.podeOperarPortaria === false) {
+        void carregarEstadoFechamento(evId, true)
+        return
+      }
+
       void Promise.all([
         carregarParticipantes(evId, true),
         carregarConvidados(evId, true),
@@ -181,7 +216,7 @@ export function PortariaView() {
     }, 8000)
 
     return () => window.clearInterval(intervalo)
-  }, [eventoIdAtual])
+  }, [eventoIdAtual, eventosDisponiveis])
 
   const handleSelecionarEvento = (evId: string) => {
     setEventoIdAtual(evId)
