@@ -4,6 +4,19 @@ export function setupDb(sqlite: any) {
     CREATE TABLE IF NOT EXISTS administracoes (id text PRIMARY KEY NOT NULL, regional_id text NOT NULL, nome text NOT NULL, codigo text, ativo integer DEFAULT true NOT NULL, created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, FOREIGN KEY (regional_id) REFERENCES regionais(id));
     CREATE TABLE IF NOT EXISTS setores (id text PRIMARY KEY NOT NULL, administracao_id text NOT NULL, nome text NOT NULL, codigo text, ativo integer DEFAULT true NOT NULL, created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, FOREIGN KEY (administracao_id) REFERENCES administracoes(id));
     CREATE TABLE IF NOT EXISTS casas (id text PRIMARY KEY NOT NULL, setor_id text NOT NULL, nome text NOT NULL, codigo text, ativo integer DEFAULT true NOT NULL, created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, FOREIGN KEY (setor_id) REFERENCES setores(id));
+    CREATE TABLE IF NOT EXISTS espacos_local (
+      id text PRIMARY KEY NOT NULL,
+      local_id text NOT NULL,
+      nome text NOT NULL,
+      descricao text,
+      capacidade integer,
+      ativo integer DEFAULT true NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (local_id) REFERENCES locais(id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_espacos_local_nome_ativo ON espacos_local(local_id, nome) WHERE ativo = 1;
+
     CREATE TABLE IF NOT EXISTS grupos_trabalho (id text PRIMARY KEY NOT NULL, nome text NOT NULL, ativo integer DEFAULT true NOT NULL, regional_id text, administracao_id text, setor_id text, created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, FOREIGN KEY (regional_id) REFERENCES regionais(id), FOREIGN KEY (administracao_id) REFERENCES administracoes(id), FOREIGN KEY (setor_id) REFERENCES setores(id));
     
     CREATE TABLE IF NOT EXISTS membros (
@@ -284,6 +297,7 @@ export function setupDb(sqlite: any) {
       dia_mes integer,
       posicao_semana_mes integer,
       local_id text,
+      espaco_id text,
       url_online text,
       organizador_membro_id text,
       regional_id text,
@@ -296,6 +310,7 @@ export function setupDb(sqlite: any) {
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       FOREIGN KEY (local_id) REFERENCES locais(id),
+      FOREIGN KEY (espaco_id) REFERENCES espacos_local(id),
       FOREIGN KEY (organizador_membro_id) REFERENCES membros(id),
       FOREIGN KEY (regional_id) REFERENCES regionais(id),
       FOREIGN KEY (administracao_id) REFERENCES administracoes(id),
