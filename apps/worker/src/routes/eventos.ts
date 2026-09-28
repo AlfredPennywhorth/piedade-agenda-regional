@@ -5,7 +5,7 @@ import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
 import { obterEscoposTerritoriaisVisiveis, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
-import { espacoPertenceAoLocal } from '../services/espacos-local'
+import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
 export const eventosRouter = new Hono<any>()
 
@@ -170,7 +170,10 @@ eventosRouter.post('/', async (c) => {
     const body = await c.req.json()
     const parsed = EventoCreate.parse(body)
     
-    if (!(await espacoPertenceAoLocal(db, parsed.localId, parsed.espacoId))) {
+    if (!(await espacoAtivoPertenceAoLocal(db, parsed.localId, parsed.espacoId))) {
+      if (await espacoPertenceAoLocal(db, parsed.localId, parsed.espacoId)) {
+        return c.json({ error: 'O espaço selecionado está inativo', code: 'ESPACO_INATIVO' }, 409)
+      }
       return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
     }
 
@@ -239,7 +242,15 @@ eventosRouter.patch('/:id', async (c) => {
     // Validar estado final mesclado (existente + patch) com EventoCreate
     const merged = { ...existing, ...parsed }
     EventoCreate.parse(merged)
-    if (!(await espacoPertenceAoLocal(db, merged.localId, merged.espacoId))) {
+    const espacoFoiAlterado = parsed.espacoId !== undefined && parsed.espacoId !== existing.espacoId
+    const espacoValido = espacoFoiAlterado
+      ? await espacoAtivoPertenceAoLocal(db, merged.localId, merged.espacoId)
+      : await espacoPertenceAoLocal(db, merged.localId, merged.espacoId)
+
+    if (!espacoValido) {
+      if (espacoFoiAlterado && await espacoPertenceAoLocal(db, merged.localId, merged.espacoId)) {
+        return c.json({ error: 'O espaço selecionado está inativo', code: 'ESPACO_INATIVO' }, 409)
+      }
       return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
     }
 
