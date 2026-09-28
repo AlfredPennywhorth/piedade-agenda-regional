@@ -234,4 +234,73 @@ describe('PR-SEC-01 — leitura de Membros e Vínculos por escopo', () => {
     expect(pessoas.length).toBeGreaterThanOrEqual(122)
     expect(pessoas.some(item => item.id === 'm-lote-119')).toBe(true)
   })
+
+  it('Gestor de Relatórios vê membros do escopo técnico sem obter escrita administrativa', async () => {
+    const relatorId = 'm-relator-a'
+    sqlite.prepare(
+      'INSERT INTO membros (id, nome, casa_id, ativo) VALUES (?, ?, ?, 1)'
+    ).run(relatorId, 'Relator A', ids.casaA)
+
+    const token = await criarSessao(
+      relatorId,
+      'token-relator-a',
+      'GESTOR_RELATORIOS',
+      'REGIONAL',
+      ids.regionalA
+    )
+
+    const lista = await req(token, '/api/v1/membros')
+    expect(lista.status).toBe(200)
+    const pessoas = await lista.json() as Array<{ id: string }>
+    const visiveis = new Set(pessoas.map(item => item.id))
+
+    expect(visiveis.has(ids.comumA)).toBe(true)
+    expect(visiveis.has(relatorId)).toBe(true)
+    expect(visiveis.has(ids.comumB)).toBe(false)
+
+    const tentativaEscrita = await app.request(
+      new Request(`http://localhost/api/v1/membros/${ids.comumA}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ nome: 'Não deve alterar' }),
+      })
+    )
+    expect(tentativaEscrita.status).toBe(403)
+  })
+
+  it('Gestor de Relatórios recebe projeção minimizada dos membros do escopo', async () => {
+    const relatorId = 'm-relator-minimo'
+    sqlite.prepare(
+      `INSERT INTO membros
+        (id, nome, data_ordenacao, codigo_carteirinha, celular, casa_id, ativo)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`
+    ).run(relatorId, 'Relator Mínimo', '2001-01-01', 'REL-001', '11999999999', ids.casaA)
+    sqlite.prepare(
+      `UPDATE membros
+       SET data_ordenacao = ?, codigo_carteirinha = ?, celular = ?
+       WHERE id = ?`
+    ).run('2002-02-02', 'COMUM-001', '11888888888', ids.comumA)
+
+    const token = await criarSessao(
+      relatorId,
+      'token-relator-minimo',
+      'GESTOR_RELATORIOS',
+      'REGIONAL',
+      ids.regionalA
+    )
+
+    const lista = await req(token, '/api/v1/membros')
+    expect(lista.status).toBe(200)
+    const pessoas = await lista.json() as Array<Record<string, unknown>>
+    const comum = pessoas.find(item => item.id === ids.comumA)
+
+    expect(comum).toMatchObject({ id: ids.comumA, nome: 'Comum A', casaId: ids.casaA, ativo: true })
+    expect(comum).not.toHaveProperty('celular')
+    expect(comum).not.toHaveProperty('codigoCarteirinha')
+    expect(comum).not.toHaveProperty('dataOrdenacao')
+  })
+
 })

@@ -606,4 +606,40 @@ describe('Administração de contas — PR-ACC-05', () => {
     })
   })
 
+
+  it('impede revogar o único Master operacional quando outro Master está bloqueado', async () => {
+    sqlite.exec(`
+      INSERT INTO membros
+        (id, nome, celular, data_ordenacao, codigo_carteirinha, casa_id, ativo)
+      VALUES
+        ('membro-master-bloqueado', 'Master Bloqueado', '11900000007', '2000-01-07', 'CART-MASTER-BLOQ', 'casa-1', 1);
+
+      INSERT INTO contas_acesso
+        (id, membro_id, status, pin_hash, pin_salt, ativado_em)
+      VALUES
+        ('conta-master-bloqueado', 'membro-master-bloqueado', 'BLOQUEADA', 'hash-bloq', 'salt-bloq', CURRENT_TIMESTAMP);
+
+      INSERT INTO acessos_conta
+        (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id)
+      VALUES
+        ('acesso-master-bloqueado', 'conta-master-bloqueado', 'MASTER_SISTEMA', 'GLOBAL', NULL);
+    `)
+
+    const tokenMaster = 'token-master-protege-operacional'
+    await criarSessao('sessao-master-protege-operacional', 'conta-master', 'membro-master', tokenMaster)
+
+    const response = await requisicao('/api/v1/admin/acessos/acesso-master', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${tokenMaster}` },
+    })
+
+    expect(response.status).toBe(409)
+    expect((await response.json()) as any).toMatchObject({ code: 'ULTIMO_MASTER' })
+
+    const acesso = sqlite.prepare(
+      "SELECT ativo FROM acessos_conta WHERE id = 'acesso-master'"
+    ).get() as { ativo: number }
+    expect(acesso.ativo).toBe(1)
+  })
+
 })

@@ -4,7 +4,7 @@ import { setupDb } from './setup'
 import { createApp } from '../index'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import BetterSqlite3 from 'better-sqlite3'
-import { regionais, locais, eventos, seriesRecorrencia, administracoes, setores, casas, membros, sessoes } from '../db/schema'
+import { regionais, locais, eventos, seriesRecorrencia, administracoes, setores, casas, membros, sessoes, convocacoes } from '../db/schema'
 import { eq } from 'drizzle-orm'
 import { hashToken } from '../security/tokens'
 
@@ -654,6 +654,79 @@ describe('Series Recorrencia API (S05)', () => {
       .where(eq(seriesRecorrencia.id, serie.id)).get()
     expect(antiga.ativo).toBe(false)
     expect(antiga.dataFim >= antiga.dataInicio).toBe(true)
+  })
+
+
+  it('24.5 ALL rejeita regeneração quando ocorrência futura possui convocação ativa', async () => {
+    const regionalId = await createRegional()
+    const createRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        titulo: 'Série com convocação',
+        regionalId,
+        dataInicio: '2099-11-01',
+        dataFim: '2099-11-03',
+      }),
+    })
+    expect(createRes.status).toBe(201)
+    const { serie } = await createRes.json()
+
+    const original = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()[0]
+
+    await db.insert(convocacoes).values({
+      id: crypto.randomUUID(),
+      eventoId: original.id,
+      status: 'PUBLICADA',
+      publicadaEm: new Date().toISOString(),
+      ativo: true,
+    })
+
+    const atualizar = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'ALL',
+        changes: { titulo: 'Não deve regenerar' },
+      }),
+    })
+
+    expect(atualizar.status).toBe(409)
+    expect(await atualizar.json()).toMatchObject({ code: 'SERIE_COM_CONVOCACAO' })
+
+    const persistido = db.select().from(eventos).where(eq(eventos.id, original.id)).get()
+    expect(persistido.ativo).toBe(true)
+    expect(persistido.titulo).toBe(original.titulo)
+  })
+
+  it('24.5.1 impede criar convocação ativa para ocorrência inativada', async () => {
+    const regionalId = await createRegional()
+    const createRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        regionalId,
+        dataInicio: '2099-11-10',
+        dataFim: '2099-11-10',
+      }),
+    })
+    const { serie } = await createRes.json()
+    const original = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .get()
+
+    await db.update(eventos).set({ ativo: false }).where(eq(eventos.id, original.id))
+
+    expect(() => db.insert(convocacoes).values({
+      id: crypto.randomUUID(),
+      eventoId: original.id,
+      status: 'RASCUNHO',
+      ativo: true,
+    }).run()).toThrow(/CONVOCACAO_EM_EVENTO_INATIVO/)
   })
 
   it('25. ALL com ativo=false inativa série e eventos futuros sem apagar ou regenerar', async () => {

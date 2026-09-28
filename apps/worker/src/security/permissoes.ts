@@ -956,6 +956,13 @@ export async function obterEscoposAutorizadosDoAuditor(db: any, membroId: string
     }
   }
 
+  const acessosAuditor = contexto.acessosAtivos.filter(
+    acesso =>
+      acesso.perfilCodigo === 'AUDITOR' &&
+      acesso.escopoId !== null &&
+      (acesso.escopoTipo === 'REGIONAL' || acesso.escopoTipo === 'ADMINISTRACAO')
+  )
+
   const vinculosAuditor = await db
     .select({
       v: schema.vinculosFuncionais,
@@ -973,10 +980,11 @@ export async function obterEscoposAutorizadosDoAuditor(db: any, membroId: string
     )
     .all()
 
-  if (!vinculosAuditor || vinculosAuditor.length === 0) return null
+  const vinculosValidos = (vinculosAuditor ?? []).filter(
+    ({ v }: any) => v.regionalId !== null || v.administracaoId !== null
+  )
 
-  const vinculosValidos = vinculosAuditor.filter(({ v }: any) => v.regionalId !== null || v.administracaoId !== null)
-  if (vinculosValidos.length === 0) return null
+  if (acessosAuditor.length === 0 && vinculosValidos.length === 0) return null
 
   const regionaisIds = new Set<string>()
   const administracoesIds = new Set<string>()
@@ -984,25 +992,49 @@ export async function obterEscoposAutorizadosDoAuditor(db: any, membroId: string
   const casasIds = new Set<string>()
   const gtsIds = new Set<string>()
 
+  for (const acesso of acessosAuditor) {
+    if (acesso.escopoTipo === 'REGIONAL' && acesso.escopoId) {
+      regionaisIds.add(acesso.escopoId)
+    } else if (acesso.escopoTipo === 'ADMINISTRACAO' && acesso.escopoId) {
+      administracoesIds.add(acesso.escopoId)
+    }
+  }
+
   for (const { v } of vinculosValidos) {
     if (v.regionalId) {
       regionaisIds.add(v.regionalId)
-      const adms = await db.select({ id: schema.administracoes.id }).from(schema.administracoes).where(eq(schema.administracoes.regionalId, v.regionalId)).all()
-      adms.forEach((a: any) => administracoesIds.add(a.id))
     } else if (v.administracaoId) {
       administracoesIds.add(v.administracaoId)
     }
   }
 
+  const arrRegionaisIniciais = Array.from(regionaisIds)
+  if (arrRegionaisIniciais.length > 0) {
+    const adms = await db
+      .select({ id: schema.administracoes.id })
+      .from(schema.administracoes)
+      .where(inArray(schema.administracoes.regionalId, arrRegionaisIniciais))
+      .all()
+    adms.forEach((a: any) => administracoesIds.add(a.id))
+  }
+
   const arrAdms = Array.from(administracoesIds)
   if (arrAdms.length > 0) {
-    const setList = await db.select({ id: schema.setores.id }).from(schema.setores).where(inArray(schema.setores.administracaoId, arrAdms)).all()
+    const setList = await db
+      .select({ id: schema.setores.id })
+      .from(schema.setores)
+      .where(inArray(schema.setores.administracaoId, arrAdms))
+      .all()
     setList.forEach((s: any) => setoresIds.add(s.id))
   }
 
   const arrSetores = Array.from(setoresIds)
   if (arrSetores.length > 0) {
-    const casList = await db.select({ id: schema.casas.id }).from(schema.casas).where(inArray(schema.casas.setorId, arrSetores)).all()
+    const casList = await db
+      .select({ id: schema.casas.id })
+      .from(schema.casas)
+      .where(inArray(schema.casas.setorId, arrSetores))
+      .all()
     casList.forEach((c: any) => casasIds.add(c.id))
   }
 
@@ -1013,7 +1045,11 @@ export async function obterEscoposAutorizadosDoAuditor(db: any, membroId: string
   if (arrSetores.length > 0) gtConditions.push(inArray(schema.gruposTrabalho.setorId, arrSetores))
 
   if (gtConditions.length > 0) {
-    const gtList = await db.select({ id: schema.gruposTrabalho.id }).from(schema.gruposTrabalho).where(or(...gtConditions)).all()
+    const gtList = await db
+      .select({ id: schema.gruposTrabalho.id })
+      .from(schema.gruposTrabalho)
+      .where(or(...gtConditions))
+      .all()
     gtList.forEach((g: any) => gtsIds.add(g.id))
   }
 

@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { and, eq, inArray, or } from 'drizzle-orm'
-import { acessosConta, administracoes, casas, contasAcesso, membros, setores, tentativasAcesso } from '../db/schema'
+import { acessosConta, administracoes, casas, contasAcesso, membros, setores, tentativasAcesso, vinculosFuncionais } from '../db/schema'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, regionaisAdministradas } from '../security/permissoes'
@@ -21,6 +21,13 @@ const membroPublico = {
   ativo: membros.ativo,
   createdAt: membros.createdAt,
   updatedAt: membros.updatedAt,
+}
+
+const membroParaRelatorio = {
+  id: membros.id,
+  nome: membros.nome,
+  casaId: membros.casaId,
+  ativo: membros.ativo,
 }
 
 function somenteCadastroInstitucional(membro: any) {
@@ -121,8 +128,35 @@ async function idsMembrosVisiveis(c: any): Promise<Set<string> | null> {
   if (eMasterSistema(contexto)) return null
 
   const ids = new Set<string>([contexto.membroId])
-  const regionaisIds = Array.from(regionaisAdministradas(contexto))
-  if (regionaisIds.length === 0) return ids
+  const regionaisIds = new Set<string>(regionaisAdministradas(contexto))
+  const administracoesIds = new Set<string>()
+  const setoresIds = new Set<string>()
+  const casasIds = new Set<string>()
+  const gtsIds = new Set<string>()
+
+  for (const acesso of contexto.acessosAtivos) {
+    if (acesso.perfilCodigo !== 'GESTOR_RELATORIOS' || !acesso.escopoId) continue
+
+    if (acesso.escopoTipo === 'REGIONAL') regionaisIds.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'ADMINISTRACAO') administracoesIds.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'SETOR') setoresIds.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'CASA') casasIds.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'GRUPO_TRABALHO') gtsIds.add(acesso.escopoId)
+  }
+
+  const filtros = [eq(membros.id, contexto.membroId)]
+  if (regionaisIds.size > 0) {
+    filtros.push(inArray(administracoes.regionalId, Array.from(regionaisIds)))
+  }
+  if (administracoesIds.size > 0) {
+    filtros.push(inArray(administracoes.id, Array.from(administracoesIds)))
+  }
+  if (setoresIds.size > 0) {
+    filtros.push(inArray(setores.id, Array.from(setoresIds)))
+  }
+  if (casasIds.size > 0) {
+    filtros.push(inArray(casas.id, Array.from(casasIds)))
+  }
 
   const rows = await db
     .select({ id: membros.id })
@@ -130,24 +164,38 @@ async function idsMembrosVisiveis(c: any): Promise<Set<string> | null> {
     .leftJoin(casas, eq(membros.casaId, casas.id))
     .leftJoin(setores, eq(casas.setorId, setores.id))
     .leftJoin(administracoes, eq(setores.administracaoId, administracoes.id))
-    .where(
-      or(
-        eq(membros.id, contexto.membroId),
-        inArray(administracoes.regionalId, regionaisIds)
-      )
-    )
+    .where(or(...filtros))
     .all()
 
   rows.forEach((row: { id: string }) => ids.add(row.id))
+
+  if (gtsIds.size > 0) {
+    const membrosGt = await db
+      .select({ id: vinculosFuncionais.membroId })
+      .from(vinculosFuncionais)
+      .where(
+        and(
+          eq(vinculosFuncionais.ativo, true),
+          inArray(vinculosFuncionais.grupoTrabalhoId, Array.from(gtsIds))
+        )
+      )
+      .all()
+    membrosGt.forEach((row: { id: string }) => ids.add(row.id))
+  }
+
   return ids
 }
 
 membrosRouter.get('/', async (c) => {
   const db = c.get('db')
+  const contexto = c.get('contextoPermissoes')
   const idsVisiveis = await idsMembrosVisiveis(c)
+  // Gestores de relatórios precisam apenas identificar e filtrar membros.
+  // Dados pessoais e cadastrais ficam restritos a quem administra pessoas.
+  const projecao = podeEscreverMembros(contexto) ? membroPublico : membroParaRelatorio
 
   if (idsVisiveis === null) {
-    return c.json(await db.select(membroPublico).from(membros).all())
+    return c.json(await db.select(projecao).from(membros).all())
   }
 
   const ids = Array.from(idsVisiveis)
@@ -159,7 +207,7 @@ membrosRouter.get('/', async (c) => {
   for (let i = 0; i < ids.length; i += LIMITE_IDS_D1) {
     const lote = ids.slice(i, i + LIMITE_IDS_D1)
     const parcial = await db
-      .select(membroPublico)
+      .select(projecao)
       .from(membros)
       .where(inArray(membros.id, lote))
       .all()
@@ -173,7 +221,9 @@ membrosRouter.get('/', async (c) => {
 membrosRouter.get('/:id', async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')
-  const data = await db.select(membroPublico).from(membros).where(eq(membros.id, id)).get()
+  const contexto = c.get('contextoPermissoes')
+  const projecao = podeEscreverMembros(contexto) ? membroPublico : membroParaRelatorio
+  const data = await db.select(projecao).from(membros).where(eq(membros.id, id)).get()
   
   if (!data) return c.json({ error: 'Membro não encontrado' }, 404)
 

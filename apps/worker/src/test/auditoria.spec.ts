@@ -17,7 +17,9 @@ import {
   rsvp,
   checkins,
   sessoes,
-  auditoriaLogs
+  auditoriaLogs,
+  contasAcesso,
+  acessosConta
 } from '../db/schema'
 import { hashToken } from '../security/tokens'
 import { eq } from 'drizzle-orm'
@@ -373,6 +375,82 @@ describe('S12 - Auditoria, Anti-Spoofing, Escopos e Fail-Closed', () => {
       expect(json.items.some((item: any) => item.id === logGlobalId)).toBe(false)
     })
   })
+
+
+    it('9. Auditor técnico REGIONAL acessa auditoria apenas dentro do próprio escopo', async () => {
+      const membroTecnicoId = crypto.randomUUID()
+      const contaTecnicaId = crypto.randomUUID()
+      const tokenTecnico = crypto.randomUUID()
+      const agora = new Date().toISOString()
+
+      await db.insert(membros).values({
+        id: membroTecnicoId,
+        nome: 'Auditor Técnico',
+        casaId: casAId,
+        ativo: true,
+        autenticacaoAtiva: true,
+      })
+      await db.insert(contasAcesso).values({
+        id: contaTecnicaId,
+        membroId: membroTecnicoId,
+        status: 'ATIVA',
+        ativadoEm: agora,
+      })
+      await db.insert(acessosConta).values({
+        id: crypto.randomUUID(),
+        contaAcessoId: contaTecnicaId,
+        perfilCodigo: 'AUDITOR',
+        escopoTipo: 'REGIONAL',
+        escopoId: regAId,
+        ativo: true,
+      })
+      await db.insert(sessoes).values({
+        id: crypto.randomUUID(),
+        contaAcessoId: contaTecnicaId,
+        membroId: membroTecnicoId,
+        tokenHash: await hashToken(tokenTecnico),
+        expiraEm: new Date(Date.now() + 86400000).toISOString(),
+        ultimoAcessoEm: agora,
+        createdAt: agora,
+      })
+
+      const logAId = crypto.randomUUID()
+      const logBId = crypto.randomUUID()
+      await db.insert(auditoriaLogs).values([
+        {
+          id: logAId,
+          acao: 'EVENTO_ATUALIZADO',
+          atorMembroId: membroTecnicoId,
+          recursoTipo: 'EVENTO',
+          recursoId: crypto.randomUUID(),
+          escopoTipo: 'REGIONAL',
+          escopoId: regAId,
+          criadoEm: agora,
+        },
+        {
+          id: logBId,
+          acao: 'EVENTO_ATUALIZADO',
+          atorMembroId: membroTecnicoId,
+          recursoTipo: 'EVENTO',
+          recursoId: crypto.randomUUID(),
+          escopoTipo: 'REGIONAL',
+          escopoId: regBId,
+          criadoEm: agora,
+        },
+      ])
+
+      const escopos = await obterEscoposAutorizadosDoAuditor(db, membroTecnicoId)
+      expect(escopos?.regionaisIds).toContain(regAId)
+      expect(escopos?.regionaisIds).not.toContain(regBId)
+
+      const res = await app.request('/api/v1/auditoria', {
+        headers: { Authorization: `Bearer ${tokenTecnico}` },
+      })
+      expect(res.status).toBe(200)
+      const json = await res.json()
+      expect(json.items.some((item: any) => item.id === logAId)).toBe(true)
+      expect(json.items.some((item: any) => item.id === logBId)).toBe(false)
+    })
 
   // =========================================================================
   // 2. SEGURANÇA DA IDENTIDADE DO ATOR (ANTI-SPOOFING)

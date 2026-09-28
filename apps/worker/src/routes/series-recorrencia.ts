@@ -12,7 +12,6 @@ export const seriesRecorrenciaRouter = new Hono<any>()
 
 seriesRecorrenciaRouter.use('*', authMiddleware)
 
-
 interface EscoposAgendaAutorizados {
   tudo: boolean
   regionaisIds: Set<string>
@@ -479,7 +478,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       }
 
       const pivotDateIso = existingEvent.recorrenciaOrigemInicioEm ?? existingEvent.inicioEm
-      
+
       const newSerieId = crypto.randomUUID()
       
       // Cálculo correto com timezone
@@ -622,6 +621,16 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
     }
 
   } catch (err: any) {
+    if (err.message && err.message.includes('EVENTO_COM_CONVOCACAO_ATIVA')) {
+      return c.json(
+        {
+          error:
+            'A série possui ocorrência futura com convocação vinculada. Altere a ocorrência individualmente ou trate a convocação antes de regenerar a série.',
+          code: 'SERIE_COM_CONVOCACAO',
+        },
+        409
+      )
+    }
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
       return c.json({ error: 'Local ou Escopo vinculado não existe' }, 400)
     }
