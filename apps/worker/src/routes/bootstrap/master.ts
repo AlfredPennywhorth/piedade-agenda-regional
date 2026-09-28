@@ -1,12 +1,14 @@
 import { Hono } from 'hono'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { executeAtomic } from '../../db/batch'
 import type { Env } from '../../index'
+import { gerarTokenAleatorio, hashToken } from '../../security/tokens'
 
 type BootstrapVariables = { db: any }
 
 const CONFIRMACAO_BOOTSTRAP = 'CRIAR PRIMEIRO MASTER'
+const VALIDADE_LINK_ATIVACAO_MS = 7 * 24 * 60 * 60 * 1000
 
 async function segredoCorresponde(recebido: string, esperado: string): Promise<boolean> {
   const encoder = new TextEncoder()
@@ -94,11 +96,15 @@ bootstrapMasterApp.post('/', async c => {
       contaStatus: schema.contasAcesso.status,
     })
     .from(schema.membros)
-    .innerJoin(schema.contasAcesso, eq(schema.contasAcesso.membroId, schema.membros.id))
+    .leftJoin(schema.contasAcesso, eq(schema.contasAcesso.membroId, schema.membros.id))
     .where(eq(schema.membros.codigoCarteirinha, body.codigoCarteirinha))
     .get()
 
-  if (!identidade || !identidade.membroAtivo || identidade.contaStatus !== 'ATIVA') {
+  if (
+    !identidade ||
+    !identidade.membroAtivo ||
+    ['BLOQUEADA', 'DESATIVADA'].includes(identidade.contaStatus ?? '')
+  ) {
     return c.json(
       { error: 'Conta ativa elegível não encontrada', code: 'CONTA_INELEGIVEL' },
       404
@@ -107,37 +113,86 @@ bootstrapMasterApp.post('/', async c => {
 
   const agora = new Date().toISOString()
   const acessoId = crypto.randomUUID()
+  const contaAcessoId = identidade.contaAcessoId ?? crypto.randomUUID()
+  const precisaAtivacao = !identidade.contaAcessoId || identidade.contaStatus === 'PENDENTE_ATIVACAO'
+  const tokenAtivacao = precisaAtivacao ? gerarTokenAleatorio() : null
+  const tokenAtivacaoHash = tokenAtivacao ? await hashToken(tokenAtivacao) : null
+  const expiraEmAtivacao = precisaAtivacao
+    ? new Date(Date.now() + VALIDADE_LINK_ATIVACAO_MS).toISOString()
+    : null
 
   try {
-    await executeAtomic(db, tx => [
-      tx.insert(schema.acessosConta).values({
-        id: acessoId,
-        contaAcessoId: identidade.contaAcessoId,
-        perfilCodigo: 'MASTER_SISTEMA',
-        escopoTipo: 'GLOBAL',
-        escopoId: null,
-        concedidoPorContaId: identidade.contaAcessoId,
-        createdAt: agora,
-        updatedAt: agora,
-      }),
-      tx.insert(schema.bootstrapMaster).values({
-        id: 'PRIMEIRO_MASTER',
-        contaAcessoId: identidade.contaAcessoId,
-        concluidoEm: agora,
-      }),
-      tx.insert(schema.auditoriaLogs).values({
-        id: crypto.randomUUID(),
-        acao: 'BOOTSTRAP_PRIMEIRO_MASTER',
-        atorMembroId: identidade.membroId,
-        atorContaAcessoId: identidade.contaAcessoId,
-        recursoTipo: 'ACESSO_CONTA',
-        recursoId: acessoId,
-        escopoTipo: 'GLOBAL',
-        escopoId: null,
-        contexto: JSON.stringify({ perfilCodigo: 'MASTER_SISTEMA' }),
-        criadoEm: agora,
-      }),
-    ])
+    await executeAtomic(db, tx => {
+      const queries = []
+
+      if (!identidade.contaAcessoId) {
+        queries.push(
+          tx.insert(schema.contasAcesso).values({
+            id: contaAcessoId,
+            membroId: identidade.membroId,
+            status: 'PENDENTE_ATIVACAO',
+            createdAt: agora,
+            updatedAt: agora,
+          })
+        )
+      }
+
+      if (tokenAtivacao && tokenAtivacaoHash && expiraEmAtivacao) {
+        queries.push(
+          tx
+            .update(schema.linksAtivacao)
+            .set({ revogadoEm: agora, updatedAt: agora })
+            .where(
+              and(
+                eq(schema.linksAtivacao.contaAcessoId, contaAcessoId),
+                isNull(schema.linksAtivacao.utilizadoEm),
+                isNull(schema.linksAtivacao.revogadoEm)
+              )
+            ),
+          tx.insert(schema.linksAtivacao).values({
+            id: crypto.randomUUID(),
+            contaAcessoId,
+            membroId: identidade.membroId,
+            tokenHash: tokenAtivacaoHash,
+            expiraEm: expiraEmAtivacao,
+            createdAt: agora,
+            updatedAt: agora,
+          })
+        )
+      }
+
+      queries.push(
+        tx.insert(schema.acessosConta).values({
+          id: acessoId,
+          contaAcessoId,
+          perfilCodigo: 'MASTER_SISTEMA',
+          escopoTipo: 'GLOBAL',
+          escopoId: null,
+          concedidoPorContaId: contaAcessoId,
+          createdAt: agora,
+          updatedAt: agora,
+        }),
+        tx.insert(schema.bootstrapMaster).values({
+          id: 'PRIMEIRO_MASTER',
+          contaAcessoId,
+          concluidoEm: agora,
+        }),
+        tx.insert(schema.auditoriaLogs).values({
+          id: crypto.randomUUID(),
+          acao: 'BOOTSTRAP_PRIMEIRO_MASTER',
+          atorMembroId: identidade.membroId,
+          atorContaAcessoId: contaAcessoId,
+          recursoTipo: 'ACESSO_CONTA',
+          recursoId: acessoId,
+          escopoTipo: 'GLOBAL',
+          escopoId: null,
+          contexto: JSON.stringify({ perfilCodigo: 'MASTER_SISTEMA' }),
+          criadoEm: agora,
+        })
+      )
+
+      return queries
+    })
   } catch {
     return c.json({ error: 'Bootstrap do Master já concluído', code: 'BOOTSTRAP_CONCLUIDO' }, 409)
   }
@@ -148,6 +203,7 @@ bootstrapMasterApp.post('/', async c => {
       acessoId,
       perfilCodigo: 'MASTER_SISTEMA',
       escopoTipo: 'GLOBAL',
+      ...(tokenAtivacao ? { tokenAtivacao, expiraEmAtivacao } : {}),
     },
     201
   )
