@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config'
+import path from 'path'
 
 // Nota de arquitetura (ressalva PMO):
 // Este config usa ambiente Node para testes unitários de rotas Hono.
@@ -9,5 +10,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    alias: {
+      'better-sqlite3': path.resolve(__dirname, './src/test/better-sqlite3-shim.ts')
+    }
   },
 })
+

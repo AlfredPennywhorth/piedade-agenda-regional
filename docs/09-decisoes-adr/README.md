@@ -19,3 +19,4 @@ Cada ADR segue o formato:
 | [ADR-001](./ADR-001-autenticacao.md)             | Mecanismo de Autenticação                        | DECIDIDO (PMO-001) | 2026-08-31 |
 | [ADR-002](./ADR-002-grupos-trabalho.md)          | Modelo de Escopo dos Grupos de Trabalho          | DECIDIDO           | 2026-08-31 |
 | [ADR-003](./ADR-003-membros-funcoes-vinculos.md) | Modelo de Membros, Funções e Vínculos Funcionais | DECIDIDO           | 2026-09-01 |
+| [ADR-004](./ADR-004-sessoes-pin-tokens.md)       | Sessões, PIN e Tokens de Ativação                | DECIDIDO           | 2026-09-01 |

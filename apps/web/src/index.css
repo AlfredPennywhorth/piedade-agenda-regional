@@ -16,4 +16,46 @@
   *::after {
     box-sizing: border-box;
   }
+
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: 3px solid #0f172a;
+    outline-offset: 3px;
+    box-shadow: 0 0 0 6px #ffffff;
+  }
+
+  :where(button, input, select, textarea):disabled {
+    cursor: not-allowed;
+  }
+}
+
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .relatorio-impressao,
+  .relatorio-impressao * {
+    visibility: visible !important;
+  }
+
+  .relatorio-impressao {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    background: white;
+  }
+
+  .relatorio-controles {
+    display: none !important;
+  }
+
+  table {
+    break-inside: auto;
+  }
+
+  tr {
+    break-inside: avoid;
+    break-after: auto;
+  }
 }

@@ -1,0 +1,1066 @@
+import { eq, and, inArray, or, isNull } from 'drizzle-orm'
+import * as schema from '../db/schema'
+import { RESPONSABILIDADE_PMO_VERSAO_ATUAL } from './responsabilidade-pmo'
+
+export interface AcessoTecnico {
+  id: string
+  perfilCodigo: string
+  escopoTipo: 'GLOBAL' | 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO'
+  escopoId: string | null
+}
+
+export interface ContextoPermissoes {
+  membroId: string
+  contaAcessoId: string | null
+  acessosAtivos: AcessoTecnico[]
+  vinculosAtivos: {
+    funcaoId: string
+    regionalId: string | null
+    administracaoId: string | null
+    setorId: string | null
+    casaId: string | null
+    grupoTrabalhoId: string | null
+  }[]
+}
+
+export async function carregarContextoPermissoes(
+  db: any,
+  membroId: string,
+  contaAcessoId?: string
+): Promise<ContextoPermissoes> {
+  const vinculos = await db
+    .select({
+      funcaoId: schema.vinculosFuncionais.funcaoId,
+      regionalId: schema.vinculosFuncionais.regionalId,
+      administracaoId: schema.vinculosFuncionais.administracaoId,
+      setorId: schema.vinculosFuncionais.setorId,
+      casaId: schema.vinculosFuncionais.casaId,
+      grupoTrabalhoId: schema.vinculosFuncionais.grupoTrabalhoId,
+    })
+    .from(schema.vinculosFuncionais)
+    .where(
+      and(
+        eq(schema.vinculosFuncionais.membroId, membroId),
+        eq(schema.vinculosFuncionais.ativo, true)
+      )
+    )
+
+  let contaId = contaAcessoId ?? null
+  if (!contaId) {
+    const conta = await db
+      .select({ id: schema.contasAcesso.id })
+      .from(schema.contasAcesso)
+      .where(eq(schema.contasAcesso.membroId, membroId))
+      .get()
+    contaId = conta?.id ?? null
+  }
+
+  const acessos = contaId
+    ? await db
+        .select({
+          id: schema.acessosConta.id,
+          perfilCodigo: schema.acessosConta.perfilCodigo,
+          escopoTipo: schema.acessosConta.escopoTipo,
+          escopoId: schema.acessosConta.escopoId,
+        })
+        .from(schema.acessosConta)
+        .where(
+          and(
+            eq(schema.acessosConta.contaAcessoId, contaId),
+            eq(schema.acessosConta.ativo, true)
+          )
+        )
+        .all()
+    : []
+
+  let acessosAutorizados = acessos as AcessoTecnico[]
+
+  if (contaId) {
+    const acessosAdminRegional = acessosAutorizados.filter(
+      acesso =>
+        acesso.perfilCodigo === 'ADMINISTRADOR_SISTEMA' &&
+        acesso.escopoTipo === 'REGIONAL' &&
+        acesso.escopoId !== null
+    )
+
+    if (acessosAdminRegional.length > 0) {
+      const ciencias = await db
+        .select({ acessoContaId: schema.cienciasResponsabilidade.acessoContaId })
+        .from(schema.cienciasResponsabilidade)
+        .where(
+          and(
+            eq(schema.cienciasResponsabilidade.contaAcessoId, contaId),
+            eq(schema.cienciasResponsabilidade.tipo, 'RESPONSAVEL_REGIONAL_PMO'),
+            eq(schema.cienciasResponsabilidade.versaoTexto, RESPONSABILIDADE_PMO_VERSAO_ATUAL),
+            inArray(
+              schema.cienciasResponsabilidade.acessoContaId,
+              acessosAdminRegional.map(acesso => acesso.id)
+            )
+          )
+        )
+        .all()
+
+      const acessosComCiencia = new Set(
+        ciencias.map((ciencia: any) => ciencia.acessoContaId)
+      )
+
+      acessosAutorizados = acessosAutorizados.filter(
+        acesso =>
+          !(
+            acesso.perfilCodigo === 'ADMINISTRADOR_SISTEMA' &&
+            acesso.escopoTipo === 'REGIONAL' &&
+            acesso.escopoId !== null &&
+            !acessosComCiencia.has(acesso.id)
+          )
+      )
+    }
+  }
+
+  return {
+    membroId,
+    contaAcessoId: contaId,
+    acessosAtivos: acessosAutorizados,
+    vinculosAtivos: vinculos,
+  }
+}
+
+
+export async function obterRegionalDoEscopo(
+  db: any,
+  escopoTipo: Exclude<AcessoTecnico['escopoTipo'], 'GLOBAL'>,
+  escopoId: string
+): Promise<string | null> {
+  if (!db || !escopoId) return null
+
+  if (escopoTipo === 'REGIONAL') {
+    const regional = await db
+      .select({ id: schema.regionais.id })
+      .from(schema.regionais)
+      .where(eq(schema.regionais.id, escopoId))
+      .get()
+    return regional?.id ?? null
+  }
+
+  if (escopoTipo === 'ADMINISTRACAO') {
+    const administracao = await db
+      .select({ regionalId: schema.administracoes.regionalId })
+      .from(schema.administracoes)
+      .where(eq(schema.administracoes.id, escopoId))
+      .get()
+    return administracao?.regionalId ?? null
+  }
+
+  if (escopoTipo === 'SETOR') {
+    const setor = await db
+      .select({ regionalId: schema.administracoes.regionalId })
+      .from(schema.setores)
+      .innerJoin(
+        schema.administracoes,
+        eq(schema.setores.administracaoId, schema.administracoes.id)
+      )
+      .where(eq(schema.setores.id, escopoId))
+      .get()
+    return setor?.regionalId ?? null
+  }
+
+  if (escopoTipo === 'CASA') {
+    const casa = await db
+      .select({ regionalId: schema.administracoes.regionalId })
+      .from(schema.casas)
+      .innerJoin(schema.setores, eq(schema.casas.setorId, schema.setores.id))
+      .innerJoin(
+        schema.administracoes,
+        eq(schema.setores.administracaoId, schema.administracoes.id)
+      )
+      .where(eq(schema.casas.id, escopoId))
+      .get()
+    return casa?.regionalId ?? null
+  }
+
+  const gtDireto = await db
+    .select({
+      regionalId: schema.gruposTrabalho.regionalId,
+      regionalAdministracao: schema.administracoes.regionalId,
+    })
+    .from(schema.gruposTrabalho)
+    .leftJoin(
+      schema.administracoes,
+      eq(schema.gruposTrabalho.administracaoId, schema.administracoes.id)
+    )
+    .where(eq(schema.gruposTrabalho.id, escopoId))
+    .get()
+
+  if (gtDireto?.regionalId) return gtDireto.regionalId
+  if (gtDireto?.regionalAdministracao) return gtDireto.regionalAdministracao
+
+  const gtSetor = await db
+    .select({ regionalId: schema.administracoes.regionalId })
+    .from(schema.gruposTrabalho)
+    .innerJoin(schema.setores, eq(schema.gruposTrabalho.setorId, schema.setores.id))
+    .innerJoin(
+      schema.administracoes,
+      eq(schema.setores.administracaoId, schema.administracoes.id)
+    )
+    .where(eq(schema.gruposTrabalho.id, escopoId))
+    .get()
+
+  return gtSetor?.regionalId ?? null
+}
+
+export interface EscoposTerritoriaisVisiveis {
+  tudo: boolean
+  regionaisIds: Set<string>
+  administracoesIds: Set<string>
+  setoresIds: Set<string>
+  casasIds: Set<string>
+  gruposTrabalhoIds: Set<string>
+}
+
+export async function obterEscoposTerritoriaisVisiveis(
+  db: any,
+  contexto: ContextoPermissoes
+): Promise<EscoposTerritoriaisVisiveis> {
+  const resultado: EscoposTerritoriaisVisiveis = {
+    tudo: eMasterSistema(contexto),
+    regionaisIds: new Set<string>(),
+    administracoesIds: new Set<string>(),
+    setoresIds: new Set<string>(),
+    casasIds: new Set<string>(),
+    gruposTrabalhoIds: new Set<string>(),
+  }
+
+  if (resultado.tudo) return resultado
+
+  const incluirCasa = async (casaId: string) => {
+    const casa = await db
+      .select({
+        casaId: schema.casas.id,
+        setorId: schema.setores.id,
+        administracaoId: schema.administracoes.id,
+        regionalId: schema.regionais.id,
+      })
+      .from(schema.casas)
+      .innerJoin(schema.setores, eq(schema.casas.setorId, schema.setores.id))
+      .innerJoin(schema.administracoes, eq(schema.setores.administracaoId, schema.administracoes.id))
+      .innerJoin(schema.regionais, eq(schema.administracoes.regionalId, schema.regionais.id))
+      .where(eq(schema.casas.id, casaId))
+      .get()
+
+    if (!casa) return
+    resultado.casasIds.add(casa.casaId)
+    resultado.setoresIds.add(casa.setorId)
+    resultado.administracoesIds.add(casa.administracaoId)
+    resultado.regionaisIds.add(casa.regionalId)
+  }
+
+  const membro = await db
+    .select({ casaId: schema.membros.casaId })
+    .from(schema.membros)
+    .where(eq(schema.membros.id, contexto.membroId))
+    .get()
+
+  if (membro?.casaId) {
+    await incluirCasa(membro.casaId)
+  }
+
+  for (const acesso of contexto.acessosAtivos) {
+    if (!acesso.escopoId || acesso.escopoTipo === 'GLOBAL') continue
+
+    if (acesso.escopoTipo === 'REGIONAL') {
+      resultado.regionaisIds.add(acesso.escopoId)
+
+      const adms = await db
+        .select({ id: schema.administracoes.id })
+        .from(schema.administracoes)
+        .where(eq(schema.administracoes.regionalId, acesso.escopoId))
+        .all()
+      adms.forEach((item: any) => resultado.administracoesIds.add(item.id))
+
+      const admIds = adms.map((item: any) => item.id)
+      if (admIds.length > 0) {
+        const setores = await db
+          .select({ id: schema.setores.id })
+          .from(schema.setores)
+          .where(inArray(schema.setores.administracaoId, admIds))
+          .all()
+        setores.forEach((item: any) => resultado.setoresIds.add(item.id))
+
+        const setorIds = setores.map((item: any) => item.id)
+        if (setorIds.length > 0) {
+          const casas = await db
+            .select({ id: schema.casas.id })
+            .from(schema.casas)
+            .where(inArray(schema.casas.setorId, setorIds))
+            .all()
+          casas.forEach((item: any) => resultado.casasIds.add(item.id))
+        }
+      }
+
+      const gts = await db
+        .select({ id: schema.gruposTrabalho.id })
+        .from(schema.gruposTrabalho)
+        .where(eq(schema.gruposTrabalho.regionalId, acesso.escopoId))
+        .all()
+      gts.forEach((item: any) => resultado.gruposTrabalhoIds.add(item.id))
+      continue
+    }
+
+    if (acesso.escopoTipo === 'ADMINISTRACAO') {
+      const adm = await db
+        .select({ id: schema.administracoes.id, regionalId: schema.administracoes.regionalId })
+        .from(schema.administracoes)
+        .where(eq(schema.administracoes.id, acesso.escopoId))
+        .get()
+      if (!adm) continue
+
+      resultado.administracoesIds.add(adm.id)
+      resultado.regionaisIds.add(adm.regionalId)
+
+      const setores = await db
+        .select({ id: schema.setores.id })
+        .from(schema.setores)
+        .where(eq(schema.setores.administracaoId, adm.id))
+        .all()
+      setores.forEach((item: any) => resultado.setoresIds.add(item.id))
+
+      const setorIds = setores.map((item: any) => item.id)
+      if (setorIds.length > 0) {
+        const casas = await db
+          .select({ id: schema.casas.id })
+          .from(schema.casas)
+          .where(inArray(schema.casas.setorId, setorIds))
+          .all()
+        casas.forEach((item: any) => resultado.casasIds.add(item.id))
+      }
+      continue
+    }
+
+    if (acesso.escopoTipo === 'SETOR') {
+      const setor = await db
+        .select({
+          setorId: schema.setores.id,
+          administracaoId: schema.administracoes.id,
+          regionalId: schema.administracoes.regionalId,
+        })
+        .from(schema.setores)
+        .innerJoin(schema.administracoes, eq(schema.setores.administracaoId, schema.administracoes.id))
+        .where(eq(schema.setores.id, acesso.escopoId))
+        .get()
+      if (!setor) continue
+
+      resultado.setoresIds.add(setor.setorId)
+      resultado.administracoesIds.add(setor.administracaoId)
+      resultado.regionaisIds.add(setor.regionalId)
+
+      const casas = await db
+        .select({ id: schema.casas.id })
+        .from(schema.casas)
+        .where(eq(schema.casas.setorId, setor.setorId))
+        .all()
+      casas.forEach((item: any) => resultado.casasIds.add(item.id))
+      continue
+    }
+
+    if (acesso.escopoTipo === 'CASA') {
+      await incluirCasa(acesso.escopoId)
+      continue
+    }
+
+    const gt = await db
+      .select({ id: schema.gruposTrabalho.id, regionalId: schema.gruposTrabalho.regionalId })
+      .from(schema.gruposTrabalho)
+      .where(eq(schema.gruposTrabalho.id, acesso.escopoId))
+      .get()
+    if (gt) {
+      resultado.gruposTrabalhoIds.add(gt.id)
+      if (gt.regionalId) resultado.regionaisIds.add(gt.regionalId)
+    }
+  }
+
+  return resultado
+}
+
+export function eMasterSistema(contexto: ContextoPermissoes): boolean {
+  return contexto.acessosAtivos.some(
+    acesso =>
+      acesso.perfilCodigo === 'MASTER_SISTEMA' &&
+      acesso.escopoTipo === 'GLOBAL' &&
+      acesso.escopoId === null
+  )
+}
+
+export function regionaisAdministradas(contexto: ContextoPermissoes): Set<string> {
+  return new Set(
+    contexto.acessosAtivos
+      .filter(
+        acesso =>
+          acesso.perfilCodigo === 'ADMINISTRADOR_SISTEMA' &&
+          acesso.escopoTipo === 'REGIONAL' &&
+          acesso.escopoId !== null
+      )
+      .map(acesso => acesso.escopoId as string)
+  )
+}
+
+export function podeAdministrarRegional(
+  contexto: ContextoPermissoes,
+  regionalId: string
+): boolean {
+  if (eMasterSistema(contexto)) return true
+  return regionaisAdministradas(contexto).has(regionalId)
+}
+
+export async function podeAdministrarEscopo(
+  db: any,
+  contexto: ContextoPermissoes,
+  escopoTipo: Exclude<AcessoTecnico['escopoTipo'], 'GLOBAL'>,
+  escopoId: string
+): Promise<boolean> {
+  if (eMasterSistema(contexto)) return true
+  const regionalId = await obterRegionalDoEscopo(db, escopoTipo, escopoId)
+  return !!regionalId && regionaisAdministradas(contexto).has(regionalId)
+}
+
+export function temPerfil(contexto: ContextoPermissoes, perfilCodigo: string): boolean {
+  return contexto.acessosAtivos.some(acesso => acesso.perfilCodigo === perfilCodigo)
+}
+
+export function temPerfilNoEscopo(
+  contexto: ContextoPermissoes,
+  perfilCodigo: string,
+  escopoTipo: AcessoTecnico['escopoTipo'],
+  escopoId: string | null
+): boolean {
+  return contexto.acessosAtivos.some(
+    acesso =>
+      acesso.perfilCodigo === perfilCodigo &&
+      acesso.escopoTipo === escopoTipo &&
+      acesso.escopoId === escopoId
+  )
+}
+
+export async function podeGerenciarAgendaNoEscopo(
+  db: any,
+  membroId: string,
+  escopoTipo: Exclude<AcessoTecnico['escopoTipo'], 'GLOBAL'>,
+  escopoId: string
+): Promise<boolean> {
+  if (!db || !membroId || !escopoId) return false
+
+  const contexto = await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) return true
+
+  const regionalAlvo = await obterRegionalDoEscopo(db, escopoTipo, escopoId)
+  if (!regionalAlvo) return false
+
+  // Administrador Regional pode gerir a Agenda apenas dentro da Regional administrada.
+  if (podeAdministrarRegional(contexto, regionalAlvo)) return true
+
+  // Regra institucional: todo membro pode gerir automaticamente a Agenda da própria Casa.
+  if (escopoTipo === 'CASA') {
+    const membro = await db
+      .select({ casaId: schema.membros.casaId })
+      .from(schema.membros)
+      .where(and(eq(schema.membros.id, membroId), eq(schema.membros.ativo, true)))
+      .get()
+    if (membro?.casaId === escopoId) return true
+  }
+
+  const acessosAgenda = contexto.acessosAtivos.filter(
+    acesso =>
+      acesso.perfilCodigo === 'GESTOR_AGENDA' &&
+      acesso.escopoTipo !== 'GLOBAL' &&
+      acesso.escopoId !== null
+  )
+  if (acessosAgenda.length === 0) return false
+
+  // Gestor Regional herda todos os escopos descendentes da Regional, inclusive GT Regional.
+  if (
+    acessosAgenda.some(
+      acesso =>
+        acesso.escopoTipo === 'REGIONAL' &&
+        acesso.escopoId === regionalAlvo
+    )
+  ) {
+    return true
+  }
+
+  // Correspondência direta continua válida em qualquer escopo configurável.
+  if (
+    acessosAgenda.some(
+      acesso => acesso.escopoTipo === escopoTipo && acesso.escopoId === escopoId
+    )
+  ) {
+    return true
+  }
+
+  if (escopoTipo === 'SETOR' || escopoTipo === 'CASA') {
+    let setorId = escopoTipo === 'SETOR' ? escopoId : null
+    if (escopoTipo === 'CASA') {
+      const casa = await db
+        .select({ setorId: schema.casas.setorId })
+        .from(schema.casas)
+        .where(eq(schema.casas.id, escopoId))
+        .get()
+      setorId = casa?.setorId ?? null
+    }
+
+    if (setorId) {
+      const setor = await db
+        .select({ administracaoId: schema.setores.administracaoId })
+        .from(schema.setores)
+        .where(eq(schema.setores.id, setorId))
+        .get()
+
+      if (
+        setor?.administracaoId &&
+        acessosAgenda.some(
+          acesso =>
+            acesso.escopoTipo === 'ADMINISTRACAO' &&
+            acesso.escopoId === setor.administracaoId
+        )
+      ) return true
+
+      if (
+        acessosAgenda.some(
+          acesso =>
+            acesso.escopoTipo === 'SETOR' &&
+            acesso.escopoId === setorId
+        )
+      ) return true
+    }
+  }
+
+  if (escopoTipo === 'ADMINISTRACAO') {
+    return acessosAgenda.some(
+      acesso =>
+        acesso.escopoTipo === 'ADMINISTRACAO' &&
+        acesso.escopoId === escopoId
+    )
+  }
+
+  return false
+}
+
+export function regionaisGeridasNaAgenda(contexto: ContextoPermissoes): Set<string> {
+  return new Set(
+    contexto.acessosAtivos
+      .filter(
+        acesso =>
+          acesso.perfilCodigo === 'GESTOR_AGENDA' &&
+          acesso.escopoTipo === 'REGIONAL' &&
+          acesso.escopoId !== null
+      )
+      .map(acesso => acesso.escopoId as string)
+  )
+}
+
+// Fundação (S03): funções auxiliares para verificar permissões futuras.
+
+export function temFuncao(contexto: ContextoPermissoes, funcaoId: string): boolean {
+  return contexto.vinculosAtivos.some((v) => v.funcaoId === funcaoId)
+}
+
+export function temFuncaoNoEscopoRegional(contexto: ContextoPermissoes, funcaoId: string, regionalId: string): boolean {
+  return contexto.vinculosAtivos.some(
+    (v) => v.funcaoId === funcaoId && v.regionalId === regionalId
+  )
+}
+
+export function temVinculoEmTipoEscopo(contexto: ContextoPermissoes, tipo: 'regional' | 'administracao' | 'setor' | 'casa' | 'gt'): boolean {
+  return contexto.vinculosAtivos.some((v) => {
+    switch (tipo) {
+      case 'regional': return v.regionalId !== null
+      case 'administracao': return v.administracaoId !== null
+      case 'setor': return v.setorId !== null
+      case 'casa': return v.casaId !== null
+      case 'gt': return v.grupoTrabalhoId !== null
+    }
+    return false
+  })
+}
+
+/**
+ * Valida se o membro possui vínculo ativo estritamente com a função de código OPERADOR_PORTARIA no mesmo escopo do evento.
+ */
+export async function eOperadorPortariaAutorizado(
+  db: any,
+  membroId: string,
+  evento: any,
+  contextoPermissoes?: ContextoPermissoes
+): Promise<boolean> {
+  if (!db || !membroId || !evento) return false
+
+  const estadoPortaria = await db
+    .select({ status: schema.portariasEvento.status })
+    .from(schema.portariasEvento)
+    .where(eq(schema.portariasEvento.eventoId, evento.id))
+    .get()
+
+  if (estadoPortaria?.status === 'FECHADA') {
+    return false
+  }
+
+  const contexto = contextoPermissoes ?? await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) return true
+
+  const autorizacaoTemporaria = await db
+    .select({ id: schema.portariaOperadoresEvento.id })
+    .from(schema.portariaOperadoresEvento)
+    .where(
+      and(
+        eq(schema.portariaOperadoresEvento.eventoId, evento.id),
+        eq(schema.portariaOperadoresEvento.membroId, membroId),
+        eq(schema.portariaOperadoresEvento.ativo, true)
+      )
+    )
+    .get()
+
+  if (autorizacaoTemporaria) {
+    return true
+  }
+
+  const vinculosPortaria = await db
+    .select({
+      v: schema.vinculosFuncionais,
+      f: schema.funcoes
+    })
+    .from(schema.vinculosFuncionais)
+    .innerJoin(schema.funcoes, eq(schema.vinculosFuncionais.funcaoId, schema.funcoes.id))
+    .where(
+      and(
+        eq(schema.vinculosFuncionais.membroId, membroId),
+        eq(schema.vinculosFuncionais.ativo, true),
+        eq(schema.funcoes.ativo, true),
+        eq(schema.funcoes.codigo, 'OPERADOR_PORTARIA')
+      )
+    )
+    .all()
+
+  if (!vinculosPortaria || vinculosPortaria.length === 0) {
+    return false
+  }
+
+  return vinculosPortaria.some(({ v }: any) => {
+    if (evento.regionalId && v.regionalId === evento.regionalId) return true
+    if (evento.administracaoId && v.administracaoId === evento.administracaoId) return true
+    if (evento.setorId && v.setorId === evento.setorId) return true
+    if (evento.casaId && v.casaId === evento.casaId) return true
+    if (evento.grupoTrabalhoId && v.grupoTrabalhoId === evento.grupoTrabalhoId) return true
+    return false
+  })
+}
+
+/**
+ * Valida se o membro possui permissão de relatórios para um evento específico.
+ * Autorizado se:
+ * 1. É o organizador do evento (evento.organizadorMembroId === membroId); OU
+ * 2. Possui vínculo ativo com a função GESTOR_RELATORIOS no exato escopo do evento.
+ */
+export async function eGestorRelatoriosAutorizadoParaEvento(db: any, membroId: string, evento: any): Promise<boolean> {
+  if (!db || !membroId || !evento) return false
+
+  const contexto = await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) return true
+
+  const escopoEvento =
+    evento.regionalId ? { tipo: 'REGIONAL', id: evento.regionalId } :
+    evento.administracaoId ? { tipo: 'ADMINISTRACAO', id: evento.administracaoId } :
+    evento.setorId ? { tipo: 'SETOR', id: evento.setorId } :
+    evento.casaId ? { tipo: 'CASA', id: evento.casaId } :
+    evento.grupoTrabalhoId ? { tipo: 'GRUPO_TRABALHO', id: evento.grupoTrabalhoId } :
+    null
+
+  if (
+    escopoEvento &&
+    contexto.acessosAtivos.some(
+      acesso =>
+        acesso.perfilCodigo === 'GESTOR_RELATORIOS' &&
+        acesso.escopoTipo === escopoEvento.tipo &&
+        acesso.escopoId === escopoEvento.id
+    )
+  ) {
+    return true
+  }
+
+  // Compatibilidade: organizador do evento.
+  if (evento.organizadorMembroId === membroId) {
+    return true
+  }
+
+  // Compatibilidade legada: vínculo funcional GESTOR_RELATORIOS no mesmo escopo
+  const vinculosGestor = await db
+    .select({
+      v: schema.vinculosFuncionais,
+      f: schema.funcoes
+    })
+    .from(schema.vinculosFuncionais)
+    .innerJoin(schema.funcoes, eq(schema.vinculosFuncionais.funcaoId, schema.funcoes.id))
+    .where(
+      and(
+        eq(schema.vinculosFuncionais.membroId, membroId),
+        eq(schema.vinculosFuncionais.ativo, true),
+        eq(schema.funcoes.ativo, true),
+        eq(schema.funcoes.codigo, 'GESTOR_RELATORIOS')
+      )
+    )
+    .all()
+
+  if (!vinculosGestor || vinculosGestor.length === 0) {
+    return false
+  }
+
+  return vinculosGestor.some(({ v }: any) => {
+    if (evento.regionalId && v.regionalId === evento.regionalId) return true
+    if (evento.administracaoId && v.administracaoId === evento.administracaoId) return true
+    if (evento.setorId && v.setorId === evento.setorId) return true
+    if (evento.casaId && v.casaId === evento.casaId) return true
+    if (evento.grupoTrabalhoId && v.grupoTrabalhoId === evento.grupoTrabalhoId) return true
+    return false
+  })
+}
+
+/**
+ * Valida se o membro possui permissão GESTOR_RELATORIOS em um escopo específico (tipo + id).
+ */
+export async function eGestorRelatoriosAutorizadoParaEscopo(
+  db: any,
+  membroId: string,
+  escopoTipo: 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+  escopoId: string
+): Promise<boolean> {
+  if (!db || !membroId || !escopoTipo || !escopoId) return false
+
+  const contexto = await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) return true
+
+  if (
+    contexto.acessosAtivos.some(
+      acesso =>
+        acesso.perfilCodigo === 'GESTOR_RELATORIOS' &&
+        acesso.escopoTipo === escopoTipo &&
+        acesso.escopoId === escopoId
+    )
+  ) {
+    return true
+  }
+
+  const vinculosGestor = await db
+    .select({
+      v: schema.vinculosFuncionais,
+      f: schema.funcoes
+    })
+    .from(schema.vinculosFuncionais)
+    .innerJoin(schema.funcoes, eq(schema.vinculosFuncionais.funcaoId, schema.funcoes.id))
+    .where(
+      and(
+        eq(schema.vinculosFuncionais.membroId, membroId),
+        eq(schema.vinculosFuncionais.ativo, true),
+        eq(schema.funcoes.ativo, true),
+        eq(schema.funcoes.codigo, 'GESTOR_RELATORIOS')
+      )
+    )
+    .all()
+
+  if (!vinculosGestor || vinculosGestor.length === 0) {
+    return false
+  }
+
+  return vinculosGestor.some(({ v }: any) => {
+    switch (escopoTipo) {
+      case 'REGIONAL': return v.regionalId === escopoId
+      case 'ADMINISTRACAO': return v.administracaoId === escopoId
+      case 'SETOR': return v.setorId === escopoId
+      case 'CASA': return v.casaId === escopoId
+      case 'GRUPO_TRABALHO': return v.grupoTrabalhoId === escopoId
+      default: return false
+    }
+  })
+}
+
+/**
+ * Valida se o membro possui vínculo ativo estritamente com a função AUDITOR_SISTEMA em escopo REGIONAL ou ADMINISTRACAO.
+ */
+export async function eAuditorSistemaAutorizado(db: any, membroId: string): Promise<boolean> {
+  if (!db || !membroId) return false
+
+  const vinculosAuditor = await db
+    .select({
+      v: schema.vinculosFuncionais,
+      f: schema.funcoes
+    })
+    .from(schema.vinculosFuncionais)
+    .innerJoin(schema.funcoes, eq(schema.vinculosFuncionais.funcaoId, schema.funcoes.id))
+    .where(
+      and(
+        eq(schema.vinculosFuncionais.membroId, membroId),
+        eq(schema.vinculosFuncionais.ativo, true),
+        eq(schema.funcoes.ativo, true),
+        eq(schema.funcoes.codigo, 'AUDITOR_SISTEMA')
+      )
+    )
+    .all()
+
+  if (!vinculosAuditor || vinculosAuditor.length === 0) {
+    return false
+  }
+
+  // Válido apenas em escopo REGIONAL ou ADMINISTRACAO
+  return vinculosAuditor.some(({ v }: any) => v.regionalId !== null || v.administracaoId !== null)
+}
+
+export interface CapacidadesMembro {
+  podeVisualizarRelatorios: boolean
+  podeVisualizarAuditoria: boolean
+  podeOperarPortaria: boolean
+  podeAdministrarAcessos: boolean
+  podeAdministrarRegionais: boolean
+  podeAdministrarEstrutura: boolean
+  podeAdministrarPessoas: boolean
+  podeAdministrarFuncoes: boolean
+  podeGerirAgenda: boolean
+}
+
+export async function obterCapacidadesMembro(
+  db: any,
+  membroId: string,
+  contaAcessoId?: string
+): Promise<CapacidadesMembro> {
+  if (!db || !membroId) {
+    return {
+      podeVisualizarRelatorios: false,
+      podeVisualizarAuditoria: false,
+      podeOperarPortaria: false,
+      podeAdministrarAcessos: false,
+      podeAdministrarRegionais: false,
+      podeAdministrarEstrutura: false,
+      podeAdministrarPessoas: false,
+      podeAdministrarFuncoes: false,
+      podeGerirAgenda: false
+    }
+  }
+
+  const vinculos = await db
+    .select({
+      codigo: schema.funcoes.codigo
+    })
+    .from(schema.vinculosFuncionais)
+    .innerJoin(schema.funcoes, eq(schema.vinculosFuncionais.funcaoId, schema.funcoes.id))
+    .where(
+      and(
+        eq(schema.vinculosFuncionais.membroId, membroId),
+        eq(schema.vinculosFuncionais.ativo, true),
+        eq(schema.funcoes.ativo, true)
+      )
+    )
+    .all()
+
+  const codigos = new Set(vinculos.map((v: any) => v.codigo))
+
+  const eventoOrganizado = await db
+    .select({ id: schema.eventos.id })
+    .from(schema.eventos)
+    .where(and(eq(schema.eventos.organizadorMembroId, membroId), eq(schema.eventos.ativo, true)))
+    .get()
+
+  const contexto = await carregarContextoPermissoes(db, membroId, contaAcessoId)
+  const perfisTecnicos = new Set(contexto.acessosAtivos.map(acesso => acesso.perfilCodigo))
+
+  const podeVisualizarRelatorios =
+    eMasterSistema(contexto) ||
+    perfisTecnicos.has('GESTOR_RELATORIOS') ||
+    codigos.has('GESTOR_RELATORIOS') ||
+    !!eventoOrganizado
+  const podeVisualizarAuditoria =
+    perfisTecnicos.has('AUDITOR') ||
+    (await eAuditorSistemaAutorizado(db, membroId))
+  const autorizacaoTemporariaPortaria = await db
+    .select({ eventoId: schema.portariaOperadoresEvento.eventoId })
+    .from(schema.portariaOperadoresEvento)
+    .leftJoin(
+      schema.portariasEvento,
+      eq(schema.portariaOperadoresEvento.eventoId, schema.portariasEvento.eventoId)
+    )
+    .where(
+      and(
+        eq(schema.portariaOperadoresEvento.membroId, membroId),
+        eq(schema.portariaOperadoresEvento.ativo, true),
+        or(
+          eq(schema.portariasEvento.status, 'ABERTA'),
+          isNull(schema.portariasEvento.status)
+        )
+      )
+    )
+    .get()
+
+  const podeOperarPortaria =
+    eMasterSistema(contexto) ||
+    perfisTecnicos.has('OPERADOR_PORTARIA_PERMANENTE') ||
+    codigos.has('OPERADOR_PORTARIA') ||
+    !!autorizacaoTemporariaPortaria
+  const master = eMasterSistema(contexto)
+  const administraAlgumaRegional = regionaisAdministradas(contexto).size > 0
+
+  const podeAdministrarAcessos = master || administraAlgumaRegional
+  const podeAdministrarRegionais = master
+  const podeAdministrarEstrutura = master || administraAlgumaRegional
+  const podeAdministrarPessoas = master || administraAlgumaRegional
+  const podeAdministrarFuncoes = master
+
+  const membroAtivo = await db
+    .select({ id: schema.membros.id })
+    .from(schema.membros)
+    .where(and(eq(schema.membros.id, membroId), eq(schema.membros.ativo, true)))
+    .get()
+
+  const podeGerirAgenda =
+    master ||
+    administraAlgumaRegional ||
+    perfisTecnicos.has('GESTOR_AGENDA') ||
+    !!membroAtivo
+
+  return {
+    podeVisualizarRelatorios,
+    podeVisualizarAuditoria,
+    podeOperarPortaria,
+    podeAdministrarAcessos,
+    podeAdministrarRegionais,
+    podeAdministrarEstrutura,
+    podeAdministrarPessoas,
+    podeAdministrarFuncoes,
+    podeGerirAgenda
+  }
+}
+
+export interface EscoposAutorizadosAuditor {
+  global: boolean
+  regionaisIds: string[]
+  administracoesIds: string[]
+  setoresIds: string[]
+  casasIds: string[]
+  gtsIds: string[]
+}
+
+export async function obterEscoposAutorizadosDoAuditor(db: any, membroId: string): Promise<EscoposAutorizadosAuditor | null> {
+  if (!db || !membroId) return null
+
+  const contexto = await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) {
+    return {
+      global: true,
+      regionaisIds: [],
+      administracoesIds: [],
+      setoresIds: [],
+      casasIds: [],
+      gtsIds: [],
+    }
+  }
+
+  const acessosAuditor = contexto.acessosAtivos.filter(
+    acesso =>
+      acesso.perfilCodigo === 'AUDITOR' &&
+      acesso.escopoId !== null &&
+      (acesso.escopoTipo === 'REGIONAL' || acesso.escopoTipo === 'ADMINISTRACAO')
+  )
+
+  const vinculosAuditor = await db
+    .select({
+      v: schema.vinculosFuncionais,
+      f: schema.funcoes
+    })
+    .from(schema.vinculosFuncionais)
+    .innerJoin(schema.funcoes, eq(schema.vinculosFuncionais.funcaoId, schema.funcoes.id))
+    .where(
+      and(
+        eq(schema.vinculosFuncionais.membroId, membroId),
+        eq(schema.vinculosFuncionais.ativo, true),
+        eq(schema.funcoes.ativo, true),
+        eq(schema.funcoes.codigo, 'AUDITOR_SISTEMA')
+      )
+    )
+    .all()
+
+  const vinculosValidos = (vinculosAuditor ?? []).filter(
+    ({ v }: any) => v.regionalId !== null || v.administracaoId !== null
+  )
+
+  if (acessosAuditor.length === 0 && vinculosValidos.length === 0) return null
+
+  const regionaisIds = new Set<string>()
+  const administracoesIds = new Set<string>()
+  const setoresIds = new Set<string>()
+  const casasIds = new Set<string>()
+  const gtsIds = new Set<string>()
+
+  for (const acesso of acessosAuditor) {
+    if (acesso.escopoTipo === 'REGIONAL' && acesso.escopoId) {
+      regionaisIds.add(acesso.escopoId)
+    } else if (acesso.escopoTipo === 'ADMINISTRACAO' && acesso.escopoId) {
+      administracoesIds.add(acesso.escopoId)
+    }
+  }
+
+  for (const { v } of vinculosValidos) {
+    if (v.regionalId) {
+      regionaisIds.add(v.regionalId)
+    } else if (v.administracaoId) {
+      administracoesIds.add(v.administracaoId)
+    }
+  }
+
+  const arrRegionaisIniciais = Array.from(regionaisIds)
+  if (arrRegionaisIniciais.length > 0) {
+    const adms = await db
+      .select({ id: schema.administracoes.id })
+      .from(schema.administracoes)
+      .where(inArray(schema.administracoes.regionalId, arrRegionaisIniciais))
+      .all()
+    adms.forEach((a: any) => administracoesIds.add(a.id))
+  }
+
+  const arrAdms = Array.from(administracoesIds)
+  if (arrAdms.length > 0) {
+    const setList = await db
+      .select({ id: schema.setores.id })
+      .from(schema.setores)
+      .where(inArray(schema.setores.administracaoId, arrAdms))
+      .all()
+    setList.forEach((s: any) => setoresIds.add(s.id))
+  }
+
+  const arrSetores = Array.from(setoresIds)
+  if (arrSetores.length > 0) {
+    const casList = await db
+      .select({ id: schema.casas.id })
+      .from(schema.casas)
+      .where(inArray(schema.casas.setorId, arrSetores))
+      .all()
+    casList.forEach((c: any) => casasIds.add(c.id))
+  }
+
+  const arrRegionais = Array.from(regionaisIds)
+  const gtConditions = []
+  if (arrRegionais.length > 0) gtConditions.push(inArray(schema.gruposTrabalho.regionalId, arrRegionais))
+  if (arrAdms.length > 0) gtConditions.push(inArray(schema.gruposTrabalho.administracaoId, arrAdms))
+  if (arrSetores.length > 0) gtConditions.push(inArray(schema.gruposTrabalho.setorId, arrSetores))
+
+  if (gtConditions.length > 0) {
+    const gtList = await db
+      .select({ id: schema.gruposTrabalho.id })
+      .from(schema.gruposTrabalho)
+      .where(or(...gtConditions))
+      .all()
+    gtList.forEach((g: any) => gtsIds.add(g.id))
+  }
+
+  return {
+    global: false,
+    regionaisIds: Array.from(regionaisIds),
+    administracoesIds: Array.from(administracoesIds),
+    setoresIds: Array.from(setoresIds),
+    casasIds: Array.from(casasIds),
+    gtsIds: Array.from(gtsIds)
+  }
+}
+
+

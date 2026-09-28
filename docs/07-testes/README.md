@@ -29,7 +29,6 @@ Este diretório contém a documentação da estratégia de testes do projeto **A
 > **Segurança**: Utilizar APENAS dados sintéticos nos testes.
 > CPF: usar gerador de CPF válido sintético.
 > Celular: usar série 99999-XXXX ou similar não-real.
-> Data de nascimento: usar datas claramente fictícias (ex: 01/01/1900).
 
 ## Comandos
 

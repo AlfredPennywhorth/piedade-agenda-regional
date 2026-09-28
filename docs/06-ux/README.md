@@ -27,7 +27,7 @@ Este diretório contém a documentação de UX e design do projeto **Agenda Regi
 ## Fluxos previstos (a detalhar pelo PMO)
 
 - Ativação de conta via link individual
-- Validação de identidade (celular + data de nascimento)
+- Validação de identidade pelo celular cadastrado no fluxo de ativação
 - Acesso à agenda de reuniões
 - Confirmação de presença em convocação
 - Consulta de histórico

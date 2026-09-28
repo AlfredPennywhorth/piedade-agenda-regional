@@ -7,6 +7,13 @@ import * as schema from '../db/schema'
 type VinculoResponse = {
   id: string
   ativo?: boolean
+  membro?: { nome: string } | null
+  funcao?: { nome: string } | null
+  regional?: { nome: string } | null
+  administracao?: { nome: string } | null
+  setor?: { nome: string } | null
+  casa?: { nome: string } | null
+  grupoTrabalho?: { nome: string } | null
 }
 
 type ErroResponse = {
@@ -20,143 +27,18 @@ sqlite.pragma('foreign_keys = ON')
 
 const db = drizzle(sqlite, { schema })
 const app = createApp(db)
+let authToken = ''
 
-beforeAll(() => {
-  const setupSql = `
-    CREATE TABLE regionais (
-      id text PRIMARY KEY NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL
-    );
+import { setupDb } from './setup'
+import { criarSessaoAutenticadaTeste, mesclarAutorizacao } from './auth-test-helper'
 
-    CREATE TABLE administracoes (
-      id text PRIMARY KEY NOT NULL,
-      regional_id text NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (regional_id) REFERENCES regionais(id)
-    );
-
-    CREATE TABLE setores (
-      id text PRIMARY KEY NOT NULL,
-      administracao_id text NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (administracao_id) REFERENCES administracoes(id)
-    );
-
-    CREATE TABLE casas (
-      id text PRIMARY KEY NOT NULL,
-      setor_id text NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (setor_id) REFERENCES setores(id)
-    );
-
-    CREATE TABLE grupos_trabalho (
-      id text PRIMARY KEY NOT NULL,
-      nome text NOT NULL,
-      ativo integer DEFAULT true NOT NULL,
-      regional_id text,
-      administracao_id text,
-      setor_id text,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (regional_id) REFERENCES regionais(id),
-      FOREIGN KEY (administracao_id) REFERENCES administracoes(id),
-      FOREIGN KEY (setor_id) REFERENCES setores(id)
-    );
-
-    CREATE TABLE membros (
-      id text PRIMARY KEY NOT NULL,
-      nome text NOT NULL,
-      data_nascimento text,
-      celular text,
-      casa_id text NOT NULL,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      FOREIGN KEY (casa_id) REFERENCES casas(id)
-    );
-
-    CREATE TABLE funcoes (
-      id text PRIMARY KEY NOT NULL,
-      nome text NOT NULL,
-      codigo text,
-      descricao text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL
-    );
-
-    CREATE TABLE vinculos_funcionais (
-      id text PRIMARY KEY NOT NULL,
-      membro_id text NOT NULL,
-      funcao_id text NOT NULL,
-      regional_id text,
-      administracao_id text,
-      setor_id text,
-      casa_id text,
-      grupo_trabalho_id text,
-      ativo integer DEFAULT true NOT NULL,
-      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
-
-      FOREIGN KEY (membro_id) REFERENCES membros(id),
-      FOREIGN KEY (funcao_id) REFERENCES funcoes(id),
-      FOREIGN KEY (regional_id) REFERENCES regionais(id),
-      FOREIGN KEY (administracao_id) REFERENCES administracoes(id),
-      FOREIGN KEY (setor_id) REFERENCES setores(id),
-      FOREIGN KEY (casa_id) REFERENCES casas(id),
-      FOREIGN KEY (grupo_trabalho_id) REFERENCES grupos_trabalho(id),
-
-      CONSTRAINT check_vinculo_escopo_unico CHECK(
-        (CASE WHEN regional_id IS NOT NULL THEN 1 ELSE 0 END) +
-        (CASE WHEN administracao_id IS NOT NULL THEN 1 ELSE 0 END) +
-        (CASE WHEN setor_id IS NOT NULL THEN 1 ELSE 0 END) +
-        (CASE WHEN casa_id IS NOT NULL THEN 1 ELSE 0 END) +
-        (CASE WHEN grupo_trabalho_id IS NOT NULL THEN 1 ELSE 0 END) = 1
-      )
-    );
-
-    CREATE UNIQUE INDEX idx_vinculo_unico_regional
-      ON vinculos_funcionais (membro_id, funcao_id, regional_id)
-      WHERE regional_id IS NOT NULL AND ativo = 1;
-
-    CREATE UNIQUE INDEX idx_vinculo_unico_administracao
-      ON vinculos_funcionais (membro_id, funcao_id, administracao_id)
-      WHERE administracao_id IS NOT NULL AND ativo = 1;
-
-    CREATE UNIQUE INDEX idx_vinculo_unico_setor
-      ON vinculos_funcionais (membro_id, funcao_id, setor_id)
-      WHERE setor_id IS NOT NULL AND ativo = 1;
-
-    CREATE UNIQUE INDEX idx_vinculo_unico_casa
-      ON vinculos_funcionais (membro_id, funcao_id, casa_id)
-      WHERE casa_id IS NOT NULL AND ativo = 1;
-
-    CREATE UNIQUE INDEX idx_vinculo_unico_gt
-      ON vinculos_funcionais (membro_id, funcao_id, grupo_trabalho_id)
-      WHERE grupo_trabalho_id IS NOT NULL AND ativo = 1;
-  `
-
-  sqlite.exec(setupSql)
+beforeAll(async () => {
+  setupDb(sqlite)
+  authToken = (await criarSessaoAutenticadaTeste(sqlite, 'vinculos-auth')).token
 })
 
 const req = async (path: string, options?: RequestInit) => {
-  const request = new Request(`http://localhost${path}`, options)
+  const request = new Request(`http://localhost${path}`, mesclarAutorizacao(authToken, options))
   return app.request(request)
 }
 
@@ -270,6 +152,34 @@ describe('Testes de Vínculos Funcionais', () => {
     })
 
     expect(res.status).toBe(201)
+  })
+
+  it('11 b. listar vínculos com membro, função e escopo resolvidos', async () => {
+    const res = await req('/api/v1/vinculos-funcionais')
+    const json = (await res.json()) as VinculoResponse[]
+
+    expect(res.status).toBe(200)
+    const vinculoGt = json.find(item => item.grupoTrabalho?.nome === 'GT 1')
+    expect(vinculoGt).toBeDefined()
+    expect(vinculoGt?.membro?.nome).toBe('Pessoa Teste')
+    expect(vinculoGt?.funcao?.nome).toBe('Responsável')
+    expect(vinculoGt?.grupoTrabalho?.nome).toBe('GT 1')
+  })
+
+  it('11 c. detalhar vínculo com relacionamentos resolvidos', async () => {
+    const resLista = await req('/api/v1/vinculos-funcionais')
+    const lista = (await resLista.json()) as VinculoResponse[]
+    const vinculoCasa = lista.find(item => item.casa?.nome === 'Casa 1')
+
+    expect(vinculoCasa).toBeDefined()
+
+    const res = await req(`/api/v1/vinculos-funcionais/${vinculoCasa!.id}`)
+    const json = (await res.json()) as VinculoResponse
+
+    expect(res.status).toBe(200)
+    expect(json.membro?.nome).toBe('Pessoa Teste')
+    expect(json.funcao?.nome).toBe('Responsável')
+    expect(json.casa?.nome).toBe('Casa 1')
   })
 
   it('12. permitir múltiplos vínculos para o mesmo membro', async () => {
@@ -390,4 +300,108 @@ describe('Testes de Vínculos Funcionais', () => {
     expect(res.status).toBe(400)
     expect(json.error).toContain('exatamente um escopo')
   })
+
+  it('22. novo vínculo recebe convocações futuras já publicadas para a função', async () => {
+    const membroNovoId = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa'
+    const eventoId = 'bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb'
+    const convocacaoId = 'cccccccc-1111-4111-8111-cccccccccccc'
+
+    sqlite.exec(`
+      INSERT INTO membros (id, nome, casa_id, ativo)
+      VALUES ('${membroNovoId}', 'Novo Diácono', '${casaId}', 1);
+
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo)
+      VALUES
+        ('${eventoId}', 'Reunião futura da função', 'PRESENCIAL',
+         '2027-03-10T22:00:00.000Z', '2027-03-10T23:00:00.000Z', '${regId}', 1);
+
+      INSERT INTO convocacoes
+        (id, evento_id, status, ativo, publicada_em)
+      VALUES
+        ('${convocacaoId}', '${eventoId}', 'PUBLICADA', 1, CURRENT_TIMESTAMP);
+
+      INSERT INTO convocacao_funcoes
+        (id, convocacao_id, funcao_id)
+      VALUES
+        ('dddddddd-1111-4111-8111-dddddddddddd', '${convocacaoId}', '${funcaoId2}');
+    `)
+
+    const res = await req('/api/v1/vinculos-funcionais', {
+      method: 'POST',
+      body: JSON.stringify({
+        membroId: membroNovoId,
+        funcaoId: funcaoId2,
+        regionalId: regId,
+      }),
+    })
+
+    expect(res.status).toBe(201)
+    const vinculo = (await res.json()) as VinculoResponse
+
+    const destinatario = sqlite.prepare(
+      `SELECT id FROM convocacao_destinatarios
+       WHERE convocacao_id = ? AND membro_id = ?`
+    ).get(convocacaoId, membroNovoId) as { id: string } | undefined
+
+    expect(destinatario).toBeDefined()
+
+    const evidencia = sqlite.prepare(
+      `SELECT funcao_id, vinculo_funcional_id
+       FROM convocacao_destinatario_evidencias
+       WHERE convocacao_destinatario_id = ?`
+    ).get(destinatario!.id) as { funcao_id: string; vinculo_funcional_id: string } | undefined
+
+    expect(evidencia).toMatchObject({
+      funcao_id: funcaoId2,
+      vinculo_funcional_id: vinculo.id,
+    })
+  })
+
+
+  it('23. vínculo ativo de membro inativo não materializa destinatário retroativo', async () => {
+    const membroInativoId = 'eeeeeeee-1111-4111-8111-eeeeeeeeeeee'
+    const eventoId = 'ffffffff-1111-4111-8111-ffffffffffff'
+    const convocacaoId = '12121212-1111-4111-8111-121212121212'
+
+    sqlite.exec(`
+      INSERT INTO membros (id, nome, casa_id, ativo)
+      VALUES ('${membroInativoId}', 'Membro Inativo', '${casaId}', 0);
+
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo)
+      VALUES
+        ('${eventoId}', 'Reunião futura para inativo', 'PRESENCIAL',
+         '2027-04-10T22:00:00.000Z', '2027-04-10T23:00:00.000Z', '${regId}', 1);
+
+      INSERT INTO convocacoes
+        (id, evento_id, status, ativo, publicada_em)
+      VALUES
+        ('${convocacaoId}', '${eventoId}', 'PUBLICADA', 1, CURRENT_TIMESTAMP);
+
+      INSERT INTO convocacao_funcoes
+        (id, convocacao_id, funcao_id)
+      VALUES
+        ('13131313-1111-4111-8111-131313131313', '${convocacaoId}', '${funcaoId2}');
+    `)
+
+    const res = await req('/api/v1/vinculos-funcionais', {
+      method: 'POST',
+      body: JSON.stringify({
+        membroId: membroInativoId,
+        funcaoId: funcaoId2,
+        regionalId: regId,
+      }),
+    })
+
+    expect(res.status).toBe(201)
+
+    const destinatario = sqlite.prepare(
+      `SELECT id FROM convocacao_destinatarios
+       WHERE convocacao_id = ? AND membro_id = ?`
+    ).get(convocacaoId, membroInativoId)
+
+    expect(destinatario).toBeUndefined()
+  })
+
 })

@@ -1,13 +1,41 @@
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
-import { gruposTrabalho } from '../db/schema'
+import { and, eq, inArray } from 'drizzle-orm'
+import { gruposTrabalho, participacoesGruposTrabalho, setores, administracoes } from '../db/schema'
 import { CreateGrupoTrabalhoSchema, UpdateGrupoTrabalhoSchema } from '@piedade/shared'
+import { authMiddleware } from '../middleware/auth'
+import { eMasterSistema, obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo, regionaisAdministradas } from '../security/permissoes'
+import { executarOperacaoComAudit } from '../services/auditoria'
 
 export const gruposTrabalhoRouter = new Hono<any>()
 
+gruposTrabalhoRouter.use('*', authMiddleware)
+gruposTrabalhoRouter.use('*', async (c, next) => {
+  if (c.req.method === 'GET' || c.req.method === 'HEAD' || c.req.method === 'OPTIONS') {
+    await next()
+    return
+  }
+
+  const contexto = c.get('contextoPermissoes')
+  if (!contexto || (!eMasterSistema(contexto) && regionaisAdministradas(contexto).size === 0)) {
+    return c.json({ error: 'Acesso não autorizado para administrar estrutura', code: 'FORBIDDEN' }, 403)
+  }
+
+  await next()
+})
+
 gruposTrabalhoRouter.get('/', async (c) => {
   const db = c.get('db')
-  const data = await db.select().from(gruposTrabalho).all()
+  const contexto = c.get('contextoPermissoes')
+  const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+
+  if (visiveis.tudo) {
+    return c.json(await db.select().from(gruposTrabalho).all())
+  }
+
+  const ids = Array.from(visiveis.gruposTrabalhoIds)
+  if (ids.length === 0) return c.json([])
+
+  const data = await db.select().from(gruposTrabalho).where(inArray(gruposTrabalho.id, ids)).all()
   return c.json(data)
 })
 
@@ -17,6 +45,13 @@ gruposTrabalhoRouter.get('/:id', async (c) => {
   const data = await db.select().from(gruposTrabalho).where(eq(gruposTrabalho.id, id)).get()
   
   if (!data) return c.json({ error: 'Grupo de Trabalho não encontrado' }, 404)
+
+  const contexto = c.get('contextoPermissoes')
+  const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+  if (!visiveis.tudo && !visiveis.gruposTrabalhoIds.has(id)) {
+    return c.json({ error: 'Acesso não autorizado para este escopo', code: 'FORBIDDEN' }, 403)
+  }
+
   return c.json(data)
 })
 
@@ -26,15 +61,32 @@ gruposTrabalhoRouter.post('/', async (c) => {
     const body = await c.req.json()
     const parsed = CreateGrupoTrabalhoSchema.parse(body)
     
+    if (!parsed.regionalId || !(await podeAdministrarEscopo(db, c.get('contextoPermissoes'), 'REGIONAL', parsed.regionalId))) {
+      return c.json({ error: 'Acesso não autorizado para administrar esta Regional', code: 'FORBIDDEN' }, 403)
+    }
+
     const id = crypto.randomUUID()
-    const result = await db.insert(gruposTrabalho).values({ id, ...parsed }).returning().get()
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [qdb.insert(gruposTrabalho).values({ id, ...parsed })],
+      {
+        acao: 'GRUPO_TRABALHO_CRIADO',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'GRUPO_TRABALHO',
+        recursoId: id,
+        escopoTipo: 'GRUPO_TRABALHO',
+        escopoId: id,
+        contexto: { campos: ['nome', 'codigo', 'ativo', 'regionalId'] },
+      }
+    )
+    const result = await db.select().from(gruposTrabalho).where(eq(gruposTrabalho.id, id)).get()
     return c.json(result, 201)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
-      return c.json({ error: 'O escopo vinculado (Regional/Administração/Setor) não existe' }, 400)
+      return c.json({ error: 'A Regional vinculada não existe' }, 400)
     }
     if (err.message && err.message.includes('CHECK constraint failed: check_escopo_unico')) {
-      return c.json({ error: 'O banco de dados rejeitou os escopos. Deve existir exatamente 1 escopo.' }, 400)
+      return c.json({ error: 'O banco de dados rejeitou o escopo do GT. O GT deve ser Regional.' }, 400)
     }
     return c.json({ error: err.issues || err.message }, 400)
   }
@@ -50,26 +102,64 @@ gruposTrabalhoRouter.patch('/:id', async (c) => {
     const existing = await db.select().from(gruposTrabalho).where(eq(gruposTrabalho.id, id)).get()
     if (!existing) return c.json({ error: 'Grupo de Trabalho não encontrado' }, 404)
 
-    // Compor estado final do PATCH
     const finalRegionalId = parsed.regionalId !== undefined ? parsed.regionalId : existing.regionalId
-    const finalAdmId = parsed.administracaoId !== undefined ? parsed.administracaoId : existing.administracaoId
-    const finalSetorId = parsed.setorId !== undefined ? parsed.setorId : existing.setorId
-
-    // Validar deterministicamente se o estado final tem exatamente um escopo
-    let escoposPreenchidos = 0
-    if (finalRegionalId) escoposPreenchidos++
-    if (finalAdmId) escoposPreenchidos++
-    if (finalSetorId) escoposPreenchidos++
-
-    if (escoposPreenchidos !== 1) {
-      return c.json({ error: 'O Grupo de Trabalho deve pertencer a exatamente um escopo no estado final da atualização.' }, 400)
+    const contexto = c.get('contextoPermissoes')
+    if (
+      !existing.regionalId ||
+      !finalRegionalId ||
+      !(await podeAdministrarEscopo(db, contexto, 'REGIONAL', existing.regionalId)) ||
+      !(await podeAdministrarEscopo(db, contexto, 'REGIONAL', finalRegionalId))
+    ) {
+      return c.json({ error: 'Acesso não autorizado para administrar esta Regional', code: 'FORBIDDEN' }, 403)
+    }
+    if (!finalRegionalId) {
+      return c.json({ error: 'Grupo de Trabalho deve pertencer a uma Regional.' }, 400)
     }
 
-    const updated = await db.update(gruposTrabalho)
-      .set({ ...parsed, updatedAt: new Date().toISOString() })
-      .where(eq(gruposTrabalho.id, id))
-      .returning().get()
-      
+    const participacoes = await db
+      .select({ regionalId: administracoes.regionalId })
+      .from(participacoesGruposTrabalho)
+      .innerJoin(setores, eq(setores.id, participacoesGruposTrabalho.setorRepresentadoId))
+      .innerJoin(administracoes, eq(administracoes.id, setores.administracaoId))
+      .where(
+        and(
+          eq(participacoesGruposTrabalho.grupoTrabalhoId, id),
+          eq(participacoesGruposTrabalho.ativo, true)
+        )
+      )
+      .all()
+
+    if (participacoes.some((item: any) => item.regionalId !== finalRegionalId)) {
+      return c.json({
+        error: 'A Regional informada conflita com Setores já representados neste GT.',
+        code: 'GT_PARTICIPACOES_INCOMPATIVEIS',
+      }, 409)
+    }
+
+    await executarOperacaoComAudit(
+      db,
+      (qdb) => [
+        qdb.update(gruposTrabalho)
+          .set({
+            ...parsed,
+            regionalId: finalRegionalId,
+            administracaoId: null,
+            setorId: null,
+            updatedAt: new Date().toISOString(),
+          })
+          .where(eq(gruposTrabalho.id, id))
+      ],
+      {
+        acao: 'GRUPO_TRABALHO_ATUALIZADO',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'GRUPO_TRABALHO',
+        recursoId: id,
+        escopoTipo: 'GRUPO_TRABALHO',
+        escopoId: id,
+        contexto: { camposAlterados: Object.keys(parsed) },
+      }
+    )
+    const updated = await db.select().from(gruposTrabalho).where(eq(gruposTrabalho.id, id)).get()
     return c.json(updated)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {

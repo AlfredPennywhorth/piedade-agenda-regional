@@ -44,3 +44,8 @@ pnpm --filter @piedade/worker deploy
 - Logs em tempo real: `wrangler tail`
 
 > **Status:** Configuração operacional básica definida. Runbooks a criar na Sprint S01+.
+
+
+## Runbook de produção
+
+- [Liberação, smoke e rollback de produção](./runbook-producao.md)

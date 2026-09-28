@@ -17,10 +17,46 @@ name = "piedade-agenda-worker-dev"
 
 [env.development.vars]
 APP_ENV = "development"
-APP_VERSION = "0.0.1-s02"
+APP_VERSION = "0.0.1-s12"
 
 [[env.development.d1_databases]]
 binding = "DB"
 database_name = "piedade-agenda-db"
 database_id = "local"
+migrations_dir = "drizzle"
+
+# ============================================================
+# Ambiente Beta / Homologação
+# ============================================================
+
+[env.beta]
+name = "piedade-agenda-worker-beta"
+
+[env.beta.vars]
+APP_ENV = "beta"
+APP_VERSION = "0.0.1-beta"
+CORS_ORIGIN = "https://beta.piedade-agenda-regional.pages.dev"
+
+[[env.beta.d1_databases]]
+binding = "DB"
+database_name = "piedade-agenda-db-beta"
+database_id = "__D1_BETA_DATABASE_ID__"
+migrations_dir = "drizzle"
+
+# ============================================================
+# Ambiente de Produção
+# ============================================================
+
+[env.production]
+name = "piedade-agenda-worker"
+
+[env.production.vars]
+APP_ENV = "production"
+APP_VERSION = "0.0.1-s12"
+CORS_ORIGIN = "https://piedade-agenda-regional.pages.dev"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "piedade-agenda-db-prod"
+database_id = "__D1_DATABASE_ID__"
 migrations_dir = "drizzle"

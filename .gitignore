@@ -57,3 +57,4 @@ coverage/
 # Agente AI (não faz parte do código do projeto)
 # ============================================================
 .agent/
+scratch/

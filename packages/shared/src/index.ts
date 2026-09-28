@@ -9,16 +9,27 @@ import { z } from 'zod'
 
 export * from './schemas/institucional'
 export * from './schemas/membros'
+export * from './utils/celular'
 export * from './schemas/funcoes'
 export * from './schemas/vinculos'
+export * from './schemas/auth'
+export * from './schemas/locais'
+export * from './schemas/series'
+export * from './schemas/eventos'
+export * from './schemas/convocacoes'
+export * from './schemas/notificacoes'
+export * from './schemas/checkin'
+export * from './utils/date-utils'
+export * from './utils/recurrence-engine'
+
 
 // ============================================================
 // Metadados da aplicação
 // ============================================================
 export const AppInfo = {
   name: 'Agenda Regional São Paulo',
-  version: '0.0.1',
-  sprint: 'S00',
+  version: '0.0.1-s12',
+  sprint: 'S12',
 } as const
 
 // ============================================================
