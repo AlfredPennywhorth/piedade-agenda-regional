@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import { setores, administracoes, participacoesGruposTrabalho, gruposTrabalho } from '../db/schema'
 import { CreateSetorSchema, UpdateSetorSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
@@ -29,13 +29,13 @@ setoresRouter.get('/', async (c) => {
   const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
 
   if (visiveis.tudo) {
-    return c.json(await db.select().from(setores).all())
+    return c.json(await db.select().from(setores).orderBy(asc(setores.nome), asc(setores.id)).all())
   }
 
   const ids = Array.from(visiveis.setoresIds)
   if (ids.length === 0) return c.json([])
 
-  const data = await db.select().from(setores).where(inArray(setores.id, ids)).all()
+  const data = await db.select().from(setores).where(inArray(setores.id, ids)).orderBy(asc(setores.nome), asc(setores.id)).all()
   return c.json(data)
 })
 
