@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, isNull, gt } from 'drizzle-orm'
+import { eq, and, isNull, gt, sql } from 'drizzle-orm'
 import { ativacaoSchema } from '@piedade/shared'
 import * as schema from '../../db/schema'
 import { hashToken, gerarTokenAleatorio } from '../../security/tokens'
@@ -64,7 +64,7 @@ ativacaoApp.post('/', async c => {
 
   const { link, conta, membro } = queryResult
 
-  if (!membro.ativo || conta.status === 'BLOQUEADA' || conta.status === 'DESATIVADA') {
+  if (!membro.ativo || conta.status !== 'PENDENTE_ATIVACAO') {
     await db.insert(schema.tentativasAcesso).values({
       id: crypto.randomUUID(),
       contaAcessoId: conta.id,
@@ -96,11 +96,9 @@ ativacaoApp.post('/', async c => {
   const loginRateLimitKey = await hashToken(celular)
   const expiraEmSessao = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
-  await executeAtomic(db, tx => [
-    tx
-      .update(schema.linksAtivacao)
-      .set({ utilizadoEm: agora, updatedAt: agora })
-      .where(eq(schema.linksAtivacao.id, link.id)),
+  const sessionId = crypto.randomUUID()
+
+  const resultados = await executeAtomic(db, tx => [
     tx
       .update(schema.contasAcesso)
       .set({
@@ -112,35 +110,124 @@ ativacaoApp.post('/', async c => {
         ativadoEm: agora,
         updatedAt: agora,
       })
-      .where(eq(schema.contasAcesso.id, conta.id)),
+      .where(
+        and(
+          eq(schema.contasAcesso.id, conta.id),
+          eq(schema.contasAcesso.status, 'PENDENTE_ATIVACAO'),
+          sql`EXISTS (
+            SELECT 1
+            FROM links_ativacao
+            WHERE id = ${link.id}
+              AND conta_acesso_id = ${conta.id}
+              AND utilizado_em IS NULL
+              AND revogado_em IS NULL
+              AND expira_em > ${agora}
+          )`
+        )
+      ),
+    tx
+      .update(schema.linksAtivacao)
+      .set({ utilizadoEm: agora, updatedAt: agora })
+      .where(
+        and(
+          eq(schema.linksAtivacao.id, link.id),
+          isNull(schema.linksAtivacao.utilizadoEm),
+          isNull(schema.linksAtivacao.revogadoEm),
+          sql`EXISTS (
+            SELECT 1 FROM contas_acesso
+            WHERE id = ${conta.id} AND status = 'ATIVA' AND pin_salt = ${salt}
+          )`
+        )
+      ),
+    tx
+      .update(schema.linksAtivacao)
+      .set({ revogadoEm: agora, updatedAt: agora })
+      .where(
+        and(
+          eq(schema.linksAtivacao.contaAcessoId, conta.id),
+          isNull(schema.linksAtivacao.utilizadoEm),
+          isNull(schema.linksAtivacao.revogadoEm),
+          sql`EXISTS (
+            SELECT 1 FROM contas_acesso
+            WHERE id = ${conta.id} AND status = 'ATIVA' AND pin_salt = ${salt}
+          )`
+        )
+      ),
     tx
       .update(schema.sessoes)
       .set({ revogadoEm: agora })
       .where(
         and(
           eq(schema.sessoes.contaAcessoId, conta.id),
-          isNull(schema.sessoes.revogadoEm)
+          isNull(schema.sessoes.revogadoEm),
+          sql`EXISTS (
+            SELECT 1 FROM contas_acesso
+            WHERE id = ${conta.id} AND status = 'ATIVA' AND pin_salt = ${salt}
+          )`
         )
       ),
     tx
       .delete(schema.rateLimitsAutenticacao)
-      .where(eq(schema.rateLimitsAutenticacao.chaveHash, loginRateLimitKey)),
-    tx.insert(schema.tentativasAcesso).values({
-      id: crypto.randomUUID(),
-      contaAcessoId: conta.id,
-      membroId: membro.id,
-      tipo: 'ATIVACAO',
-      sucesso: true,
-    }),
-    tx.insert(schema.sessoes).values({
-      id: crypto.randomUUID(),
-      contaAcessoId: conta.id,
-      membroId: membro.id,
-      tokenHash: hashedSessionToken,
-      expiraEm: expiraEmSessao,
-      userAgent: c.req.header('User-Agent') || null,
-    }),
+      .where(
+        and(
+          eq(schema.rateLimitsAutenticacao.chaveHash, loginRateLimitKey),
+          sql`EXISTS (
+            SELECT 1 FROM contas_acesso
+            WHERE id = ${conta.id} AND status = 'ATIVA' AND pin_salt = ${salt}
+          )`
+        )
+      ),
+    tx.insert(schema.tentativasAcesso).select(
+      tx
+        .select({
+          id: sql`${crypto.randomUUID()}`.as('id'),
+          contaAcessoId: sql`${conta.id}`.as('conta_acesso_id'),
+          membroId: sql`${membro.id}`.as('membro_id'),
+          tipo: sql`'ATIVACAO'`.as('tipo'),
+          sucesso: sql`1`.as('sucesso'),
+          motivo: sql`NULL`.as('motivo'),
+          createdAt: sql`${agora}`.as('created_at'),
+        })
+        .from(schema.contasAcesso)
+        .where(
+          and(
+            eq(schema.contasAcesso.id, conta.id),
+            eq(schema.contasAcesso.status, 'ATIVA'),
+            eq(schema.contasAcesso.pinSalt, salt)
+          )
+        )
+    ),
+    tx.insert(schema.sessoes).select(
+      tx
+        .select({
+          id: sql`${sessionId}`.as('id'),
+          contaAcessoId: sql`${conta.id}`.as('conta_acesso_id'),
+          membroId: sql`${membro.id}`.as('membro_id'),
+          tokenHash: sql`${hashedSessionToken}`.as('token_hash'),
+          expiraEm: sql`${expiraEmSessao}`.as('expira_em'),
+          revogadoEm: sql`NULL`.as('revogado_em'),
+          ultimoAcessoEm: sql`NULL`.as('ultimo_acesso_em'),
+          userAgent: sql`${c.req.header('User-Agent') || null}`.as('user_agent'),
+          createdAt: sql`${agora}`.as('created_at'),
+        })
+        .from(schema.contasAcesso)
+        .where(
+          and(
+            eq(schema.contasAcesso.id, conta.id),
+            eq(schema.contasAcesso.status, 'ATIVA'),
+            eq(schema.contasAcesso.pinSalt, salt)
+          )
+        )
+    ),
   ])
+
+  const alteracoesClaim = resultados?.[0]?.meta?.changes ?? resultados?.[0]?.changes ?? 0
+
+  if (alteracoesClaim !== 1) {
+    // As inserções de auditoria e sessão são condicionadas ao salt gravado
+    // pelo vencedor do claim; concorrentes perdedores não produzem sessão.
+    return c.json({ error: 'Link de ativação inválido ou expirado' }, 400)
+  }
 
   return c.json(
     {
