@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
-import { and, asc, eq, inArray, or } from 'drizzle-orm'
+import { and, eq, inArray, or } from 'drizzle-orm'
 import { acessosConta, administracoes, casas, contasAcesso, funcoes, membros, setores, tentativasAcesso, vinculosFuncionais } from '../db/schema'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, regionaisAdministradas } from '../security/permissoes'
-import { listarVinculosVisiveis } from './vinculos_funcionais'
+import { listarVinculosVisiveis, prepararSincronizacaoConvocacoes, queriesSincronizacaoConvocacoes } from './vinculos_funcionais'
 import { executarOperacaoComAudit, executarOperacaoComAudits } from '../services/auditoria'
 
 export const membrosRouter = new Hono<any>()
@@ -221,7 +221,9 @@ membrosRouter.get('/', async (c) => {
   const visibilidade = await idsMembrosVisiveis(c)
 
   if (visibilidade === null) {
-    return c.json(await db.select(membroPublico).from(membros).orderBy(asc(membros.nome), asc(membros.id)).all())
+    const data = await db.select(membroPublico).from(membros).all()
+    data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
+    return c.json(data)
   }
 
   const ids = Array.from(visibilidade.ids)
@@ -247,7 +249,7 @@ membrosRouter.get('/', async (c) => {
     }
   }
 
-  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR') || a.id.localeCompare(b.id))
+  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
   return c.json(data)
 })
 
@@ -346,17 +348,24 @@ membrosRouter.post('/', async (c) => {
     }
 
     const id = crypto.randomUUID()
+    const agoraCriacao = new Date().toISOString()
+    const vinculoDco = {
+      id: crypto.randomUUID(),
+      membroId: id,
+      funcaoId: funcaoDco.id,
+      casaId: parsed.casaId,
+      ativo: true,
+      createdAt: agoraCriacao,
+      updatedAt: agoraCriacao,
+    }
+    const sincronizacoesDco = await prepararSincronizacaoConvocacoes(db, vinculoDco, true)
+
     await executarOperacaoComAudit(
       db,
       (qdb) => [
         qdb.insert(membros).values({ id, ...parsed }),
-        qdb.insert(vinculosFuncionais).values({
-          id: crypto.randomUUID(),
-          membroId: id,
-          funcaoId: funcaoDco.id,
-          casaId: parsed.casaId,
-          ativo: true,
-        }),
+        qdb.insert(vinculosFuncionais).values(vinculoDco),
+        ...queriesSincronizacaoConvocacoes(qdb, vinculoDco, sincronizacoesDco, agoraCriacao),
       ],
       {
         acao: 'MEMBRO_CRIADO',
@@ -460,6 +469,20 @@ membrosRouter.patch('/:id', async (c) => {
           .get()
       : null
     const funcaoDco = moveuCasa ? await obterFuncaoDco(db) : null
+    const vinculoDcoDestinoExistente = moveuCasa && funcaoDco
+      ? await db
+          .select()
+          .from(vinculosFuncionais)
+          .where(
+            and(
+              eq(vinculosFuncionais.membroId, id),
+              eq(vinculosFuncionais.funcaoId, funcaoDco.id),
+              eq(vinculosFuncionais.casaId, casaFinalId),
+              eq(vinculosFuncionais.ativo, true)
+            )
+          )
+          .get()
+      : null
 
     if (moveuCasa && !funcaoDco) {
       return c.json(
@@ -467,6 +490,22 @@ membrosRouter.patch('/:id', async (c) => {
         409
       )
     }
+
+    const novoVinculoDcoId = vinculoDcoDestinoExistente?.id ?? crypto.randomUUID()
+    const novoVinculoDco = moveuCasa && funcaoDco
+      ? {
+          id: novoVinculoDcoId,
+          membroId: id,
+          funcaoId: funcaoDco.id,
+          casaId: casaFinalId,
+          ativo: true,
+          createdAt: agoraAtualizacao,
+          updatedAt: agoraAtualizacao,
+        }
+      : null
+    const sincronizacoesDco = novoVinculoDco
+      ? await prepararSincronizacaoConvocacoes(db, novoVinculoDco)
+      : []
 
     if (moveuCasa) {
       await executarOperacaoComAudits(
@@ -485,19 +524,25 @@ membrosRouter.patch('/:id', async (c) => {
                 and(
                   eq(vinculosFuncionais.membroId, id),
                   eq(vinculosFuncionais.funcaoId, funcaoDco!.id),
+                  eq(vinculosFuncionais.casaId, existing.casaId),
                   eq(vinculosFuncionais.ativo, true)
                 )
-              ),
-            qdb.insert(vinculosFuncionais).values({
-              id: crypto.randomUUID(),
-              membroId: id,
-              funcaoId: funcaoDco!.id,
-              casaId: casaFinalId,
-              ativo: true,
-              createdAt: agoraAtualizacao,
-              updatedAt: agoraAtualizacao,
-            })
+              )
           )
+
+          if (!vinculoDcoDestinoExistente && novoVinculoDco) {
+            queries.push(qdb.insert(vinculosFuncionais).values(novoVinculoDco))
+          }
+          if (novoVinculoDco) {
+            queries.push(
+              ...queriesSincronizacaoConvocacoes(
+                qdb,
+                novoVinculoDco,
+                sincronizacoesDco,
+                agoraAtualizacao
+              )
+            )
+          }
 
           if (contaDoMembro) {
             queries.push(
@@ -603,9 +648,23 @@ membrosRouter.delete('/:id', async (c) => {
   }
 
   try {
+    const funcaoDco = await obterFuncaoDco(db)
     await executarOperacaoComAudit(
       db,
-      qdb => [qdb.delete(membros).where(eq(membros.id, id))],
+      qdb => [
+        ...(funcaoDco
+          ? [
+              qdb.delete(vinculosFuncionais).where(
+                and(
+                  eq(vinculosFuncionais.membroId, id),
+                  eq(vinculosFuncionais.funcaoId, funcaoDco.id),
+                  eq(vinculosFuncionais.casaId, existing.casaId)
+                )
+              ),
+            ]
+          : []),
+        qdb.delete(membros).where(eq(membros.id, id)),
+      ],
       {
         acao: 'MEMBRO_EXCLUIDO',
         atorMembroId: c.get('membroId') || null,
