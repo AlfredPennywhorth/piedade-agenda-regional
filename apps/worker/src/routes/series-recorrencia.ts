@@ -7,7 +7,7 @@ import { executeAtomic } from '../db/batch'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, podeGerenciarAgendaNoEscopo, regionaisAdministradas } from '../security/permissoes'
 import { criarAuditQuery, executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
-import { espacoPertenceAoLocal } from '../services/espacos-local'
+import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
 export const seriesRecorrenciaRouter = new Hono<any>()
 
@@ -200,7 +200,10 @@ seriesRecorrenciaRouter.post('/', async (c) => {
     const body = await c.req.json()
     const parsed = SerieCreate.parse(body)
 
-    if (!(await espacoPertenceAoLocal(db, parsed.localId, parsed.espacoId))) {
+    if (!(await espacoAtivoPertenceAoLocal(db, parsed.localId, parsed.espacoId))) {
+      if (await espacoPertenceAoLocal(db, parsed.localId, parsed.espacoId)) {
+        return c.json({ error: 'O espaço selecionado está inativo', code: 'ESPACO_INATIVO' }, 409)
+      }
       return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
     }
     
@@ -310,7 +313,14 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
 
       const mergedEvent = { ...existingEvent, ...parsed.changes }
       EventoCreate.parse(mergedEvent) // Valida regras S04
-      if (!(await espacoPertenceAoLocal(db, mergedEvent.localId, mergedEvent.espacoId))) {
+      const espacoFoiAlterado = parsed.changes.espacoId !== undefined && parsed.changes.espacoId !== existingEvent.espacoId
+      const espacoValido = espacoFoiAlterado
+        ? await espacoAtivoPertenceAoLocal(db, mergedEvent.localId, mergedEvent.espacoId)
+        : await espacoPertenceAoLocal(db, mergedEvent.localId, mergedEvent.espacoId)
+      if (!espacoValido) {
+        if (espacoFoiAlterado && await espacoPertenceAoLocal(db, mergedEvent.localId, mergedEvent.espacoId)) {
+          return c.json({ error: 'O espaço selecionado está inativo', code: 'ESPACO_INATIVO' }, 409)
+        }
         return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
       }
       if (!(await podeGerenciarEntidade(c, mergedEvent))) {
@@ -353,7 +363,10 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
 
       if (!apenasDesativacao) {
         SerieCreate.parse(mergedSerieData)
-        if (!(await espacoPertenceAoLocal(db, mergedSerieData.localId, mergedSerieData.espacoId))) {
+        if (!(await espacoAtivoPertenceAoLocal(db, mergedSerieData.localId, mergedSerieData.espacoId))) {
+          if (await espacoPertenceAoLocal(db, mergedSerieData.localId, mergedSerieData.espacoId)) {
+            return c.json({ error: 'O espaço selecionado está inativo', code: 'ESPACO_INATIVO' }, 409)
+          }
           return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
         }
         if (!(await podeGerenciarEntidade(c, mergedSerieData))) {
@@ -502,7 +515,10 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         ...parsed.changes,
         dataInicio: newStartDateStr
       })
-      if (!(await espacoPertenceAoLocal(db, serieBData.localId, serieBData.espacoId))) {
+      if (!(await espacoAtivoPertenceAoLocal(db, serieBData.localId, serieBData.espacoId))) {
+        if (await espacoPertenceAoLocal(db, serieBData.localId, serieBData.espacoId)) {
+          return c.json({ error: 'O espaço selecionado está inativo', code: 'ESPACO_INATIVO' }, 409)
+        }
         return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
       }
       if (!(await podeGerenciarEntidade(c, serieBData))) {
