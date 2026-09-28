@@ -702,6 +702,33 @@ describe('Series Recorrencia API (S05)', () => {
     expect(persistido.titulo).toBe(original.titulo)
   })
 
+  it('24.5.1 impede criar convocação ativa para ocorrência inativada', async () => {
+    const regionalId = await createRegional()
+    const createRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        regionalId,
+        dataInicio: '2099-11-10',
+        dataFim: '2099-11-10',
+      }),
+    })
+    const { serie } = await createRes.json()
+    const original = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .get()
+
+    await db.update(eventos).set({ ativo: false }).where(eq(eventos.id, original.id))
+
+    expect(() => db.insert(convocacoes).values({
+      id: crypto.randomUUID(),
+      eventoId: original.id,
+      status: 'RASCUNHO',
+      ativo: true,
+    }).run()).toThrow(/CONVOCACAO_EM_EVENTO_INATIVO/)
+  })
+
   it('25. ALL com ativo=false inativa série e eventos futuros sem apagar ou regenerar', async () => {
     // 1. Criar série futura distante para isolar do relógio (2099)
     const regionalId = await createRegional()

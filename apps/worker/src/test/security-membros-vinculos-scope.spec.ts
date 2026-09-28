@@ -271,4 +271,36 @@ describe('PR-SEC-01 — leitura de Membros e Vínculos por escopo', () => {
     expect(tentativaEscrita.status).toBe(403)
   })
 
+  it('Gestor de Relatórios recebe projeção minimizada dos membros do escopo', async () => {
+    const relatorId = 'm-relator-minimo'
+    sqlite.prepare(
+      `INSERT INTO membros
+        (id, nome, data_ordenacao, codigo_carteirinha, celular, casa_id, ativo)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`
+    ).run(relatorId, 'Relator Mínimo', '2001-01-01', 'REL-001', '11999999999', ids.casaA)
+    sqlite.prepare(
+      `UPDATE membros
+       SET data_ordenacao = ?, codigo_carteirinha = ?, celular = ?
+       WHERE id = ?`
+    ).run('2002-02-02', 'COMUM-001', '11888888888', ids.comumA)
+
+    const token = await criarSessao(
+      relatorId,
+      'token-relator-minimo',
+      'GESTOR_RELATORIOS',
+      'REGIONAL',
+      ids.regionalA
+    )
+
+    const lista = await req(token, '/api/v1/membros')
+    expect(lista.status).toBe(200)
+    const pessoas = await lista.json() as Array<Record<string, unknown>>
+    const comum = pessoas.find(item => item.id === ids.comumA)
+
+    expect(comum).toMatchObject({ id: ids.comumA, nome: 'Comum A', casaId: ids.casaA, ativo: true })
+    expect(comum).not.toHaveProperty('celular')
+    expect(comum).not.toHaveProperty('codigoCarteirinha')
+    expect(comum).not.toHaveProperty('dataOrdenacao')
+  })
+
 })

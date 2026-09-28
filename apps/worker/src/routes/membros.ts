@@ -23,6 +23,13 @@ const membroPublico = {
   updatedAt: membros.updatedAt,
 }
 
+const membroParaRelatorio = {
+  id: membros.id,
+  nome: membros.nome,
+  casaId: membros.casaId,
+  ativo: membros.ativo,
+}
+
 function somenteCadastroInstitucional(membro: any) {
   return {
     id: membro.id,
@@ -181,10 +188,14 @@ async function idsMembrosVisiveis(c: any): Promise<Set<string> | null> {
 
 membrosRouter.get('/', async (c) => {
   const db = c.get('db')
+  const contexto = c.get('contextoPermissoes')
   const idsVisiveis = await idsMembrosVisiveis(c)
+  // Gestores de relatórios precisam apenas identificar e filtrar membros.
+  // Dados pessoais e cadastrais ficam restritos a quem administra pessoas.
+  const projecao = podeEscreverMembros(contexto) ? membroPublico : membroParaRelatorio
 
   if (idsVisiveis === null) {
-    return c.json(await db.select(membroPublico).from(membros).all())
+    return c.json(await db.select(projecao).from(membros).all())
   }
 
   const ids = Array.from(idsVisiveis)
@@ -196,7 +207,7 @@ membrosRouter.get('/', async (c) => {
   for (let i = 0; i < ids.length; i += LIMITE_IDS_D1) {
     const lote = ids.slice(i, i + LIMITE_IDS_D1)
     const parcial = await db
-      .select(membroPublico)
+      .select(projecao)
       .from(membros)
       .where(inArray(membros.id, lote))
       .all()
@@ -210,7 +221,9 @@ membrosRouter.get('/', async (c) => {
 membrosRouter.get('/:id', async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')
-  const data = await db.select(membroPublico).from(membros).where(eq(membros.id, id)).get()
+  const contexto = c.get('contextoPermissoes')
+  const projecao = podeEscreverMembros(contexto) ? membroPublico : membroParaRelatorio
+  const data = await db.select(projecao).from(membros).where(eq(membros.id, id)).get()
   
   if (!data) return c.json({ error: 'Membro não encontrado' }, 404)
 

@@ -125,8 +125,12 @@ convocacoesRouter.post('/', async c => {
     const parsed = ConvocacaoCreate.parse(body)
 
     // Validate if evento exists
-    const evento = await db.select().from(eventos).where(eq(eventos.id, parsed.eventoId)).get()
-    if (!evento) return c.json({ error: 'Evento não encontrado' }, 404)
+    const evento = await db
+      .select()
+      .from(eventos)
+      .where(and(eq(eventos.id, parsed.eventoId), eq(eventos.ativo, true)))
+      .get()
+    if (!evento) return c.json({ error: 'Evento não encontrado ou inativo' }, 409)
 
     const membroId = c.get('membroId')
     if (!membroId || !(await podeGerirConvocacao(db, membroId, evento))) {
@@ -163,6 +167,9 @@ convocacoesRouter.post('/', async c => {
 
     return c.json(resultConvocacao, 201)
   } catch (err: any) {
+    if (err.message && err.message.includes('CONVOCACAO_EM_EVENTO_INATIVO')) {
+      return c.json({ error: 'Evento associado não existe ou inativo' }, 409)
+    }
     return c.json({ error: err.issues || err.message }, 400)
   }
 })
