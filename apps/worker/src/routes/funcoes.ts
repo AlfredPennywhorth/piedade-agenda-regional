@@ -13,7 +13,7 @@ funcoesRouter.use('*', exigirMasterParaEscrita)
 funcoesRouter.get('/', async (c) => {
   const db = c.get('db')
   const data = await db.select().from(funcoes).all()
-  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
+  data.sort((a: typeof funcoes.$inferSelect, b: typeof funcoes.$inferSelect) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
   return c.json(data)
 })
 
