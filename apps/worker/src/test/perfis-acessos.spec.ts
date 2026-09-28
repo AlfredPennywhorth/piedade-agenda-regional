@@ -121,6 +121,56 @@ describe('Perfis, escopos e governança — PR-ACC-03', () => {
     expect(segunda.status).toBe(409)
   })
 
+  it('prepara a ativação do primeiro Master quando a instalação ainda não possui conta', async () => {
+    sqlite.prepare(`DELETE FROM contas_acesso WHERE id = ?`).run('conta-master')
+
+    const bootstrap = await requisicao('/api/v1/bootstrap/master', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bootstrap-Secret': bootstrapSecret,
+      },
+      body: JSON.stringify({
+        codigoCarteirinha: 'CARTEIRA-MASTER',
+        confirmacao: 'CRIAR PRIMEIRO MASTER',
+      }),
+    })
+
+    expect(bootstrap.status).toBe(201)
+    const body = (await bootstrap.json()) as any
+    expect(body.tokenAtivacao).toEqual(expect.any(String))
+    expect(body.expiraEmAtivacao).toEqual(expect.any(String))
+
+    const conta = sqlite
+      .prepare(`SELECT id, status FROM contas_acesso WHERE membro_id = ?`)
+      .get('membro-master') as any
+    expect(conta.status).toBe('PENDENTE_ATIVACAO')
+
+    const link = sqlite
+      .prepare(`SELECT token_hash, conta_acesso_id FROM links_ativacao WHERE membro_id = ?`)
+      .get('membro-master') as any
+    expect(link.conta_acesso_id).toBe(conta.id)
+    expect(link.token_hash).toBe(await hashToken(body.tokenAtivacao))
+
+    const ativacao = await requisicao('/api/v1/auth/ativar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: body.tokenAtivacao,
+        celular: '11999990001',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
+    })
+    expect(ativacao.status).toBe(200)
+
+    const sessao = (await ativacao.json()) as any
+    const me = await requisicao('/api/v1/auth/me', {
+      headers: { Authorization: `Bearer ${sessao.sessionToken}` },
+    })
+    expect(me.status).toBe(200)
+  })
+
   it('impede Master com escopo institucional', () => {
     expect(() =>
       sqlite
