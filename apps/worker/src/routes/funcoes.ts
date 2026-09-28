@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { funcoes } from '../db/schema'
 import { CreateFuncaoSchema, UpdateFuncaoSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
@@ -12,7 +12,7 @@ funcoesRouter.use('*', exigirMasterParaEscrita)
 
 funcoesRouter.get('/', async (c) => {
   const db = c.get('db')
-  const data = await db.select().from(funcoes).all()
+  const data = await db.select().from(funcoes).orderBy(asc(funcoes.nome), asc(funcoes.id)).all()
   return c.json(data)
 })
 
