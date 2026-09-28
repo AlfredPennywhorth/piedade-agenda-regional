@@ -70,6 +70,7 @@ jobs:
         env:
           D1_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_DATABASE_ID }}
         run: |
+          test -n "$D1_DATABASE_ID"
           sed -i "s|__D1_DATABASE_ID__|$D1_DATABASE_ID|" apps/worker/wrangler.toml
           grep -q "$D1_DATABASE_ID" apps/worker/wrangler.toml
 
