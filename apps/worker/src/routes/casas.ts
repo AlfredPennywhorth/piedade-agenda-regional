@@ -30,7 +30,7 @@ casasRouter.get('/', async (c) => {
 
   if (visiveis.tudo) {
     const data = await db.select().from(casas).all()
-    data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
+    data.sort((a: typeof casas.$inferSelect, b: typeof casas.$inferSelect) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
     return c.json(data)
   }
 
@@ -46,7 +46,7 @@ casasRouter.get('/', async (c) => {
     data.push(...parcial)
   }
 
-  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
+  data.sort((a: typeof casas.$inferSelect, b: typeof casas.$inferSelect) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
   return c.json(data)
 })
 
