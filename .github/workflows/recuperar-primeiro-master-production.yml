@@ -1,0 +1,109 @@
+name: Recuperar Primeiro Master — Produção
+
+on:
+  workflow_dispatch:
+    inputs:
+      codigo_carteirinha:
+        description: 'Código da carteirinha do primeiro Master'
+        required: true
+        type: string
+      confirm_recovery:
+        description: 'Confirmo a regeneração do link de ativação do primeiro Master'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-master-recovery
+  cancel-in-progress: false
+
+jobs:
+  recuperar:
+    name: Regenerar ativação do primeiro Master
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Validar gate de produção
+        shell: bash
+        env:
+          CONFIRM_RECOVERY: ${{ inputs.confirm_recovery }}
+          MASTER_BOOTSTRAP_SECRET: ${{ secrets.MASTER_BOOTSTRAP_SECRET }}
+          PROD_API_URL: ${{ vars.PROD_API_URL }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$CONFIRM_RECOVERY" = "true"
+          test -n "$MASTER_BOOTSTRAP_SECRET"
+          test -n "$PROD_API_URL"
+          case "$PROD_API_URL" in
+            https://*/api/v1) ;;
+            *) echo "::error::PROD_API_URL deve usar HTTPS e terminar em /api/v1"; exit 1 ;;
+          esac
+          echo "::add-mask::$MASTER_BOOTSTRAP_SECRET"
+
+      - name: Regenerar link de ativação
+        id: recuperar
+        shell: bash
+        env:
+          CODIGO_CARTEIRINHA: ${{ inputs.codigo_carteirinha }}
+          MASTER_BOOTSTRAP_SECRET: ${{ secrets.MASTER_BOOTSTRAP_SECRET }}
+          PROD_API_URL: ${{ vars.PROD_API_URL }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$MASTER_BOOTSTRAP_SECRET"
+
+          payload="$(jq -n \
+            --arg codigo "$CODIGO_CARTEIRINHA" \
+            --arg confirmacao "CRIAR PRIMEIRO MASTER" \
+            '{codigoCarteirinha: $codigo, confirmacao: $confirmacao}')"
+
+          response_file="$(mktemp)"
+          http_code="$(curl --silent --show-error \
+            --output "$response_file" \
+            --write-out '%{http_code}' \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --header "X-Bootstrap-Secret: $MASTER_BOOTSTRAP_SECRET" \
+            --data "$payload" \
+            "$PROD_API_URL/bootstrap/master")"
+
+          if [ "$http_code" != "200" ]; then
+            error_code="$(jq -r '.code // "SEM_CODIGO"' "$response_file" 2>/dev/null || true)"
+            error_message="$(jq -r '.error // "Falha ao recuperar o primeiro Master"' "$response_file" 2>/dev/null || true)"
+            rm -f "$response_file"
+            echo "::error::Bootstrap retornou HTTP $http_code — $error_code — $error_message"
+            exit 1
+          fi
+
+          token="$(jq -r '.tokenAtivacao // empty' "$response_file")"
+          expira="$(jq -r '.expiraEmAtivacao // empty' "$response_file")"
+          mensagem="$(jq -r '.message // empty' "$response_file")"
+          rm -f "$response_file"
+
+          test -n "$token"
+          echo "::add-mask::$token"
+
+          {
+            echo "### Recuperação do primeiro Master concluída"
+            echo
+            echo "$mensagem"
+            echo
+            echo "**Validade do novo token:** $expira"
+            echo
+            echo "O token de ativação foi protegido como secret e salvo como artefato temporário desta execução."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          umask 077
+          printf '%s' "$token" > token-ativacao.txt
+
+      - name: Disponibilizar token temporário
+        uses: actions/upload-artifact@v4
+        with:
+          name: token-ativacao-primeiro-master
+          path: token-ativacao.txt
+          retention-days: 1
+          if-no-files-found: error
