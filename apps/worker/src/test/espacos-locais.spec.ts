@@ -99,6 +99,68 @@ describe('Espaços de Local', () => {
     expect((await patch.json() as any).code).toBe('ESPACO_LOCAL_IMUTAVEL')
   })
 
+  it('permite editar evento existente que mantém referência histórica a espaço inativo', async () => {
+    sqlite.exec(`
+      INSERT INTO espacos_local (id, local_id, nome, ativo)
+      VALUES ('66666666-6666-4666-8666-666666666666', '11111111-1111-4111-8111-111111111111', 'Sala histórica', 0);
+
+      INSERT INTO eventos (
+        id, titulo, modalidade, inicio_em, fim_em, local_id, espaco_id, regional_id, ativo
+      )
+      VALUES (
+        '77777777-7777-4777-8777-777777777777',
+        'Evento histórico',
+        'PRESENCIAL',
+        '2026-09-01T20:00:00.000Z',
+        '2026-09-01T21:00:00.000Z',
+        '11111111-1111-4111-8111-111111111111',
+        '66666666-6666-4666-8666-666666666666',
+        '44444444-4444-4444-8444-444444444444',
+        1
+      );
+    `)
+
+    const res = await app.request(
+      '/api/v1/eventos/77777777-7777-4777-8777-777777777777',
+      mesclarAutorizacao(token, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ titulo: 'Evento histórico ajustado' }),
+      })
+    )
+
+    expect(res.status).toBe(200)
+    expect((await res.json() as any).titulo).toBe('Evento histórico ajustado')
+  })
+
+  it('rejeita espaço inativo em uma nova série recorrente', async () => {
+    sqlite.prepare(`
+      INSERT INTO espacos_local (id, local_id, nome, ativo)
+      VALUES ('88888888-8888-4888-8888-888888888888', '11111111-1111-4111-8111-111111111111', 'Sala aposentada', 0)
+    `).run()
+
+    const res = await app.request('/api/v1/series-recorrencia', mesclarAutorizacao(token, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Série em espaço inativo',
+        modalidade: 'PRESENCIAL',
+        localId: '11111111-1111-4111-8111-111111111111',
+        espacoId: '88888888-8888-4888-8888-888888888888',
+        horarioInicio: '19:00',
+        horarioFim: '20:00',
+        dataInicio: '2026-10-01',
+        dataFim: '2026-10-01',
+        frequencia: 'DIARIA',
+        intervalo: 1,
+        regionalId: '44444444-4444-4444-8444-444444444444',
+      }),
+    }))
+
+    expect(res.status).toBe(409)
+    expect((await res.json() as any).code).toBe('ESPACO_INATIVO')
+  })
+
   it('rejeita espaço inativo em um novo evento', async () => {
     sqlite.prepare(`
       INSERT INTO espacos_local (id, local_id, nome, ativo)
