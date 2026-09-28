@@ -53,7 +53,7 @@ name = "piedade-agenda-worker"
 [env.production.vars]
 APP_ENV = "production"
 APP_VERSION = "0.0.1-s12"
-CORS_ORIGIN = "https://piedade-agenda-regional.pages.dev"
+CORS_ORIGIN = "https://piedade-agenda-regional.pages.dev,https://main.piedade-agenda-regional.pages.dev"
 
 [[env.production.d1_databases]]
 binding = "DB"
