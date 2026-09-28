@@ -14,6 +14,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM funcoes WHERE codigo = 'DCO'
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_funcoes_codigo_unico
+CREATE UNIQUE INDEX IF NOT EXISTS idx_funcoes_dco_unico
 ON funcoes(codigo)
-WHERE codigo IS NOT NULL;
+WHERE codigo = 'DCO';
