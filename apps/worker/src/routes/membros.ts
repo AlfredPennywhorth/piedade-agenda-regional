@@ -222,7 +222,7 @@ membrosRouter.get('/', async (c) => {
 
   if (visibilidade === null) {
     const data = await db.select(membroPublico).from(membros).all()
-    data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
+    data.sort((a: { id: string; nome: string }, b: { id: string; nome: string }) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
     return c.json(data)
   }
 
@@ -249,7 +249,7 @@ membrosRouter.get('/', async (c) => {
     }
   }
 
-  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
+  data.sort((a: { id: string; nome: string }, b: { id: string; nome: string }) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
   return c.json(data)
 })
 
