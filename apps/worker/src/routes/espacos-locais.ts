@@ -4,6 +4,7 @@ import { espacosLocal } from '../db/schema'
 import { EspacoLocalCreate, EspacoLocalUpdate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { exigirMasterParaEscrita } from '../middleware/master-write'
+import { executarOperacaoComAudit } from '../services/auditoria'
 
 export const espacosLocaisRouter = new Hono<any>()
 
@@ -38,7 +39,19 @@ espacosLocaisRouter.post('/', async c => {
   try {
     const parsed = EspacoLocalCreate.parse(await c.req.json())
     const id = crypto.randomUUID()
-    await db.insert(espacosLocal).values({ id, ...parsed })
+    await executarOperacaoComAudit(
+      db,
+      qdb => [qdb.insert(espacosLocal).values({ id, ...parsed })],
+      {
+        acao: 'ESPACO_LOCAL_CRIADO',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'ESPACO_LOCAL',
+        recursoId: id,
+        escopoTipo: 'GLOBAL',
+        escopoId: null,
+        contexto: { localId: parsed.localId, nome: parsed.nome },
+      }
+    )
     return c.json(await db.select().from(espacosLocal).where(eq(espacosLocal.id, id)).get(), 201)
   } catch (err: any) {
     if (err.message?.includes('FOREIGN KEY constraint failed')) {
@@ -58,9 +71,23 @@ espacosLocaisRouter.patch('/:id', async c => {
     const existing = await db.select().from(espacosLocal).where(eq(espacosLocal.id, id)).get()
     if (!existing) return c.json({ error: 'Espaço não encontrado' }, 404)
     const parsed = EspacoLocalUpdate.parse(await c.req.json())
-    await db.update(espacosLocal)
-      .set({ ...parsed, updatedAt: new Date().toISOString() })
-      .where(eq(espacosLocal.id, id))
+    await executarOperacaoComAudit(
+      db,
+      qdb => [
+        qdb.update(espacosLocal)
+          .set({ ...parsed, updatedAt: new Date().toISOString() })
+          .where(eq(espacosLocal.id, id))
+      ],
+      {
+        acao: 'ESPACO_LOCAL_ATUALIZADO',
+        atorMembroId: c.get('membroId') || null,
+        recursoTipo: 'ESPACO_LOCAL',
+        recursoId: id,
+        escopoTipo: 'GLOBAL',
+        escopoId: null,
+        contexto: { localId: parsed.localId ?? existing.localId, camposAlterados: Object.keys(parsed) },
+      }
+    )
     return c.json(await db.select().from(espacosLocal).where(eq(espacosLocal.id, id)).get())
   } catch (err: any) {
     if (err.message?.includes('FOREIGN KEY constraint failed')) {
