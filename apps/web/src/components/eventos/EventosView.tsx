@@ -15,6 +15,13 @@ interface Local {
   nome: string
 }
 
+interface EspacoLocal {
+  id: string
+  localId: string
+  nome: string
+  ativo: boolean
+}
+
 interface SerieResponse {
   id: string
   titulo: string
@@ -31,6 +38,7 @@ interface SerieResponse {
   diaMes: number | null
   posicaoSemanaMes: number | null
   localId: string | null
+  espacoId: string | null
   urlOnline: string | null
   organizadorMembroId: string | null
   regionalId: string | null
@@ -51,6 +59,7 @@ export interface Evento {
   inicioEm: string
   fimEm: string
   localId: string | null
+  espacoId: string | null
   urlOnline: string | null
   organizadorMembroId: string | null
   regionalId: string | null
@@ -71,6 +80,7 @@ export function EventosView() {
   
   // Lookups
   const [locais, setLocais] = useState<Local[]>([])
+  const [espacos, setEspacos] = useState<EspacoLocal[]>([])
   const [membros, setMembros] = useState<Membro[]>([])
   const [regionais, setRegionais] = useState<Regional[]>([])
   const [administracoes, setAdministracoes] = useState<Administracao[]>([])
@@ -108,6 +118,7 @@ export function EventosView() {
     inicioEm: '',
     fimEm: '',
     localId: '',
+    espacoId: '',
     urlOnline: '',
     organizadorMembroId: '',
     regionalId: '',
@@ -128,11 +139,12 @@ export function EventosView() {
     setErro(null)
     try {
       const [
-        eventosData, locaisData, membrosData, regionaisData,
+        eventosData, locaisData, espacosData, membrosData, regionaisData,
         administracoesData, setoresData, casasData, gruposData
       ] = await Promise.all([
         fetchWithAuth<Evento[]>('/eventos'),
         fetchWithAuth<Local[]>('/locais'),
+        fetchWithAuth<EspacoLocal[]>('/espacos-locais?ativo=true'),
         fetchWithAuth<Membro[]>('/membros'),
         fetchWithAuth<Regional[]>('/regionais'),
         fetchWithAuth<Administracao[]>('/administracoes'),
@@ -143,6 +155,7 @@ export function EventosView() {
       
       setEventos(eventosData || [])
       setLocais(locaisData || [])
+      setEspacos(espacosData || [])
       setMembros(membrosData || [])
       setRegionais(regionaisData || [])
       setAdministracoes(administracoesData || [])
@@ -193,6 +206,7 @@ export function EventosView() {
       ...prev,
       modalidade: mod,
       localId: mod === 'ONLINE' ? '' : prev.localId,
+      espacoId: mod === 'ONLINE' ? '' : prev.espacoId,
       urlOnline: mod === 'PRESENCIAL' ? '' : prev.urlOnline
     }))
   }
@@ -235,6 +249,7 @@ export function EventosView() {
       inicioEm: '',
       fimEm: '',
       localId: '',
+      espacoId: '',
       urlOnline: '',
       organizadorMembroId: '',
       regionalId: '',
@@ -287,6 +302,7 @@ export function EventosView() {
         inicioEm: formatDatetimeLocal(item.inicioEm),
         fimEm: formatDatetimeLocal(item.fimEm),
         localId: item.localId || '',
+        espacoId: item.espacoId || '',
         urlOnline: item.urlOnline || '',
         organizadorMembroId: item.organizadorMembroId || '',
         regionalId: item.regionalId || '',
@@ -338,6 +354,7 @@ export function EventosView() {
         diaMes: serie.diaMes,
         posicaoSemanaMes: serie.posicaoSemanaMes,
         localId: serie.localId || '',
+        espacoId: serie.espacoId || '',
         urlOnline: serie.urlOnline || '',
         organizadorMembroId: serie.organizadorMembroId || '',
         regionalId: serie.regionalId || '',
@@ -375,6 +392,7 @@ export function EventosView() {
       descricao: formData.descricao || null,
       pauta: formData.pauta || null,
       localId: formData.localId || null,
+      espacoId: formData.espacoId || null,
       urlOnline: formData.urlOnline || null,
       organizadorMembroId: formData.organizadorMembroId || null,
       regionalId: formData.regionalId || null,
@@ -410,6 +428,7 @@ export function EventosView() {
         setConfirmacaoThisAberto({
           ...parsed.data,
           localId: parsed.data.modalidade === 'ONLINE' ? null : parsed.data.localId,
+          espacoId: parsed.data.modalidade === 'ONLINE' ? null : parsed.data.espacoId,
           urlOnline: parsed.data.modalidade === 'PRESENCIAL' ? null : parsed.data.urlOnline,
         })
         return
@@ -419,6 +438,7 @@ export function EventosView() {
         const updatePayload = {
           ...parsed.data,
           localId: parsed.data.modalidade === 'ONLINE' ? null : parsed.data.localId,
+          espacoId: parsed.data.modalidade === 'ONLINE' ? null : parsed.data.espacoId,
           urlOnline: parsed.data.modalidade === 'PRESENCIAL' ? null : parsed.data.urlOnline,
         }
         await patchWithAuth(`/eventos/${eventoEditandoId}`, updatePayload)
@@ -475,14 +495,14 @@ export function EventosView() {
       const {
         titulo, descricao, pauta, modalidade, frequencia, dataInicio,
         dataFim, horarioInicio, horarioFim, diaSemana, diaMes,
-        posicaoSemanaMes, localId, urlOnline, organizadorMembroId, regionalId,
+        posicaoSemanaMes, localId, espacoId, urlOnline, organizadorMembroId, regionalId,
         administracaoId, setorId, casaId, grupoTrabalhoId, observacoes, ativo
       } = confirmacaoFutureAberto
 
       const changes = {
         titulo, descricao, pauta, modalidade, frequencia, intervalo: 1, dataInicio,
         dataFim, horarioInicio, horarioFim, diaSemana, diaMes,
-        posicaoSemanaMes, localId, urlOnline, organizadorMembroId, regionalId,
+        posicaoSemanaMes, localId, espacoId, urlOnline, organizadorMembroId, regionalId,
         administracaoId, setorId, casaId, grupoTrabalhoId, observacoes, ativo
       }
 
@@ -716,7 +736,7 @@ export function EventosView() {
                         <select
                           id="localId"
                           value={formData.localId || ''}
-                          onChange={e => setFormData({ ...formData, localId: e.target.value })}
+                          onChange={e => setFormData({ ...formData, localId: e.target.value, espacoId: '' })}
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         >
                           <option value="">Selecione...</option>
@@ -725,6 +745,24 @@ export function EventosView() {
                           ))}
                         </select>
                         {errosForm.localId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.localId}</p>}
+                      </div>
+                    )}
+
+                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.localId && (
+                      <div>
+                        <label htmlFor="espacoId" className="block text-sm font-medium text-slate-700 mb-1">Espaço</label>
+                        <select
+                          id="espacoId"
+                          value={formData.espacoId || ''}
+                          onChange={e => setFormData({ ...formData, espacoId: e.target.value })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                        >
+                          <option value="">Local inteiro / não especificado</option>
+                          {espacos.filter(espaco => espaco.localId === formData.localId).map(espaco => (
+                            <option key={espaco.id} value={espaco.id}>{espaco.nome}</option>
+                          ))}
+                        </select>
+                        {errosForm.espacoId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.espacoId}</p>}
                       </div>
                     )}
 
@@ -1092,7 +1130,7 @@ export function EventosView() {
         title="Editar Evento Recorrente (Este e os próximos)"
         initialData={serieInitialData}
         initialTipoEscopo={serieInitialTipoEscopo}
-        lookups={{ locais, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
+        lookups={{ locais, espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
         onSubmit={handleSerieSubmit}
         externalError={erro}
       />
