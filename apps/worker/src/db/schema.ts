@@ -499,6 +499,25 @@ export const locais = sqliteTable('locais', {
   ...timestampsS02,
 })
 
+export const espacosLocal = sqliteTable(
+  'espacos_local',
+  {
+    id: text('id').primaryKey(),
+    localId: text('local_id').notNull().references(() => locais.id),
+    nome: text('nome').notNull(),
+    descricao: text('descricao'),
+    capacidade: integer('capacidade'),
+    ativo: ativoDefault,
+    ...timestampsS02,
+  },
+  table => ({
+    idxLocal: index('idx_espacos_local_local').on(table.localId, table.ativo),
+    uniqueAtivo: uniqueIndex('idx_espacos_local_nome_ativo')
+      .on(table.localId, table.nome)
+      .where(sql`${table.ativo} = 1`),
+  })
+)
+
 export const seriesRecorrencia = sqliteTable(
   'series_recorrencia',
   {
@@ -521,6 +540,7 @@ export const seriesRecorrencia = sqliteTable(
     posicaoSemanaMes: integer('posicao_semana_mes'), // 1-5, -1
 
     localId: text('local_id').references(() => locais.id),
+    espacoId: text('espaco_id').references(() => espacosLocal.id),
     urlOnline: text('url_online'),
     organizadorMembroId: text('organizador_membro_id').references(() => membros.id),
 
@@ -561,6 +581,7 @@ export const eventos = sqliteTable(
     inicioEm: text('inicio_em').notNull(), // ISO 8601 UTC
     fimEm: text('fim_em').notNull(), // ISO 8601 UTC
     localId: text('local_id').references(() => locais.id),
+    espacoId: text('espaco_id').references(() => espacosLocal.id),
     urlOnline: text('url_online'),
     organizadorMembroId: text('organizador_membro_id').references(() => membros.id),
 
