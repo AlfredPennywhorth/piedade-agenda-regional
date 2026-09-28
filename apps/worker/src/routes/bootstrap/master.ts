@@ -68,10 +68,81 @@ bootstrapMasterApp.post('/', async c => {
   }
 
   const bootstrapExistente = await db
-    .select({ id: schema.bootstrapMaster.id })
+    .select({
+      id: schema.bootstrapMaster.id,
+      contaAcessoId: schema.bootstrapMaster.contaAcessoId,
+      contaStatus: schema.contasAcesso.status,
+      membroId: schema.membros.id,
+      codigoCarteirinha: schema.membros.codigoCarteirinha,
+      celular: schema.membros.celular,
+      membroAtivo: schema.membros.ativo,
+    })
     .from(schema.bootstrapMaster)
+    .innerJoin(
+      schema.contasAcesso,
+      eq(schema.bootstrapMaster.contaAcessoId, schema.contasAcesso.id)
+    )
+    .innerJoin(schema.membros, eq(schema.contasAcesso.membroId, schema.membros.id))
     .where(eq(schema.bootstrapMaster.id, 'PRIMEIRO_MASTER'))
     .get()
+
+  if (
+    bootstrapExistente &&
+    bootstrapExistente.contaStatus === 'PENDENTE_ATIVACAO' &&
+    bootstrapExistente.membroAtivo &&
+    bootstrapExistente.celular &&
+    bootstrapExistente.codigoCarteirinha === body.codigoCarteirinha
+  ) {
+    const agora = new Date().toISOString()
+    const tokenAtivacao = gerarTokenAleatorio()
+    const tokenAtivacaoHash = await hashToken(tokenAtivacao)
+    const expiraEmAtivacao = new Date(Date.now() + VALIDADE_LINK_ATIVACAO_MS).toISOString()
+
+    await executeAtomic(db, tx => [
+      tx
+        .update(schema.linksAtivacao)
+        .set({ revogadoEm: agora, updatedAt: agora })
+        .where(
+          and(
+            eq(schema.linksAtivacao.contaAcessoId, bootstrapExistente.contaAcessoId),
+            isNull(schema.linksAtivacao.utilizadoEm),
+            isNull(schema.linksAtivacao.revogadoEm)
+          )
+        ),
+      tx.insert(schema.linksAtivacao).values({
+        id: crypto.randomUUID(),
+        contaAcessoId: bootstrapExistente.contaAcessoId,
+        membroId: bootstrapExistente.membroId,
+        tokenHash: tokenAtivacaoHash,
+        expiraEm: expiraEmAtivacao,
+        createdAt: agora,
+        updatedAt: agora,
+      }),
+      tx.insert(schema.auditoriaLogs).values({
+        id: crypto.randomUUID(),
+        acao: 'BOOTSTRAP_MASTER_LINK_REGERADO',
+        atorMembroId: bootstrapExistente.membroId,
+        atorContaAcessoId: bootstrapExistente.contaAcessoId,
+        recursoTipo: 'CONTA_ACESSO',
+        recursoId: bootstrapExistente.contaAcessoId,
+        escopoTipo: 'GLOBAL',
+        escopoId: null,
+        contexto: JSON.stringify({ motivo: 'MASTER_PENDENTE_ATIVACAO' }),
+        criadoEm: agora,
+      }),
+    ])
+
+    return c.json(
+      {
+        message: 'Link de ativação do primeiro Master regenerado com sucesso',
+        perfilCodigo: 'MASTER_SISTEMA',
+        escopoTipo: 'GLOBAL',
+        tokenAtivacao,
+        expiraEmAtivacao,
+      },
+      200
+    )
+  }
 
   const masterExistente = await db
     .select({ id: schema.acessosConta.id })
@@ -94,6 +165,7 @@ bootstrapMasterApp.post('/', async c => {
       membroAtivo: schema.membros.ativo,
       contaAcessoId: schema.contasAcesso.id,
       contaStatus: schema.contasAcesso.status,
+      celular: schema.membros.celular,
     })
     .from(schema.membros)
     .leftJoin(schema.contasAcesso, eq(schema.contasAcesso.membroId, schema.membros.id))
@@ -103,6 +175,7 @@ bootstrapMasterApp.post('/', async c => {
   if (
     !identidade ||
     !identidade.membroAtivo ||
+    !identidade.celular ||
     ['BLOQUEADA', 'DESATIVADA'].includes(identidade.contaStatus ?? '')
   ) {
     return c.json(
