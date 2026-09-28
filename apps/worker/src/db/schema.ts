@@ -224,9 +224,9 @@ export const funcoes = sqliteTable(
     ...timestampsS02,
   },
   table => ({
-    uniqueCodigo: uniqueIndex('idx_funcoes_codigo_unico')
+    uniqueDco: uniqueIndex('idx_funcoes_dco_unico')
       .on(table.codigo)
-      .where(sql`${table.codigo} IS NOT NULL`),
+      .where(sql`${table.codigo} = 'DCO'`),
   })
 )
 
