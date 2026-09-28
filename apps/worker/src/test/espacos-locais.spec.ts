@@ -17,6 +17,9 @@ describe('Espaços de Local', () => {
     token = (await criarSessaoAutenticadaTeste(sqlite, 'espacos-local')).token
 
     sqlite.prepare(`
+      INSERT INTO regionais (id, nome, ativo)
+      VALUES ('44444444-4444-4444-8444-444444444444', 'Regional Espaços', 1);
+
       INSERT INTO locais (id, nome, endereco, numero, cidade, uf, ativo)
       VALUES ('11111111-1111-4111-8111-111111111111', 'Complexo Brás', 'Rua Teste', '1', 'São Paulo', 'SP', 1),
              ('22222222-2222-4222-8222-222222222222', 'Outro Local', 'Rua Teste', '2', 'São Paulo', 'SP', 1)
@@ -74,6 +77,28 @@ describe('Espaços de Local', () => {
     expect(segundo.status).toBe(409)
   })
 
+  it('impede mover um espaço para outro Local', async () => {
+    const create = await app.request('/api/v1/espacos-locais', mesclarAutorizacao(token, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        localId: '11111111-1111-4111-8111-111111111111',
+        nome: '3º andar',
+      }),
+    }))
+    expect(create.status).toBe(201)
+    const criado = await create.json() as any
+
+    const patch = await app.request(`/api/v1/espacos-locais/${criado.id}`, mesclarAutorizacao(token, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ localId: '22222222-2222-4222-8222-222222222222' }),
+    }))
+
+    expect(patch.status).toBe(409)
+    expect((await patch.json() as any).code).toBe('ESPACO_LOCAL_IMUTAVEL')
+  })
+
   it('rejeita evento quando o espaço não pertence ao Local informado', async () => {
     sqlite.prepare(`
       INSERT INTO espacos_local (id, local_id, nome, ativo)
@@ -90,7 +115,7 @@ describe('Espaços de Local', () => {
         fimEm: '2026-10-01T21:00:00.000Z',
         localId: '11111111-1111-4111-8111-111111111111',
         espacoId: '33333333-3333-4333-8333-333333333333',
-        casaId: 'espacos-local-casa',
+        regionalId: '44444444-4444-4444-8444-444444444444',
       }),
     }))
     expect(res.status).toBe(400)
