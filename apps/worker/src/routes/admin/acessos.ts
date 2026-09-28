@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, count, eq, inArray, isNull } from 'drizzle-orm'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { executeAtomic } from '../../db/batch'
 import { gerarTokenAleatorio, hashToken } from '../../security/tokens'
@@ -119,29 +119,35 @@ async function regionalDaConta(db: any, contaAcessoId: string): Promise<string |
 }
 
 async function eUltimoMasterOperacional(db: any, contaAcessoId: string): Promise<boolean> {
-  const acessoMaster = await db
+  const acessoMasterOperacional = await db
     .select({ id: schema.acessosConta.id })
     .from(schema.acessosConta)
+    .innerJoin(schema.contasAcesso, eq(schema.acessosConta.contaAcessoId, schema.contasAcesso.id))
+    .innerJoin(schema.membros, eq(schema.contasAcesso.membroId, schema.membros.id))
     .where(
       and(
         eq(schema.acessosConta.contaAcessoId, contaAcessoId),
         eq(schema.acessosConta.perfilCodigo, 'MASTER_SISTEMA'),
-        eq(schema.acessosConta.ativo, true)
+        eq(schema.acessosConta.ativo, true),
+        eq(schema.contasAcesso.status, 'ATIVA'),
+        eq(schema.membros.ativo, true)
       )
     )
     .get()
 
-  if (!acessoMaster) return false
+  if (!acessoMasterOperacional) return false
 
   const mestres = await db
     .select({ contaAcessoId: schema.acessosConta.contaAcessoId })
     .from(schema.acessosConta)
     .innerJoin(schema.contasAcesso, eq(schema.acessosConta.contaAcessoId, schema.contasAcesso.id))
+    .innerJoin(schema.membros, eq(schema.contasAcesso.membroId, schema.membros.id))
     .where(
       and(
         eq(schema.acessosConta.perfilCodigo, 'MASTER_SISTEMA'),
         eq(schema.acessosConta.ativo, true),
-        eq(schema.contasAcesso.status, 'ATIVA')
+        eq(schema.contasAcesso.status, 'ATIVA'),
+        eq(schema.membros.ativo, true)
       )
     )
     .all()
@@ -852,21 +858,14 @@ adminAcessosApp.delete('/:id', async c => {
     }
   }
 
-  if (acesso.perfilCodigo === 'MASTER_SISTEMA') {
-    const total = await db
-      .select({ total: count() })
-      .from(schema.acessosConta)
-      .where(
-        and(
-          eq(schema.acessosConta.perfilCodigo, 'MASTER_SISTEMA'),
-          eq(schema.acessosConta.ativo, true)
-        )
-      )
-      .get()
-
-    if (!total || total.total <= 1) {
-      return c.json({ error: 'O último Master ativo não pode ser revogado', code: 'ULTIMO_MASTER' }, 409)
-    }
+  if (
+    acesso.perfilCodigo === 'MASTER_SISTEMA' &&
+    await eUltimoMasterOperacional(db, acesso.contaAcessoId)
+  ) {
+    return c.json(
+      { error: 'O último Master operacional não pode ser revogado', code: 'ULTIMO_MASTER' },
+      409
+    )
   }
 
   const agora = new Date().toISOString()
