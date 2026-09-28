@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and, gte, sql, inArray } from 'drizzle-orm'
-import { administracoes, casas, eventos, gruposTrabalho, membros, seriesRecorrencia, setores } from '../db/schema'
+import { administracoes, casas, convocacoes, eventos, gruposTrabalho, membros, seriesRecorrencia, setores } from '../db/schema'
 import { SerieCreate, SerieUpdatePayload, generateOccurrences, getLocalDateFromUtc } from '@piedade/shared'
 import { EventoCreate } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
@@ -11,6 +11,30 @@ import { criarAuditQuery, executarOperacaoComAudit, extrairEscopoDoEvento } from
 export const seriesRecorrenciaRouter = new Hono<any>()
 
 seriesRecorrenciaRouter.use('*', authMiddleware)
+
+async function seriePossuiConvocacaoAtivaDesde(
+  db: any,
+  serieId: string,
+  inicioEm: string
+): Promise<boolean> {
+  const dependencia = await db
+    .select({ id: convocacoes.id })
+    .from(convocacoes)
+    .innerJoin(eventos, eq(convocacoes.eventoId, eventos.id))
+    .where(
+      and(
+        eq(eventos.serieRecorrenciaId, serieId),
+        gte(eventos.inicioEm, inicioEm),
+        eq(eventos.recorrenciaExcecao, false),
+        eq(eventos.ativo, true),
+        eq(convocacoes.ativo, true),
+        inArray(convocacoes.status, ['RASCUNHO', 'PUBLICADA'])
+      )
+    )
+    .get()
+
+  return Boolean(dependencia)
+}
 
 
 interface EscoposAgendaAutorizados {
@@ -378,6 +402,17 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         return c.json({ message: 'Série atualizada e eventos futuros inativados com sucesso' })
       }
 
+      if (await seriePossuiConvocacaoAtivaDesde(db, serieId, nowIso)) {
+        return c.json(
+          {
+            error:
+              'A série possui ocorrência futura com convocação vinculada. Altere a ocorrência individualmente ou trate a convocação antes de regenerar a série.',
+            code: 'SERIE_COM_CONVOCACAO',
+          },
+          409
+        )
+      }
+
       const exceptions = await db.select().from(eventos).where(and(
         eq(eventos.serieRecorrenciaId, serieId),
         gte(
@@ -479,6 +514,17 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       }
 
       const pivotDateIso = existingEvent.recorrenciaOrigemInicioEm ?? existingEvent.inicioEm
+
+      if (await seriePossuiConvocacaoAtivaDesde(db, serieId, pivotDateIso)) {
+        return c.json(
+          {
+            error:
+              'A série possui ocorrência futura com convocação vinculada. Altere a ocorrência individualmente ou trate a convocação antes de dividir a série.',
+            code: 'SERIE_COM_CONVOCACAO',
+          },
+          409
+        )
+      }
       
       const newSerieId = crypto.randomUUID()
       
