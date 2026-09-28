@@ -285,6 +285,19 @@ adminPreCadastrosMinisteriaisApp.post('/:id/finalizar', async c => {
     }
   }
 
+  const funcaoDco = await db
+    .select({ id: schema.funcoes.id })
+    .from(schema.funcoes)
+    .where(and(eq(schema.funcoes.codigo, 'DCO'), eq(schema.funcoes.ativo, true)))
+    .get()
+
+  if (!funcaoDco) {
+    return c.json(
+      { error: 'Função Diácono Casa de Oração (DCO) não cadastrada ou inativa', code: 'FUNCAO_DCO_INDISPONIVEL' },
+      409
+    )
+  }
+
   const membroId = crypto.randomUUID()
   const agora = new Date().toISOString()
 
@@ -293,6 +306,15 @@ adminPreCadastrosMinisteriaisApp.post('/:id/finalizar', async c => {
       tx.insert(schema.membros).values({
         id: membroId,
         ...parsed.data,
+        createdAt: agora,
+        updatedAt: agora,
+      }),
+      tx.insert(schema.vinculosFuncionais).values({
+        id: crypto.randomUUID(),
+        membroId,
+        funcaoId: funcaoDco.id,
+        casaId,
+        ativo: true,
         createdAt: agora,
         updatedAt: agora,
       }),
