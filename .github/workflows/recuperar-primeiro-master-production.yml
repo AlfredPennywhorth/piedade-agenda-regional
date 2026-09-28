@@ -59,7 +59,7 @@ jobs:
           payload="$(jq -n \
             --arg codigo "$CODIGO_CARTEIRINHA" \
             --arg confirmacao "CRIAR PRIMEIRO MASTER" \
-            '{codigoCarteirinha: $codigo, confirmacao: $confirmacao}')"
+            '{codigoCarteirinha: $codigo, confirmacao: $confirmacao, somenteRecuperacao: true}')"
 
           response_file="$(mktemp)"
           http_code="$(curl --silent --show-error \
@@ -94,16 +94,7 @@ jobs:
             echo
             echo "**Validade do novo token:** $expira"
             echo
-            echo "O token de ativação foi protegido como secret e salvo como artefato temporário desta execução."
+            echo
+            echo "Por segurança, o token não é persistido em logs nem artefatos."
+            echo "Execute a ativação no mesmo job por uma etapa interativa segura ou use o procedimento administrativo aprovado."
           } >> "$GITHUB_STEP_SUMMARY"
-
-          umask 077
-          printf '%s' "$token" > token-ativacao.txt
-
-      - name: Disponibilizar token temporário
-        uses: actions/upload-artifact@v4
-        with:
-          name: token-ativacao-primeiro-master
-          path: token-ativacao.txt
-          retention-days: 1
-          if-no-files-found: error
