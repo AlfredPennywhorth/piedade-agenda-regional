@@ -5,6 +5,7 @@ import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
 import { obterEscoposTerritoriaisVisiveis, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
+import { espacoPertenceAoLocal } from '../services/espacos-local'
 
 export const eventosRouter = new Hono<any>()
 
@@ -169,6 +170,10 @@ eventosRouter.post('/', async (c) => {
     const body = await c.req.json()
     const parsed = EventoCreate.parse(body)
     
+    if (!(await espacoPertenceAoLocal(db, parsed.localId, parsed.espacoId))) {
+      return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
+    }
+
     const id = crypto.randomUUID()
 
     const { escopoTipo, escopoId } = extrairEscopoDoEvento(parsed)
@@ -212,7 +217,7 @@ eventosRouter.post('/', async (c) => {
     return c.json(result, 201)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
-      return c.json({ error: 'Local ou Escopo vinculado não existe' }, 400)
+      return c.json({ error: 'Local, Espaço ou Escopo vinculado não existe' }, 400)
     }
     if (err.message && err.message.includes('CHECK constraint failed')) {
       return c.json({ error: 'Violação de regra de negócio no banco (ex: escopo único)' }, 400)
@@ -234,6 +239,9 @@ eventosRouter.patch('/:id', async (c) => {
     // Validar estado final mesclado (existente + patch) com EventoCreate
     const merged = { ...existing, ...parsed }
     EventoCreate.parse(merged)
+    if (!(await espacoPertenceAoLocal(db, merged.localId, merged.espacoId))) {
+      return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
+    }
 
     const escopoOriginal = extrairEscopoDoEvento(existing)
     const escopoFinal = extrairEscopoDoEvento(merged)
@@ -301,7 +309,7 @@ eventosRouter.patch('/:id', async (c) => {
     return c.json(updated)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
-      return c.json({ error: 'Local ou Escopo vinculado não existe' }, 400)
+      return c.json({ error: 'Local, Espaço ou Escopo vinculado não existe' }, 400)
     }
     if (err.message && err.message.includes('CHECK constraint failed')) {
       return c.json({ error: 'Violação de regra de negócio no banco (ex: escopo único)' }, 400)
