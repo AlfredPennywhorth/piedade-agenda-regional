@@ -47,7 +47,7 @@ bootstrapMasterApp.post('/', async c => {
     return c.json({ error: 'Operação não autorizada', code: 'UNAUTHORIZED' }, 401)
   }
 
-  let body: { codigoCarteirinha?: string; confirmacao?: string }
+  let body: { codigoCarteirinha?: string; confirmacao?: string; somenteRecuperacao?: boolean }
   try {
     body = await c.req.json()
   } catch {
@@ -141,6 +141,16 @@ bootstrapMasterApp.post('/', async c => {
         expiraEmAtivacao,
       },
       200
+    )
+  }
+
+  if (body.somenteRecuperacao === true) {
+    return c.json(
+      {
+        error: 'Não existe primeiro Master pendente elegível para recuperação',
+        code: 'RECUPERACAO_INDISPONIVEL',
+      },
+      409
     )
   }
 
