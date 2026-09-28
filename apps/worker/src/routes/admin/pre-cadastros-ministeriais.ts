@@ -3,6 +3,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { CreateMembroSchema } from '@piedade/shared'
 import { executeAtomic } from '../../db/batch'
+import { prepararSincronizacaoConvocacoes, queriesSincronizacaoConvocacoes } from '../vinculos_funcionais'
 import { authMiddleware, Variables } from '../../middleware/auth'
 import {
   eMasterSistema,
@@ -300,6 +301,16 @@ adminPreCadastrosMinisteriaisApp.post('/:id/finalizar', async c => {
 
   const membroId = crypto.randomUUID()
   const agora = new Date().toISOString()
+  const vinculoDco = {
+    id: crypto.randomUUID(),
+    membroId,
+    funcaoId: funcaoDco.id,
+    casaId,
+    ativo: true,
+    createdAt: agora,
+    updatedAt: agora,
+  }
+  const sincronizacoesDco = await prepararSincronizacaoConvocacoes(db, vinculoDco, true)
 
   try {
     await executeAtomic(db, tx => [
@@ -309,15 +320,8 @@ adminPreCadastrosMinisteriaisApp.post('/:id/finalizar', async c => {
         createdAt: agora,
         updatedAt: agora,
       }),
-      tx.insert(schema.vinculosFuncionais).values({
-        id: crypto.randomUUID(),
-        membroId,
-        funcaoId: funcaoDco.id,
-        casaId,
-        ativo: true,
-        createdAt: agora,
-        updatedAt: agora,
-      }),
+      tx.insert(schema.vinculosFuncionais).values(vinculoDco),
+      ...queriesSincronizacaoConvocacoes(tx, vinculoDco, sincronizacoesDco, agora),
       tx
         .update(schema.preCadastrosMinisteriais)
         .set({
