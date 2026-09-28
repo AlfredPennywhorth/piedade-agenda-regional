@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { and, eq, inArray, or } from 'drizzle-orm'
-import { acessosConta, administracoes, casas, contasAcesso, membros, setores, tentativasAcesso, vinculosFuncionais } from '../db/schema'
+import { and, asc, eq, inArray, or } from 'drizzle-orm'
+import { acessosConta, administracoes, casas, contasAcesso, funcoes, membros, setores, tentativasAcesso, vinculosFuncionais } from '../db/schema'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, regionaisAdministradas } from '../security/permissoes'
@@ -87,6 +87,14 @@ function podeAdministrarRegionalDoContexto(contexto: any, regionalId: string | n
 
 function podeEscreverMembros(contexto: any): boolean {
   return eMasterSistema(contexto) || regionaisAdministradas(contexto).size > 0
+}
+
+async function obterFuncaoDco(db: any) {
+  return db
+    .select({ id: funcoes.id })
+    .from(funcoes)
+    .where(and(eq(funcoes.codigo, 'DCO'), eq(funcoes.ativo, true)))
+    .get()
 }
 
 async function membroPossuiMasterAtivo(db: any, membroId: string): Promise<boolean> {
@@ -213,7 +221,7 @@ membrosRouter.get('/', async (c) => {
   const visibilidade = await idsMembrosVisiveis(c)
 
   if (visibilidade === null) {
-    return c.json(await db.select(membroPublico).from(membros).all())
+    return c.json(await db.select(membroPublico).from(membros).orderBy(asc(membros.nome), asc(membros.id)).all())
   }
 
   const ids = Array.from(visibilidade.ids)
@@ -239,7 +247,7 @@ membrosRouter.get('/', async (c) => {
     }
   }
 
-  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR') || a.id.localeCompare(b.id))
   return c.json(data)
 })
 
@@ -329,10 +337,27 @@ membrosRouter.post('/', async (c) => {
       }
     }
 
+    const funcaoDco = await obterFuncaoDco(db)
+    if (!funcaoDco) {
+      return c.json(
+        { error: 'Função Diácono Casa de Oração (DCO) não cadastrada ou inativa', code: 'FUNCAO_DCO_INDISPONIVEL' },
+        409
+      )
+    }
+
     const id = crypto.randomUUID()
     await executarOperacaoComAudit(
       db,
-      (qdb) => [qdb.insert(membros).values({ id, ...parsed })],
+      (qdb) => [
+        qdb.insert(membros).values({ id, ...parsed }),
+        qdb.insert(vinculosFuncionais).values({
+          id: crypto.randomUUID(),
+          membroId: id,
+          funcaoId: funcaoDco.id,
+          casaId: parsed.casaId,
+          ativo: true,
+        }),
+      ],
       {
         acao: 'MEMBRO_CRIADO',
         atorMembroId: c.get('membroId') || null,
@@ -434,6 +459,14 @@ membrosRouter.patch('/:id', async (c) => {
           .where(eq(contasAcesso.membroId, id))
           .get()
       : null
+    const funcaoDco = moveuCasa ? await obterFuncaoDco(db) : null
+
+    if (moveuCasa && !funcaoDco) {
+      return c.json(
+        { error: 'Função Diácono Casa de Oração (DCO) não cadastrada ou inativa', code: 'FUNCAO_DCO_INDISPONIVEL' },
+        409
+      )
+    }
 
     if (moveuCasa) {
       await executarOperacaoComAudits(
@@ -444,6 +477,27 @@ membrosRouter.patch('/:id', async (c) => {
               .set({ ...parsed, updatedAt: agoraAtualizacao })
               .where(eq(membros.id, id))
           ]
+
+          queries.push(
+            qdb.update(vinculosFuncionais)
+              .set({ ativo: false, updatedAt: agoraAtualizacao })
+              .where(
+                and(
+                  eq(vinculosFuncionais.membroId, id),
+                  eq(vinculosFuncionais.funcaoId, funcaoDco!.id),
+                  eq(vinculosFuncionais.ativo, true)
+                )
+              ),
+            qdb.insert(vinculosFuncionais).values({
+              id: crypto.randomUUID(),
+              membroId: id,
+              funcaoId: funcaoDco!.id,
+              casaId: casaFinalId,
+              ativo: true,
+              createdAt: agoraAtualizacao,
+              updatedAt: agoraAtualizacao,
+            })
+          )
 
           if (contaDoMembro) {
             queries.push(
