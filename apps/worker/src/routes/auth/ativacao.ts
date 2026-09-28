@@ -114,15 +114,15 @@ ativacaoApp.post('/', async c => {
         and(
           eq(schema.contasAcesso.id, conta.id),
           eq(schema.contasAcesso.status, 'PENDENTE_ATIVACAO'),
-          sql\`EXISTS (
+          sql`EXISTS (
             SELECT 1
             FROM links_ativacao
-            WHERE id = \${link.id}
-              AND conta_acesso_id = \${conta.id}
+            WHERE id = ${link.id}
+              AND conta_acesso_id = ${conta.id}
               AND utilizado_em IS NULL
               AND revogado_em IS NULL
-              AND expira_em > \${agora}
-          )\`
+              AND expira_em > ${agora}
+          )`
         )
       ),
     tx
@@ -133,10 +133,10 @@ ativacaoApp.post('/', async c => {
           eq(schema.linksAtivacao.id, link.id),
           isNull(schema.linksAtivacao.utilizadoEm),
           isNull(schema.linksAtivacao.revogadoEm),
-          sql\`EXISTS (
+          sql`EXISTS (
             SELECT 1 FROM contas_acesso
-            WHERE id = \${conta.id} AND status = 'ATIVA' AND pin_salt = \${salt}
-          )\`
+            WHERE id = ${conta.id} AND status = 'ATIVA' AND pin_salt = ${salt}
+          )`
         )
       ),
     tx
@@ -147,10 +147,10 @@ ativacaoApp.post('/', async c => {
           eq(schema.linksAtivacao.contaAcessoId, conta.id),
           isNull(schema.linksAtivacao.utilizadoEm),
           isNull(schema.linksAtivacao.revogadoEm),
-          sql\`EXISTS (
+          sql`EXISTS (
             SELECT 1 FROM contas_acesso
-            WHERE id = \${conta.id} AND status = 'ATIVA' AND pin_salt = \${salt}
-          )\`
+            WHERE id = ${conta.id} AND status = 'ATIVA' AND pin_salt = ${salt}
+          )`
         )
       ),
     tx
@@ -160,10 +160,10 @@ ativacaoApp.post('/', async c => {
         and(
           eq(schema.sessoes.contaAcessoId, conta.id),
           isNull(schema.sessoes.revogadoEm),
-          sql\`EXISTS (
+          sql`EXISTS (
             SELECT 1 FROM contas_acesso
-            WHERE id = \${conta.id} AND status = 'ATIVA' AND pin_salt = \${salt}
-          )\`
+            WHERE id = ${conta.id} AND status = 'ATIVA' AND pin_salt = ${salt}
+          )`
         )
       ),
     tx
@@ -171,10 +171,10 @@ ativacaoApp.post('/', async c => {
       .where(
         and(
           eq(schema.rateLimitsAutenticacao.chaveHash, loginRateLimitKey),
-          sql\`EXISTS (
+          sql`EXISTS (
             SELECT 1 FROM contas_acesso
-            WHERE id = \${conta.id} AND status = 'ATIVA' AND pin_salt = \${salt}
-          )\`
+            WHERE id = ${conta.id} AND status = 'ATIVA' AND pin_salt = ${salt}
+          )`
         )
       ),
     tx.insert(schema.tentativasAcesso).values({
