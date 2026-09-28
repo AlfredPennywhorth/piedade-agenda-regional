@@ -797,7 +797,7 @@ export function EventosView() {
                             <option value="regional">Regional</option>
                             <option value="administracao">Administração</option>
                             <option value="setor">Setor</option>
-                            <option value="casa">Casa</option>
+                            <option value="casa">Casa de Oração</option>
                             <option value="grupoTrabalho">Grupo de Trabalho</option>
                           </select>
                         </div>
@@ -847,7 +847,7 @@ export function EventosView() {
                           )}
                           {tipoEscopo === 'casa' && (
                             <>
-                              <label htmlFor="casaId" className="block text-xs font-medium text-slate-700 mb-1">Casa *</label>
+                              <label htmlFor="casaId" className="block text-xs font-medium text-slate-700 mb-1">Casa de Oração *</label>
                               <select
                                 id="casaId"
                                 value={formData.casaId || ''}
