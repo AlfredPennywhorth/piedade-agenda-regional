@@ -8,6 +8,7 @@ import { gerarTokenAleatorio, hashToken } from '../../security/tokens'
 type BootstrapVariables = { db: any }
 
 const CONFIRMACAO_BOOTSTRAP = 'CRIAR PRIMEIRO MASTER'
+const CONFIRMACAO_RECUPERACAO = 'RECUPERAR PRIMEIRO MASTER'
 const VALIDADE_LINK_ATIVACAO_MS = 7 * 24 * 60 * 60 * 1000
 
 async function segredoCorresponde(recebido: string, esperado: string): Promise<boolean> {
@@ -56,7 +57,7 @@ bootstrapMasterApp.post('/', async c => {
 
   if (
     !body.codigoCarteirinha ||
-    body.confirmacao !== CONFIRMACAO_BOOTSTRAP
+    ![CONFIRMACAO_BOOTSTRAP, CONFIRMACAO_RECUPERACAO].includes(body.confirmacao ?? '')
   ) {
     return c.json(
       {
@@ -85,6 +86,15 @@ bootstrapMasterApp.post('/', async c => {
     .innerJoin(schema.membros, eq(schema.contasAcesso.membroId, schema.membros.id))
     .where(eq(schema.bootstrapMaster.id, 'PRIMEIRO_MASTER'))
     .get()
+
+  const recuperacaoSolicitada = body.confirmacao === CONFIRMACAO_RECUPERACAO
+
+  if (recuperacaoSolicitada && !bootstrapExistente) {
+    return c.json(
+      { error: 'Não existe primeiro Master pendente para recuperação', code: 'RECUPERACAO_INDISPONIVEL' },
+      409
+    )
+  }
 
   if (
     bootstrapExistente &&
@@ -141,6 +151,13 @@ bootstrapMasterApp.post('/', async c => {
         expiraEmAtivacao,
       },
       200
+    )
+  }
+
+  if (recuperacaoSolicitada) {
+    return c.json(
+      { error: 'Primeiro Master não está elegível para recuperação', code: 'RECUPERACAO_INDISPONIVEL' },
+      409
     )
   }
 
