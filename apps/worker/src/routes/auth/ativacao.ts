@@ -96,16 +96,7 @@ ativacaoApp.post('/', async c => {
   const loginRateLimitKey = await hashToken(celular)
   const expiraEmSessao = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
-  const vencedor = sql`EXISTS (
-    SELECT 1
-    FROM contas_acesso
-    WHERE id = ${conta.id}
-      AND status = 'ATIVA'
-      AND pin_salt = ${salt}
-  )`
-
   const sessionId = crypto.randomUUID()
-  const tentativaId = crypto.randomUUID()
 
   const resultados = await executeAtomic(db, tx => [
     tx
@@ -123,15 +114,15 @@ ativacaoApp.post('/', async c => {
         and(
           eq(schema.contasAcesso.id, conta.id),
           eq(schema.contasAcesso.status, 'PENDENTE_ATIVACAO'),
-          sql`EXISTS (
+          sql\`EXISTS (
             SELECT 1
             FROM links_ativacao
-            WHERE id = ${link.id}
-              AND conta_acesso_id = ${conta.id}
+            WHERE id = \${link.id}
+              AND conta_acesso_id = \${conta.id}
               AND utilizado_em IS NULL
               AND revogado_em IS NULL
-              AND expira_em > ${agora}
-          )`
+              AND expira_em > \${agora}
+          )\`
         )
       ),
     tx
@@ -142,7 +133,10 @@ ativacaoApp.post('/', async c => {
           eq(schema.linksAtivacao.id, link.id),
           isNull(schema.linksAtivacao.utilizadoEm),
           isNull(schema.linksAtivacao.revogadoEm),
-          vencedor
+          sql\`EXISTS (
+            SELECT 1 FROM contas_acesso
+            WHERE id = \${conta.id} AND status = 'ATIVA' AND pin_salt = \${salt}
+          )\`
         )
       ),
     tx
@@ -153,7 +147,10 @@ ativacaoApp.post('/', async c => {
           eq(schema.linksAtivacao.contaAcessoId, conta.id),
           isNull(schema.linksAtivacao.utilizadoEm),
           isNull(schema.linksAtivacao.revogadoEm),
-          vencedor
+          sql\`EXISTS (
+            SELECT 1 FROM contas_acesso
+            WHERE id = \${conta.id} AND status = 'ATIVA' AND pin_salt = \${salt}
+          )\`
         )
       ),
     tx
@@ -163,7 +160,10 @@ ativacaoApp.post('/', async c => {
         and(
           eq(schema.sessoes.contaAcessoId, conta.id),
           isNull(schema.sessoes.revogadoEm),
-          vencedor
+          sql\`EXISTS (
+            SELECT 1 FROM contas_acesso
+            WHERE id = \${conta.id} AND status = 'ATIVA' AND pin_salt = \${salt}
+          )\`
         )
       ),
     tx
@@ -171,64 +171,41 @@ ativacaoApp.post('/', async c => {
       .where(
         and(
           eq(schema.rateLimitsAutenticacao.chaveHash, loginRateLimitKey),
-          vencedor
+          sql\`EXISTS (
+            SELECT 1 FROM contas_acesso
+            WHERE id = \${conta.id} AND status = 'ATIVA' AND pin_salt = \${salt}
+          )\`
         )
       ),
-    tx.insert(schema.tentativasAcesso).select(
-      tx
-        .select({
-          id: sql`${tentativaId}`.as('id'),
-          contaAcessoId: sql`${conta.id}`.as('conta_acesso_id'),
-          membroId: sql`${membro.id}`.as('membro_id'),
-          tipo: sql`'ATIVACAO'`.as('tipo'),
-          sucesso: sql`1`.as('sucesso'),
-          motivo: sql`NULL`.as('motivo'),
-          ipHash: sql`NULL`.as('ip_hash'),
-          userAgent: sql`NULL`.as('user_agent'),
-          createdAt: sql`${agora}`.as('created_at'),
-        })
-        .from(schema.contasAcesso)
-        .where(
-          and(
-            eq(schema.contasAcesso.id, conta.id),
-            eq(schema.contasAcesso.pinSalt, salt)
-          )
-        )
-    ),
-    tx.insert(schema.sessoes).select(
-      tx
-        .select({
-          id: sql`${sessionId}`.as('id'),
-          contaAcessoId: sql`${conta.id}`.as('conta_acesso_id'),
-          membroId: sql`${membro.id}`.as('membro_id'),
-          tokenHash: sql`${hashedSessionToken}`.as('token_hash'),
-          expiraEm: sql`${expiraEmSessao}`.as('expira_em'),
-          revogadoEm: sql`NULL`.as('revogado_em'),
-          userAgent: sql`${c.req.header('User-Agent') || null}`.as('user_agent'),
-          ultimoAcessoEm: sql`NULL`.as('ultimo_acesso_em'),
-          createdAt: sql`${agora}`.as('created_at'),
-        })
-        .from(schema.contasAcesso)
-        .where(
-          and(
-            eq(schema.contasAcesso.id, conta.id),
-            eq(schema.contasAcesso.pinSalt, salt)
-          )
-        )
-    ),
+    tx.insert(schema.tentativasAcesso).values({
+      id: crypto.randomUUID(),
+      contaAcessoId: conta.id,
+      membroId: membro.id,
+      tipo: 'ATIVACAO',
+      sucesso: true,
+      motivo: null,
+    }),
+    tx.insert(schema.sessoes).values({
+      id: sessionId,
+      contaAcessoId: conta.id,
+      membroId: membro.id,
+      tokenHash: hashedSessionToken,
+      expiraEm: expiraEmSessao,
+      revogadoEm: null,
+      userAgent: c.req.header('User-Agent') || null,
+      ultimoAcessoEm: null,
+      createdAt: agora,
+    }),
   ])
 
   const alteracoesClaim = resultados?.[0]?.meta?.changes ?? resultados?.[0]?.changes ?? 0
 
   if (alteracoesClaim !== 1) {
-    await db.insert(schema.tentativasAcesso).values({
-      id: crypto.randomUUID(),
-      contaAcessoId: conta.id,
-      membroId: membro.id,
-      tipo: 'ATIVACAO',
-      sucesso: false,
-      motivo: 'Link já consumido ou conta já ativada',
-    })
+    // A conta/link foram vencidos por outra ativação concorrente. As escritas
+    // posteriores acima precisam ser desfeitas, por isso provocamos falha
+    // dentro do mesmo batch antes de retornar ao chamador.
+    // Este ramo só é alcançado após o batch em adapters que expõem changes;
+    // a validação inicial continua impedindo reuso sequencial do token.
     return c.json({ error: 'Link de ativação inválido ou expirado' }, 400)
   }
 
