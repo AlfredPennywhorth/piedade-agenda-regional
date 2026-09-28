@@ -112,15 +112,17 @@ type SincronizacaoConvocacao = {
   destinatarioNovo: boolean
 }
 
-async function prepararSincronizacaoConvocacoes(db: any, vinculo: any): Promise<SincronizacaoConvocacao[]> {
+export async function prepararSincronizacaoConvocacoes(db: any, vinculo: any, assumirMembroAtivo = false): Promise<SincronizacaoConvocacao[]> {
   if (!vinculo?.ativo) return []
 
-  const membro = await db
-    .select({ ativo: membros.ativo })
-    .from(membros)
-    .where(eq(membros.id, vinculo.membroId))
-    .get()
-  if (!membro?.ativo) return []
+  if (!assumirMembroAtivo) {
+    const membro = await db
+      .select({ ativo: membros.ativo })
+      .from(membros)
+      .where(eq(membros.id, vinculo.membroId))
+      .get()
+    if (!membro?.ativo) return []
+  }
 
   const agoraIso = new Date().toISOString()
   const candidatas = await db
@@ -172,7 +174,7 @@ async function prepararSincronizacaoConvocacoes(db: any, vinculo: any): Promise<
   return resultado
 }
 
-function queriesSincronizacaoConvocacoes(
+export function queriesSincronizacaoConvocacoes(
   qdb: any,
   vinculo: any,
   sincronizacoes: SincronizacaoConvocacao[],
