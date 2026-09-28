@@ -121,97 +121,122 @@ async function podeAdministrarMembro(
   return podeAdministrarRegionalDoContexto(contexto, regionalId)
 }
 
-async function idsMembrosVisiveis(c: any): Promise<Set<string> | null> {
+type VisibilidadeMembros = {
+  ids: Set<string>
+  idsComCadastroCompleto: Set<string>
+}
+
+async function idsMembrosVisiveis(c: any): Promise<VisibilidadeMembros | null> {
   const db = c.get('db')
   const contexto = c.get('contextoPermissoes')
 
   if (eMasterSistema(contexto)) return null
 
   const ids = new Set<string>([contexto.membroId])
-  const regionaisIds = new Set<string>(regionaisAdministradas(contexto))
-  const administracoesIds = new Set<string>()
-  const setoresIds = new Set<string>()
-  const casasIds = new Set<string>()
-  const gtsIds = new Set<string>()
+  const idsComCadastroCompleto = new Set<string>([contexto.membroId])
+  const regionaisAdministradasIds = new Set<string>(regionaisAdministradas(contexto))
+  const regionaisRelatoriosIds = new Set<string>()
+  const administracoesRelatoriosIds = new Set<string>()
+  const setoresRelatoriosIds = new Set<string>()
+  const casasRelatoriosIds = new Set<string>()
+  const gtsRelatoriosIds = new Set<string>()
 
   for (const acesso of contexto.acessosAtivos) {
     if (acesso.perfilCodigo !== 'GESTOR_RELATORIOS' || !acesso.escopoId) continue
 
-    if (acesso.escopoTipo === 'REGIONAL') regionaisIds.add(acesso.escopoId)
-    if (acesso.escopoTipo === 'ADMINISTRACAO') administracoesIds.add(acesso.escopoId)
-    if (acesso.escopoTipo === 'SETOR') setoresIds.add(acesso.escopoId)
-    if (acesso.escopoTipo === 'CASA') casasIds.add(acesso.escopoId)
-    if (acesso.escopoTipo === 'GRUPO_TRABALHO') gtsIds.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'REGIONAL') regionaisRelatoriosIds.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'ADMINISTRACAO') administracoesRelatoriosIds.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'SETOR') setoresRelatoriosIds.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'CASA') casasRelatoriosIds.add(acesso.escopoId)
+    if (acesso.escopoTipo === 'GRUPO_TRABALHO') gtsRelatoriosIds.add(acesso.escopoId)
   }
 
-  const filtros = [eq(membros.id, contexto.membroId)]
-  if (regionaisIds.size > 0) {
-    filtros.push(inArray(administracoes.regionalId, Array.from(regionaisIds)))
-  }
-  if (administracoesIds.size > 0) {
-    filtros.push(inArray(administracoes.id, Array.from(administracoesIds)))
-  }
-  if (setoresIds.size > 0) {
-    filtros.push(inArray(setores.id, Array.from(setoresIds)))
-  }
-  if (casasIds.size > 0) {
-    filtros.push(inArray(casas.id, Array.from(casasIds)))
+  const buscarMembrosTerritoriais = async (filtros: any[]) => {
+    if (filtros.length === 0) return []
+    return db
+      .select({ id: membros.id })
+      .from(membros)
+      .leftJoin(casas, eq(membros.casaId, casas.id))
+      .leftJoin(setores, eq(casas.setorId, setores.id))
+      .leftJoin(administracoes, eq(setores.administracaoId, administracoes.id))
+      .where(or(...filtros))
+      .all()
   }
 
-  const rows = await db
-    .select({ id: membros.id })
-    .from(membros)
-    .leftJoin(casas, eq(membros.casaId, casas.id))
-    .leftJoin(setores, eq(casas.setorId, setores.id))
-    .leftJoin(administracoes, eq(setores.administracaoId, administracoes.id))
-    .where(or(...filtros))
-    .all()
+  const filtrosAdministrativos = [eq(membros.id, contexto.membroId)]
+  if (regionaisAdministradasIds.size > 0) {
+    filtrosAdministrativos.push(
+      inArray(administracoes.regionalId, Array.from(regionaisAdministradasIds))
+    )
+  }
+  const membrosAdministrativos = await buscarMembrosTerritoriais(filtrosAdministrativos)
+  membrosAdministrativos.forEach((row: { id: string }) => {
+    ids.add(row.id)
+    idsComCadastroCompleto.add(row.id)
+  })
 
-  rows.forEach((row: { id: string }) => ids.add(row.id))
+  const filtrosRelatorios = []
+  if (regionaisRelatoriosIds.size > 0) {
+    filtrosRelatorios.push(inArray(administracoes.regionalId, Array.from(regionaisRelatoriosIds)))
+  }
+  if (administracoesRelatoriosIds.size > 0) {
+    filtrosRelatorios.push(inArray(administracoes.id, Array.from(administracoesRelatoriosIds)))
+  }
+  if (setoresRelatoriosIds.size > 0) {
+    filtrosRelatorios.push(inArray(setores.id, Array.from(setoresRelatoriosIds)))
+  }
+  if (casasRelatoriosIds.size > 0) {
+    filtrosRelatorios.push(inArray(casas.id, Array.from(casasRelatoriosIds)))
+  }
+  const membrosRelatorios = await buscarMembrosTerritoriais(filtrosRelatorios)
+  membrosRelatorios.forEach((row: { id: string }) => ids.add(row.id))
 
-  if (gtsIds.size > 0) {
+  if (gtsRelatoriosIds.size > 0) {
     const membrosGt = await db
       .select({ id: vinculosFuncionais.membroId })
       .from(vinculosFuncionais)
       .where(
         and(
           eq(vinculosFuncionais.ativo, true),
-          inArray(vinculosFuncionais.grupoTrabalhoId, Array.from(gtsIds))
+          inArray(vinculosFuncionais.grupoTrabalhoId, Array.from(gtsRelatoriosIds))
         )
       )
       .all()
     membrosGt.forEach((row: { id: string }) => ids.add(row.id))
   }
 
-  return ids
+  return { ids, idsComCadastroCompleto }
 }
 
 membrosRouter.get('/', async (c) => {
   const db = c.get('db')
-  const contexto = c.get('contextoPermissoes')
-  const idsVisiveis = await idsMembrosVisiveis(c)
-  // Gestores de relatórios precisam apenas identificar e filtrar membros.
-  // Dados pessoais e cadastrais ficam restritos a quem administra pessoas.
-  const projecao = podeEscreverMembros(contexto) ? membroPublico : membroParaRelatorio
+  const visibilidade = await idsMembrosVisiveis(c)
 
-  if (idsVisiveis === null) {
-    return c.json(await db.select(projecao).from(membros).all())
+  if (visibilidade === null) {
+    return c.json(await db.select(membroPublico).from(membros).all())
   }
 
-  const ids = Array.from(idsVisiveis)
+  const ids = Array.from(visibilidade.ids)
   if (ids.length === 0) return c.json([])
 
   const LIMITE_IDS_D1 = 90
   const data: any[] = []
+  const idsCompletos = Array.from(visibilidade.idsComCadastroCompleto)
+  const idsMinimizados = ids.filter(id => !visibilidade.idsComCadastroCompleto.has(id))
 
-  for (let i = 0; i < ids.length; i += LIMITE_IDS_D1) {
-    const lote = ids.slice(i, i + LIMITE_IDS_D1)
-    const parcial = await db
-      .select(projecao)
-      .from(membros)
-      .where(inArray(membros.id, lote))
-      .all()
-    data.push(...parcial)
+  for (const [loteIds, projecao] of [
+    [idsCompletos, membroPublico],
+    [idsMinimizados, membroParaRelatorio],
+  ] as const) {
+    for (let i = 0; i < loteIds.length; i += LIMITE_IDS_D1) {
+      const lote = loteIds.slice(i, i + LIMITE_IDS_D1)
+      const parcial = await db
+        .select(projecao)
+        .from(membros)
+        .where(inArray(membros.id, lote))
+        .all()
+      data.push(...parcial)
+    }
   }
 
   data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
@@ -221,16 +246,16 @@ membrosRouter.get('/', async (c) => {
 membrosRouter.get('/:id', async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')
-  const contexto = c.get('contextoPermissoes')
-  const projecao = podeEscreverMembros(contexto) ? membroPublico : membroParaRelatorio
-  const data = await db.select(projecao).from(membros).where(eq(membros.id, id)).get()
-  
-  if (!data) return c.json({ error: 'Membro não encontrado' }, 404)
-
-  const idsVisiveis = await idsMembrosVisiveis(c)
-  if (idsVisiveis !== null && !idsVisiveis.has(id)) {
+  const visibilidade = await idsMembrosVisiveis(c)
+  if (visibilidade !== null && !visibilidade.ids.has(id)) {
     return c.json({ error: 'Acesso não autorizado para este membro', code: 'FORBIDDEN' }, 403)
   }
+
+  const projecao = visibilidade === null || visibilidade.idsComCadastroCompleto.has(id)
+    ? membroPublico
+    : membroParaRelatorio
+  const data = await db.select(projecao).from(membros).where(eq(membros.id, id)).get()
+  if (!data) return c.json({ error: 'Membro não encontrado' }, 404)
 
   return c.json(data)
 })
@@ -242,8 +267,8 @@ membrosRouter.get('/:id/vinculos', async (c) => {
   const membroExists = await db.select().from(membros).where(eq(membros.id, id)).get()
   if (!membroExists) return c.json({ error: 'Membro não encontrado' }, 404)
 
-  const idsVisiveis = await idsMembrosVisiveis(c)
-  if (idsVisiveis !== null && !idsVisiveis.has(id)) {
+  const visibilidade = await idsMembrosVisiveis(c)
+  if (visibilidade !== null && !visibilidade.ids.has(id)) {
     return c.json({ error: 'Acesso não autorizado para este membro', code: 'FORBIDDEN' }, 403)
   }
 

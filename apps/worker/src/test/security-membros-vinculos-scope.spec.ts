@@ -303,4 +303,50 @@ describe('PR-SEC-01 — leitura de Membros e Vínculos por escopo', () => {
     expect(comum).not.toHaveProperty('dataOrdenacao')
   })
 
+  it('mistura cadastro administrativo e relatórios sem expor dados do escopo somente de relatório', async () => {
+    const mistoId = 'm-admin-a-relator-b'
+    sqlite.prepare(
+      'INSERT INTO membros (id, nome, casa_id, ativo) VALUES (?, ?, ?, 1)'
+    ).run(mistoId, 'Admin A e Relator B', ids.casaA)
+
+    const token = await criarSessao(
+      mistoId,
+      'token-admin-a-relator-b',
+      'ADMINISTRADOR_SISTEMA',
+      'REGIONAL',
+      ids.regionalA
+    )
+    sqlite.prepare(`
+      INSERT INTO acessos_conta
+        (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id, ativo)
+      VALUES (?, ?, 'GESTOR_RELATORIOS', 'REGIONAL', ?, 1)
+    `).run(`acesso-relatorio-${mistoId}`, `conta-${mistoId}`, ids.regionalB)
+    sqlite.prepare(`
+      UPDATE membros
+      SET data_ordenacao = ?, codigo_carteirinha = ?, celular = ?
+      WHERE id = ?
+    `).run('2002-02-02', 'CART-A-001', '11888888881', ids.comumA)
+    sqlite.prepare(`
+      UPDATE membros
+      SET data_ordenacao = ?, codigo_carteirinha = ?, celular = ?
+      WHERE id = ?
+    `).run('2003-03-03', 'CART-B-001', '11888888882', ids.comumB)
+
+    const lista = await req(token, '/api/v1/membros')
+    expect(lista.status).toBe(200)
+    const pessoas = await lista.json() as Array<Record<string, unknown>>
+    const membroA = pessoas.find(item => item.id === ids.comumA)
+    const membroB = pessoas.find(item => item.id === ids.comumB)
+
+    expect(membroA).toHaveProperty('celular', '11888888881')
+    expect(membroB).toMatchObject({ id: ids.comumB, nome: 'Comum B', casaId: ids.casaB, ativo: true })
+    expect(membroB).not.toHaveProperty('celular')
+    expect(membroB).not.toHaveProperty('codigoCarteirinha')
+    expect(membroB).not.toHaveProperty('dataOrdenacao')
+
+    const detalheB = await req(token, `/api/v1/membros/${ids.comumB}`)
+    expect(detalheB.status).toBe(200)
+    expect(await detalheB.json()).not.toHaveProperty('celular')
+  })
+
 })
