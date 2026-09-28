@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { gruposTrabalho, participacoesGruposTrabalho, setores, administracoes } from '../db/schema'
 import { CreateGrupoTrabalhoSchema, UpdateGrupoTrabalhoSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
@@ -29,13 +29,14 @@ gruposTrabalhoRouter.get('/', async (c) => {
   const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
 
   if (visiveis.tudo) {
-    return c.json(await db.select().from(gruposTrabalho).orderBy(asc(gruposTrabalho.nome), asc(gruposTrabalho.id)).all())
+    return c.json(await db.select().from(gruposTrabalho).orderBy(asc(gruposTrabalho.nome)(gruposTrabalho.id)).all())
   }
 
   const ids = Array.from(visiveis.gruposTrabalhoIds)
   if (ids.length === 0) return c.json([])
 
-  const data = await db.select().from(gruposTrabalho).where(inArray(gruposTrabalho.id, ids)).orderBy(asc(gruposTrabalho.nome), asc(gruposTrabalho.id)).all()
+  const data = await db.select().from(gruposTrabalho).where(inArray(gruposTrabalho.id, ids)).all()
+  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
   return c.json(data)
 })
 
