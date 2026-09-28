@@ -93,6 +93,5 @@ jobs:
         run: >
           pnpm --filter @piedade/worker exec wrangler pages deploy ../web/dist
           --project-name=piedade-agenda-regional
-          --branch=main
           --commit-hash=${{ github.sha }}
           --commit-message="Production ${{ github.sha }}"
