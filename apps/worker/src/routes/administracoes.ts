@@ -29,13 +29,16 @@ administracoesRouter.get('/', async (c) => {
   const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
 
   if (visiveis.tudo) {
-    return c.json(await db.select().from(administracoes).all())
+    const data = await db.select().from(administracoes).all()
+    data.sort((a: typeof administracoes.$inferSelect, b: typeof administracoes.$inferSelect) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
+    return c.json(data)
   }
 
   const ids = Array.from(visiveis.administracoesIds)
   if (ids.length === 0) return c.json([])
 
   const data = await db.select().from(administracoes).where(inArray(administracoes.id, ids)).all()
+  data.sort((a: typeof administracoes.$inferSelect, b: typeof administracoes.$inferSelect) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
   return c.json(data)
 })
 

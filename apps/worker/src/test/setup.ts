@@ -109,6 +109,17 @@ export function setupDb(sqlite: any) {
     END;
 
     CREATE TABLE IF NOT EXISTS funcoes (id text PRIMARY KEY NOT NULL, nome text NOT NULL, codigo text, descricao text, ativo integer DEFAULT true NOT NULL, created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_funcoes_dco_unico
+      ON funcoes(codigo)
+      WHERE codigo = 'DCO';
+    INSERT OR IGNORE INTO funcoes (id, nome, codigo, descricao, ativo)
+      VALUES (
+        'funcao-dco-canonica',
+        'Diácono Casa de Oração',
+        'DCO',
+        'Função canônica vinculada automaticamente ao Diácono em sua Casa de Oração.',
+        1
+      );
     
     CREATE TABLE IF NOT EXISTS vinculos_funcionais (
       id text PRIMARY KEY NOT NULL,

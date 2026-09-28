@@ -213,14 +213,22 @@ export const participacoesGruposTrabalho = sqliteTable(
   })
 )
 
-export const funcoes = sqliteTable('funcoes', {
-  id: text('id').primaryKey(),
-  nome: text('nome').notNull(),
-  codigo: text('codigo'),
-  descricao: text('descricao'),
-  ativo: ativoDefault,
-  ...timestampsS02,
-})
+export const funcoes = sqliteTable(
+  'funcoes',
+  {
+    id: text('id').primaryKey(),
+    nome: text('nome').notNull(),
+    codigo: text('codigo'),
+    descricao: text('descricao'),
+    ativo: ativoDefault,
+    ...timestampsS02,
+  },
+  table => ({
+    uniqueDco: uniqueIndex('idx_funcoes_dco_unico')
+      .on(table.codigo)
+      .where(sql`${table.codigo} = 'DCO'`),
+  })
+)
 
 export const vinculosFuncionais = sqliteTable(
   'vinculos_funcionais',
