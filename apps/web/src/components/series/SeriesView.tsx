@@ -14,6 +14,13 @@ interface Local {
   nome: string
 }
 
+interface EspacoLocal {
+  id: string
+  localId: string
+  nome: string
+  ativo: boolean
+}
+
 export interface SerieRecorrencia {
   id: string
   titulo: string
@@ -30,6 +37,7 @@ export interface SerieRecorrencia {
   diaMes: number | null
   posicaoSemanaMes: number | null
   localId: string | null
+  espacoId: string | null
   urlOnline: string | null
   organizadorMembroId: string | null
   regionalId: string | null
@@ -48,6 +56,7 @@ export function SeriesView() {
   
   // Lookups
   const [locais, setLocais] = useState<Local[]>([])
+  const [espacos, setEspacos] = useState<EspacoLocal[]>([])
   const [membros, setMembros] = useState<Membro[]>([])
   const [regionais, setRegionais] = useState<Regional[]>([])
   const [administracoes, setAdministracoes] = useState<Administracao[]>([])
@@ -85,6 +94,7 @@ export function SeriesView() {
     diaMes: 1,
     posicaoSemanaMes: 1,
     localId: '',
+    espacoId: '',
     urlOnline: '',
     organizadorMembroId: '',
     regionalId: '',
@@ -107,6 +117,7 @@ export function SeriesView() {
       const seriesPromise = fetchWithAuth<SerieRecorrencia[]>('/series-recorrencia')
       const lookupsPromise = Promise.allSettled([
         fetchWithAuth<Local[]>('/locais'),
+        fetchWithAuth<EspacoLocal[]>('/espacos-locais?ativo=true'),
         fetchWithAuth<Membro[]>('/membros'),
         fetchWithAuth<Regional[]>('/regionais'),
         fetchWithAuth<Administracao[]>('/administracoes'),
@@ -122,6 +133,7 @@ export function SeriesView() {
 
       const setters = [
         (valor: unknown) => setLocais(valor as Local[]),
+        (valor: unknown) => setEspacos(valor as EspacoLocal[]),
         (valor: unknown) => setMembros(valor as Membro[]),
         (valor: unknown) => setRegionais(valor as Regional[]),
         (valor: unknown) => setAdministracoes(valor as Administracao[]),
@@ -172,6 +184,7 @@ export function SeriesView() {
       diaMes: null,
       posicaoSemanaMes: null,
       localId: '',
+      espacoId: '',
       urlOnline: '',
       organizadorMembroId: '',
       regionalId: '',
@@ -204,6 +217,7 @@ export function SeriesView() {
       diaMes: serie.diaMes,
       posicaoSemanaMes: serie.posicaoSemanaMes,
       localId: serie.localId || '',
+      espacoId: serie.espacoId || '',
       urlOnline: serie.urlOnline || '',
       organizadorMembroId: serie.organizadorMembroId || '',
       regionalId: serie.regionalId || '',
@@ -382,7 +396,7 @@ export function SeriesView() {
         title={serieEditandoId ? 'Editar Série de Recorrência' : 'Nova Série de Recorrência'}
         initialData={formData}
         initialTipoEscopo={tipoEscopo}
-        lookups={{ locais, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
+        lookups={{ locais, espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
         externalError={formOpen ? (erro ?? lookupAviso) : null}
         onSubmit={async (data) => {
           if (serieEditandoId) {
