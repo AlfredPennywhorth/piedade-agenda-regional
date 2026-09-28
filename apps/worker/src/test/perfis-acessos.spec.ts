@@ -271,6 +271,34 @@ describe('Perfis, escopos e governança — PR-ACC-03', () => {
     expect(depoisDeAtivar.status).toBe(409)
   })
 
+  it('modo somente recuperação nunca cria o primeiro Master', async () => {
+    sqlite.prepare(`DELETE FROM contas_acesso WHERE id = ?`).run('conta-master')
+
+    const response = await requisicao('/api/v1/bootstrap/master', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bootstrap-Secret': bootstrapSecret,
+      },
+      body: JSON.stringify({
+        codigoCarteirinha: 'CARTEIRA-MASTER',
+        confirmacao: 'CRIAR PRIMEIRO MASTER',
+        somenteRecuperacao: true,
+      }),
+    })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'RECUPERACAO_INDISPONIVEL' })
+    expect(
+      sqlite.prepare(`SELECT COUNT(*) AS total FROM bootstrap_master`).get()
+    ).toMatchObject({ total: 0 })
+    expect(
+      sqlite.prepare(
+        `SELECT COUNT(*) AS total FROM acessos_conta WHERE perfil_codigo = 'MASTER_SISTEMA'`
+      ).get()
+    ).toMatchObject({ total: 0 })
+  })
+
   it('impede Master com escopo institucional', () => {
     expect(() =>
       sqlite
