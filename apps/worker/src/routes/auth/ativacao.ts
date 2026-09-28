@@ -99,7 +99,17 @@ ativacaoApp.post('/', async c => {
   await executeAtomic(db, tx => [
     tx
       .update(schema.linksAtivacao)
-      .set({ utilizadoEm: agora, updatedAt: agora })
+      .set({ revogadoEm: agora, updatedAt: agora })
+      .where(
+        and(
+          eq(schema.linksAtivacao.contaAcessoId, conta.id),
+          isNull(schema.linksAtivacao.utilizadoEm),
+          isNull(schema.linksAtivacao.revogadoEm)
+        )
+      ),
+    tx
+      .update(schema.linksAtivacao)
+      .set({ utilizadoEm: agora, revogadoEm: null, updatedAt: agora })
       .where(eq(schema.linksAtivacao.id, link.id)),
     tx
       .update(schema.contasAcesso)
