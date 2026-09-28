@@ -23,6 +23,10 @@ export interface AgendaItem {
     urlMaps?: string | null
     urlWaze?: string | null
   } | null
+  espaco?: {
+    id: string
+    nome: string
+  } | null
   destinatarioId: string
   rsvp: {
     resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI'
