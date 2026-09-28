@@ -64,7 +64,7 @@ ativacaoApp.post('/', async c => {
 
   const { link, conta, membro } = queryResult
 
-  if (!membro.ativo || conta.status === 'BLOQUEADA' || conta.status === 'DESATIVADA') {
+  if (!membro.ativo || conta.status !== 'PENDENTE_ATIVACAO') {
     await db.insert(schema.tentativasAcesso).values({
       id: crypto.randomUUID(),
       contaAcessoId: conta.id,
@@ -101,6 +101,16 @@ ativacaoApp.post('/', async c => {
       .update(schema.linksAtivacao)
       .set({ utilizadoEm: agora, updatedAt: agora })
       .where(eq(schema.linksAtivacao.id, link.id)),
+    tx
+      .update(schema.linksAtivacao)
+      .set({ revogadoEm: agora, updatedAt: agora })
+      .where(
+        and(
+          eq(schema.linksAtivacao.contaAcessoId, conta.id),
+          isNull(schema.linksAtivacao.utilizadoEm),
+          isNull(schema.linksAtivacao.revogadoEm)
+        )
+      ),
     tx
       .update(schema.contasAcesso)
       .set({
