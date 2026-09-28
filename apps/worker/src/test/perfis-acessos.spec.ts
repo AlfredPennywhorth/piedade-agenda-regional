@@ -171,6 +171,106 @@ describe('Perfis, escopos e governança — PR-ACC-03', () => {
     expect(me.status).toBe(200)
   })
 
+  it('rejeita bootstrap quando o membro selecionado não possui celular', async () => {
+    sqlite.prepare(`DELETE FROM contas_acesso WHERE id = ?`).run('conta-master')
+    sqlite.prepare(`UPDATE membros SET celular = NULL WHERE id = ?`).run('membro-master')
+
+    const response = await requisicao('/api/v1/bootstrap/master', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bootstrap-Secret': bootstrapSecret,
+      },
+      body: JSON.stringify({
+        codigoCarteirinha: 'CARTEIRA-MASTER',
+        confirmacao: 'CRIAR PRIMEIRO MASTER',
+      }),
+    })
+
+    expect(response.status).toBe(404)
+    expect(
+      sqlite.prepare(`SELECT COUNT(*) AS total FROM bootstrap_master`).get()
+    ).toMatchObject({ total: 0 })
+  })
+
+  it('regenera link do mesmo primeiro Master enquanto a conta estiver pendente', async () => {
+    sqlite.prepare(`DELETE FROM contas_acesso WHERE id = ?`).run('conta-master')
+
+    const executar = () =>
+      requisicao('/api/v1/bootstrap/master', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Bootstrap-Secret': bootstrapSecret,
+        },
+        body: JSON.stringify({
+          codigoCarteirinha: 'CARTEIRA-MASTER',
+          confirmacao: 'CRIAR PRIMEIRO MASTER',
+        }),
+      })
+
+    const primeira = await executar()
+    expect(primeira.status).toBe(201)
+    const primeiroBody = (await primeira.json()) as any
+
+    const segunda = await executar()
+    expect(segunda.status).toBe(200)
+    const segundoBody = (await segunda.json()) as any
+    expect(segundoBody.tokenAtivacao).toEqual(expect.any(String))
+    expect(segundoBody.tokenAtivacao).not.toBe(primeiroBody.tokenAtivacao)
+
+    const conta = sqlite
+      .prepare(`SELECT id, status FROM contas_acesso WHERE membro_id = ?`)
+      .get('membro-master') as any
+    expect(conta.status).toBe('PENDENTE_ATIVACAO')
+
+    const acessos = sqlite
+      .prepare(
+        `SELECT COUNT(*) AS total FROM acessos_conta
+         WHERE conta_acesso_id = ? AND perfil_codigo = 'MASTER_SISTEMA' AND ativo = 1`
+      )
+      .get(conta.id) as any
+    expect(acessos.total).toBe(1)
+
+    const links = sqlite
+      .prepare(
+        `SELECT token_hash, revogado_em FROM links_ativacao
+         WHERE conta_acesso_id = ? ORDER BY created_at ASC`
+      )
+      .all(conta.id) as any[]
+    expect(links).toHaveLength(2)
+    expect(links[0].revogado_em).not.toBeNull()
+    expect(links[1].token_hash).toBe(await hashToken(segundoBody.tokenAtivacao))
+    expect(links[1].revogado_em).toBeNull()
+
+    const ativacaoAntiga = await requisicao('/api/v1/auth/ativar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: primeiroBody.tokenAtivacao,
+        celular: '11999990001',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
+    })
+    expect(ativacaoAntiga.status).toBe(400)
+
+    const ativacaoNova = await requisicao('/api/v1/auth/ativar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: segundoBody.tokenAtivacao,
+        celular: '11999990001',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
+    })
+    expect(ativacaoNova.status).toBe(200)
+
+    const depoisDeAtivar = await executar()
+    expect(depoisDeAtivar.status).toBe(409)
+  })
+
   it('impede Master com escopo institucional', () => {
     expect(() =>
       sqlite
