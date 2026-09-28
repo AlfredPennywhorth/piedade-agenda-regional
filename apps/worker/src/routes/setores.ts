@@ -29,14 +29,16 @@ setoresRouter.get('/', async (c) => {
   const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
 
   if (visiveis.tudo) {
-    return c.json(await db.select().from(setores).orderBy(asc(setores.nome)(setores.id)).all())
+    const data = await db.select().from(setores).all()
+    data.sort((a: typeof setores.$inferSelect, b: typeof setores.$inferSelect) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
+    return c.json(data)
   }
 
   const ids = Array.from(visiveis.setoresIds)
   if (ids.length === 0) return c.json([])
 
   const data = await db.select().from(setores).where(inArray(setores.id, ids)).all()
-  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
+  data.sort((a: typeof setores.$inferSelect, b: typeof setores.$inferSelect) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
   return c.json(data)
 })
 
