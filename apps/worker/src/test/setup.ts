@@ -267,6 +267,19 @@ export function setupDb(sqlite: any) {
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS espacos_local (
+      id text PRIMARY KEY NOT NULL,
+      local_id text NOT NULL,
+      nome text NOT NULL,
+      descricao text,
+      capacidade integer,
+      ativo integer DEFAULT true NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (local_id) REFERENCES locais(id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_espacos_local_nome_ativo ON espacos_local(local_id, nome) WHERE ativo = 1;
+
     CREATE TABLE IF NOT EXISTS series_recorrencia (
       id text PRIMARY KEY NOT NULL,
       titulo text NOT NULL,
@@ -284,6 +297,7 @@ export function setupDb(sqlite: any) {
       dia_mes integer,
       posicao_semana_mes integer,
       local_id text,
+      espaco_id text,
       url_online text,
       organizador_membro_id text,
       regional_id text,
@@ -296,6 +310,7 @@ export function setupDb(sqlite: any) {
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       FOREIGN KEY (local_id) REFERENCES locais(id),
+      FOREIGN KEY (espaco_id) REFERENCES espacos_local(id),
       FOREIGN KEY (organizador_membro_id) REFERENCES membros(id),
       FOREIGN KEY (regional_id) REFERENCES regionais(id),
       FOREIGN KEY (administracao_id) REFERENCES administracoes(id),
@@ -323,6 +338,7 @@ export function setupDb(sqlite: any) {
       inicio_em text NOT NULL,
       fim_em text NOT NULL,
       local_id text,
+      espaco_id text,
       url_online text,
       organizador_membro_id text,
       regional_id text,
@@ -341,6 +357,7 @@ export function setupDb(sqlite: any) {
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       FOREIGN KEY (local_id) REFERENCES locais(id),
+      FOREIGN KEY (espaco_id) REFERENCES espacos_local(id),
       FOREIGN KEY (organizador_membro_id) REFERENCES membros(id),
       FOREIGN KEY (regional_id) REFERENCES regionais(id),
       FOREIGN KEY (administracao_id) REFERENCES administracoes(id),

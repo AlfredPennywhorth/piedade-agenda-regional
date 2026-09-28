@@ -39,9 +39,10 @@ describe('S07 - Minha Agenda', () => {
       INSERT INTO vinculos_funcionais (id, membro_id, funcao_id, regional_id, ativo) VALUES ('vinc-1', '${membroId}', 'func-1', 'reg-1', 1);
 
       INSERT INTO locais (id, nome, endereco, numero, cidade, uf) VALUES ('loc-1', 'Local 1', 'Rua A', '1', 'SP', 'SP');
+      INSERT INTO espacos_local (id, local_id, nome, ativo) VALUES ('esp-1', 'loc-1', 'Sala A', 1);
 
-      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, local_id, regional_id, ativo)
-      VALUES ('ev-1', 'Evento Teste', 'PRESENCIAL', '2026-01-01T10:00:00Z', '2026-01-01T11:00:00Z', 'loc-1', 'reg-1', 1);
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, local_id, espaco_id, regional_id, ativo)
+      VALUES ('ev-1', 'Evento Teste', 'PRESENCIAL', '2026-01-01T10:00:00Z', '2026-01-01T11:00:00Z', 'loc-1', 'esp-1', 'reg-1', 1);
 
       INSERT INTO convocacoes (id, evento_id, status, ativo)
       VALUES ('conv-1', 'ev-1', 'PUBLICADA', 1);
@@ -76,6 +77,8 @@ describe('S07 - Minha Agenda', () => {
     expect(json[0].evento.id).toBe('ev-1')
     expect(json[0].convocacao.id).toBe('conv-1')
     expect(json[0].local.id).toBe('loc-1')
+    expect(json[0].espaco.id).toBe('esp-1')
+    expect(json[0].espaco.nome).toBe('Sala A')
     expect(json[0].destinatarioId).toBe('dest-1')
     expect(json[0].rsvp).toBeNull()
   })

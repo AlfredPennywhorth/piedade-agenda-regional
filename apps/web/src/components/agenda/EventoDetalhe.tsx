@@ -197,7 +197,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
   const isPresentialOrHybrid = item.evento.modalidade === 'PRESENCIAL' || item.evento.modalidade === 'HIBRIDO'
 
   const handleShareWhatsApp = () => {
-    const texto = `*[Agenda Regional]* ${item.evento.titulo}\nData: ${dateStr} às ${timeInicio}${item.local?.nome ? `\nLocal: ${item.local.nome}` : ''}\n\nAcesse a agenda para confirmar sua presença.`
+    const texto = `*[Agenda Regional]* ${item.evento.titulo}\nData: ${dateStr} às ${timeInicio}${item.local?.nome ? `\nLocal: ${item.local.nome}` : ''}${item.espaco?.nome ? `\nEspaço: ${item.espaco.nome}` : ''}\n\nAcesse a agenda para confirmar sua presença.`
     const url = `https://wa.me/?text=${encodeURIComponent(texto)}`
     window.open(url, '_blank', 'noopener,noreferrer')
   }
@@ -259,6 +259,9 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Local</h3>
             <div className="bg-slate-50 rounded-lg p-4 border border-slate-100">
               <p className="font-semibold text-slate-900">{item.local.nome}</p>
+              {item.espaco?.nome && (
+                <p className="text-brand-800 text-sm font-semibold mt-1">Espaço: {item.espaco.nome}</p>
+              )}
               <p className="text-slate-600 text-sm mt-1">{item.local.endereco}</p>
               
               <div className="flex gap-2 mt-3 flex-wrap">

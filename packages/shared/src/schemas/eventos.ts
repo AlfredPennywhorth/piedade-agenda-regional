@@ -18,6 +18,7 @@ export const baseEvento = {
   inicioEm: z.string().datetime({ message: 'A data de início deve ser uma string ISO 8601 válida' }),
   fimEm: z.string().datetime({ message: 'A data de fim deve ser uma string ISO 8601 válida' }),
   localId: z.string().uuid('Local ID inválido').nullable().optional(),
+  espacoId: z.string().uuid('Espaço ID inválido').nullable().optional(),
   urlOnline: HttpUrl.nullable().optional(),
   organizadorMembroId: z.string().uuid('Membro ID inválido').nullable().optional(),
   
@@ -76,11 +77,10 @@ const eventoSuperRefine = (data: any, ctx: z.RefinementCtx) => {
       })
     }
     if (data.localId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Eventos online não devem ter localId',
-        path: ['localId']
-      })
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Eventos online não devem ter localId', path: ['localId'] })
+    }
+    if (data.espacoId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Eventos online não devem ter espacoId', path: ['espacoId'] })
     }
   } else if (data.modalidade === 'HIBRIDO') {
     if (!data.localId) {

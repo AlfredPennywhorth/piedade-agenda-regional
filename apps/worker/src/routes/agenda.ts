@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and, asc, inArray } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, locais, rsvp, eventoRefeicoes, checkins } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, locais, espacosLocal, rsvp, eventoRefeicoes, checkins } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 
 export const agendaRouter = new Hono<{ Variables: Variables }>()
@@ -20,6 +20,7 @@ agendaRouter.get('/', async (c) => {
       evento: eventos,
       convocacao: convocacoes,
       local: locais,
+      espaco: espacosLocal,
       destinatario: convocacaoDestinatarios,
       rsvp: rsvp,
       checkin: checkins
@@ -28,6 +29,7 @@ agendaRouter.get('/', async (c) => {
     .innerJoin(convocacoes, eq(eventos.id, convocacoes.eventoId))
     .innerJoin(convocacaoDestinatarios, eq(convocacoes.id, convocacaoDestinatarios.convocacaoId))
     .leftJoin(locais, eq(eventos.localId, locais.id))
+    .leftJoin(espacosLocal, eq(eventos.espacoId, espacosLocal.id))
     .leftJoin(rsvp, eq(convocacaoDestinatarios.id, rsvp.convocacaoDestinatarioId))
     .leftJoin(
       checkins,
@@ -73,6 +75,7 @@ agendaRouter.get('/', async (c) => {
         },
         convocacao: r.convocacao,
         local: r.local,
+        espaco: r.espaco,
         destinatarioId: r.destinatario.id,
         rsvp: r.rsvp ? {
           resposta: r.rsvp.resposta,

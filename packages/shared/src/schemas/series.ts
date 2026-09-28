@@ -48,6 +48,7 @@ const baseSerie = {
   posicaoSemanaMes: z.number().int().refine(val => (val >= 1 && val <= 5) || val === -1, 'Deve ser entre 1 e 5, ou -1 para último').nullable().optional(),
 
   localId: z.string().uuid('Local ID inválido').nullable().optional(),
+  espacoId: z.string().uuid('Espaço ID inválido').nullable().optional(),
   urlOnline: HttpUrl.nullable().optional(),
   organizadorMembroId: z.string().uuid('Membro ID inválido').nullable().optional(),
   
@@ -98,6 +99,9 @@ const serieSuperRefine = (data: any, ctx: z.RefinementCtx) => {
     }
     if (data.localId) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Eventos online não devem ter localId', path: ['localId'] })
+    }
+    if (data.espacoId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Eventos online não devem ter espacoId', path: ['espacoId'] })
     }
   } else if (data.modalidade === 'HIBRIDO') {
     if (!data.localId) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Eventos híbridos exigem localId', path: ['localId'] })
