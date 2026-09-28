@@ -71,6 +71,12 @@ espacosLocaisRouter.patch('/:id', async c => {
     const existing = await db.select().from(espacosLocal).where(eq(espacosLocal.id, id)).get()
     if (!existing) return c.json({ error: 'Espaço não encontrado' }, 404)
     const parsed = EspacoLocalUpdate.parse(await c.req.json())
+    if (parsed.localId && parsed.localId !== existing.localId) {
+      return c.json(
+        { error: 'O Local de um Espaço não pode ser alterado. Cadastre um novo Espaço no Local correto.', code: 'ESPACO_LOCAL_IMUTAVEL' },
+        409
+      )
+    }
     await executarOperacaoComAudit(
       db,
       qdb => [
