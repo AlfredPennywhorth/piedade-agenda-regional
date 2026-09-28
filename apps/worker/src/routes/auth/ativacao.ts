@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, isNull, gt } from 'drizzle-orm'
+import { eq, and, isNull, gt, sql } from 'drizzle-orm'
 import { ativacaoSchema } from '@piedade/shared'
 import * as schema from '../../db/schema'
 import { hashToken, gerarTokenAleatorio } from '../../security/tokens'
@@ -96,21 +96,7 @@ ativacaoApp.post('/', async c => {
   const loginRateLimitKey = await hashToken(celular)
   const expiraEmSessao = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
-  await executeAtomic(db, tx => [
-    tx
-      .update(schema.linksAtivacao)
-      .set({ utilizadoEm: agora, updatedAt: agora })
-      .where(eq(schema.linksAtivacao.id, link.id)),
-    tx
-      .update(schema.linksAtivacao)
-      .set({ revogadoEm: agora, updatedAt: agora })
-      .where(
-        and(
-          eq(schema.linksAtivacao.contaAcessoId, conta.id),
-          isNull(schema.linksAtivacao.utilizadoEm),
-          isNull(schema.linksAtivacao.revogadoEm)
-        )
-      ),
+  const resultadosClaim = await executeAtomic(db, tx => [
     tx
       .update(schema.contasAcesso)
       .set({
@@ -122,7 +108,66 @@ ativacaoApp.post('/', async c => {
         ativadoEm: agora,
         updatedAt: agora,
       })
-      .where(eq(schema.contasAcesso.id, conta.id)),
+      .where(
+        and(
+          eq(schema.contasAcesso.id, conta.id),
+          eq(schema.contasAcesso.status, 'PENDENTE_ATIVACAO'),
+          sql`EXISTS (
+            SELECT 1
+            FROM links_ativacao
+            WHERE id = ${link.id}
+              AND conta_acesso_id = ${conta.id}
+              AND utilizado_em IS NULL
+              AND revogado_em IS NULL
+              AND expira_em > ${agora}
+          )`
+        )
+      ),
+    tx
+      .update(schema.linksAtivacao)
+      .set({ utilizadoEm: agora, updatedAt: agora })
+      .where(
+        and(
+          eq(schema.linksAtivacao.id, link.id),
+          isNull(schema.linksAtivacao.utilizadoEm),
+          isNull(schema.linksAtivacao.revogadoEm),
+          sql`EXISTS (
+            SELECT 1
+            FROM contas_acesso
+            WHERE id = ${conta.id}
+              AND status = 'ATIVA'
+              AND pin_salt = ${salt}
+          )`
+        )
+      ),
+  ])
+
+  const alteracoesClaim =
+    resultadosClaim?.[0]?.meta?.changes ?? resultadosClaim?.[0]?.changes ?? 0
+
+  if (alteracoesClaim !== 1) {
+    await db.insert(schema.tentativasAcesso).values({
+      id: crypto.randomUUID(),
+      contaAcessoId: conta.id,
+      membroId: membro.id,
+      tipo: 'ATIVACAO',
+      sucesso: false,
+      motivo: 'Link já consumido ou conta já ativada',
+    })
+    return c.json({ error: 'Link de ativação inválido ou expirado' }, 400)
+  }
+
+  await executeAtomic(db, tx => [
+    tx
+      .update(schema.linksAtivacao)
+      .set({ revogadoEm: agora, updatedAt: agora })
+      .where(
+        and(
+          eq(schema.linksAtivacao.contaAcessoId, conta.id),
+          isNull(schema.linksAtivacao.utilizadoEm),
+          isNull(schema.linksAtivacao.revogadoEm)
+        )
+      ),
     tx
       .update(schema.sessoes)
       .set({ revogadoEm: agora })
