@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, inArray } from 'drizzle-orm'
+import { asc, eq, inArray } from 'drizzle-orm'
 import { casas } from '../db/schema'
 import { CreateCasaSchema, UpdateCasaSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
@@ -29,7 +29,7 @@ casasRouter.get('/', async (c) => {
   const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
 
   if (visiveis.tudo) {
-    return c.json(await db.select().from(casas).all())
+    return c.json(await db.select().from(casas).orderBy(asc(casas.nome), asc(casas.id)).all())
   }
 
   const ids = Array.from(visiveis.casasIds)
@@ -44,7 +44,7 @@ casasRouter.get('/', async (c) => {
     data.push(...parcial)
   }
 
-  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR') || a.id.localeCompare(b.id))
   return c.json(data)
 })
 
