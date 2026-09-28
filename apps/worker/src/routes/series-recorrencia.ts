@@ -417,6 +417,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
           pauta: serieBaseData.pauta,
           modalidade: serieBaseData.modalidade,
           localId: serieBaseData.localId,
+          espacoId: serieBaseData.espacoId,
           urlOnline: serieBaseData.urlOnline,
           organizadorMembroId: serieBaseData.organizadorMembroId,
           regionalId: serieBaseData.regionalId,
@@ -501,6 +502,9 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         ...parsed.changes,
         dataInicio: newStartDateStr
       })
+      if (!(await espacoPertenceAoLocal(db, serieBData.localId, serieBData.espacoId))) {
+        return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
+      }
       if (!(await podeGerenciarEntidade(c, serieBData))) {
         return c.json({ error: 'Acesso não autorizado para mover a série para este escopo', code: 'FORBIDDEN' }, 403)
       }
@@ -543,6 +547,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
             pauta: serieBaseData.pauta,
             modalidade: serieBaseData.modalidade,
             localId: serieBaseData.localId,
+            espacoId: serieBaseData.espacoId,
             urlOnline: serieBaseData.urlOnline,
             organizadorMembroId: serieBaseData.organizadorMembroId,
             regionalId: serieBaseData.regionalId,
