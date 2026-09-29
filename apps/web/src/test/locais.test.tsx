@@ -331,6 +331,63 @@ describe('LocaisView', () => {
     })
   })
 
+  it('deve ignorar resposta antiga ao trocar o Local no gerenciamento de Espaços', async () => {
+    const locais = [
+      mockLocais[0],
+      {
+        id: '2',
+        nome: 'Anexo Regional',
+        endereco: 'Rua B',
+        numero: '200',
+        cidade: 'São Paulo',
+        uf: 'SP',
+        ativo: true,
+      },
+    ]
+
+    let resolverLocalA: ((value: any[]) => void) | undefined
+    const respostaLocalA = new Promise<any[]>(resolve => {
+      resolverLocalA = resolve
+    })
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/locais') return locais as any
+      if (endpoint === '/espacos-locais?localId=1') return respostaLocalA as any
+      if (endpoint === '/espacos-locais?localId=2') {
+        return [{ id: 'esp-b', localId: '2', nome: 'Sala B', ativo: true }] as any
+      }
+      return [] as any
+    })
+
+    render(<LocaisView />)
+    await waitFor(() => {
+      expect(screen.getByText('Templo Central')).toBeInTheDocument()
+      expect(screen.getByText('Anexo Regional')).toBeInTheDocument()
+    })
+
+    const linhaA = screen.getByText('Templo Central').closest('tr')
+    expect(linhaA).not.toBeNull()
+    fireEvent.click(within(linhaA!).getByRole('button', { name: 'Espaços' }))
+
+    let dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
+    fireEvent.click(within(dialog).getByText('✕'))
+
+    const linhaB = screen.getByText('Anexo Regional').closest('tr')
+    expect(linhaB).not.toBeNull()
+    fireEvent.click(within(linhaB!).getByRole('button', { name: 'Espaços' }))
+
+    dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
+    expect(await within(dialog).findByText('Sala B')).toBeInTheDocument()
+
+    await act(async () => {
+      resolverLocalA?.([{ id: 'esp-a', localId: '1', nome: 'Sala A', ativo: true }])
+      await respostaLocalA
+    })
+
+    expect(within(dialog).getByText('Sala B')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Sala A')).not.toBeInTheDocument()
+  })
+
   it('deve exibir mensagem de erro se listagem falhar', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockRejectedValueOnce(new Error('Erro 500'))
 
