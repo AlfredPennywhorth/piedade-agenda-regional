@@ -581,7 +581,7 @@ describe('S06 - Convocações', () => {
     const destConvId = crypto.randomUUID()
     sqlite
       .prepare(`INSERT INTO convocacoes (id, evento_id, status) VALUES (?, ?, 'RASCUNHO')`)
-      .run(destConvId, ctx.evSetorId)
+      .run(destConvId, ctx.evCasaId)
     const destId = crypto.randomUUID()
     sqlite
       .prepare(
