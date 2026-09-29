@@ -4,7 +4,7 @@ import { setupDb } from './setup'
 import { createApp } from '../index'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import BetterSqlite3 from 'better-sqlite3'
-import { regionais, locais, eventos, seriesRecorrencia, administracoes, setores, casas, membros, sessoes, convocacoes } from '../db/schema'
+import { regionais, locais, espacosLocal, eventos, seriesRecorrencia, administracoes, setores, casas, membros, sessoes, convocacoes } from '../db/schema'
 import { eq } from 'drizzle-orm'
 import { hashToken } from '../security/tokens'
 
@@ -656,6 +656,66 @@ describe('Series Recorrencia API (S05)', () => {
     expect(antiga.dataFim >= antiga.dataInicio).toBe(true)
   })
 
+
+  it('24.4.1 ALL preserva espaço histórico inativo quando Local e Espaço não mudam', async () => {
+    const regionalId = await createRegional()
+    const localId = crypto.randomUUID()
+    const espacoId = crypto.randomUUID()
+
+    await db.insert(locais).values({
+      id: localId,
+      nome: 'Local Histórico',
+      endereco: 'Rua Teste',
+      numero: '100',
+      cidade: 'São Paulo',
+      uf: 'SP',
+      ativo: true,
+    })
+    await db.insert(espacosLocal).values({
+      id: espacoId,
+      localId,
+      nome: 'Sala Histórica',
+      ativo: true,
+    })
+
+    const createRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Série Presencial Histórica',
+        modalidade: 'PRESENCIAL',
+        localId,
+        espacoId,
+        horarioInicio: '09:00',
+        horarioFim: '10:00',
+        dataInicio: '2099-12-01',
+        dataFim: '2099-12-03',
+        frequencia: 'DIARIA',
+        intervalo: 1,
+        regionalId,
+      }),
+    })
+    expect(createRes.status).toBe(201)
+    const { serie } = await createRes.json()
+
+    await db.update(espacosLocal).set({ ativo: false }).where(eq(espacosLocal.id, espacoId))
+
+    const patchRes = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'ALL',
+        changes: { titulo: 'Série Presencial Histórica Editada' },
+      }),
+    })
+
+    expect(patchRes.status).toBe(200)
+
+    const serieAtualizada = await db.select().from(seriesRecorrencia)
+      .where(eq(seriesRecorrencia.id, serie.id)).get()
+    expect(serieAtualizada.titulo).toBe('Série Presencial Histórica Editada')
+    expect(serieAtualizada.espacoId).toBe(espacoId)
+  })
 
   it('24.5 ALL rejeita regeneração quando ocorrência futura possui convocação ativa', async () => {
     const regionalId = await createRegional()
