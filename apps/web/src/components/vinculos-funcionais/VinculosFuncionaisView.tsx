@@ -438,9 +438,11 @@ export function VinculosFuncionaisView() {
                     disabled={salvando}
                   >
                     <option value="">Selecione uma função...</option>
-                    {funcoes.map(f => (
-                      <option key={f.id} value={f.id}>{f.nome} {f.ativo ? '' : '(Inativa)'}</option>
-                    ))}
+                    {funcoes
+                      .filter(f => f.ativo || (modoForm === 'editar' && f.id === funcaoId))
+                      .map(f => (
+                        <option key={f.id} value={f.id}>{f.nome} {f.ativo ? '' : '(Inativa)'}</option>
+                      ))}
                   </select>
                   {errosForm.funcaoId && <p className="text-xs text-red-600 mt-1">{errosForm.funcaoId}</p>}
                 </div>
