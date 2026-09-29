@@ -388,6 +388,80 @@ describe('LocaisView', () => {
     expect(within(dialog).queryByText('Sala A')).not.toBeInTheDocument()
   })
 
+  it('deve ignorar refresh pós-save de um Local depois que outro Local foi aberto', async () => {
+    const locais = [
+      mockLocais[0],
+      {
+        id: '2',
+        nome: 'Anexo Regional',
+        endereco: 'Rua B',
+        numero: '200',
+        cidade: 'São Paulo',
+        uf: 'SP',
+        ativo: true,
+      },
+    ]
+
+    let resolverRefreshA: ((value: any[]) => void) | undefined
+    const refreshA = new Promise<any[]>(resolve => {
+      resolverRefreshA = resolve
+    })
+    let chamadasLocalA = 0
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/locais') return locais as any
+      if (endpoint === '/espacos-locais?localId=1') {
+        chamadasLocalA += 1
+        if (chamadasLocalA === 1) return [] as any
+        return refreshA as any
+      }
+      if (endpoint === '/espacos-locais?localId=2') {
+        return [{ id: 'esp-b', localId: '2', nome: 'Sala B', ativo: true }] as any
+      }
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValueOnce({})
+
+    render(<LocaisView />)
+    await waitFor(() => {
+      expect(screen.getByText('Templo Central')).toBeInTheDocument()
+      expect(screen.getByText('Anexo Regional')).toBeInTheDocument()
+    })
+
+    const linhaA = screen.getByText('Templo Central').closest('tr')
+    expect(linhaA).not.toBeNull()
+    fireEvent.click(within(linhaA!).getByRole('button', { name: 'Espaços' }))
+
+    let dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
+    fireEvent.change(within(dialog).getByLabelText(/nome do espaço/i), { target: { value: 'Sala A Nova' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /adicionar espaço/i }))
+
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith('/espacos-locais', expect.objectContaining({
+        localId: '1',
+        nome: 'Sala A Nova',
+      }))
+      expect(chamadasLocalA).toBe(2)
+    })
+
+    fireEvent.click(within(dialog).getByText('✕'))
+
+    const linhaB = screen.getByText('Anexo Regional').closest('tr')
+    expect(linhaB).not.toBeNull()
+    fireEvent.click(within(linhaB!).getByRole('button', { name: 'Espaços' }))
+
+    dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
+    expect(await within(dialog).findByText('Sala B')).toBeInTheDocument()
+
+    await act(async () => {
+      resolverRefreshA?.([{ id: 'esp-a', localId: '1', nome: 'Sala A Atualizada', ativo: true }])
+      await refreshA
+    })
+
+    expect(within(dialog).getByText('Sala B')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Sala A Atualizada')).not.toBeInTheDocument()
+  })
+
   it('deve exibir mensagem de erro se listagem falhar', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockRejectedValueOnce(new Error('Erro 500'))
 
