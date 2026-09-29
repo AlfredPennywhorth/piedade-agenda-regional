@@ -151,6 +151,36 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     ).get(json.id, funcaoDco.id) as { ativo: number }
 
     expect(vinculoAposReativacao.ativo).toBe(1)
+
+    sqlite.exec(`
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, casa_id, ativo)
+      VALUES
+        ('evento-dco-reativado', 'Evento DCO Após Reativação', 'ONLINE',
+         '2030-02-01T12:00:00.000Z', '2030-02-01T13:00:00.000Z', '${casaId}', 1);
+
+      INSERT INTO convocacoes
+        (id, evento_id, status, ativo)
+      VALUES
+        ('conv-dco-reativado', 'evento-dco-reativado', 'RASCUNHO', 1);
+
+      INSERT INTO convocacao_funcoes
+        (id, convocacao_id, funcao_id)
+      VALUES
+        ('cf-dco-reativado', 'conv-dco-reativado', '${funcaoDco.id}');
+    `)
+
+    const resPublicar = await req('/api/v1/convocacoes/conv-dco-reativado/publicar', {
+      method: 'POST',
+    })
+
+    expect(resPublicar.status).toBe(200)
+
+    const destinatarioAposReativacao = sqlite.prepare(
+      'SELECT id FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
+    ).get('conv-dco-reativado', json.id)
+
+    expect(destinatarioAposReativacao).toBeDefined()
   })
 
   it('2. Deve rejeitar membro com Casa inexistente', async () => {
