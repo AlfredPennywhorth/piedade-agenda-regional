@@ -285,6 +285,17 @@ export function EventosView() {
 
     try {
       const item = await fetchWithAuth<Evento>(`/eventos/${id}`)
+
+      // A listagem padrão traz apenas espaços ativos. Ao editar um evento
+      // histórico, preserve o espaço inativo já vinculado sem torná-lo
+      // disponível para novas atribuições.
+      if (item.espacoId && item.localId && !espacos.some(espaco => espaco.id === item.espacoId)) {
+        const espacosDoLocal = await fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${item.localId}`)
+        const espacoAtual = (espacosDoLocal || []).find(espaco => espaco.id === item.espacoId)
+        if (espacoAtual) {
+          setEspacos(prev => prev.some(espaco => espaco.id === espacoAtual.id) ? prev : [...prev, espacoAtual])
+        }
+      }
       
       let tipo: any = ''
       if (item.regionalId) tipo = 'regional'
@@ -758,9 +769,16 @@ export function EventosView() {
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         >
                           <option value="">Local inteiro / não especificado</option>
-                          {espacos.filter(espaco => espaco.localId === formData.localId).map(espaco => (
-                            <option key={espaco.id} value={espaco.id}>{espaco.nome}</option>
-                          ))}
+                          {espacos
+                            .filter(espaco =>
+                              espaco.localId === formData.localId &&
+                              (espaco.ativo || (Boolean(eventoEditandoId) && espaco.id === formData.espacoId))
+                            )
+                            .map(espaco => (
+                              <option key={espaco.id} value={espaco.id}>
+                                {espaco.nome}{espaco.ativo ? '' : ' (inativo)'}
+                              </option>
+                            ))}
                         </select>
                         {errosForm.espacoId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.espacoId}</p>}
                       </div>
