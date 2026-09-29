@@ -138,6 +138,18 @@ describe('DATA-04B — finalização do pré-cadastro ministerial', () => {
       'SELECT id FROM contas_acesso WHERE membro_id = ?'
     ).get(body.id)
     expect(conta).toBeUndefined()
+
+    const vinculoDco = sqlite.prepare(
+      `SELECT vf.casa_id, vf.origem, vf.ativo
+       FROM vinculos_funcionais vf
+       JOIN funcoes f ON f.id = vf.funcao_id
+       WHERE vf.membro_id = ? AND f.codigo = 'DCO'`
+    ).get(body.id)
+    expect(vinculoDco).toMatchObject({
+      casa_id: casaA,
+      origem: 'MEMBRO_AUTOMATICO',
+      ativo: 1,
+    })
   })
 
   it('Administrador Regional não finaliza pré-cadastro de outra Regional', async () => {
