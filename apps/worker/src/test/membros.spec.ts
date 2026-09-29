@@ -240,6 +240,87 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     )).toBe(true)
   })
 
+  it('3b. Deve sincronizar convocações DCO usando o estado final ao mover e reativar membro', async () => {
+    const funcaoDco = sqlite.prepare(
+      "SELECT id FROM funcoes WHERE codigo = 'DCO' AND ativo = 1"
+    ).get() as { id: string }
+
+    sqlite.prepare('UPDATE membros SET ativo = 0 WHERE id = ?').run(membroId)
+    sqlite.exec(`
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, casa_id, ativo)
+      VALUES
+        ('evento-dco-move-reativa', 'Evento DCO Destino', 'ONLINE',
+         '2031-01-01T12:00:00.000Z', '2031-01-01T13:00:00.000Z', '${casaId2}', 1);
+
+      INSERT INTO convocacoes
+        (id, evento_id, status, publicada_em, ativo)
+      VALUES
+        ('conv-dco-move-reativa', 'evento-dco-move-reativa', 'PUBLICADA', CURRENT_TIMESTAMP, 1);
+
+      INSERT INTO convocacao_funcoes
+        (id, convocacao_id, funcao_id)
+      VALUES
+        ('cf-dco-move-reativa', 'conv-dco-move-reativa', '${funcaoDco.id}');
+    `)
+
+    const resPatch = await req(`/api/v1/membros/${membroId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ casaId: casaId2, ativo: true }),
+    })
+
+    const json = (await resPatch.json()) as MembroResponse
+    expect(resPatch.status).toBe(200)
+    expect(json.casaId).toBe(casaId2)
+    expect(json.ativo).toBe(true)
+
+    const destinatario = sqlite.prepare(
+      'SELECT id FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
+    ).get('conv-dco-move-reativa', membroId)
+
+    expect(destinatario).toBeDefined()
+  })
+
+  it('3c. Não deve sincronizar convocações DCO ao mover e inativar membro no mesmo PATCH', async () => {
+    const funcaoDco = sqlite.prepare(
+      "SELECT id FROM funcoes WHERE codigo = 'DCO' AND ativo = 1"
+    ).get() as { id: string }
+
+    sqlite.exec(`
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, casa_id, ativo)
+      VALUES
+        ('evento-dco-move-inativa', 'Evento DCO Destino Inativo', 'ONLINE',
+         '2031-02-01T12:00:00.000Z', '2031-02-01T13:00:00.000Z', '${casaId2}', 1);
+
+      INSERT INTO convocacoes
+        (id, evento_id, status, publicada_em, ativo)
+      VALUES
+        ('conv-dco-move-inativa', 'evento-dco-move-inativa', 'PUBLICADA', CURRENT_TIMESTAMP, 1);
+
+      INSERT INTO convocacao_funcoes
+        (id, convocacao_id, funcao_id)
+      VALUES
+        ('cf-dco-move-inativa', 'conv-dco-move-inativa', '${funcaoDco.id}');
+    `)
+
+    const resPatch = await req(`/api/v1/membros/${membroId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ casaId: casaId2, ativo: false }),
+    })
+
+    const json = (await resPatch.json()) as MembroResponse
+    expect(resPatch.status).toBe(200)
+    expect(json.casaId).toBe(casaId2)
+    expect(json.ativo).toBe(false)
+
+    const destinatarios = sqlite.prepare(
+      'SELECT COUNT(*) AS total FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
+    ).get('conv-dco-move-inativa', membroId) as { total: number }
+
+    expect(destinatarios.total).toBe(0)
+  })
+
   it('4. Deve inativar membro (ativo = false)', async () => {
     const resPatch = await req(`/api/v1/membros/${membroId}`, {
       method: 'PATCH',
@@ -390,6 +471,43 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     expect(resDelete.status).toBe(200)
     const restante = await db.select().from(schema.membros).where(eq(schema.membros.id, criado.id)).get()
     expect(restante).toBeUndefined()
+  })
+
+  it('25b. Deve excluir cadastro sem dependências mesmo após mudança de Casa deixar DCO antigo inativo', async () => {
+    const resCreate = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'Cadastro Movido Excluir',
+        dataOrdenacao: '2002-02-02',
+        codigoCarteirinha: 'TESTE-25B',
+        casaId,
+        celular: '11963333333',
+      }),
+    })
+    expect(resCreate.status).toBe(201)
+    const criado = await resCreate.json() as MembroResponse
+
+    const resMove = await req(`/api/v1/membros/${criado.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ casaId: casaId2 }),
+    })
+    expect(resMove.status).toBe(200)
+
+    const vinculosAntes = sqlite.prepare(
+      "SELECT COUNT(*) AS total FROM vinculos_funcionais vf JOIN funcoes f ON f.id = vf.funcao_id WHERE vf.membro_id = ? AND f.codigo = 'DCO'"
+    ).get(criado.id) as { total: number }
+    expect(vinculosAntes.total).toBe(2)
+
+    const resDelete = await req(`/api/v1/membros/${criado.id}`, { method: 'DELETE' })
+    expect(resDelete.status).toBe(200)
+
+    const membroRestante = await db.select().from(schema.membros).where(eq(schema.membros.id, criado.id!)).get()
+    expect(membroRestante).toBeUndefined()
+
+    const vinculosDepois = sqlite.prepare(
+      'SELECT COUNT(*) AS total FROM vinculos_funcionais WHERE membro_id = ?'
+    ).get(criado.id) as { total: number }
+    expect(vinculosDepois.total).toBe(0)
   })
 
   it('26. Deve bloquear exclusão quando o membro possui dependências', async () => {
