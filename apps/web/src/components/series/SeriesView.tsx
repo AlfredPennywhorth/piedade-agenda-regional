@@ -117,7 +117,7 @@ export function SeriesView() {
       const seriesPromise = fetchWithAuth<SerieRecorrencia[]>('/series-recorrencia')
       const lookupsPromise = Promise.allSettled([
         fetchWithAuth<Local[]>('/locais'),
-        fetchWithAuth<EspacoLocal[]>('/espacos-locais?ativo=true'),
+        fetchWithAuth<EspacoLocal[]>('/espacos-locais'),
         fetchWithAuth<Membro[]>('/membros'),
         fetchWithAuth<Regional[]>('/regionais'),
         fetchWithAuth<Administracao[]>('/administracoes'),
