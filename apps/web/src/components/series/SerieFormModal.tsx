@@ -370,9 +370,16 @@ export function SerieFormModal({
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         >
                           <option value="">Local inteiro / não especificado</option>
-                          {espacos.filter(espaco => espaco.localId === formData.localId && espaco.ativo).map(espaco => (
-                            <option key={espaco.id} value={espaco.id}>{espaco.nome}</option>
-                          ))}
+                          {espacos
+                            .filter(espaco =>
+                              espaco.localId === formData.localId &&
+                              (espaco.ativo || espaco.id === formData.espacoId)
+                            )
+                            .map(espaco => (
+                              <option key={espaco.id} value={espaco.id}>
+                                {espaco.nome}{espaco.ativo ? '' : ' (inativo)'}
+                              </option>
+                            ))}
                         </select>
                         {errosForm.espacoId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.espacoId}</p>}
                       </div>
