@@ -188,6 +188,28 @@ describe('S06 - Convocações', () => {
     expect(log?.escopoId).toBe(ctx.setId)
   })
 
+  it('1.0.1 impede segunda convocação para o mesmo evento', async () => {
+    const ctx = await setupBaseData()
+
+    const primeira = await app.request('/api/v1/convocacoes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId: ctx.evSetorId }),
+    })
+    expect(primeira.status).toBe(201)
+
+    const segunda = await app.request('/api/v1/convocacoes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId: ctx.evSetorId }),
+    })
+    expect(segunda.status).toBe(409)
+    expect(await segunda.json()).toMatchObject({
+      code: 'CONVOCACAO_EVENTO_EXISTENTE',
+      status: 'RASCUNHO',
+    })
+  })
+
   it('1.1 audita adição e remoção de função da convocação', async () => {
     const ctx = await setupBaseData()
     const convRes = await app.request('/api/v1/convocacoes', {
