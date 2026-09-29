@@ -672,11 +672,11 @@ membrosRouter.delete('/:id', async (c) => {
         )
         .all()
 
-      const casasHistoricas = Array.from(
-        new Set(
-          casasAuditadas
-            .map((item: { casaId: string | null }) => item.casaId)
-            .filter((casaId: string | null): casaId is string => Boolean(casaId))
+      const casasHistoricas: string[] = Array.from(
+        new Set<string>(
+          casasAuditadas.flatMap((item: { casaId: string | null }) =>
+            item.casaId ? [item.casaId] : []
+          )
         )
       )
 
