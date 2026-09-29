@@ -16,6 +16,8 @@ vi.mock('../api/apiClient', async (importOriginal) => {
 const EVENTO_ID = '33333333-3333-3333-3333-333333333333'
 const LOCAL_ID = '11111111-1111-1111-1111-111111111111'
 const REGIONAL_ID = '22222222-2222-2222-2222-222222222222'
+const ESPACO_INATIVO_ID = '66666666-6666-4666-8666-666666666666'
+const ESPACO_ATIVO_ID = '77777777-7777-4777-8777-777777777777'
 
 const mockEventos = [
   {
@@ -202,6 +204,55 @@ describe('EventosView', () => {
         administracaoId: null,
       }))
     })
+  })
+
+  it('deve preservar espaço inativo já vinculado ao editar sem oferecê-lo em novo evento', async () => {
+    const eventoComEspacoInativo = {
+      ...mockEventos[0],
+      espacoId: ESPACO_INATIVO_ID,
+    }
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return [eventoComEspacoInativo]
+      if (url === `/eventos/${EVENTO_ID}`) return eventoComEspacoInativo
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/espacos-locais?ativo=true') {
+        return [{ id: ESPACO_ATIVO_ID, localId: LOCAL_ID, nome: 'Sala Ativa', ativo: true }]
+      }
+      if (url === `/espacos-locais?localId=${LOCAL_ID}`) {
+        return [
+          { id: ESPACO_ATIVO_ID, localId: LOCAL_ID, nome: 'Sala Ativa', ativo: true },
+          { id: ESPACO_INATIVO_ID, localId: LOCAL_ID, nome: 'Sala Histórica', ativo: false },
+        ]
+      }
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+
+    render(<EventosView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Presencial')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
+
+    const dialogEdicao = await screen.findByRole('dialog', { name: /editar evento/i })
+    const seletorEspaco = within(dialogEdicao).getByLabelText(/espaço/i)
+
+    await waitFor(() => {
+      expect(seletorEspaco).toHaveValue(ESPACO_INATIVO_ID)
+      expect(within(dialogEdicao).getByRole('option', { name: 'Sala Histórica (inativo)' })).toBeInTheDocument()
+    })
+
+    fireEvent.click(within(dialogEdicao).getByRole('button', { name: /cancelar/i }))
+
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+    const dialogNovo = await screen.findByRole('dialog', { name: /novo evento/i })
+    fireEvent.change(within(dialogNovo).getByLabelText(/local \*/i), { target: { value: LOCAL_ID } })
+
+    expect(within(dialogNovo).queryByRole('option', { name: /Sala Histórica/ })).not.toBeInTheDocument()
+    expect(within(dialogNovo).getByRole('option', { name: 'Sala Ativa' })).toBeInTheDocument()
   })
 
   it('deve abrir escolha ao editar evento recorrente, cancelar não envia PATCH', async () => {
