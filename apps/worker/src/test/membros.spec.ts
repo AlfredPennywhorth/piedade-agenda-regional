@@ -483,7 +483,51 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     expect(destinatario).toBeUndefined()
   })
 
-  it('29. Deve excluir todos os vínculos DCO automáticos após mudança de Casa', async () => {
+  it('29. Deve preservar vínculo DCO manual e bloquear exclusão', async () => {
+    const resCreate = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'Cadastro com DCO Manual',
+        dataOrdenacao: '2003-01-01',
+        codigoCarteirinha: 'TESTE-29',
+        casaId,
+        celular: '11963222222',
+      }),
+    })
+    expect(resCreate.status).toBe(201)
+    const criado = await resCreate.json() as any
+
+    const funcaoDco = sqlite.prepare(
+      "SELECT id FROM funcoes WHERE codigo = 'DCO' AND ativo = 1"
+    ).get() as { id: string }
+
+    const resVinculoManual = await req('/api/v1/vinculos-funcionais', {
+      method: 'POST',
+      body: JSON.stringify({
+        membroId: criado.id,
+        funcaoId: funcaoDco.id,
+        casaId,
+        ativo: false,
+      }),
+    })
+    expect(resVinculoManual.status).toBe(201)
+    const vinculoManual = await resVinculoManual.json() as any
+
+    const resDelete = await req(`/api/v1/membros/${criado.id}`, {
+      method: 'DELETE',
+    })
+
+    const jsonDelete = await resDelete.json() as any
+    expect(resDelete.status).toBe(409)
+    expect(jsonDelete.code).toBe('MEMBRO_POSSUI_DEPENDENCIAS')
+
+    const manualPreservado = sqlite.prepare(
+      'SELECT id FROM vinculos_funcionais WHERE id = ?'
+    ).get(vinculoManual.id)
+    expect(manualPreservado).toBeDefined()
+  })
+
+  it('30. Deve excluir todos os vínculos DCO automáticos após mudança de Casa', async () => {
     const resCreate = await req('/api/v1/membros', {
       method: 'POST',
       body: JSON.stringify({
