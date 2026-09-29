@@ -114,7 +114,7 @@ export function setupDb(sqlite: any) {
       WHERE codigo = 'DCO';
     INSERT OR IGNORE INTO funcoes (id, nome, codigo, descricao, ativo)
       VALUES (
-        'funcao-dco-canonica',
+        'd0c0d0c0-0000-4000-8000-000000000001',
         'Diácono Casa de Oração',
         'DCO',
         'Função canônica vinculada automaticamente ao Diácono em sua Casa de Oração.',
