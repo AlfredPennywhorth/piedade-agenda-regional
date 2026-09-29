@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { and, eq, inArray, or } from 'drizzle-orm'
-import { acessosConta, administracoes, auditoriaLogs, casas, contasAcesso, funcoes, membros, setores, tentativasAcesso, vinculosFuncionais } from '../db/schema'
+import { acessosConta, administracoes, casas, contasAcesso, funcoes, membros, setores, tentativasAcesso, vinculosFuncionais } from '../db/schema'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, regionaisAdministradas } from '../security/permissoes'
@@ -355,6 +355,7 @@ membrosRouter.post('/', async (c) => {
       membroId: id,
       funcaoId: funcaoDco.id,
       casaId: parsed.casaId,
+      origem: 'MEMBRO_AUTOMATICO',
       ativo: true,
       createdAt: agoraCriacao,
       updatedAt: agoraCriacao,
@@ -501,6 +502,7 @@ membrosRouter.patch('/:id', async (c) => {
           membroId: id,
           funcaoId: funcaoDco.id,
           casaId: casaFinalId,
+          origem: vinculoDcoDestinoExistente?.origem ?? 'MEMBRO_AUTOMATICO',
           ativo: true,
           createdAt: agoraAtualizacao,
           updatedAt: agoraAtualizacao,
@@ -653,68 +655,22 @@ membrosRouter.delete('/:id', async (c) => {
 
   try {
     const funcaoDco = await obterFuncaoDco(db)
-    let vinculosDcoAutomaticosIds: string[] = []
-
-    if (funcaoDco) {
-      // Reconhece apenas os DCO automáticos cuja Casa faz parte do histórico
-      // auditado do membro e que nunca foram criados/alterados pelo endpoint
-      // genérico de vínculos. Na dúvida, preserva o vínculo como dependência.
-      const casasAuditadas = await db
-        .select({ casaId: auditoriaLogs.escopoId })
-        .from(auditoriaLogs)
-        .where(
-          and(
-            eq(auditoriaLogs.recursoTipo, 'MEMBRO'),
-            eq(auditoriaLogs.recursoId, id),
-            eq(auditoriaLogs.escopoTipo, 'CASA'),
-            inArray(auditoriaLogs.acao, ['MEMBRO_CRIADO', 'MEMBRO_ATUALIZADO'])
-          )
-        )
-        .all()
-
-      const casasHistoricas: string[] = Array.from(
-        new Set<string>(
-          casasAuditadas.flatMap((item: { casaId: string | null }) =>
-            item.casaId ? [item.casaId] : []
-          )
-        )
-      )
-
-      if (casasHistoricas.length > 0) {
-        const candidatos = await db
+    const vinculosDcoAutomaticos = funcaoDco
+      ? await db
           .select({ id: vinculosFuncionais.id })
           .from(vinculosFuncionais)
           .where(
             and(
               eq(vinculosFuncionais.membroId, id),
               eq(vinculosFuncionais.funcaoId, funcaoDco.id),
-              inArray(vinculosFuncionais.casaId, casasHistoricas)
+              eq(vinculosFuncionais.origem, 'MEMBRO_AUTOMATICO')
             )
           )
           .all()
-
-        const candidatosIds = candidatos.map((item: { id: string }) => item.id)
-        if (candidatosIds.length > 0) {
-          const auditadosComoVinculo = await db
-            .select({ id: auditoriaLogs.recursoId })
-            .from(auditoriaLogs)
-            .where(
-              and(
-                eq(auditoriaLogs.recursoTipo, 'VINCULO_FUNCIONAL'),
-                inArray(auditoriaLogs.recursoId, candidatosIds)
-              )
-            )
-            .all()
-
-          const idsManuais = new Set(
-            auditadosComoVinculo.map((item: { id: string }) => item.id)
-          )
-          vinculosDcoAutomaticosIds = candidatosIds.filter(
-            (vinculoId: string) => !idsManuais.has(vinculoId)
-          )
-        }
-      }
-    }
+      : []
+    const vinculosDcoAutomaticosIds = vinculosDcoAutomaticos.map(
+      (item: { id: string }) => item.id
+    )
 
     await executarOperacaoComAudit(
       db,
