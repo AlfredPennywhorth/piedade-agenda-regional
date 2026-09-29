@@ -655,30 +655,18 @@ membrosRouter.delete('/:id', async (c) => {
 
   try {
     const funcaoDco = await obterFuncaoDco(db)
-    const vinculosDcoAutomaticos = funcaoDco
-      ? await db
-          .select({ id: vinculosFuncionais.id })
-          .from(vinculosFuncionais)
-          .where(
-            and(
-              eq(vinculosFuncionais.membroId, id),
-              eq(vinculosFuncionais.funcaoId, funcaoDco.id),
-              eq(vinculosFuncionais.origem, 'MEMBRO_AUTOMATICO')
-            )
-          )
-          .all()
-      : []
-    const vinculosDcoAutomaticosIds = vinculosDcoAutomaticos.map(
-      (item: { id: string }) => item.id
-    )
 
     await executarOperacaoComAudit(
       db,
       qdb => [
-        ...(vinculosDcoAutomaticosIds.length > 0
+        ...(funcaoDco
           ? [
               qdb.delete(vinculosFuncionais).where(
-                inArray(vinculosFuncionais.id, vinculosDcoAutomaticosIds)
+                and(
+                  eq(vinculosFuncionais.membroId, id),
+                  eq(vinculosFuncionais.funcaoId, funcaoDco.id),
+                  eq(vinculosFuncionais.origem, 'MEMBRO_AUTOMATICO')
+                )
               ),
             ]
           : []),
@@ -712,4 +700,3 @@ membrosRouter.delete('/:id', async (c) => {
     return c.json({ error: 'Não foi possível excluir o membro' }, 400)
   }
 })
-

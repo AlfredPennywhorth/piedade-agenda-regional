@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import Database from 'better-sqlite3'
 import { createApp } from '../index'
@@ -6,6 +6,7 @@ import * as schema from '../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { setupDb } from './setup'
 import { criarSessaoAutenticadaTeste, mesclarAutorizacao } from './auth-test-helper'
+import * as batch from '../db/batch'
 
 type MembroResponse = {
   id: string
@@ -667,6 +668,71 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
       'SELECT id FROM vinculos_funcionais WHERE id = ?'
     ).get(vinculoAutomatico.id)
     expect(preservado).toBeDefined()
+  })
+
+  it('33. Deve revalidar origem DCO na exclusão atômica após PATCH concorrente', async () => {
+    const resCreate = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'Cadastro DCO Concorrente',
+        dataOrdenacao: '2005-01-01',
+        codigoCarteirinha: 'TESTE-33',
+        casaId,
+      }),
+    })
+    expect(resCreate.status).toBe(201)
+    const criado = await resCreate.json() as MembroResponse
+
+    const resMover = await req(`/api/v1/membros/${criado.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ casaId: casaId2 }),
+    })
+    expect(resMover.status).toBe(200)
+
+    const vinculosAntes = sqlite.prepare(
+      `SELECT id, casa_id, origem FROM vinculos_funcionais
+       WHERE membro_id = ? ORDER BY casa_id`
+    ).all(criado.id) as Array<{ id: string; casa_id: string; origem: string | null }>
+    expect(vinculosAntes).toHaveLength(2)
+    expect(vinculosAntes.every(vinculo => vinculo.origem === 'MEMBRO_AUTOMATICO')).toBe(true)
+    const vinculoAtual = vinculosAntes.find(vinculo => vinculo.casa_id === casaId2)!
+
+    const executarAtomico = batch.executeAtomic
+    // Intercala o PATCH real após as leituras do DELETE e antes da transação.
+    const atomicSpy = vi.spyOn(batch, 'executeAtomic').mockImplementationOnce(async (banco, queries) => {
+      const resPatch = await req(`/api/v1/vinculos-funcionais/${vinculoAtual.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ regionalId, casaId: null }),
+      })
+      expect(resPatch.status).toBe(200)
+      expect(sqlite.prepare(
+        'SELECT origem FROM vinculos_funcionais WHERE id = ?'
+      ).get(vinculoAtual.id).origem).toBeNull()
+      return executarAtomico(banco, queries)
+    })
+
+    try {
+      const resDelete = await req(`/api/v1/membros/${criado.id}`, { method: 'DELETE' })
+      expect(atomicSpy).toHaveBeenCalled()
+      expect(resDelete.status).toBe(409)
+      expect(await resDelete.json()).toMatchObject({ code: 'MEMBRO_POSSUI_DEPENDENCIAS' })
+    } finally {
+      atomicSpy.mockRestore()
+    }
+
+    expect(sqlite.prepare('SELECT id FROM membros WHERE id = ?').get(criado.id)).toBeDefined()
+    const vinculosDepois = sqlite.prepare(
+      `SELECT id, casa_id, regional_id, origem FROM vinculos_funcionais
+       WHERE membro_id = ?`
+    ).all(criado.id)
+    expect(vinculosDepois).toHaveLength(2)
+    expect(vinculosDepois).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: vinculoAtual.id, casa_id: null, regional_id: regionalId, origem: null }),
+      expect.objectContaining({ id: vinculosAntes[0].id, casa_id: casaId, origem: 'MEMBRO_AUTOMATICO' }),
+    ]))
+    expect(sqlite.prepare(
+      "SELECT id FROM auditoria_logs WHERE acao = 'MEMBRO_EXCLUIDO' AND recurso_id = ?"
+    ).get(criado.id)).toBeUndefined()
   })
 
 })
