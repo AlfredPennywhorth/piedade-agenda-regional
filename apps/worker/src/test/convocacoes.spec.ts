@@ -208,6 +208,13 @@ describe('S06 - Convocações', () => {
       code: 'CONVOCACAO_EVENTO_EXISTENTE',
       status: 'RASCUNHO',
     })
+
+    expect(() =>
+      sqlite.prepare(
+        `INSERT INTO convocacoes (id, evento_id, status, ativo)
+         VALUES (?, ?, 'RASCUNHO', 1)`
+      ).run(crypto.randomUUID(), ctx.evSetorId)
+    ).toThrow(/UNIQUE constraint failed: convocacoes\.evento_id/)
   })
 
   it('1.1 audita adição e remoção de função da convocação', async () => {
