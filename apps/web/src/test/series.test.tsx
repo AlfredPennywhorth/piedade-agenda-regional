@@ -261,6 +261,59 @@ describe('SeriesView', () => {
     })
   })
 
+  it('deve exibir o espaço histórico inativo na edição sem oferecê-lo em nova série', async () => {
+    const localId = '9f8b7c6d-5e4f-4a2b-8c0d-e9f8a7b6c5d4'
+    const espacoInativoId = '8e7d6c5b-4a3f-4b2c-9d1e-f0a9b8c7d6e5'
+    const seriePresencial = {
+      ...MOCK_SERIES[0],
+      id: '7d6c5b4a-3f2e-4c1d-8b9a-0f1e2d3c4b5a',
+      titulo: 'Série Presencial Histórica',
+      modalidade: 'PRESENCIAL',
+      localId,
+      espacoId: espacoInativoId,
+      urlOnline: null,
+    }
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/series-recorrencia') return [seriePresencial]
+      if (url === '/locais') return [{ id: localId, nome: 'Sede Histórica' }]
+      if (url === '/espacos-locais') {
+        return [
+          { id: espacoInativoId, localId, nome: 'Sala Histórica', ativo: false },
+          { id: '6c5b4a3f-2e1d-4b9a-8f0e-1d2c3b4a5f6e', localId, nome: 'Sala Ativa', ativo: true },
+        ]
+      }
+      if (url === '/membros') return MOCK_LOOKUPS.membros
+      if (url === '/regionais') return MOCK_LOOKUPS.regionais
+      if (url === '/administracoes') return []
+      if (url === '/setores') return []
+      if (url === '/casas') return []
+      if (url === '/grupos-trabalho') return []
+      return []
+    })
+
+    render(<SeriesView />)
+
+    await waitFor(() => expect(screen.getByText('Série Presencial Histórica')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('Editar'))
+
+    const dialogEdicao = await screen.findByRole('dialog', { name: 'Editar Série de Recorrência' })
+    const seletorEspaco = within(dialogEdicao).getByLabelText('Espaço')
+
+    expect(seletorEspaco).toHaveValue(espacoInativoId)
+    expect(within(dialogEdicao).getByRole('option', { name: 'Sala Histórica (inativo)' })).toBeInTheDocument()
+
+    fireEvent.click(within(dialogEdicao).getByText('✕'))
+    fireEvent.click(screen.getByText('+ Nova Série'))
+
+    const dialogNovo = await screen.findByRole('dialog', { name: 'Nova Série de Recorrência' })
+    fireEvent.change(within(dialogNovo).getByLabelText(/Modalidade \*/i), { target: { value: 'PRESENCIAL' } })
+    fireEvent.change(within(dialogNovo).getByLabelText(/Local \*/i), { target: { value: localId } })
+
+    expect(within(dialogNovo).queryByRole('option', { name: /Sala Histórica/ })).not.toBeInTheDocument()
+    expect(within(dialogNovo).getByRole('option', { name: 'Sala Ativa' })).toBeInTheDocument()
+  })
+
   it('deve abrir inativação, exigir confirmação e enviar PATCH com updateMode ALL e ativo falso', async () => {
     render(<SeriesView />)
 
