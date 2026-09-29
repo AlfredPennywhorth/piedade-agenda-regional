@@ -127,13 +127,30 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
       'SELECT ativo FROM vinculos_funcionais WHERE membro_id = ? AND funcao_id = ?'
     ).get(json.id, funcaoDco.id) as { ativo: number }
 
-    expect(vinculoDco.ativo).toBe(0)
+    // O vínculo automático permanece ativo para que uma futura reativação do
+    // membro volte a torná-lo elegível sem exigir reparo administrativo.
+    expect(vinculoDco.ativo).toBe(1)
 
     const destinatarios = sqlite.prepare(
       'SELECT COUNT(*) AS total FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
     ).get('conv-dco-inativo', json.id) as { total: number }
 
+    // Apesar do vínculo ativo, membro inativo não pode ser sincronizado
+    // retroativamente para convocações já publicadas.
     expect(destinatarios.total).toBe(0)
+
+    const resReativar = await req(`/api/v1/membros/${json.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ativo: true }),
+    })
+
+    expect(resReativar.status).toBe(200)
+
+    const vinculoAposReativacao = sqlite.prepare(
+      'SELECT ativo FROM vinculos_funcionais WHERE membro_id = ? AND funcao_id = ?'
+    ).get(json.id, funcaoDco.id) as { ativo: number }
+
+    expect(vinculoAposReativacao.ativo).toBe(1)
   })
 
   it('2. Deve rejeitar membro com Casa inexistente', async () => {
