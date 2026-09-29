@@ -494,6 +494,7 @@ membrosRouter.patch('/:id', async (c) => {
       )
     }
 
+    const membroAtivoFinal = parsed.ativo ?? existing.ativo
     const novoVinculoDcoId = vinculoDcoDestinoExistente?.id ?? crypto.randomUUID()
     const novoVinculoDco = moveuCasa && funcaoDco
       ? {
@@ -506,8 +507,8 @@ membrosRouter.patch('/:id', async (c) => {
           updatedAt: agoraAtualizacao,
         }
       : null
-    const sincronizacoesDco = novoVinculoDco
-      ? await prepararSincronizacaoConvocacoes(db, novoVinculoDco)
+    const sincronizacoesDco = novoVinculoDco && membroAtivoFinal
+      ? await prepararSincronizacaoConvocacoes(db, novoVinculoDco, true)
       : []
 
     if (moveuCasa) {
@@ -660,8 +661,7 @@ membrosRouter.delete('/:id', async (c) => {
               qdb.delete(vinculosFuncionais).where(
                 and(
                   eq(vinculosFuncionais.membroId, id),
-                  eq(vinculosFuncionais.funcaoId, funcaoDco.id),
-                  eq(vinculosFuncionais.casaId, existing.casaId)
+                  eq(vinculosFuncionais.funcaoId, funcaoDco.id)
                 )
               ),
             ]
