@@ -14,6 +14,7 @@ vi.mock('../api/apiClient', async (importOriginal) => {
 })
 
 const EVENTO_ID = '33333333-3333-3333-3333-333333333333'
+const EVENTO_DISPONIVEL_ID = '77777777-7777-4777-8777-777777777777'
 const CONVOCACAO_ID = '44444444-4444-4444-4444-444444444444'
 
 const EVENTO_PASSADO_ID = '22222222-2222-2222-2222-222222222222'
@@ -26,6 +27,25 @@ const mockEventos = [
   {
     id: EVENTO_ID,
     titulo: 'Reunião Presencial Teste',
+    descricao: null,
+    pauta: null,
+    modalidade: 'PRESENCIAL',
+    inicioEm: INICIO_EVENTO_FUTURO,
+    fimEm: FIM_EVENTO_FUTURO,
+    localId: null,
+    urlOnline: null,
+    organizadorMembroId: null,
+    regionalId: null,
+    administracaoId: null,
+    setorId: null,
+    casaId: null,
+    grupoTrabalhoId: null,
+    observacoes: null,
+    ativo: true,
+  },
+  {
+    id: EVENTO_DISPONIVEL_ID,
+    titulo: 'Reunião Nova Disponível',
     descricao: null,
     pauta: null,
     modalidade: 'PRESENCIAL',
@@ -119,7 +139,7 @@ describe('ConvocacoesView', () => {
     })
   })
 
-  it('deve mostrar data/hora no seletor e ocultar eventos já encerrados', async () => {
+  it('deve mostrar data/hora no seletor e ocultar eventos encerrados ou já convocados', async () => {
     render(<ConvocacoesView />)
 
     await waitFor(() => {
@@ -128,7 +148,7 @@ describe('ConvocacoesView', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /novo rascunho/i }))
 
-    const select = await screen.findByRole('combobox')
+    const select = await screen.findByLabelText('Evento da convocação')
     const dataHoraEsperada = new Intl.DateTimeFormat('pt-BR', {
       timeZone: 'America/Sao_Paulo',
       day: '2-digit',
@@ -138,8 +158,119 @@ describe('ConvocacoesView', () => {
       minute: '2-digit',
       hour12: false,
     }).format(new Date(INICIO_EVENTO_FUTURO))
-    expect(select).toHaveTextContent(`Reunião Presencial Teste — ${dataHoraEsperada}`)
+    expect(select).toHaveTextContent(`Reunião Nova Disponível — ${dataHoraEsperada}`)
+    expect(select).not.toHaveTextContent('Reunião Presencial Teste')
     expect(select).not.toHaveTextContent('Reunião Antiga')
+  })
+
+  it('deve aplicar filtro geográfico por Regional em toda a cascata, inclusive GTs', async () => {
+    const reg1 = { id: 'reg-1', nome: 'Regional 1' }
+    const reg2 = { id: 'reg-2', nome: 'Regional 2' }
+    const adm1 = { id: 'adm-1', nome: 'Administração 1', regionalId: reg1.id }
+    const adm2 = { id: 'adm-2', nome: 'Administração 2', regionalId: reg2.id }
+    const setor1 = { id: 'setor-1', nome: 'Setor Regional 1', administracaoId: adm1.id }
+    const setor2 = { id: 'setor-2', nome: 'Setor Regional 2', administracaoId: adm2.id }
+    const casa1 = { id: 'casa-1', nome: 'Casa Regional 1', setorId: setor1.id }
+    const casa2 = { id: 'casa-2', nome: 'Casa Regional 2', setorId: setor2.id }
+    const gtRegional = { id: 'gt-reg-1', nome: 'GT Regional 1', regionalId: reg1.id }
+    const gtAdministracao = { id: 'gt-adm-1', nome: 'GT Administração 1', administracaoId: adm1.id }
+    const gtSetor = { id: 'gt-setor-1', nome: 'GT Setor 1', setorId: setor1.id }
+    const gtOutroSetor = { id: 'gt-setor-2', nome: 'GT Setor 2', setorId: setor2.id }
+
+    const eventos = mockEventos.map(evento =>
+      evento.id === EVENTO_ID
+        ? {
+            ...evento,
+            regionalId: null,
+            administracaoId: null,
+            setorId: null,
+            casaId: null,
+            grupoTrabalhoId: gtSetor.id,
+          }
+        : evento.id === EVENTO_DISPONIVEL_ID
+          ? { ...evento, regionalId: reg2.id }
+          : evento
+    )
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return eventos
+      if (url === '/convocacoes') return mockConvocacoes
+      if (url === '/regionais') return [reg1, reg2]
+      if (url === '/administracoes') return [adm1, adm2]
+      if (url === '/setores') return [setor1, setor2]
+      if (url === '/casas') return [casa1, casa2]
+      if (url === '/grupos-trabalho') return [gtRegional, gtAdministracao, gtSetor, gtOutroSetor]
+      return []
+    })
+
+    render(<ConvocacoesView />)
+    await screen.findByText('Minha observação rascunho')
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Regional'), {
+      target: { value: reg1.id },
+    })
+
+    expect(screen.getByLabelText('Filtrar por Administração')).toHaveTextContent('Administração 1')
+    expect(screen.getByLabelText('Filtrar por Administração')).not.toHaveTextContent('Administração 2')
+    expect(screen.getByLabelText('Filtrar por Setor')).toHaveTextContent('Setor Regional 1')
+    expect(screen.getByLabelText('Filtrar por Setor')).not.toHaveTextContent('Setor Regional 2')
+    expect(screen.getByLabelText('Filtrar por Casa de Oração')).toHaveTextContent('Casa Regional 1')
+    expect(screen.getByLabelText('Filtrar por Casa de Oração')).not.toHaveTextContent('Casa Regional 2')
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveTextContent('GT Regional 1')
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveTextContent('GT Administração 1')
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveTextContent('GT Setor 1')
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).not.toHaveTextContent('GT Setor 2')
+    expect(await screen.findByText('Minha observação rascunho')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Grupo de Trabalho'), {
+      target: { value: gtSetor.id },
+    })
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveValue(gtSetor.id)
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Administração'), {
+      target: { value: adm1.id },
+    })
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveValue('')
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).not.toHaveTextContent('GT Regional 1')
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveTextContent('GT Administração 1')
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveTextContent('GT Setor 1')
+    expect(await screen.findByText('Minha observação rascunho')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Grupo de Trabalho'), {
+      target: { value: gtSetor.id },
+    })
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveValue(gtSetor.id)
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Setor'), {
+      target: { value: setor1.id },
+    })
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveValue('')
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveTextContent('GT Setor 1')
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).not.toHaveTextContent('GT Administração 1')
+    expect(await screen.findByText('Minha observação rascunho')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Casa de Oração'), {
+      target: { value: casa1.id },
+    })
+    expect(screen.getByLabelText('Filtrar por Casa de Oração')).toHaveValue(casa1.id)
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Grupo de Trabalho'), {
+      target: { value: gtSetor.id },
+    })
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveValue(gtSetor.id)
+    expect(screen.getByLabelText('Filtrar por Casa de Oração')).toHaveValue('')
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Casa de Oração'), {
+      target: { value: casa1.id },
+    })
+    expect(screen.getByLabelText('Filtrar por Casa de Oração')).toHaveValue(casa1.id)
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveValue('')
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Regional'), {
+      target: { value: reg2.id },
+    })
+
+    expect(screen.getByText('Nenhuma convocação corresponde aos filtros selecionados.')).toBeInTheDocument()
   })
 
   it('deve permitir criar um rascunho', async () => {
@@ -155,8 +286,8 @@ describe('ConvocacoesView', () => {
       expect(screen.getByRole('dialog', { name: /nova convocação/i })).toBeInTheDocument()
     })
 
-    const select = screen.getByRole('combobox')
-    fireEvent.change(select, { target: { value: EVENTO_ID } })
+    const select = screen.getByLabelText('Evento da convocação')
+    fireEvent.change(select, { target: { value: EVENTO_DISPONIVEL_ID } })
 
     const textarea = screen.getByRole('textbox')
     fireEvent.change(textarea, { target: { value: 'Nova obs' } })
@@ -165,7 +296,7 @@ describe('ConvocacoesView', () => {
 
     await waitFor(() => {
       expect(apiClient.postWithAuth).toHaveBeenCalledWith('/convocacoes', {
-        eventoId: EVENTO_ID,
+        eventoId: EVENTO_DISPONIVEL_ID,
         observacoes: 'Nova obs'
       })
     })
@@ -265,7 +396,7 @@ describe('ConvocacoesView', () => {
         expect(screen.getByText('Nenhuma função vinculada.')).toBeInTheDocument()
       })
       
-      const select = screen.getByRole('combobox')
+      const select = screen.getByLabelText('Função para adicionar')
       fireEvent.change(select, { target: { value: '11111111-1111-1111-1111-111111111111' } })
       fireEvent.click(screen.getByRole('button', { name: /adicionar/i }))
       
@@ -307,7 +438,7 @@ describe('ConvocacoesView', () => {
         expect(screen.getByRole('dialog', { name: /gerenciar funções do rascunho/i })).toBeInTheDocument()
       })
 
-      fireEvent.change(screen.getByRole('combobox'), { target: { value: '22222222-2222-2222-2222-222222222222' } })
+      fireEvent.change(screen.getByLabelText('Função para adicionar'), { target: { value: '22222222-2222-2222-2222-222222222222' } })
       fireEvent.click(screen.getByRole('button', { name: /adicionar/i }))
 
       await waitFor(() => {
@@ -369,16 +500,23 @@ describe('ConvocacoesView', () => {
       })
     })
 
-    it('botão cancelar ausente para CANCELADA', async () => {
+    it('oculta CANCELADA por padrão e permite consultá-la pelo filtro de status', async () => {
       vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
         if (url === '/convocacoes') return [{ ...mockConvocacoes[0], status: 'CANCELADA' }]
         if (url === '/eventos') return mockEventos
         return []
       })
       render(<ConvocacoesView />)
+
       await waitFor(() => {
-        expect(screen.getByText('Minha observação rascunho')).toBeInTheDocument()
+        expect(screen.getByText('Nenhuma convocação corresponde aos filtros selecionados.')).toBeInTheDocument()
       })
+
+      fireEvent.change(screen.getByLabelText('Filtrar por status'), {
+        target: { value: 'CANCELADA' },
+      })
+
+      expect(await screen.findByText('Minha observação rascunho')).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument()
     })
 

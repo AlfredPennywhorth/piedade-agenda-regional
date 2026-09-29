@@ -137,6 +137,24 @@ convocacoesRouter.post('/', async c => {
       return c.json({ error: 'Acesso não autorizado para gerir a convocação', code: 'FORBIDDEN' }, 403)
     }
 
+    const convocacaoExistente = await db
+      .select({ id: convocacoes.id, status: convocacoes.status })
+      .from(convocacoes)
+      .where(eq(convocacoes.eventoId, parsed.eventoId))
+      .get()
+
+    if (convocacaoExistente) {
+      return c.json(
+        {
+          error: 'Este evento já possui convocação',
+          code: 'CONVOCACAO_EVENTO_EXISTENTE',
+          convocacaoId: convocacaoExistente.id,
+          status: convocacaoExistente.status,
+        },
+        409
+      )
+    }
+
     const convocacaoId = crypto.randomUUID()
     const nowIso = new Date().toISOString()
 
@@ -169,6 +187,18 @@ convocacoesRouter.post('/', async c => {
   } catch (err: any) {
     if (err.message && err.message.includes('CONVOCACAO_EM_EVENTO_INATIVO')) {
       return c.json({ error: 'Evento associado não existe ou inativo' }, 409)
+    }
+    if (
+      err.message &&
+      (
+        err.message.includes('UNIQUE constraint failed: convocacoes.evento_id') ||
+        err.message.includes('idx_convocacoes_evento_unico')
+      )
+    ) {
+      return c.json(
+        { error: 'Este evento já possui convocação', code: 'CONVOCACAO_EVENTO_EXISTENTE' },
+        409
+      )
     }
     return c.json({ error: err.issues || err.message }, 400)
   }
