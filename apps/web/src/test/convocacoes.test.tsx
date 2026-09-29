@@ -148,7 +148,7 @@ describe('ConvocacoesView', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /novo rascunho/i }))
 
-    const select = await screen.findByRole('combobox')
+    const select = await screen.findByLabelText('Evento da convocação')
     const dataHoraEsperada = new Intl.DateTimeFormat('pt-BR', {
       timeZone: 'America/Sao_Paulo',
       day: '2-digit',
@@ -208,7 +208,7 @@ describe('ConvocacoesView', () => {
       expect(screen.getByRole('dialog', { name: /nova convocação/i })).toBeInTheDocument()
     })
 
-    const select = screen.getByRole('combobox')
+    const select = screen.getByLabelText('Evento da convocação')
     fireEvent.change(select, { target: { value: EVENTO_DISPONIVEL_ID } })
 
     const textarea = screen.getByRole('textbox')
@@ -318,7 +318,7 @@ describe('ConvocacoesView', () => {
         expect(screen.getByText('Nenhuma função vinculada.')).toBeInTheDocument()
       })
       
-      const select = screen.getByRole('combobox')
+      const select = screen.getByLabelText('Função para adicionar')
       fireEvent.change(select, { target: { value: '11111111-1111-1111-1111-111111111111' } })
       fireEvent.click(screen.getByRole('button', { name: /adicionar/i }))
       
@@ -360,7 +360,7 @@ describe('ConvocacoesView', () => {
         expect(screen.getByRole('dialog', { name: /gerenciar funções do rascunho/i })).toBeInTheDocument()
       })
 
-      fireEvent.change(screen.getByRole('combobox'), { target: { value: '22222222-2222-2222-2222-222222222222' } })
+      fireEvent.change(screen.getByLabelText('Função para adicionar'), { target: { value: '22222222-2222-2222-2222-222222222222' } })
       fireEvent.click(screen.getByRole('button', { name: /adicionar/i }))
 
       await waitFor(() => {
