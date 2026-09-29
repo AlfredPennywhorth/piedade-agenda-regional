@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { SerieCreateInput } from '@piedade/shared'
 import { SerieFormModal } from './SerieFormModal'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
@@ -73,6 +73,7 @@ export function SeriesView() {
   const [salvando, setSalvando] = useState<boolean>(false)
   
   const [serieEditandoId, setSerieEditandoId] = useState<string | null>(null)
+  const serieFormConsultaSeq = useRef(0)
   const [confirmacaoEditar, setConfirmacaoEditar] = useState<Partial<SerieCreateInput> | null>(null)
   const [confirmacaoInativar, setConfirmacaoInativar] = useState<SerieRecorrencia | null>(null)
 
@@ -168,6 +169,7 @@ export function SeriesView() {
 
 
   const abrirFormCriar = () => {
+    serieFormConsultaSeq.current += 1
     setSerieEditandoId(null)
     setFormData({
       titulo: '',
@@ -201,6 +203,7 @@ export function SeriesView() {
   }
 
   const abrirFormEditar = async (serie: SerieRecorrencia) => {
+    const consultaAtual = ++serieFormConsultaSeq.current
     setErro(null)
 
     if (
@@ -210,6 +213,8 @@ export function SeriesView() {
     ) {
       try {
         const espacosDoLocal = await fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${serie.localId}`)
+        if (consultaAtual !== serieFormConsultaSeq.current) return
+
         const espacoAtual = (espacosDoLocal || []).find(espaco => espaco.id === serie.espacoId)
         if (espacoAtual) {
           setEspacos(prev =>
@@ -219,9 +224,12 @@ export function SeriesView() {
           )
         }
       } catch {
+        if (consultaAtual !== serieFormConsultaSeq.current) return
         setLookupAviso('Não foi possível carregar o espaço histórico desta série. Selecione outro espaço ou limpe o campo antes de salvar.')
       }
     }
+
+    if (consultaAtual !== serieFormConsultaSeq.current) return
 
     setSerieEditandoId(serie.id)
     setFormData({
