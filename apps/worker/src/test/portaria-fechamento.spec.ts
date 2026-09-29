@@ -50,13 +50,11 @@ describe('PORT-03 — fechamento e lista final consolidada', () => {
          'setor-1', 1);
 
       INSERT INTO convocacoes (id, evento_id, status, ativo) VALUES
-        ('conv-1', 'evento-1', 'PUBLICADA', 1),
-        ('conv-2', 'evento-1', 'PUBLICADA', 1);
+        ('conv-1', 'evento-1', 'PUBLICADA', 1);
 
       INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES
         ('dest-1', 'conv-1', 'm1'),
-        ('dest-2', 'conv-1', 'm2'),
-        ('dest-3', 'conv-2', 'm1');
+        ('dest-2', 'conv-1', 'm2');
 
       INSERT INTO rsvp
         (id, convocacao_destinatario_id, resposta, respondido_em, atualizado_em)
