@@ -93,6 +93,18 @@ export function SerieFormModal({
     setErrosForm({})
     setErro(null)
     
+    if (formData.espacoId) {
+      const espacoSelecionado = espacos.find(espaco => espaco.id === formData.espacoId)
+      if (!espacoSelecionado || !espacoSelecionado.ativo) {
+        setErrosForm({
+          espacoId: espacoSelecionado
+            ? 'O espaço atual está inativo. Selecione um espaço ativo ou deixe o Local inteiro.'
+            : 'O espaço atual não está disponível. Selecione outro espaço ou deixe o Local inteiro.',
+        })
+        return
+      }
+    }
+
     const payload = {
       ...formData,
       descricao: formData.descricao || null,
@@ -370,9 +382,16 @@ export function SerieFormModal({
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         >
                           <option value="">Local inteiro / não especificado</option>
-                          {espacos.filter(espaco => espaco.localId === formData.localId && espaco.ativo).map(espaco => (
-                            <option key={espaco.id} value={espaco.id}>{espaco.nome}</option>
-                          ))}
+                          {espacos
+                            .filter(espaco =>
+                              espaco.localId === formData.localId &&
+                              (espaco.ativo || espaco.id === formData.espacoId)
+                            )
+                            .map(espaco => (
+                              <option key={espaco.id} value={espaco.id}>
+                                {espaco.nome}{espaco.ativo ? '' : ' (inativo — substitua ou limpe)'}
+                              </option>
+                            ))}
                         </select>
                         {errosForm.espacoId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.espacoId}</p>}
                       </div>
