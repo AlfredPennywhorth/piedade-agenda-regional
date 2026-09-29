@@ -163,7 +163,7 @@ describe('ConvocacoesView', () => {
     expect(select).not.toHaveTextContent('Reunião Antiga')
   })
 
-  it('deve aplicar filtro geográfico por Regional em toda a cascata', async () => {
+  it('deve aplicar filtro geográfico por Regional em toda a cascata, inclusive GTs', async () => {
     const reg1 = { id: 'reg-1', nome: 'Regional 1' }
     const reg2 = { id: 'reg-2', nome: 'Regional 2' }
     const adm1 = { id: 'adm-1', nome: 'Administração 1', regionalId: reg1.id }
@@ -172,10 +172,24 @@ describe('ConvocacoesView', () => {
     const setor2 = { id: 'setor-2', nome: 'Setor Regional 2', administracaoId: adm2.id }
     const casa1 = { id: 'casa-1', nome: 'Casa Regional 1', setorId: setor1.id }
     const casa2 = { id: 'casa-2', nome: 'Casa Regional 2', setorId: setor2.id }
+    const gtRegional = { id: 'gt-reg-1', nome: 'GT Regional 1', regionalId: reg1.id }
+    const gtAdministracao = { id: 'gt-adm-1', nome: 'GT Administração 1', administracaoId: adm1.id }
+    const gtSetor = { id: 'gt-setor-1', nome: 'GT Setor 1', setorId: setor1.id }
+    const gtOutroSetor = { id: 'gt-setor-2', nome: 'GT Setor 2', setorId: setor2.id }
+
     const eventos = mockEventos.map(evento =>
-      evento.id === EVENTO_ID ? { ...evento, regionalId: reg1.id } :
-      evento.id === EVENTO_DISPONIVEL_ID ? { ...evento, regionalId: reg2.id } :
-      evento
+      evento.id === EVENTO_ID
+        ? {
+            ...evento,
+            regionalId: null,
+            administracaoId: null,
+            setorId: null,
+            casaId: null,
+            grupoTrabalhoId: gtSetor.id,
+          }
+        : evento.id === EVENTO_DISPONIVEL_ID
+          ? { ...evento, regionalId: reg2.id }
+          : evento
     )
 
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
@@ -185,6 +199,7 @@ describe('ConvocacoesView', () => {
       if (url === '/administracoes') return [adm1, adm2]
       if (url === '/setores') return [setor1, setor2]
       if (url === '/casas') return [casa1, casa2]
+      if (url === '/grupos-trabalho') return [gtRegional, gtAdministracao, gtSetor, gtOutroSetor]
       return []
     })
 
@@ -201,6 +216,25 @@ describe('ConvocacoesView', () => {
     expect(screen.getByLabelText('Filtrar por Setor')).not.toHaveTextContent('Setor Regional 2')
     expect(screen.getByLabelText('Filtrar por Casa de Oração')).toHaveTextContent('Casa Regional 1')
     expect(screen.getByLabelText('Filtrar por Casa de Oração')).not.toHaveTextContent('Casa Regional 2')
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveTextContent('GT Regional 1')
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveTextContent('GT Administração 1')
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveTextContent('GT Setor 1')
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).not.toHaveTextContent('GT Setor 2')
+    expect(await screen.findByText('Minha observação rascunho')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Administração'), {
+      target: { value: adm1.id },
+    })
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).not.toHaveTextContent('GT Regional 1')
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveTextContent('GT Administração 1')
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveTextContent('GT Setor 1')
+    expect(await screen.findByText('Minha observação rascunho')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Setor'), {
+      target: { value: setor1.id },
+    })
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveTextContent('GT Setor 1')
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).not.toHaveTextContent('GT Administração 1')
     expect(await screen.findByText('Minha observação rascunho')).toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('Filtrar por Regional'), {
