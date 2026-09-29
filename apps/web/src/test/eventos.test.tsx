@@ -255,6 +255,58 @@ describe('EventosView', () => {
     expect(within(dialogNovo).getByRole('option', { name: 'Sala Ativa' })).toBeInTheDocument()
   })
 
+  it('deve ignorar lookup histórico atrasado após fechar edição e abrir novo evento', async () => {
+    const eventoComEspacoInativo = {
+      ...mockEventos[0],
+      espacoId: ESPACO_INATIVO_ID,
+    }
+
+    let resolverEspacosHistoricos: ((value: any[]) => void) | undefined
+    const espacosHistoricosPendentes = new Promise<any[]>(resolve => {
+      resolverEspacosHistoricos = resolve
+    })
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return [eventoComEspacoInativo]
+      if (url === `/eventos/${EVENTO_ID}`) return eventoComEspacoInativo
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/espacos-locais?ativo=true') {
+        return [{ id: ESPACO_ATIVO_ID, localId: LOCAL_ID, nome: 'Sala Ativa', ativo: true }]
+      }
+      if (url === `/espacos-locais?localId=${LOCAL_ID}`) {
+        return espacosHistoricosPendentes as any
+      }
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+
+    render(<EventosView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Presencial')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
+
+    const dialogEdicao = await screen.findByRole('dialog', { name: /editar evento/i })
+    fireEvent.click(within(dialogEdicao).getByRole('button', { name: '✕' }))
+
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+    const dialogNovo = await screen.findByRole('dialog', { name: /novo evento/i })
+    expect(within(dialogNovo).getByLabelText(/título/i)).toHaveValue('')
+
+    await act(async () => {
+      resolverEspacosHistoricos?.([
+        { id: ESPACO_INATIVO_ID, localId: LOCAL_ID, nome: 'Sala Histórica', ativo: false },
+      ])
+      await espacosHistoricosPendentes
+    })
+
+    expect(screen.getByRole('dialog', { name: /novo evento/i })).toBeInTheDocument()
+    expect(within(dialogNovo).getByLabelText(/título/i)).toHaveValue('')
+    expect(within(dialogNovo).getByLabelText(/modalidade/i)).toHaveValue('PRESENCIAL')
+  })
+
   it('deve abrir escolha ao editar evento recorrente, cancelar não envia PATCH', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/eventos') return [mockEventoRecorrente]
