@@ -650,7 +650,7 @@ export const convocacoes = sqliteTable(
       'check_status_convocacao',
       sql`${table.status} IN ('RASCUNHO','PUBLICADA','CANCELADA')`
     ),
-    idxEventoId: index('idx_convocacoes_evento_id').on(table.eventoId),
+    idxEventoId: uniqueIndex('idx_convocacoes_evento_unico').on(table.eventoId),
     idxStatus: index('idx_convocacoes_status').on(table.status),
   })
 )
