@@ -338,6 +338,15 @@ adminAcessosApp.post('/membros/:id/link-ativacao', async c => {
     .from(schema.contasAcesso)
     .where(eq(schema.contasAcesso.membroId, membroId))
     .get()
+  if (contaExistente?.status === 'ATIVA') {
+    return c.json(
+      {
+        error: 'Conta já ativada; utilize o fluxo de redefinição de PIN',
+        code: 'CONTA_JA_ATIVA',
+      },
+      409
+    )
+  }
   if (contaExistente?.status === 'BLOQUEADA' || contaExistente?.status === 'DESATIVADA') {
     return c.json({ error: 'Conta indisponível para ativação', code: 'CONTA_INDISPONIVEL' }, 409)
   }
