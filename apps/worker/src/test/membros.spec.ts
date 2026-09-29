@@ -85,7 +85,7 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     expect(json.id).toBeDefined()
   })
 
-  it('1b. Não deve sincronizar membro inativo em convocações DCO futuras', async () => {
+  it('1b. Deve omitir membro inativo e sincronizar convocações publicadas ao reativar na mesma Casa', async () => {
     const funcaoDco = sqlite.prepare(
       "SELECT id FROM funcoes WHERE codigo = 'DCO' AND ativo = 1"
     ).get() as { id: string }
@@ -152,6 +152,20 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     ).get(json.id, funcaoDco.id) as { ativo: number }
 
     expect(vinculoAposReativacao.ativo).toBe(1)
+
+    const destinatariosRetroativos = sqlite.prepare(
+      'SELECT COUNT(*) AS total FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
+    ).get('conv-dco-inativo', json.id) as { total: number }
+    expect(destinatariosRetroativos.total).toBe(1)
+
+    const resRepetir = await req(`/api/v1/membros/${json.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ativo: true }),
+    })
+    expect(resRepetir.status).toBe(200)
+    expect(sqlite.prepare(
+      'SELECT COUNT(*) AS total FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
+    ).get('conv-dco-inativo', json.id)).toMatchObject({ total: 1 })
 
     sqlite.exec(`
       INSERT INTO eventos
@@ -733,6 +747,62 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     expect(sqlite.prepare(
       "SELECT id FROM auditoria_logs WHERE acao = 'MEMBRO_EXCLUIDO' AND recurso_id = ?"
     ).get(criado.id)).toBeUndefined()
+  })
+
+  it.each([
+    { origem: 'MEMBRO_AUTOMATICO', ativo: 1, totalEsperado: 1 },
+    { origem: null, ativo: 1, totalEsperado: 0 },
+    { origem: 'MEMBRO_AUTOMATICO', ativo: 0, totalEsperado: 0 },
+  ])('34. Reativação após publicação respeita origem $origem e vínculo ativo $ativo', async ({ origem, ativo, totalEsperado }) => {
+    const resCreate = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'Membro Reativação Mesma Casa',
+        dataOrdenacao: '2005-01-01',
+        codigoCarteirinha: 'TESTE-34',
+        casaId,
+        ativo: false,
+      }),
+    })
+    expect(resCreate.status).toBe(201)
+    const criado = await resCreate.json() as MembroResponse
+    const vinculo = sqlite.prepare(
+      'SELECT id, funcao_id FROM vinculos_funcionais WHERE membro_id = ?'
+    ).get(criado.id) as { id: string; funcao_id: string }
+    sqlite.prepare('UPDATE vinculos_funcionais SET origem = ?, ativo = ? WHERE id = ?')
+      .run(origem, ativo, vinculo.id)
+
+    sqlite.exec(`
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, casa_id, ativo)
+      VALUES ('evento-reativacao-casa', 'Evento reativação mesma Casa', 'ONLINE',
+        '2030-03-01T12:00:00.000Z', '2030-03-01T13:00:00.000Z', '${casaId}', 1);
+      INSERT INTO convocacoes (id, evento_id, status, ativo)
+      VALUES ('conv-reativacao-casa', 'evento-reativacao-casa', 'RASCUNHO', 1);
+      INSERT INTO convocacao_funcoes (id, convocacao_id, funcao_id)
+      VALUES ('cf-reativacao-casa', 'conv-reativacao-casa', '${vinculo.funcao_id}');
+    `)
+    const resPublicar = await req('/api/v1/convocacoes/conv-reativacao-casa/publicar', { method: 'POST' })
+    expect(resPublicar.status).toBe(200)
+    const contarDestinatarios = () => sqlite.prepare(
+      'SELECT COUNT(*) AS total FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
+    ).get('conv-reativacao-casa', criado.id) as { total: number }
+    expect(contarDestinatarios().total).toBe(0)
+
+    const resReativar = await req(`/api/v1/membros/${criado.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ casaId, ativo: true }),
+    })
+    expect(resReativar.status).toBe(200)
+    expect(contarDestinatarios().total).toBe(totalEsperado)
+    expect(sqlite.prepare('SELECT origem, ativo FROM vinculos_funcionais WHERE id = ?').get(vinculo.id))
+      .toMatchObject({ origem, ativo })
+
+    const evidencias = sqlite.prepare(
+      `SELECT COUNT(*) AS total FROM convocacao_destinatario_evidencias e
+       JOIN convocacao_destinatarios d ON d.id = e.convocacao_destinatario_id
+       WHERE d.convocacao_id = ? AND d.membro_id = ? AND e.vinculo_funcional_id = ?`
+    ).get('conv-reativacao-casa', criado.id, vinculo.id) as { total: number }
+    expect(evidencias.total).toBe(totalEsperado)
   })
 
 })
