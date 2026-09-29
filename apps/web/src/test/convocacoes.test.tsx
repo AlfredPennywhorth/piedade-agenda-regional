@@ -163,9 +163,15 @@ describe('ConvocacoesView', () => {
     expect(select).not.toHaveTextContent('Reunião Antiga')
   })
 
-  it('deve aplicar filtro geográfico por Regional', async () => {
+  it('deve aplicar filtro geográfico por Regional em toda a cascata', async () => {
     const reg1 = { id: 'reg-1', nome: 'Regional 1' }
     const reg2 = { id: 'reg-2', nome: 'Regional 2' }
+    const adm1 = { id: 'adm-1', nome: 'Administração 1', regionalId: reg1.id }
+    const adm2 = { id: 'adm-2', nome: 'Administração 2', regionalId: reg2.id }
+    const setor1 = { id: 'setor-1', nome: 'Setor Regional 1', administracaoId: adm1.id }
+    const setor2 = { id: 'setor-2', nome: 'Setor Regional 2', administracaoId: adm2.id }
+    const casa1 = { id: 'casa-1', nome: 'Casa Regional 1', setorId: setor1.id }
+    const casa2 = { id: 'casa-2', nome: 'Casa Regional 2', setorId: setor2.id }
     const eventos = mockEventos.map(evento =>
       evento.id === EVENTO_ID ? { ...evento, regionalId: reg1.id } :
       evento.id === EVENTO_DISPONIVEL_ID ? { ...evento, regionalId: reg2.id } :
@@ -176,6 +182,9 @@ describe('ConvocacoesView', () => {
       if (url === '/eventos') return eventos
       if (url === '/convocacoes') return mockConvocacoes
       if (url === '/regionais') return [reg1, reg2]
+      if (url === '/administracoes') return [adm1, adm2]
+      if (url === '/setores') return [setor1, setor2]
+      if (url === '/casas') return [casa1, casa2]
       return []
     })
 
@@ -183,16 +192,22 @@ describe('ConvocacoesView', () => {
     await screen.findByText('Minha observação rascunho')
 
     fireEvent.change(screen.getByLabelText('Filtrar por Regional'), {
+      target: { value: reg1.id },
+    })
+
+    expect(screen.getByLabelText('Filtrar por Administração')).toHaveTextContent('Administração 1')
+    expect(screen.getByLabelText('Filtrar por Administração')).not.toHaveTextContent('Administração 2')
+    expect(screen.getByLabelText('Filtrar por Setor')).toHaveTextContent('Setor Regional 1')
+    expect(screen.getByLabelText('Filtrar por Setor')).not.toHaveTextContent('Setor Regional 2')
+    expect(screen.getByLabelText('Filtrar por Casa de Oração')).toHaveTextContent('Casa Regional 1')
+    expect(screen.getByLabelText('Filtrar por Casa de Oração')).not.toHaveTextContent('Casa Regional 2')
+    expect(await screen.findByText('Minha observação rascunho')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Regional'), {
       target: { value: reg2.id },
     })
 
     expect(screen.getByText('Nenhuma convocação corresponde aos filtros selecionados.')).toBeInTheDocument()
-
-    fireEvent.change(screen.getByLabelText('Filtrar por Regional'), {
-      target: { value: reg1.id },
-    })
-
-    expect(await screen.findByText('Minha observação rascunho')).toBeInTheDocument()
   })
 
   it('deve permitir criar um rascunho', async () => {
