@@ -121,6 +121,293 @@ describe('Perfis, escopos e governança — PR-ACC-03', () => {
     expect(segunda.status).toBe(409)
   })
 
+  it('prepara a ativação do primeiro Master quando a instalação ainda não possui conta', async () => {
+    sqlite.prepare(`DELETE FROM contas_acesso WHERE id = ?`).run('conta-master')
+
+    const bootstrap = await requisicao('/api/v1/bootstrap/master', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bootstrap-Secret': bootstrapSecret,
+      },
+      body: JSON.stringify({
+        codigoCarteirinha: 'CARTEIRA-MASTER',
+        confirmacao: 'CRIAR PRIMEIRO MASTER',
+      }),
+    })
+
+    expect(bootstrap.status).toBe(201)
+    const body = (await bootstrap.json()) as any
+    expect(body.tokenAtivacao).toEqual(expect.any(String))
+    expect(body.expiraEmAtivacao).toEqual(expect.any(String))
+
+    const conta = sqlite
+      .prepare(`SELECT id, status FROM contas_acesso WHERE membro_id = ?`)
+      .get('membro-master') as any
+    expect(conta.status).toBe('PENDENTE_ATIVACAO')
+
+    const link = sqlite
+      .prepare(`SELECT token_hash, conta_acesso_id FROM links_ativacao WHERE membro_id = ?`)
+      .get('membro-master') as any
+    expect(link.conta_acesso_id).toBe(conta.id)
+    expect(link.token_hash).toBe(await hashToken(body.tokenAtivacao))
+
+    const ativacao = await requisicao('/api/v1/auth/ativar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: body.tokenAtivacao,
+        celular: '11999990001',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
+    })
+    expect(ativacao.status).toBe(200)
+
+    const sessao = (await ativacao.json()) as any
+    const me = await requisicao('/api/v1/auth/me', {
+      headers: { Authorization: `Bearer ${sessao.sessionToken}` },
+    })
+    expect(me.status).toBe(200)
+  })
+
+  it('consome um mesmo token de ativação apenas uma vez sob concorrência', async () => {
+    sqlite.prepare(`DELETE FROM contas_acesso WHERE id = ?`).run('conta-master')
+
+    const bootstrap = await requisicao('/api/v1/bootstrap/master', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bootstrap-Secret': bootstrapSecret,
+      },
+      body: JSON.stringify({
+        codigoCarteirinha: 'CARTEIRA-MASTER',
+        confirmacao: 'CRIAR PRIMEIRO MASTER',
+      }),
+    })
+    const { tokenAtivacao } = (await bootstrap.json()) as any
+
+    const ativar = (pin: string) =>
+      requisicao('/api/v1/auth/ativar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: tokenAtivacao,
+          celular: '11999990001',
+          pin,
+          confirmacaoPin: pin,
+        }),
+      })
+
+    const respostas = await Promise.all([ativar('123456'), ativar('654321')])
+    expect(respostas.map(r => r.status).sort()).toEqual([200, 400])
+
+    const conta = sqlite
+      .prepare(`SELECT id, status FROM contas_acesso WHERE membro_id = ?`)
+      .get('membro-master') as any
+    expect(conta.status).toBe('ATIVA')
+    expect(
+      sqlite.prepare(
+        `SELECT COUNT(*) AS total FROM sessoes WHERE conta_acesso_id = ? AND revogado_em IS NULL`
+      ).get(conta.id)
+    ).toMatchObject({ total: 1 })
+  })
+
+  it('permite apenas um vencedor entre dois links válidos concorrentes', async () => {
+    sqlite.prepare(`DELETE FROM contas_acesso WHERE id = ?`).run('conta-master')
+
+    const bootstrap = await requisicao('/api/v1/bootstrap/master', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bootstrap-Secret': bootstrapSecret,
+      },
+      body: JSON.stringify({
+        codigoCarteirinha: 'CARTEIRA-MASTER',
+        confirmacao: 'CRIAR PRIMEIRO MASTER',
+      }),
+    })
+    const primeiro = (await bootstrap.json()) as any
+    const conta = sqlite
+      .prepare(`SELECT id FROM contas_acesso WHERE membro_id = ?`)
+      .get('membro-master') as any
+
+    const segundoToken = 'token-concorrente-distinto'
+    const agora = new Date().toISOString()
+    sqlite
+      .prepare(
+        `INSERT INTO links_ativacao
+          (id, conta_acesso_id, membro_id, token_hash, expira_em, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        'link-concorrente-2',
+        conta.id,
+        'membro-master',
+        await hashToken(segundoToken),
+        new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        agora,
+        agora
+      )
+
+    const ativar = (token: string, pin: string) =>
+      requisicao('/api/v1/auth/ativar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          celular: '11999990001',
+          pin,
+          confirmacaoPin: pin,
+        }),
+      })
+
+    const respostas = await Promise.all([
+      ativar(primeiro.tokenAtivacao, '123456'),
+      ativar(segundoToken, '654321'),
+    ])
+    expect(respostas.map(r => r.status).sort()).toEqual([200, 400])
+    expect(
+      sqlite.prepare(
+        `SELECT COUNT(*) AS total FROM sessoes WHERE conta_acesso_id = ? AND revogado_em IS NULL`
+      ).get(conta.id)
+    ).toMatchObject({ total: 1 })
+    expect(
+      sqlite.prepare(
+        `SELECT COUNT(*) AS total FROM links_ativacao
+         WHERE conta_acesso_id = ? AND utilizado_em IS NULL AND revogado_em IS NULL`
+      ).get(conta.id)
+    ).toMatchObject({ total: 0 })
+  })
+
+  it('rejeita bootstrap quando o membro selecionado não possui celular', async () => {
+    sqlite.prepare(`DELETE FROM contas_acesso WHERE id = ?`).run('conta-master')
+    sqlite.prepare(`UPDATE membros SET celular = NULL WHERE id = ?`).run('membro-master')
+
+    const response = await requisicao('/api/v1/bootstrap/master', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bootstrap-Secret': bootstrapSecret,
+      },
+      body: JSON.stringify({
+        codigoCarteirinha: 'CARTEIRA-MASTER',
+        confirmacao: 'CRIAR PRIMEIRO MASTER',
+      }),
+    })
+
+    expect(response.status).toBe(404)
+    expect(
+      sqlite.prepare(`SELECT COUNT(*) AS total FROM bootstrap_master`).get()
+    ).toMatchObject({ total: 0 })
+  })
+
+  it('regenera link do mesmo primeiro Master enquanto a conta estiver pendente', async () => {
+    sqlite.prepare(`DELETE FROM contas_acesso WHERE id = ?`).run('conta-master')
+
+    const executar = () =>
+      requisicao('/api/v1/bootstrap/master', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Bootstrap-Secret': bootstrapSecret,
+        },
+        body: JSON.stringify({
+          codigoCarteirinha: 'CARTEIRA-MASTER',
+          confirmacao: 'CRIAR PRIMEIRO MASTER',
+        }),
+      })
+
+    const primeira = await executar()
+    expect(primeira.status).toBe(201)
+    const primeiroBody = (await primeira.json()) as any
+
+    const segunda = await executar()
+    expect(segunda.status).toBe(200)
+    const segundoBody = (await segunda.json()) as any
+    expect(segundoBody.tokenAtivacao).toEqual(expect.any(String))
+    expect(segundoBody.tokenAtivacao).not.toBe(primeiroBody.tokenAtivacao)
+
+    const conta = sqlite
+      .prepare(`SELECT id, status FROM contas_acesso WHERE membro_id = ?`)
+      .get('membro-master') as any
+    expect(conta.status).toBe('PENDENTE_ATIVACAO')
+
+    const acessos = sqlite
+      .prepare(
+        `SELECT COUNT(*) AS total FROM acessos_conta
+         WHERE conta_acesso_id = ? AND perfil_codigo = 'MASTER_SISTEMA' AND ativo = 1`
+      )
+      .get(conta.id) as any
+    expect(acessos.total).toBe(1)
+
+    const links = sqlite
+      .prepare(
+        `SELECT token_hash, revogado_em FROM links_ativacao
+         WHERE conta_acesso_id = ? ORDER BY created_at ASC`
+      )
+      .all(conta.id) as any[]
+    expect(links).toHaveLength(2)
+    expect(links[0].revogado_em).not.toBeNull()
+    expect(links[1].token_hash).toBe(await hashToken(segundoBody.tokenAtivacao))
+    expect(links[1].revogado_em).toBeNull()
+
+    const ativacaoAntiga = await requisicao('/api/v1/auth/ativar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: primeiroBody.tokenAtivacao,
+        celular: '11999990001',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
+    })
+    expect(ativacaoAntiga.status).toBe(400)
+
+    const ativacaoNova = await requisicao('/api/v1/auth/ativar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: segundoBody.tokenAtivacao,
+        celular: '11999990001',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
+    })
+    expect(ativacaoNova.status).toBe(200)
+
+    const depoisDeAtivar = await executar()
+    expect(depoisDeAtivar.status).toBe(409)
+  })
+
+  it('modo somente recuperação nunca cria o primeiro Master', async () => {
+    sqlite.prepare(`DELETE FROM contas_acesso WHERE id = ?`).run('conta-master')
+
+    const response = await requisicao('/api/v1/bootstrap/master', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Bootstrap-Secret': bootstrapSecret,
+      },
+      body: JSON.stringify({
+        codigoCarteirinha: 'CARTEIRA-MASTER',
+        confirmacao: 'CRIAR PRIMEIRO MASTER',
+        somenteRecuperacao: true,
+      }),
+    })
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'RECUPERACAO_INDISPONIVEL' })
+    expect(
+      sqlite.prepare(`SELECT COUNT(*) AS total FROM bootstrap_master`).get()
+    ).toMatchObject({ total: 0 })
+    expect(
+      sqlite.prepare(
+        `SELECT COUNT(*) AS total FROM acessos_conta WHERE perfil_codigo = 'MASTER_SISTEMA'`
+      ).get()
+    ).toMatchObject({ total: 0 })
+  })
+
   it('impede Master com escopo institucional', () => {
     expect(() =>
       sqlite
