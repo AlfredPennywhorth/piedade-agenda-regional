@@ -363,8 +363,15 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
 
       if (!apenasDesativacao) {
         SerieCreate.parse(mergedSerieData)
-        if (!(await espacoAtivoPertenceAoLocal(db, mergedSerieData.localId, mergedSerieData.espacoId))) {
-          if (await espacoPertenceAoLocal(db, mergedSerieData.localId, mergedSerieData.espacoId)) {
+        const preservaEspacoHistorico =
+          mergedSerieData.localId === existingSerie.localId &&
+          mergedSerieData.espacoId === existingSerie.espacoId
+        const espacoValido = preservaEspacoHistorico
+          ? await espacoPertenceAoLocal(db, mergedSerieData.localId, mergedSerieData.espacoId)
+          : await espacoAtivoPertenceAoLocal(db, mergedSerieData.localId, mergedSerieData.espacoId)
+
+        if (!espacoValido) {
+          if (!preservaEspacoHistorico && await espacoPertenceAoLocal(db, mergedSerieData.localId, mergedSerieData.espacoId)) {
             return c.json({ error: 'O espaço selecionado está inativo', code: 'ESPACO_INATIVO' }, 409)
           }
           return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
