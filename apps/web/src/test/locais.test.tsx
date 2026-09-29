@@ -462,6 +462,70 @@ describe('LocaisView', () => {
     expect(within(dialog).queryByText('Sala A Atualizada')).not.toBeInTheDocument()
   })
 
+  it('deve atualizar o mesmo Local reaberto enquanto o save ainda estava pendente', async () => {
+    let resolverSave: ((value: any) => void) | undefined
+    const savePendente = new Promise<any>(resolve => {
+      resolverSave = resolve
+    })
+    let chamadasEspacos = 0
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/locais') return mockLocais as any
+      if (endpoint === '/espacos-locais?localId=1') {
+        chamadasEspacos += 1
+        if (chamadasEspacos <= 2) {
+          return [{ id: 'esp-antigo', localId: '1', nome: 'Sala Antiga', ativo: true }] as any
+        }
+        return [
+          { id: 'esp-antigo', localId: '1', nome: 'Sala Antiga', ativo: true },
+          { id: 'esp-novo', localId: '1', nome: 'Sala Nova', ativo: true },
+        ] as any
+      }
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockReturnValueOnce(savePendente as any)
+
+    render(<LocaisView />)
+    await waitFor(() => expect(screen.getByText('Templo Central')).toBeInTheDocument())
+
+    const linha = screen.getByText('Templo Central').closest('tr')
+    expect(linha).not.toBeNull()
+    fireEvent.click(within(linha!).getByRole('button', { name: 'Espaços' }))
+
+    let dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
+    expect(await within(dialog).findByText('Sala Antiga')).toBeInTheDocument()
+
+    fireEvent.change(within(dialog).getByLabelText(/nome do espaço/i), {
+      target: { value: 'Sala Nova' },
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: /adicionar espaço/i }))
+
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith('/espacos-locais', expect.objectContaining({
+        localId: '1',
+        nome: 'Sala Nova',
+      }))
+    })
+
+    fireEvent.click(within(dialog).getByText('✕'))
+
+    fireEvent.click(within(linha!).getByRole('button', { name: 'Espaços' }))
+    dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
+
+    expect(await within(dialog).findByText('Sala Antiga')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Sala Nova')).not.toBeInTheDocument()
+
+    await act(async () => {
+      resolverSave?.({})
+      await savePendente
+    })
+
+    await waitFor(() => {
+      expect(within(dialog).getByText('Sala Nova')).toBeInTheDocument()
+    })
+    expect(chamadasEspacos).toBe(3)
+  })
+
   it('deve exibir mensagem de erro se listagem falhar', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockRejectedValueOnce(new Error('Erro 500'))
 
