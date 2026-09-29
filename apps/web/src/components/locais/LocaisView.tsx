@@ -99,6 +99,8 @@ export function LocaisView() {
   const [espacoForm, setEspacoForm] = useState({ nome: '', descricao: '', capacidade: '', ativo: true })
   const [espacoErro, setEspacoErro] = useState<string | null>(null)
   const [salvandoEspaco, setSalvandoEspaco] = useState(false)
+  const espacoSaveSeq = useRef(0)
+  const espacosSavePendentesRef = useRef(new Map<string, number>())
 
   const fetchLocais = async () => {
     try {
@@ -203,7 +205,7 @@ export function LocaisView() {
     setEspacoEditandoId(null)
     setEspacoForm({ nome: '', descricao: '', capacidade: '', ativo: true })
     setEspacoErro(null)
-    setSalvandoEspaco(false)
+    setSalvandoEspaco(espacosSavePendentesRef.current.has(local.id))
 
     try {
       const data = await apiClient.fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${local.id}`)
@@ -228,6 +230,14 @@ export function LocaisView() {
     e.preventDefault()
     if (!localEspacos) return
     const localIdSalvo = localEspacos.id
+
+    // Impede uma segunda mutação concorrente para o mesmo Local, inclusive
+    // quando o modal foi fechado e reaberto enquanto o primeiro save aguardava.
+    if (espacosSavePendentesRef.current.has(localIdSalvo)) return
+
+    const operacaoSave = ++espacoSaveSeq.current
+    espacosSavePendentesRef.current.set(localIdSalvo, operacaoSave)
+
     const payload = {
       localId: localIdSalvo,
       nome: espacoForm.nome,
@@ -270,8 +280,12 @@ export function LocaisView() {
       if (localEspacosAtivoIdRef.current !== localIdSalvo) return
       setEspacoErro(err.message || 'Erro ao salvar espaço')
     } finally {
-      if (localEspacosAtivoIdRef.current === localIdSalvo) {
-        setSalvandoEspaco(false)
+      // Só a operação que ainda detém o lock deste Local pode liberá-lo.
+      if (espacosSavePendentesRef.current.get(localIdSalvo) === operacaoSave) {
+        espacosSavePendentesRef.current.delete(localIdSalvo)
+        if (localEspacosAtivoIdRef.current === localIdSalvo) {
+          setSalvandoEspaco(false)
+        }
       }
     }
   }
