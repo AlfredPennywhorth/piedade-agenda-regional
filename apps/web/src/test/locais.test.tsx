@@ -389,10 +389,12 @@ describe('LocaisView', () => {
   })
 
   it('deve ignorar refresh pós-save de um Local depois que outro Local foi aberto', async () => {
+    const localAId = '11111111-1111-4111-8111-111111111111'
+    const localBId = '22222222-2222-4222-8222-222222222222'
     const locais = [
-      mockLocais[0],
+      { ...mockLocais[0], id: localAId },
       {
-        id: '2',
+        id: localBId,
         nome: 'Anexo Regional',
         endereco: 'Rua B',
         numero: '200',
@@ -410,13 +412,13 @@ describe('LocaisView', () => {
 
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
       if (endpoint === '/locais') return locais as any
-      if (endpoint === '/espacos-locais?localId=1') {
+      if (endpoint === `/espacos-locais?localId=${localAId}`) {
         chamadasLocalA += 1
         if (chamadasLocalA === 1) return [] as any
         return refreshA as any
       }
-      if (endpoint === '/espacos-locais?localId=2') {
-        return [{ id: 'esp-b', localId: '2', nome: 'Sala B', ativo: true }] as any
+      if (endpoint === `/espacos-locais?localId=${localBId}`) {
+        return [{ id: 'esp-b', localId: localBId, nome: 'Sala B', ativo: true }] as any
       }
       return [] as any
     })
@@ -438,7 +440,7 @@ describe('LocaisView', () => {
 
     await waitFor(() => {
       expect(apiClient.postWithAuth).toHaveBeenCalledWith('/espacos-locais', expect.objectContaining({
-        localId: '1',
+        localId: localAId,
         nome: 'Sala A Nova',
       }))
       expect(chamadasLocalA).toBe(2)
@@ -454,7 +456,7 @@ describe('LocaisView', () => {
     expect(await within(dialog).findByText('Sala B')).toBeInTheDocument()
 
     await act(async () => {
-      resolverRefreshA?.([{ id: 'esp-a', localId: '1', nome: 'Sala A Atualizada', ativo: true }])
+      resolverRefreshA?.([{ id: 'esp-a', localId: localAId, nome: 'Sala A Atualizada', ativo: true }])
       await refreshA
     })
 
@@ -463,6 +465,8 @@ describe('LocaisView', () => {
   })
 
   it('deve atualizar o mesmo Local reaberto enquanto o save ainda estava pendente', async () => {
+    const localId = '33333333-3333-4333-8333-333333333333'
+    const locais = [{ ...mockLocais[0], id: localId }]
     let resolverSave: ((value: any) => void) | undefined
     const savePendente = new Promise<any>(resolve => {
       resolverSave = resolve
@@ -470,15 +474,15 @@ describe('LocaisView', () => {
     let chamadasEspacos = 0
 
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
-      if (endpoint === '/locais') return mockLocais as any
-      if (endpoint === '/espacos-locais?localId=1') {
+      if (endpoint === '/locais') return locais as any
+      if (endpoint === `/espacos-locais?localId=${localId}`) {
         chamadasEspacos += 1
         if (chamadasEspacos <= 2) {
-          return [{ id: 'esp-antigo', localId: '1', nome: 'Sala Antiga', ativo: true }] as any
+          return [{ id: 'esp-antigo', localId, nome: 'Sala Antiga', ativo: true }] as any
         }
         return [
-          { id: 'esp-antigo', localId: '1', nome: 'Sala Antiga', ativo: true },
-          { id: 'esp-novo', localId: '1', nome: 'Sala Nova', ativo: true },
+          { id: 'esp-antigo', localId, nome: 'Sala Antiga', ativo: true },
+          { id: 'esp-novo', localId, nome: 'Sala Nova', ativo: true },
         ] as any
       }
       return [] as any
@@ -502,7 +506,7 @@ describe('LocaisView', () => {
 
     await waitFor(() => {
       expect(apiClient.postWithAuth).toHaveBeenCalledWith('/espacos-locais', expect.objectContaining({
-        localId: '1',
+        localId,
         nome: 'Sala Nova',
       }))
     })
