@@ -14,6 +14,7 @@ vi.mock('../api/apiClient', async (importOriginal) => {
 })
 
 const EVENTO_ID = '33333333-3333-3333-3333-333333333333'
+const EVENTO_DISPONIVEL_ID = '77777777-7777-4777-8777-777777777777'
 const CONVOCACAO_ID = '44444444-4444-4444-4444-444444444444'
 
 const EVENTO_PASSADO_ID = '22222222-2222-2222-2222-222222222222'
@@ -26,6 +27,25 @@ const mockEventos = [
   {
     id: EVENTO_ID,
     titulo: 'Reunião Presencial Teste',
+    descricao: null,
+    pauta: null,
+    modalidade: 'PRESENCIAL',
+    inicioEm: INICIO_EVENTO_FUTURO,
+    fimEm: FIM_EVENTO_FUTURO,
+    localId: null,
+    urlOnline: null,
+    organizadorMembroId: null,
+    regionalId: null,
+    administracaoId: null,
+    setorId: null,
+    casaId: null,
+    grupoTrabalhoId: null,
+    observacoes: null,
+    ativo: true,
+  },
+  {
+    id: EVENTO_DISPONIVEL_ID,
+    titulo: 'Reunião Nova Disponível',
     descricao: null,
     pauta: null,
     modalidade: 'PRESENCIAL',
@@ -119,7 +139,7 @@ describe('ConvocacoesView', () => {
     })
   })
 
-  it('deve mostrar data/hora no seletor e ocultar eventos já encerrados', async () => {
+  it('deve mostrar data/hora no seletor e ocultar eventos encerrados ou já convocados', async () => {
     render(<ConvocacoesView />)
 
     await waitFor(() => {
@@ -138,8 +158,41 @@ describe('ConvocacoesView', () => {
       minute: '2-digit',
       hour12: false,
     }).format(new Date(INICIO_EVENTO_FUTURO))
-    expect(select).toHaveTextContent(`Reunião Presencial Teste — ${dataHoraEsperada}`)
+    expect(select).toHaveTextContent(`Reunião Nova Disponível — ${dataHoraEsperada}`)
+    expect(select).not.toHaveTextContent('Reunião Presencial Teste')
     expect(select).not.toHaveTextContent('Reunião Antiga')
+  })
+
+  it('deve aplicar filtro geográfico por Regional', async () => {
+    const reg1 = { id: 'reg-1', nome: 'Regional 1' }
+    const reg2 = { id: 'reg-2', nome: 'Regional 2' }
+    const eventos = mockEventos.map(evento =>
+      evento.id === EVENTO_ID ? { ...evento, regionalId: reg1.id } :
+      evento.id === EVENTO_DISPONIVEL_ID ? { ...evento, regionalId: reg2.id } :
+      evento
+    )
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return eventos
+      if (url === '/convocacoes') return mockConvocacoes
+      if (url === '/regionais') return [reg1, reg2]
+      return []
+    })
+
+    render(<ConvocacoesView />)
+    await screen.findByText('Minha observação rascunho')
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Regional'), {
+      target: { value: reg2.id },
+    })
+
+    expect(screen.getByText('Nenhuma convocação corresponde aos filtros selecionados.')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Regional'), {
+      target: { value: reg1.id },
+    })
+
+    expect(await screen.findByText('Minha observação rascunho')).toBeInTheDocument()
   })
 
   it('deve permitir criar um rascunho', async () => {
@@ -156,7 +209,7 @@ describe('ConvocacoesView', () => {
     })
 
     const select = screen.getByRole('combobox')
-    fireEvent.change(select, { target: { value: EVENTO_ID } })
+    fireEvent.change(select, { target: { value: EVENTO_DISPONIVEL_ID } })
 
     const textarea = screen.getByRole('textbox')
     fireEvent.change(textarea, { target: { value: 'Nova obs' } })
@@ -165,7 +218,7 @@ describe('ConvocacoesView', () => {
 
     await waitFor(() => {
       expect(apiClient.postWithAuth).toHaveBeenCalledWith('/convocacoes', {
-        eventoId: EVENTO_ID,
+        eventoId: EVENTO_DISPONIVEL_ID,
         observacoes: 'Nova obs'
       })
     })
@@ -369,16 +422,23 @@ describe('ConvocacoesView', () => {
       })
     })
 
-    it('botão cancelar ausente para CANCELADA', async () => {
+    it('oculta CANCELADA por padrão e permite consultá-la pelo filtro de status', async () => {
       vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
         if (url === '/convocacoes') return [{ ...mockConvocacoes[0], status: 'CANCELADA' }]
         if (url === '/eventos') return mockEventos
         return []
       })
       render(<ConvocacoesView />)
+
       await waitFor(() => {
-        expect(screen.getByText('Minha observação rascunho')).toBeInTheDocument()
+        expect(screen.getByText('Nenhuma convocação corresponde aos filtros selecionados.')).toBeInTheDocument()
       })
+
+      fireEvent.change(screen.getByLabelText('Filtrar por status'), {
+        target: { value: 'CANCELADA' },
+      })
+
+      expect(await screen.findByText('Minha observação rascunho')).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument()
     })
 
