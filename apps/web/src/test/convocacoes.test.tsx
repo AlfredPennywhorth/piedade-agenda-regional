@@ -328,18 +328,14 @@ describe('ConvocacoesView', () => {
     })
   })
 
-  it('deve bloquear edição se status for PUBLICADA ou CANCELADA', async () => {
+  it('deve exibir edição somente para RASCUNHO', async () => {
     render(<ConvocacoesView />)
 
     await waitFor(() => {
       expect(screen.getByText('Convocação publicada')).toBeInTheDocument()
     })
 
-    const editButtons = screen.getAllByRole('button', { name: /editar/i })
-    fireEvent.click(editButtons[1]) // O segundo é a PUBLICADA
-
-    expect(screen.getByRole('alert')).toHaveTextContent('Não é possível editar uma convocação com status PUBLICADA. Somente rascunhos podem ser editados.')
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /editar/i })).toHaveLength(1)
     expect(apiClient.patchWithAuth).not.toHaveBeenCalled()
   })
 
@@ -484,19 +480,19 @@ describe('ConvocacoesView', () => {
       })
     })
 
-    it('deve cancelar somente após confirmação e enviar POST correto', async () => {
+    it('deve cancelar PUBLICADA somente após confirmação e enviar POST correto', async () => {
       render(<ConvocacoesView />)
       await waitFor(() => {
-        expect(screen.getAllByRole('button', { name: 'Cancelar' }).length).toBeGreaterThan(0)
+        expect(screen.getByText('Convocação publicada')).toBeInTheDocument()
       })
       const btns = screen.getAllByRole('button', { name: 'Cancelar' })
-      fireEvent.click(btns[0]) // Clica no cancelar do rascunho
+      fireEvent.click(btns[1]) // O segundo cancelar pertence à PUBLICADA
       await waitFor(() => {
         expect(screen.getByRole('dialog', { name: /cancelar convocação/i })).toBeInTheDocument()
       })
       fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
       await waitFor(() => {
-        expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/convocacoes/${CONVOCACAO_ID}/cancelar`, {})
+        expect(apiClient.postWithAuth).toHaveBeenCalledWith('/convocacoes/55555555-5555-5555-5555-555555555555/cancelar', {})
       })
     })
 
