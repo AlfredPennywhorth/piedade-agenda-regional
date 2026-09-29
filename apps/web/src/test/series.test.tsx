@@ -261,6 +261,68 @@ describe('SeriesView', () => {
     })
   })
 
+  it('deve mostrar espaço histórico inativo e exigir substituição antes de editar a série', async () => {
+    const localId = MOCK_LOOKUPS.locais[0].id
+    const espacoInativoId = '11111111-1111-4111-8111-111111111111'
+    const espacoAtivoId = '22222222-2222-4222-8222-222222222222'
+    const serieComEspacoInativo = {
+      ...MOCK_SERIES[0],
+      modalidade: 'PRESENCIAL',
+      localId,
+      espacoId: espacoInativoId,
+      urlOnline: null,
+    }
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/series-recorrencia') return [serieComEspacoInativo]
+      if (url === '/locais') return MOCK_LOOKUPS.locais
+      if (url === '/espacos-locais?ativo=true') {
+        return [{ id: espacoAtivoId, localId, nome: 'Sala Ativa', ativo: true }]
+      }
+      if (url === `/espacos-locais?localId=${localId}`) {
+        return [
+          { id: espacoAtivoId, localId, nome: 'Sala Ativa', ativo: true },
+          { id: espacoInativoId, localId, nome: 'Sala Histórica', ativo: false },
+        ]
+      }
+      if (url === '/membros') return MOCK_LOOKUPS.membros
+      if (url === '/regionais') return MOCK_LOOKUPS.regionais
+      if (url === '/administracoes') return MOCK_LOOKUPS.administracoes
+      if (url === '/setores') return MOCK_LOOKUPS.setores
+      if (url === '/casas') return MOCK_LOOKUPS.casas
+      if (url === '/grupos-trabalho') return MOCK_LOOKUPS.gruposTrabalho
+      return []
+    })
+
+    render(<SeriesView />)
+    await waitFor(() => expect(screen.getByText('Reunião Semanal')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByText('Editar'))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Editar Série de Recorrência' })
+    const seletorEspaco = within(dialog).getByLabelText('Espaço')
+
+    await waitFor(() => {
+      expect(seletorEspaco).toHaveValue(espacoInativoId)
+      expect(within(dialog).getByRole('option', { name: /Sala Histórica.*inativo/i })).toBeInTheDocument()
+    })
+
+    fireEvent.change(within(dialog).getByLabelText(/Título \*/i), {
+      target: { value: 'Reunião Semanal Editada' },
+    })
+    fireEvent.click(within(dialog).getByText('Salvar Série'))
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'O espaço atual está inativo'
+    )
+    expect(screen.queryByRole('dialog', { name: 'Confirmar Edição de Série' })).not.toBeInTheDocument()
+
+    fireEvent.change(seletorEspaco, { target: { value: espacoAtivoId } })
+    fireEvent.click(within(dialog).getByText('Salvar Série'))
+
+    expect(await screen.findByRole('dialog', { name: 'Confirmar Edição de Série' })).toBeInTheDocument()
+  })
+
   it('deve abrir inativação, exigir confirmação e enviar PATCH com updateMode ALL e ativo falso', async () => {
     render(<SeriesView />)
 
