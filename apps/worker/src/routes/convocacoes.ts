@@ -188,6 +188,18 @@ convocacoesRouter.post('/', async c => {
     if (err.message && err.message.includes('CONVOCACAO_EM_EVENTO_INATIVO')) {
       return c.json({ error: 'Evento associado não existe ou inativo' }, 409)
     }
+    if (
+      err.message &&
+      (
+        err.message.includes('UNIQUE constraint failed: convocacoes.evento_id') ||
+        err.message.includes('idx_convocacoes_evento_unico')
+      )
+    ) {
+      return c.json(
+        { error: 'Este evento já possui convocação', code: 'CONVOCACAO_EVENTO_EXISTENTE' },
+        409
+      )
+    }
     return c.json({ error: err.issues || err.message }, 400)
   }
 })
