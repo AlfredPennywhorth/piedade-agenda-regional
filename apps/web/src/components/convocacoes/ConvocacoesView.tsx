@@ -234,7 +234,7 @@ export function ConvocacoesView() {
   const resolverEscopoGrupoTrabalho = (grupo?: GrupoTrabalhoLookup) => {
     if (!grupo) return { regionalId: '', administracaoId: '', setorId: '' }
 
-    let setorId = grupo.setorId || ''
+    const setorId = grupo.setorId || ''
     let administracaoId = grupo.administracaoId || ''
     let regionalId = grupo.regionalId || ''
 
