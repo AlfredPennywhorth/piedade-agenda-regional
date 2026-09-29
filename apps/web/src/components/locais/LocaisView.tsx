@@ -235,9 +235,6 @@ export function LocaisView() {
     // quando o modal foi fechado e reaberto enquanto o primeiro save aguardava.
     if (espacosSavePendentesRef.current.has(localIdSalvo)) return
 
-    const operacaoSave = ++espacoSaveSeq.current
-    espacosSavePendentesRef.current.set(localIdSalvo, operacaoSave)
-
     const payload = {
       localId: localIdSalvo,
       nome: espacoForm.nome,
@@ -250,6 +247,9 @@ export function LocaisView() {
       setEspacoErro(parsed.error.issues[0]?.message || 'Dados inválidos')
       return
     }
+
+    const operacaoSave = ++espacoSaveSeq.current
+    espacosSavePendentesRef.current.set(localIdSalvo, operacaoSave)
     setSalvandoEspaco(true)
     setEspacoErro(null)
     try {
