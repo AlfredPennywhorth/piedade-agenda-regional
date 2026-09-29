@@ -69,6 +69,12 @@ describe('Migration 0035 - consolidação DCO institucional', () => {
         vinculo_funcional_id text NOT NULL REFERENCES vinculos_funcionais(id),
         created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
+      CREATE UNIQUE INDEX idx_convocacao_evidencia_unica
+        ON convocacao_destinatario_evidencias(
+          convocacao_destinatario_id,
+          funcao_id,
+          vinculo_funcional_id
+        );
 
       INSERT INTO funcoes (id, nome, codigo, ativo) VALUES
         ('${TARGET}', 'Diácono Casa de Oração', NULL, 1),
@@ -88,13 +94,16 @@ describe('Migration 0035 - consolidação DCO institucional', () => {
       INSERT INTO convocacoes (id, status) VALUES
         ('draft-a', 'RASCUNHO'),
         ('draft-b', 'RASCUNHO'),
-        ('published', 'PUBLICADA');
+        ('published-only', 'PUBLICADA'),
+        ('published-both', 'PUBLICADA');
 
       INSERT INTO convocacao_funcoes (id, convocacao_id, funcao_id) VALUES
         ('cf-draft-a-source', 'draft-a', '${TECHNICAL}'),
         ('cf-draft-b-target', 'draft-b', '${TARGET}'),
         ('cf-draft-b-source', 'draft-b', '${TECHNICAL}'),
-        ('cf-published-source', 'published', '${TECHNICAL}');
+        ('cf-published-only-source', 'published-only', '${TECHNICAL}'),
+        ('cf-published-both-target', 'published-both', '${TARGET}'),
+        ('cf-published-both-source', 'published-both', '${TECHNICAL}');
 
       INSERT INTO convocacao_destinatarios (id) VALUES ('dest-1'), ('dest-2');
 
@@ -102,7 +111,8 @@ describe('Migration 0035 - consolidação DCO institucional', () => {
         (id, convocacao_destinatario_id, funcao_id, vinculo_funcional_id)
       VALUES
         ('ev-collision', 'dest-1', '${TECHNICAL}', 'v-collision'),
-        ('ev-promote', 'dest-2', '${TECHNICAL}', 'v-promote');
+        ('ev-promote', 'dest-2', '${TECHNICAL}', 'v-promote'),
+        ('ev-promote-target', 'dest-2', '${TARGET}', 'v-promote');
     `)
 
     const dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -126,16 +136,20 @@ describe('Migration 0035 - consolidação DCO institucional', () => {
 
     expect(sqlite.prepare("SELECT funcao_id FROM convocacao_destinatario_evidencias WHERE id = 'ev-collision'").get())
       .toMatchObject({ funcao_id: TECHNICAL })
-    expect(sqlite.prepare("SELECT funcao_id FROM convocacao_destinatario_evidencias WHERE id = 'ev-promote'").get())
-      .toMatchObject({ funcao_id: TARGET })
+    const evidenciasPromovidas = sqlite.prepare(
+      "SELECT funcao_id FROM convocacao_destinatario_evidencias WHERE convocacao_destinatario_id = 'dest-2' AND vinculo_funcional_id = 'v-promote'"
+    ).all() as any[]
+    expect(evidenciasPromovidas).toEqual([{ funcao_id: TARGET }])
 
     const draftA = sqlite.prepare("SELECT funcao_id FROM convocacao_funcoes WHERE convocacao_id = 'draft-a'").all() as any[]
     const draftB = sqlite.prepare("SELECT funcao_id FROM convocacao_funcoes WHERE convocacao_id = 'draft-b'").all() as any[]
-    const published = sqlite.prepare("SELECT funcao_id FROM convocacao_funcoes WHERE convocacao_id = 'published'").all() as any[]
+    const publishedOnly = sqlite.prepare("SELECT funcao_id FROM convocacao_funcoes WHERE convocacao_id = 'published-only'").all() as any[]
+    const publishedBoth = sqlite.prepare("SELECT funcao_id FROM convocacao_funcoes WHERE convocacao_id = 'published-both'").all() as any[]
 
     expect(draftA.map(x => x.funcao_id)).toEqual([TARGET])
     expect(draftB.map(x => x.funcao_id)).toEqual([TARGET])
-    expect(published.map(x => x.funcao_id)).toEqual([TECHNICAL])
+    expect(publishedOnly.map(x => x.funcao_id)).toEqual([TARGET])
+    expect(publishedBoth.map(x => x.funcao_id)).toEqual([TARGET])
   })
 
   it('não altera a DCO técnica em ambiente novo sem função institucional preexistente', () => {
