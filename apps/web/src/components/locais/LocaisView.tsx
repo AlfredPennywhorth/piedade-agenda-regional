@@ -201,6 +201,7 @@ export function LocaisView() {
     setEspacoEditandoId(null)
     setEspacoForm({ nome: '', descricao: '', capacidade: '', ativo: true })
     setEspacoErro(null)
+    setSalvandoEspaco(false)
 
     try {
       const data = await apiClient.fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${local.id}`)
@@ -223,8 +224,10 @@ export function LocaisView() {
   const salvarEspaco = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!localEspacos) return
+    const localIdSalvo = localEspacos.id
+    const consultaAtual = espacosConsultaSeq.current
     const payload = {
-      localId: localEspacos.id,
+      localId: localIdSalvo,
       nome: espacoForm.nome,
       descricao: espacoForm.descricao || null,
       capacidade: espacoForm.capacidade ? Number(espacoForm.capacidade) : null,
@@ -243,14 +246,22 @@ export function LocaisView() {
       } else {
         await apiClient.postWithAuth('/espacos-locais', parsed.data)
       }
-      const data = await apiClient.fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${localEspacos.id}`)
+
+      if (consultaAtual !== espacosConsultaSeq.current) return
+
+      const data = await apiClient.fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${localIdSalvo}`)
+      if (consultaAtual !== espacosConsultaSeq.current) return
+
       setEspacos(data || [])
       setEspacoEditandoId(null)
       setEspacoForm({ nome: '', descricao: '', capacidade: '', ativo: true })
     } catch (err: any) {
+      if (consultaAtual !== espacosConsultaSeq.current) return
       setEspacoErro(err.message || 'Erro ao salvar espaço')
     } finally {
-      setSalvandoEspaco(false)
+      if (consultaAtual === espacosConsultaSeq.current) {
+        setSalvandoEspaco(false)
+      }
     }
   }
 
