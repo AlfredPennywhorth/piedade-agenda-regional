@@ -512,7 +512,7 @@ vinculosFuncionaisRouter.patch('/:id', async (c) => {
           qdb.update(vinculosFuncionais)
             .set(atualizacaoManual)
             .where(eq(vinculosFuncionais.id, id)),
-          ...queriesSincronizacaoConvocacoes(qdb, vinculoResultante, sincronizacoes, agoraAtualizacao),
+          ...queriesSincronizacaoConvocacoes(qdb, vinculoResultanteManual, sincronizacoes, agoraAtualizacao),
         ],
         [
           {
@@ -550,9 +550,9 @@ vinculosFuncionaisRouter.patch('/:id', async (c) => {
         db,
         (qdb) => [
           qdb.update(vinculosFuncionais)
-            .set({ ...parsed, updatedAt: agoraAtualizacao })
+            .set(atualizacaoManual)
             .where(eq(vinculosFuncionais.id, id)),
-          ...queriesSincronizacaoConvocacoes(qdb, vinculoResultante, sincronizacoes, agoraAtualizacao),
+          ...queriesSincronizacaoConvocacoes(qdb, vinculoResultanteManual, sincronizacoes, agoraAtualizacao),
         ],
         {
           acao: 'VINCULO_FUNCIONAL_ATUALIZADO',
