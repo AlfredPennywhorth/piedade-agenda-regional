@@ -355,7 +355,7 @@ membrosRouter.post('/', async (c) => {
       membroId: id,
       funcaoId: funcaoDco.id,
       casaId: parsed.casaId,
-      ativo: membroAtivo,
+      ativo: true,
       createdAt: agoraCriacao,
       updatedAt: agoraCriacao,
     }
