@@ -200,7 +200,29 @@ export function SeriesView() {
     setFormOpen(true)
   }
 
-  const abrirFormEditar = (serie: SerieRecorrencia) => {
+  const abrirFormEditar = async (serie: SerieRecorrencia) => {
+    setErro(null)
+
+    if (
+      serie.espacoId &&
+      serie.localId &&
+      !espacos.some(espaco => espaco.id === serie.espacoId)
+    ) {
+      try {
+        const espacosDoLocal = await fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${serie.localId}`)
+        const espacoAtual = (espacosDoLocal || []).find(espaco => espaco.id === serie.espacoId)
+        if (espacoAtual) {
+          setEspacos(prev =>
+            prev.some(espaco => espaco.id === espacoAtual.id)
+              ? prev
+              : [...prev, espacoAtual]
+          )
+        }
+      } catch {
+        setLookupAviso('Não foi possível carregar o espaço histórico desta série. Selecione outro espaço ou limpe o campo antes de salvar.')
+      }
+    }
+
     setSerieEditandoId(serie.id)
     setFormData({
       titulo: serie.titulo,
