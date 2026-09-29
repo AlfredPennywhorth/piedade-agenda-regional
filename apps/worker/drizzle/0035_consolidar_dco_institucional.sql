@@ -84,6 +84,57 @@ AND EXISTS (
     AND tgt.grupo_trabalho_id IS src.grupo_trabalho_id
 );
 
+-- Remove somente evidência técnica que se tornaria duplicata exata após a
+-- canonicalização. A evidência institucional equivalente já preserva o mesmo
+-- destinatário e vínculo funcional.
+DELETE FROM convocacao_destinatario_evidencias AS src
+WHERE src.funcao_id IN (
+  'funcao-dco-canonica',
+  'd0c0d0c0-0000-4000-8000-000000000001'
+)
+AND src.vinculo_funcional_id IN (
+  SELECT id
+  FROM vinculos_funcionais
+  WHERE funcao_id IN (
+    'funcao-dco-canonica',
+    'd0c0d0c0-0000-4000-8000-000000000001'
+  )
+  AND ativo = 1
+)
+AND EXISTS (
+  SELECT 1
+  FROM funcoes
+  WHERE id IN (
+    'funcao-dco-canonica',
+    'd0c0d0c0-0000-4000-8000-000000000001'
+  )
+)
+AND (
+  SELECT COUNT(*)
+  FROM funcoes
+  WHERE nome = 'Diácono Casa de Oração'
+    AND id NOT IN (
+      'funcao-dco-canonica',
+      'd0c0d0c0-0000-4000-8000-000000000001'
+    )
+) = 1
+AND EXISTS (
+  SELECT 1
+  FROM convocacao_destinatario_evidencias tgt
+  WHERE tgt.convocacao_destinatario_id = src.convocacao_destinatario_id
+    AND tgt.funcao_id = (
+  SELECT id
+  FROM funcoes
+  WHERE nome = 'Diácono Casa de Oração'
+    AND id NOT IN (
+      'funcao-dco-canonica',
+      'd0c0d0c0-0000-4000-8000-000000000001'
+    )
+  LIMIT 1
+)
+    AND tgt.vinculo_funcional_id = src.vinculo_funcional_id
+);
+
 -- Evidências ligadas a vínculos técnicos que ainda serão promovidos acompanham o vínculo.
 UPDATE convocacao_destinatario_evidencias
 SET funcao_id = (
@@ -163,8 +214,10 @@ AND (
     )
 ) = 1;
 
--- Em rascunhos, remove associação técnica se a função institucional já estiver
--- vinculada à mesma convocação.
+-- Canonicaliza também as funções associadas a convocações já publicadas/canceladas.
+-- Isso não altera o snapshot de destinatários; apenas substitui o ID técnico pelo ID
+-- institucional semanticamente equivalente, mantendo a sincronização retroativa de
+-- vínculos futuros baseada em igualdade de funcao_id.
 DELETE FROM convocacao_funcoes AS src
 WHERE src.funcao_id IN (
   'funcao-dco-canonica',
@@ -189,12 +242,6 @@ AND (
 ) = 1
 AND EXISTS (
   SELECT 1
-  FROM convocacoes c
-  WHERE c.id = src.convocacao_id
-    AND c.status = 'RASCUNHO'
-)
-AND EXISTS (
-  SELECT 1
   FROM convocacao_funcoes tgt
   WHERE tgt.convocacao_id = src.convocacao_id
     AND tgt.funcao_id = (
@@ -209,8 +256,6 @@ AND EXISTS (
 )
 );
 
--- Rascunhos restantes passam a usar a função institucional. Publicadas/canceladas
--- permanecem imutáveis para preservar o snapshot histórico.
 UPDATE convocacao_funcoes
 SET funcao_id = (
   SELECT id
@@ -225,11 +270,6 @@ SET funcao_id = (
 WHERE funcao_id IN (
   'funcao-dco-canonica',
   'd0c0d0c0-0000-4000-8000-000000000001'
-)
-AND convocacao_id IN (
-  SELECT id
-  FROM convocacoes
-  WHERE status = 'RASCUNHO'
 )
 AND EXISTS (
   SELECT 1
