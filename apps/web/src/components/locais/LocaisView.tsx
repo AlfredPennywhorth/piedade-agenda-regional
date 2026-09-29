@@ -94,10 +94,13 @@ export function LocaisView() {
   const [localEspacos, setLocalEspacos] = useState<Local | null>(null)
   const [espacos, setEspacos] = useState<EspacoLocal[]>([])
   const espacosConsultaSeq = useRef(0)
+  const localEspacosAtivoIdRef = useRef<string | null>(null)
   const [espacoEditandoId, setEspacoEditandoId] = useState<string | null>(null)
   const [espacoForm, setEspacoForm] = useState({ nome: '', descricao: '', capacidade: '', ativo: true })
   const [espacoErro, setEspacoErro] = useState<string | null>(null)
   const [salvandoEspaco, setSalvandoEspaco] = useState(false)
+  const espacoSaveSeq = useRef(0)
+  const espacosSavePendentesRef = useRef(new Map<string, number>())
 
   const fetchLocais = async () => {
     try {
@@ -195,12 +198,14 @@ export function LocaisView() {
 
   const abrirEspacos = async (local: Local) => {
     const consultaAtual = ++espacosConsultaSeq.current
+    localEspacosAtivoIdRef.current = local.id
     setLocalEspacos(local)
     setEspacos([])
     setEspacosOpen(true)
     setEspacoEditandoId(null)
     setEspacoForm({ nome: '', descricao: '', capacidade: '', ativo: true })
     setEspacoErro(null)
+    setSalvandoEspaco(espacosSavePendentesRef.current.has(local.id))
 
     try {
       const data = await apiClient.fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${local.id}`)
@@ -214,6 +219,7 @@ export function LocaisView() {
 
   const fecharEspacos = () => {
     espacosConsultaSeq.current += 1
+    localEspacosAtivoIdRef.current = null
     setEspacosOpen(false)
     setLocalEspacos(null)
     setEspacos([])
@@ -223,8 +229,14 @@ export function LocaisView() {
   const salvarEspaco = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!localEspacos) return
+    const localIdSalvo = localEspacos.id
+
+    // Impede uma segunda mutação concorrente para o mesmo Local, inclusive
+    // quando o modal foi fechado e reaberto enquanto o primeiro save aguardava.
+    if (espacosSavePendentesRef.current.has(localIdSalvo)) return
+
     const payload = {
-      localId: localEspacos.id,
+      localId: localIdSalvo,
       nome: espacoForm.nome,
       descricao: espacoForm.descricao || null,
       capacidade: espacoForm.capacidade ? Number(espacoForm.capacidade) : null,
@@ -235,6 +247,9 @@ export function LocaisView() {
       setEspacoErro(parsed.error.issues[0]?.message || 'Dados inválidos')
       return
     }
+
+    const operacaoSave = ++espacoSaveSeq.current
+    espacosSavePendentesRef.current.set(localIdSalvo, operacaoSave)
     setSalvandoEspaco(true)
     setEspacoErro(null)
     try {
@@ -243,14 +258,35 @@ export function LocaisView() {
       } else {
         await apiClient.postWithAuth('/espacos-locais', parsed.data)
       }
-      const data = await apiClient.fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${localEspacos.id}`)
+
+      // Se outro Local estiver aberto (ou o modal estiver fechado), não aplique
+      // o resultado deste save. Reabrir o MESMO Local, porém, deve receber o
+      // refresh pós-save.
+      if (localEspacosAtivoIdRef.current !== localIdSalvo) return
+
+      // Invalida uma listagem do mesmo Local iniciada antes da conclusão da
+      // mutação, evitando que uma resposta pré-save sobrescreva o refresh.
+      const refreshAtual = ++espacosConsultaSeq.current
+      const data = await apiClient.fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${localIdSalvo}`)
+      if (
+        localEspacosAtivoIdRef.current !== localIdSalvo ||
+        refreshAtual !== espacosConsultaSeq.current
+      ) return
+
       setEspacos(data || [])
       setEspacoEditandoId(null)
       setEspacoForm({ nome: '', descricao: '', capacidade: '', ativo: true })
     } catch (err: any) {
+      if (localEspacosAtivoIdRef.current !== localIdSalvo) return
       setEspacoErro(err.message || 'Erro ao salvar espaço')
     } finally {
-      setSalvandoEspaco(false)
+      // Só a operação que ainda detém o lock deste Local pode liberá-lo.
+      if (espacosSavePendentesRef.current.get(localIdSalvo) === operacaoSave) {
+        espacosSavePendentesRef.current.delete(localIdSalvo)
+        if (localEspacosAtivoIdRef.current === localIdSalvo) {
+          setSalvandoEspaco(false)
+        }
+      }
     }
   }
 

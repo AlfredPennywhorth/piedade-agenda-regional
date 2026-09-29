@@ -388,6 +388,155 @@ describe('LocaisView', () => {
     expect(within(dialog).queryByText('Sala A')).not.toBeInTheDocument()
   })
 
+  it('deve ignorar refresh pós-save de um Local depois que outro Local foi aberto', async () => {
+    const localAId = '11111111-1111-4111-8111-111111111111'
+    const localBId = '22222222-2222-4222-8222-222222222222'
+    const locais = [
+      { ...mockLocais[0], id: localAId },
+      {
+        id: localBId,
+        nome: 'Anexo Regional',
+        endereco: 'Rua B',
+        numero: '200',
+        cidade: 'São Paulo',
+        uf: 'SP',
+        ativo: true,
+      },
+    ]
+
+    let resolverRefreshA: ((value: any[]) => void) | undefined
+    const refreshA = new Promise<any[]>(resolve => {
+      resolverRefreshA = resolve
+    })
+    let chamadasLocalA = 0
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/locais') return locais as any
+      if (endpoint === `/espacos-locais?localId=${localAId}`) {
+        chamadasLocalA += 1
+        if (chamadasLocalA === 1) return [] as any
+        return refreshA as any
+      }
+      if (endpoint === `/espacos-locais?localId=${localBId}`) {
+        return [{ id: 'esp-b', localId: localBId, nome: 'Sala B', ativo: true }] as any
+      }
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValueOnce({})
+
+    render(<LocaisView />)
+    await waitFor(() => {
+      expect(screen.getByText('Templo Central')).toBeInTheDocument()
+      expect(screen.getByText('Anexo Regional')).toBeInTheDocument()
+    })
+
+    const linhaA = screen.getByText('Templo Central').closest('tr')
+    expect(linhaA).not.toBeNull()
+    fireEvent.click(within(linhaA!).getByRole('button', { name: 'Espaços' }))
+
+    let dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
+    fireEvent.change(within(dialog).getByLabelText(/nome do espaço/i), { target: { value: 'Sala A Nova' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /adicionar espaço/i }))
+
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith('/espacos-locais', expect.objectContaining({
+        localId: localAId,
+        nome: 'Sala A Nova',
+      }))
+      expect(chamadasLocalA).toBe(2)
+    })
+
+    fireEvent.click(within(dialog).getByText('✕'))
+
+    const linhaB = screen.getByText('Anexo Regional').closest('tr')
+    expect(linhaB).not.toBeNull()
+    fireEvent.click(within(linhaB!).getByRole('button', { name: 'Espaços' }))
+
+    dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
+    expect(await within(dialog).findByText('Sala B')).toBeInTheDocument()
+
+    await act(async () => {
+      resolverRefreshA?.([{ id: 'esp-a', localId: localAId, nome: 'Sala A Atualizada', ativo: true }])
+      await refreshA
+    })
+
+    expect(within(dialog).getByText('Sala B')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Sala A Atualizada')).not.toBeInTheDocument()
+  })
+
+  it('deve atualizar o mesmo Local reaberto enquanto o save ainda estava pendente', async () => {
+    const localId = '33333333-3333-4333-8333-333333333333'
+    const locais = [{ ...mockLocais[0], id: localId }]
+    let resolverSave: ((value: any) => void) | undefined
+    const savePendente = new Promise<any>(resolve => {
+      resolverSave = resolve
+    })
+    let chamadasEspacos = 0
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/locais') return locais as any
+      if (endpoint === `/espacos-locais?localId=${localId}`) {
+        chamadasEspacos += 1
+        if (chamadasEspacos <= 2) {
+          return [{ id: 'esp-antigo', localId, nome: 'Sala Antiga', ativo: true }] as any
+        }
+        return [
+          { id: 'esp-antigo', localId, nome: 'Sala Antiga', ativo: true },
+          { id: 'esp-novo', localId, nome: 'Sala Nova', ativo: true },
+        ] as any
+      }
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockReturnValueOnce(savePendente as any)
+
+    render(<LocaisView />)
+    await waitFor(() => expect(screen.getByText('Templo Central')).toBeInTheDocument())
+
+    const linha = screen.getByText('Templo Central').closest('tr')
+    expect(linha).not.toBeNull()
+    fireEvent.click(within(linha!).getByRole('button', { name: 'Espaços' }))
+
+    let dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
+    expect(await within(dialog).findByText('Sala Antiga')).toBeInTheDocument()
+
+    fireEvent.change(within(dialog).getByLabelText(/nome do espaço/i), {
+      target: { value: 'Sala Nova' },
+    })
+    fireEvent.click(within(dialog).getByRole('button', { name: /adicionar espaço/i }))
+
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith('/espacos-locais', expect.objectContaining({
+        localId,
+        nome: 'Sala Nova',
+      }))
+    })
+
+    fireEvent.click(within(dialog).getByText('✕'))
+
+    fireEvent.click(within(linha!).getByRole('button', { name: 'Espaços' }))
+    dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
+
+    expect(await within(dialog).findByText('Sala Antiga')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Sala Nova')).not.toBeInTheDocument()
+
+    const botaoSaveReaberto = within(dialog).getByRole('button', { name: /salvando/i })
+    expect(botaoSaveReaberto).toBeDisabled()
+    fireEvent.click(botaoSaveReaberto)
+    expect(apiClient.postWithAuth).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolverSave?.({})
+      await savePendente
+    })
+
+    await waitFor(() => {
+      expect(within(dialog).getByText('Sala Nova')).toBeInTheDocument()
+      expect(within(dialog).getByRole('button', { name: /adicionar espaço/i })).not.toBeDisabled()
+    })
+    expect(apiClient.postWithAuth).toHaveBeenCalledTimes(1)
+    expect(chamadasEspacos).toBe(3)
+  })
+
   it('deve exibir mensagem de erro se listagem falhar', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockRejectedValueOnce(new Error('Erro 500'))
 
