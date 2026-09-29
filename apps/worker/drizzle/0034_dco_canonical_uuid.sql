@@ -12,12 +12,7 @@ SELECT
   created_at,
   updated_at
 FROM funcoes
-WHERE id = 'funcao-dco-canonica'
-  AND NOT EXISTS (
-    SELECT 1
-    FROM funcoes
-    WHERE id = 'd0c0d0c0-0000-4000-8000-000000000001'
-  );
+WHERE id = 'funcao-dco-canonica';
 
 UPDATE vinculos_funcionais
 SET funcao_id = 'd0c0d0c0-0000-4000-8000-000000000001'
