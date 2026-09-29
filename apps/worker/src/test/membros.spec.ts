@@ -407,4 +407,120 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     expect(json.code).toBe('MEMBRO_POSSUI_DEPENDENCIAS')
   })
 
+  it('27. Deve sincronizar DCO ao mover e reativar membro no mesmo PATCH', async () => {
+    const funcaoDco = sqlite.prepare(
+      "SELECT id FROM funcoes WHERE codigo = 'DCO' AND ativo = 1"
+    ).get() as { id: string }
+
+    sqlite.exec(`
+      UPDATE membros SET ativo = 0 WHERE id = '${membroId}';
+
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, casa_id, ativo)
+      VALUES
+        ('evento-move-reativa', 'Evento destino reativação', 'ONLINE',
+         '2030-03-01T12:00:00.000Z', '2030-03-01T13:00:00.000Z', '${casaId2}', 1);
+
+      INSERT INTO convocacoes
+        (id, evento_id, status, publicada_em, ativo)
+      VALUES
+        ('conv-move-reativa', 'evento-move-reativa', 'PUBLICADA', CURRENT_TIMESTAMP, 1);
+
+      INSERT INTO convocacao_funcoes
+        (id, convocacao_id, funcao_id)
+      VALUES
+        ('cf-move-reativa', 'conv-move-reativa', '${funcaoDco.id}');
+    `)
+
+    const resPatch = await req(`/api/v1/membros/${membroId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ casaId: casaId2, ativo: true }),
+    })
+
+    expect(resPatch.status).toBe(200)
+
+    const destinatario = sqlite.prepare(
+      'SELECT id FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
+    ).get('conv-move-reativa', membroId)
+
+    expect(destinatario).toBeDefined()
+  })
+
+  it('28. Não deve sincronizar DCO ao mover e inativar membro no mesmo PATCH', async () => {
+    const funcaoDco = sqlite.prepare(
+      "SELECT id FROM funcoes WHERE codigo = 'DCO' AND ativo = 1"
+    ).get() as { id: string }
+
+    sqlite.exec(`
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, casa_id, ativo)
+      VALUES
+        ('evento-move-inativa', 'Evento destino inativação', 'ONLINE',
+         '2030-04-01T12:00:00.000Z', '2030-04-01T13:00:00.000Z', '${casaId2}', 1);
+
+      INSERT INTO convocacoes
+        (id, evento_id, status, publicada_em, ativo)
+      VALUES
+        ('conv-move-inativa', 'evento-move-inativa', 'PUBLICADA', CURRENT_TIMESTAMP, 1);
+
+      INSERT INTO convocacao_funcoes
+        (id, convocacao_id, funcao_id)
+      VALUES
+        ('cf-move-inativa', 'conv-move-inativa', '${funcaoDco.id}');
+    `)
+
+    const resPatch = await req(`/api/v1/membros/${membroId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ casaId: casaId2, ativo: false }),
+    })
+
+    expect(resPatch.status).toBe(200)
+
+    const destinatario = sqlite.prepare(
+      'SELECT id FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
+    ).get('conv-move-inativa', membroId)
+
+    expect(destinatario).toBeUndefined()
+  })
+
+  it('29. Deve excluir todos os vínculos DCO automáticos após mudança de Casa', async () => {
+    const resCreate = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'Cadastro Movido Indevido',
+        dataOrdenacao: '2003-01-01',
+        codigoCarteirinha: 'TESTE-29',
+        casaId,
+        celular: '11963333333',
+      }),
+    })
+    expect(resCreate.status).toBe(201)
+    const criado = await resCreate.json() as any
+
+    const resMover = await req(`/api/v1/membros/${criado.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ casaId: casaId2 }),
+    })
+    expect(resMover.status).toBe(200)
+
+    const vinculosAntes = sqlite.prepare(
+      `SELECT COUNT(*) AS total
+       FROM vinculos_funcionais vf
+       INNER JOIN funcoes f ON f.id = vf.funcao_id
+       WHERE vf.membro_id = ? AND f.codigo = 'DCO'`
+    ).get(criado.id) as { total: number }
+    expect(vinculosAntes.total).toBeGreaterThanOrEqual(2)
+
+    const resDelete = await req(`/api/v1/membros/${criado.id}`, {
+      method: 'DELETE',
+    })
+
+    expect(resDelete.status).toBe(200)
+
+    const vinculosDepois = sqlite.prepare(
+      'SELECT COUNT(*) AS total FROM vinculos_funcionais WHERE membro_id = ?'
+    ).get(criado.id) as { total: number }
+    expect(vinculosDepois.total).toBe(0)
+  })
+
 })
