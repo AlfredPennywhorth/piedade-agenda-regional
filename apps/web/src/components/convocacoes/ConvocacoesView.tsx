@@ -20,7 +20,13 @@ interface RegionalLookup { id: string; nome: string }
 interface AdministracaoLookup { id: string; nome: string; regionalId: string }
 interface SetorLookup { id: string; nome: string; administracaoId: string }
 interface CasaLookup { id: string; nome: string; setorId: string }
-interface GrupoTrabalhoLookup { id: string; nome: string; regionalId?: string | null }
+interface GrupoTrabalhoLookup {
+  id: string
+  nome: string
+  regionalId?: string | null
+  administracaoId?: string | null
+  setorId?: string | null
+}
 type FiltroStatus = 'ATIVAS' | 'RASCUNHO' | 'PUBLICADA' | 'CANCELADA' | 'TODAS'
 
 export function ConvocacoesView() {
@@ -225,6 +231,23 @@ export function ConvocacoesView() {
     return ev ? ev.titulo : 'Evento não encontrado'
   }
 
+  const resolverEscopoGrupoTrabalho = (grupo?: GrupoTrabalhoLookup) => {
+    if (!grupo) return { regionalId: '', administracaoId: '', setorId: '' }
+
+    let setorId = grupo.setorId || ''
+    let administracaoId = grupo.administracaoId || ''
+    let regionalId = grupo.regionalId || ''
+
+    if (setorId && !administracaoId) {
+      administracaoId = setores.find(item => item.id === setorId)?.administracaoId || ''
+    }
+    if (administracaoId && !regionalId) {
+      regionalId = administracoes.find(item => item.id === administracaoId)?.regionalId || ''
+    }
+
+    return { regionalId, administracaoId, setorId }
+  }
+
   const resolverEscopoEvento = (evento?: EventoLookup) => {
     if (!evento) return { regionalId: '', administracaoId: '', setorId: '', casaId: '', grupoTrabalhoId: '' }
 
@@ -237,7 +260,15 @@ export function ConvocacoesView() {
     if (casaId && !setorId) setorId = casas.find(item => item.id === casaId)?.setorId || ''
     if (setorId && !administracaoId) administracaoId = setores.find(item => item.id === setorId)?.administracaoId || ''
     if (administracaoId && !regionalId) regionalId = administracoes.find(item => item.id === administracaoId)?.regionalId || ''
-    if (grupoTrabalhoId && !regionalId) regionalId = gruposTrabalho.find(item => item.id === grupoTrabalhoId)?.regionalId || ''
+
+    if (grupoTrabalhoId) {
+      const escopoGt = resolverEscopoGrupoTrabalho(
+        gruposTrabalho.find(item => item.id === grupoTrabalhoId)
+      )
+      if (!setorId) setorId = escopoGt.setorId
+      if (!administracaoId) administracaoId = escopoGt.administracaoId
+      if (!regionalId) regionalId = escopoGt.regionalId
+    }
 
     return { regionalId, administracaoId, setorId, casaId, grupoTrabalhoId }
   }
@@ -289,7 +320,13 @@ export function ConvocacoesView() {
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
 
   const gruposTrabalhoFiltrados = gruposTrabalho
-    .filter(item => !filtroRegionalId || !item.regionalId || item.regionalId === filtroRegionalId)
+    .filter(item => {
+      const escopo = resolverEscopoGrupoTrabalho(item)
+      if (filtroRegionalId && escopo.regionalId !== filtroRegionalId) return false
+      if (filtroAdministracaoId && escopo.administracaoId !== filtroAdministracaoId) return false
+      if (filtroSetorId && escopo.setorId !== filtroSetorId) return false
+      return true
+    })
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
 
   const convocacoesFiltradas = convocacoes.filter(conv => {
