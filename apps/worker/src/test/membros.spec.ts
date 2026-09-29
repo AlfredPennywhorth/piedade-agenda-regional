@@ -605,4 +605,68 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     expect(legadoPreservado?.origem).toBeNull()
   })
 
+
+  it('32. Deve converter DCO automático em manual ao repurpose pelo endpoint genérico', async () => {
+    const resCreate = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'Cadastro DCO Repurpose',
+        dataOrdenacao: '2005-01-01',
+        codigoCarteirinha: 'TESTE-32',
+        casaId,
+        celular: '11960000032',
+      }),
+    })
+    expect(resCreate.status).toBe(201)
+    const criado = await resCreate.json() as any
+
+    const vinculoAutomatico = sqlite.prepare(
+      `SELECT vf.id, vf.origem
+       FROM vinculos_funcionais vf
+       INNER JOIN funcoes f ON f.id = vf.funcao_id
+       WHERE vf.membro_id = ?
+         AND f.codigo = 'DCO'
+         AND vf.casa_id = ?
+         AND vf.ativo = 1`
+    ).get(criado.id, casaId) as { id: string; origem: string | null }
+
+    expect(vinculoAutomatico).toBeDefined()
+    expect(vinculoAutomatico.origem).toBe('MEMBRO_AUTOMATICO')
+
+    const resPatch = await req(`/api/v1/vinculos-funcionais/${vinculoAutomatico.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        regionalId,
+        casaId: null,
+      }),
+    })
+
+    expect(resPatch.status).toBe(200)
+
+    const vinculoRepurposed = sqlite.prepare(
+      'SELECT origem, regional_id, casa_id FROM vinculos_funcionais WHERE id = ?'
+    ).get(vinculoAutomatico.id) as {
+      origem: string | null
+      regional_id: string | null
+      casa_id: string | null
+    }
+
+    expect(vinculoRepurposed.origem).toBeNull()
+    expect(vinculoRepurposed.regional_id).toBe(regionalId)
+    expect(vinculoRepurposed.casa_id).toBeNull()
+
+    const resDelete = await req(`/api/v1/membros/${criado.id}`, {
+      method: 'DELETE',
+    })
+
+    const jsonDelete = await resDelete.json() as any
+    expect(resDelete.status).toBe(409)
+    expect(jsonDelete.code).toBe('MEMBRO_POSSUI_DEPENDENCIAS')
+
+    const preservado = sqlite.prepare(
+      'SELECT id FROM vinculos_funcionais WHERE id = ?'
+    ).get(vinculoAutomatico.id)
+    expect(preservado).toBeDefined()
+  })
+
 })
