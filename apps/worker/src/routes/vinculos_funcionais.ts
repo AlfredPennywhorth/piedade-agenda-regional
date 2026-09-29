@@ -490,16 +490,29 @@ vinculosFuncionaisRouter.patch('/:id', async (c) => {
     const camposAlterados = Object.keys(parsed)
     const moveuEscopo = escopoOrigem.tipo !== escopoFinal.tipo || escopoOrigem.id !== escopoFinal.id
     const agoraAtualizacao = new Date().toISOString()
-    const sincronizacoes = await prepararSincronizacaoConvocacoes(db, vinculoResultante)
+
+    // Qualquer alteração pelo endpoint administrativo genérico transfere a
+    // propriedade do vínculo para o fluxo manual. Assim, um DCO originalmente
+    // criado pelo cadastro de Membro deixa de ser descartável na exclusão.
+    const atualizacaoManual = {
+      ...parsed,
+      origem: null,
+      updatedAt: agoraAtualizacao,
+    }
+    const vinculoResultanteManual = {
+      ...vinculoResultante,
+      origem: null,
+    }
+    const sincronizacoes = await prepararSincronizacaoConvocacoes(db, vinculoResultanteManual)
 
     if (moveuEscopo) {
       await executarOperacaoComAudits(
         db,
         (qdb) => [
           qdb.update(vinculosFuncionais)
-            .set({ ...parsed, updatedAt: agoraAtualizacao })
+            .set(atualizacaoManual)
             .where(eq(vinculosFuncionais.id, id)),
-          ...queriesSincronizacaoConvocacoes(qdb, vinculoResultante, sincronizacoes, agoraAtualizacao),
+          ...queriesSincronizacaoConvocacoes(qdb, vinculoResultanteManual, sincronizacoes, agoraAtualizacao),
         ],
         [
           {
@@ -537,9 +550,9 @@ vinculosFuncionaisRouter.patch('/:id', async (c) => {
         db,
         (qdb) => [
           qdb.update(vinculosFuncionais)
-            .set({ ...parsed, updatedAt: agoraAtualizacao })
+            .set(atualizacaoManual)
             .where(eq(vinculosFuncionais.id, id)),
-          ...queriesSincronizacaoConvocacoes(qdb, vinculoResultante, sincronizacoes, agoraAtualizacao),
+          ...queriesSincronizacaoConvocacoes(qdb, vinculoResultanteManual, sincronizacoes, agoraAtualizacao),
         ],
         {
           acao: 'VINCULO_FUNCIONAL_ATUALIZADO',

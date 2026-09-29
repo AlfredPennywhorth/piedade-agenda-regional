@@ -130,6 +130,7 @@ export function setupDb(sqlite: any) {
       setor_id text,
       casa_id text,
       grupo_trabalho_id text,
+      origem text,
       ativo integer DEFAULT true NOT NULL,
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,

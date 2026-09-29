@@ -306,6 +306,7 @@ adminPreCadastrosMinisteriaisApp.post('/:id/finalizar', async c => {
     membroId,
     funcaoId: funcaoDco.id,
     casaId,
+    origem: 'MEMBRO_AUTOMATICO',
     ativo: true,
     createdAt: agora,
     updatedAt: agora,

@@ -355,6 +355,7 @@ membrosRouter.post('/', async (c) => {
       membroId: id,
       funcaoId: funcaoDco.id,
       casaId: parsed.casaId,
+      origem: 'MEMBRO_AUTOMATICO',
       ativo: true,
       createdAt: agoraCriacao,
       updatedAt: agoraCriacao,
@@ -501,13 +502,15 @@ membrosRouter.patch('/:id', async (c) => {
           membroId: id,
           funcaoId: funcaoDco.id,
           casaId: casaFinalId,
+          origem: vinculoDcoDestinoExistente?.origem ?? 'MEMBRO_AUTOMATICO',
           ativo: true,
           createdAt: agoraAtualizacao,
           updatedAt: agoraAtualizacao,
         }
       : null
-    const sincronizacoesDco = novoVinculoDco
-      ? await prepararSincronizacaoConvocacoes(db, novoVinculoDco)
+    const membroAtivoFinal = parsed.ativo ?? existing.ativo
+    const sincronizacoesDco = novoVinculoDco && membroAtivoFinal
+      ? await prepararSincronizacaoConvocacoes(db, novoVinculoDco, true)
       : []
 
     if (moveuCasa) {
@@ -652,6 +655,7 @@ membrosRouter.delete('/:id', async (c) => {
 
   try {
     const funcaoDco = await obterFuncaoDco(db)
+
     await executarOperacaoComAudit(
       db,
       qdb => [
@@ -661,7 +665,7 @@ membrosRouter.delete('/:id', async (c) => {
                 and(
                   eq(vinculosFuncionais.membroId, id),
                   eq(vinculosFuncionais.funcaoId, funcaoDco.id),
-                  eq(vinculosFuncionais.casaId, existing.casaId)
+                  eq(vinculosFuncionais.origem, 'MEMBRO_AUTOMATICO')
                 )
               ),
             ]
@@ -696,4 +700,3 @@ membrosRouter.delete('/:id', async (c) => {
     return c.json({ error: 'Não foi possível excluir o membro' }, 400)
   }
 })
-

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import Database from 'better-sqlite3'
 import { createApp } from '../index'
@@ -6,6 +6,7 @@ import * as schema from '../db/schema'
 import { eq, and } from 'drizzle-orm'
 import { setupDb } from './setup'
 import { criarSessaoAutenticadaTeste, mesclarAutorizacao } from './auth-test-helper'
+import * as batch from '../db/batch'
 
 type MembroResponse = {
   id: string
@@ -405,6 +406,333 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     const json = await resDelete.json() as any
     expect(resDelete.status).toBe(409)
     expect(json.code).toBe('MEMBRO_POSSUI_DEPENDENCIAS')
+  })
+
+  it('27. Deve sincronizar DCO ao mover e reativar membro no mesmo PATCH', async () => {
+    const funcaoDco = sqlite.prepare(
+      "SELECT id FROM funcoes WHERE codigo = 'DCO' AND ativo = 1"
+    ).get() as { id: string }
+
+    sqlite.exec(`
+      UPDATE membros SET ativo = 0 WHERE id = '${membroId}';
+
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, casa_id, ativo)
+      VALUES
+        ('evento-move-reativa', 'Evento destino reativação', 'ONLINE',
+         '2030-03-01T12:00:00.000Z', '2030-03-01T13:00:00.000Z', '${casaId2}', 1);
+
+      INSERT INTO convocacoes
+        (id, evento_id, status, publicada_em, ativo)
+      VALUES
+        ('conv-move-reativa', 'evento-move-reativa', 'PUBLICADA', CURRENT_TIMESTAMP, 1);
+
+      INSERT INTO convocacao_funcoes
+        (id, convocacao_id, funcao_id)
+      VALUES
+        ('cf-move-reativa', 'conv-move-reativa', '${funcaoDco.id}');
+    `)
+
+    const resPatch = await req(`/api/v1/membros/${membroId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ casaId: casaId2, ativo: true }),
+    })
+
+    expect(resPatch.status).toBe(200)
+
+    const destinatario = sqlite.prepare(
+      'SELECT id FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
+    ).get('conv-move-reativa', membroId)
+
+    expect(destinatario).toBeDefined()
+  })
+
+  it('28. Não deve sincronizar DCO ao mover e inativar membro no mesmo PATCH', async () => {
+    const funcaoDco = sqlite.prepare(
+      "SELECT id FROM funcoes WHERE codigo = 'DCO' AND ativo = 1"
+    ).get() as { id: string }
+
+    sqlite.exec(`
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, casa_id, ativo)
+      VALUES
+        ('evento-move-inativa', 'Evento destino inativação', 'ONLINE',
+         '2030-04-01T12:00:00.000Z', '2030-04-01T13:00:00.000Z', '${casaId2}', 1);
+
+      INSERT INTO convocacoes
+        (id, evento_id, status, publicada_em, ativo)
+      VALUES
+        ('conv-move-inativa', 'evento-move-inativa', 'PUBLICADA', CURRENT_TIMESTAMP, 1);
+
+      INSERT INTO convocacao_funcoes
+        (id, convocacao_id, funcao_id)
+      VALUES
+        ('cf-move-inativa', 'conv-move-inativa', '${funcaoDco.id}');
+    `)
+
+    const resPatch = await req(`/api/v1/membros/${membroId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ casaId: casaId2, ativo: false }),
+    })
+
+    expect(resPatch.status).toBe(200)
+
+    const destinatario = sqlite.prepare(
+      'SELECT id FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
+    ).get('conv-move-inativa', membroId)
+
+    expect(destinatario).toBeUndefined()
+  })
+
+  it('29. Deve preservar vínculo DCO manual e bloquear exclusão', async () => {
+    const resCreate = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'Cadastro com DCO Manual',
+        dataOrdenacao: '2003-01-01',
+        codigoCarteirinha: 'TESTE-29',
+        casaId,
+        celular: '11963222222',
+      }),
+    })
+    expect(resCreate.status).toBe(201)
+    const criado = await resCreate.json() as any
+
+    const funcaoDco = sqlite.prepare(
+      "SELECT id FROM funcoes WHERE codigo = 'DCO' AND ativo = 1"
+    ).get() as { id: string }
+
+    const resVinculoManual = await req('/api/v1/vinculos-funcionais', {
+      method: 'POST',
+      body: JSON.stringify({
+        membroId: criado.id,
+        funcaoId: funcaoDco.id,
+        casaId,
+        ativo: false,
+      }),
+    })
+    expect(resVinculoManual.status).toBe(201)
+    const vinculoManual = await resVinculoManual.json() as any
+
+    const resDelete = await req(`/api/v1/membros/${criado.id}`, {
+      method: 'DELETE',
+    })
+
+    const jsonDelete = await resDelete.json() as any
+    expect(resDelete.status).toBe(409)
+    expect(jsonDelete.code).toBe('MEMBRO_POSSUI_DEPENDENCIAS')
+
+    const manualPreservado = sqlite.prepare(
+      'SELECT id FROM vinculos_funcionais WHERE id = ?'
+    ).get(vinculoManual.id)
+    expect(manualPreservado).toBeDefined()
+  })
+
+  it('30. Deve excluir todos os vínculos DCO automáticos após mudança de Casa', async () => {
+    const resCreate = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'Cadastro Movido Indevido',
+        dataOrdenacao: '2003-01-01',
+        codigoCarteirinha: 'TESTE-29',
+        casaId,
+        celular: '11963333333',
+      }),
+    })
+    expect(resCreate.status).toBe(201)
+    const criado = await resCreate.json() as any
+
+    const resMover = await req(`/api/v1/membros/${criado.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ casaId: casaId2 }),
+    })
+    expect(resMover.status).toBe(200)
+
+    const vinculosAntes = sqlite.prepare(
+      `SELECT origem
+       FROM vinculos_funcionais vf
+       INNER JOIN funcoes f ON f.id = vf.funcao_id
+       WHERE vf.membro_id = ? AND f.codigo = 'DCO'`
+    ).all(criado.id) as Array<{ origem: string | null }>
+    expect(vinculosAntes.length).toBeGreaterThanOrEqual(2)
+    expect(vinculosAntes.every(vinculo => vinculo.origem === 'MEMBRO_AUTOMATICO')).toBe(true)
+
+    const resDelete = await req(`/api/v1/membros/${criado.id}`, {
+      method: 'DELETE',
+    })
+
+    expect(resDelete.status).toBe(200)
+
+    const vinculosDepois = sqlite.prepare(
+      'SELECT COUNT(*) AS total FROM vinculos_funcionais WHERE membro_id = ?'
+    ).get(criado.id) as { total: number }
+    expect(vinculosDepois.total).toBe(0)
+  })
+
+
+  it('31. Deve preservar DCO legado sem origem e bloquear exclusão', async () => {
+    const membroLegadoId = '44444444-4444-4444-8444-444444444444'
+    const funcaoDco = sqlite.prepare(
+      "SELECT id FROM funcoes WHERE codigo = 'DCO' AND ativo = 1"
+    ).get() as { id: string }
+
+    sqlite.exec(`
+      INSERT INTO membros
+        (id, nome, celular, data_ordenacao, codigo_carteirinha, casa_id, ativo)
+      VALUES
+        ('${membroLegadoId}', 'Membro Legado DCO', '11961111111',
+         '2004-01-01', 'TESTE-31', '${casaId}', 1);
+
+      INSERT INTO vinculos_funcionais
+        (id, membro_id, funcao_id, casa_id, origem, ativo)
+      VALUES
+        ('vinculo-dco-legado', '${membroLegadoId}', '${funcaoDco.id}',
+         '${casaId}', NULL, 1);
+    `)
+
+    const resDelete = await req(`/api/v1/membros/${membroLegadoId}`, {
+      method: 'DELETE',
+    })
+
+    const jsonDelete = await resDelete.json() as any
+    expect(resDelete.status).toBe(409)
+    expect(jsonDelete.code).toBe('MEMBRO_POSSUI_DEPENDENCIAS')
+
+    const legadoPreservado = sqlite.prepare(
+      'SELECT origem FROM vinculos_funcionais WHERE id = ?'
+    ).get('vinculo-dco-legado') as { origem: string | null } | undefined
+
+    expect(legadoPreservado).toBeDefined()
+    expect(legadoPreservado?.origem).toBeNull()
+  })
+
+
+  it('32. Deve converter DCO automático em manual ao repurpose pelo endpoint genérico', async () => {
+    const resCreate = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'Cadastro DCO Repurpose',
+        dataOrdenacao: '2005-01-01',
+        codigoCarteirinha: 'TESTE-32',
+        casaId,
+        celular: '11960000032',
+      }),
+    })
+    expect(resCreate.status).toBe(201)
+    const criado = await resCreate.json() as any
+
+    const vinculoAutomatico = sqlite.prepare(
+      `SELECT vf.id, vf.origem
+       FROM vinculos_funcionais vf
+       INNER JOIN funcoes f ON f.id = vf.funcao_id
+       WHERE vf.membro_id = ?
+         AND f.codigo = 'DCO'
+         AND vf.casa_id = ?
+         AND vf.ativo = 1`
+    ).get(criado.id, casaId) as { id: string; origem: string | null }
+
+    expect(vinculoAutomatico).toBeDefined()
+    expect(vinculoAutomatico.origem).toBe('MEMBRO_AUTOMATICO')
+
+    const resPatch = await req(`/api/v1/vinculos-funcionais/${vinculoAutomatico.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        regionalId,
+        casaId: null,
+      }),
+    })
+
+    expect(resPatch.status).toBe(200)
+
+    const vinculoRepurposed = sqlite.prepare(
+      'SELECT origem, regional_id, casa_id FROM vinculos_funcionais WHERE id = ?'
+    ).get(vinculoAutomatico.id) as {
+      origem: string | null
+      regional_id: string | null
+      casa_id: string | null
+    }
+
+    expect(vinculoRepurposed.origem).toBeNull()
+    expect(vinculoRepurposed.regional_id).toBe(regionalId)
+    expect(vinculoRepurposed.casa_id).toBeNull()
+
+    const resDelete = await req(`/api/v1/membros/${criado.id}`, {
+      method: 'DELETE',
+    })
+
+    const jsonDelete = await resDelete.json() as any
+    expect(resDelete.status).toBe(409)
+    expect(jsonDelete.code).toBe('MEMBRO_POSSUI_DEPENDENCIAS')
+
+    const preservado = sqlite.prepare(
+      'SELECT id FROM vinculos_funcionais WHERE id = ?'
+    ).get(vinculoAutomatico.id)
+    expect(preservado).toBeDefined()
+  })
+
+  it('33. Deve revalidar origem DCO na exclusão atômica após PATCH concorrente', async () => {
+    const resCreate = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'Cadastro DCO Concorrente',
+        dataOrdenacao: '2005-01-01',
+        codigoCarteirinha: 'TESTE-33',
+        casaId,
+      }),
+    })
+    expect(resCreate.status).toBe(201)
+    const criado = await resCreate.json() as MembroResponse
+
+    const resMover = await req(`/api/v1/membros/${criado.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ casaId: casaId2 }),
+    })
+    expect(resMover.status).toBe(200)
+
+    const vinculosAntes = sqlite.prepare(
+      `SELECT id, casa_id, origem FROM vinculos_funcionais
+       WHERE membro_id = ? ORDER BY casa_id`
+    ).all(criado.id) as Array<{ id: string; casa_id: string; origem: string | null }>
+    expect(vinculosAntes).toHaveLength(2)
+    expect(vinculosAntes.every(vinculo => vinculo.origem === 'MEMBRO_AUTOMATICO')).toBe(true)
+    const vinculoAtual = vinculosAntes.find(vinculo => vinculo.casa_id === casaId2)!
+
+    const executarAtomico = batch.executeAtomic
+    // Intercala o PATCH real após as leituras do DELETE e antes da transação.
+    const atomicSpy = vi.spyOn(batch, 'executeAtomic').mockImplementationOnce(async (banco, queries) => {
+      const resPatch = await req(`/api/v1/vinculos-funcionais/${vinculoAtual.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ regionalId, casaId: null }),
+      })
+      expect(resPatch.status).toBe(200)
+      expect(sqlite.prepare(
+        'SELECT origem FROM vinculos_funcionais WHERE id = ?'
+      ).get(vinculoAtual.id).origem).toBeNull()
+      return executarAtomico(banco, queries)
+    })
+
+    try {
+      const resDelete = await req(`/api/v1/membros/${criado.id}`, { method: 'DELETE' })
+      expect(atomicSpy).toHaveBeenCalled()
+      expect(resDelete.status).toBe(409)
+      expect(await resDelete.json()).toMatchObject({ code: 'MEMBRO_POSSUI_DEPENDENCIAS' })
+    } finally {
+      atomicSpy.mockRestore()
+    }
+
+    expect(sqlite.prepare('SELECT id FROM membros WHERE id = ?').get(criado.id)).toBeDefined()
+    const vinculosDepois = sqlite.prepare(
+      `SELECT id, casa_id, regional_id, origem FROM vinculos_funcionais
+       WHERE membro_id = ?`
+    ).all(criado.id)
+    expect(vinculosDepois).toHaveLength(2)
+    expect(vinculosDepois).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: vinculoAtual.id, casa_id: null, regional_id: regionalId, origem: null }),
+      expect.objectContaining({ id: vinculosAntes[0].id, casa_id: casaId, origem: 'MEMBRO_AUTOMATICO' }),
+    ]))
+    expect(sqlite.prepare(
+      "SELECT id FROM auditoria_logs WHERE acao = 'MEMBRO_EXCLUIDO' AND recurso_id = ?"
+    ).get(criado.id)).toBeUndefined()
   })
 
 })

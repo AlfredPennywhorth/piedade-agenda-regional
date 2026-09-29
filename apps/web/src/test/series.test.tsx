@@ -261,6 +261,227 @@ describe('SeriesView', () => {
     })
   })
 
+  it('deve mostrar espaço histórico inativo e exigir substituição antes de editar a série', async () => {
+    const localId = MOCK_LOOKUPS.locais[0].id
+    const espacoInativoId = '11111111-1111-4111-8111-111111111111'
+    const espacoAtivoId = '22222222-2222-4222-8222-222222222222'
+    const serieComEspacoInativo = {
+      ...MOCK_SERIES[0],
+      modalidade: 'PRESENCIAL',
+      localId,
+      espacoId: espacoInativoId,
+      urlOnline: null,
+    }
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/series-recorrencia') return [serieComEspacoInativo]
+      if (url === '/locais') return MOCK_LOOKUPS.locais
+      if (url === '/espacos-locais?ativo=true') {
+        return [{ id: espacoAtivoId, localId, nome: 'Sala Ativa', ativo: true }]
+      }
+      if (url === `/espacos-locais?localId=${localId}`) {
+        return [
+          { id: espacoAtivoId, localId, nome: 'Sala Ativa', ativo: true },
+          { id: espacoInativoId, localId, nome: 'Sala Histórica', ativo: false },
+        ]
+      }
+      if (url === '/membros') return MOCK_LOOKUPS.membros
+      if (url === '/regionais') return MOCK_LOOKUPS.regionais
+      if (url === '/administracoes') return MOCK_LOOKUPS.administracoes
+      if (url === '/setores') return MOCK_LOOKUPS.setores
+      if (url === '/casas') return MOCK_LOOKUPS.casas
+      if (url === '/grupos-trabalho') return MOCK_LOOKUPS.gruposTrabalho
+      return []
+    })
+
+    render(<SeriesView />)
+    await waitFor(() => expect(screen.getByText('Reunião Semanal')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByText('Editar'))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Editar Série de Recorrência' })
+    const seletorEspaco = within(dialog).getByLabelText('Espaço')
+
+    await waitFor(() => {
+      expect(seletorEspaco).toHaveValue(espacoInativoId)
+      expect(within(dialog).getByRole('option', { name: /Sala Histórica.*inativo/i })).toBeInTheDocument()
+    })
+
+    fireEvent.change(within(dialog).getByLabelText(/Título \*/i), {
+      target: { value: 'Reunião Semanal Editada' },
+    })
+    fireEvent.click(within(dialog).getByText('Salvar Série'))
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'O espaço atual está inativo'
+    )
+    expect(screen.queryByRole('dialog', { name: 'Confirmar Edição de Série' })).not.toBeInTheDocument()
+
+    fireEvent.change(seletorEspaco, { target: { value: espacoAtivoId } })
+    fireEvent.click(within(dialog).getByText('Salvar Série'))
+
+    expect(await screen.findByRole('dialog', { name: 'Confirmar Edição de Série' })).toBeInTheDocument()
+  })
+
+  it('deve ignorar lookup histórico atrasado ao abrir Nova Série', async () => {
+    const localId = MOCK_LOOKUPS.locais[0].id
+    const espacoInativoId = '33333333-3333-4333-8333-333333333333'
+    const serieComEspacoInativo = {
+      ...MOCK_SERIES[0],
+      modalidade: 'PRESENCIAL',
+      localId,
+      espacoId: espacoInativoId,
+      urlOnline: null,
+    }
+
+    let resolverEspacosHistoricos: ((value: any[]) => void) | undefined
+    const espacosHistoricosPendentes = new Promise<any[]>(resolve => {
+      resolverEspacosHistoricos = resolve
+    })
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/series-recorrencia') return [serieComEspacoInativo]
+      if (url === '/locais') return MOCK_LOOKUPS.locais
+      if (url === '/espacos-locais?ativo=true') return []
+      if (url === `/espacos-locais?localId=${localId}`) {
+        return espacosHistoricosPendentes as any
+      }
+      if (url === '/membros') return MOCK_LOOKUPS.membros
+      if (url === '/regionais') return MOCK_LOOKUPS.regionais
+      if (url === '/administracoes') return MOCK_LOOKUPS.administracoes
+      if (url === '/setores') return MOCK_LOOKUPS.setores
+      if (url === '/casas') return MOCK_LOOKUPS.casas
+      if (url === '/grupos-trabalho') return MOCK_LOOKUPS.gruposTrabalho
+      return []
+    })
+
+    render(<SeriesView />)
+    await waitFor(() => expect(screen.getByText('Reunião Semanal')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByText('Editar'))
+    fireEvent.click(screen.getByText('+ Nova Série'))
+
+    const dialogNovo = await screen.findByRole('dialog', { name: 'Nova Série de Recorrência' })
+    expect(within(dialogNovo).getByLabelText(/Título \*/i)).toHaveValue('')
+
+    resolverEspacosHistoricos?.([
+      { id: espacoInativoId, localId, nome: 'Sala Histórica', ativo: false },
+    ])
+    await espacosHistoricosPendentes
+
+    expect(screen.getByRole('dialog', { name: 'Nova Série de Recorrência' })).toBeInTheDocument()
+    expect(within(dialogNovo).getByLabelText(/Título \*/i)).toHaveValue('')
+  })
+
+  it('deve cancelar edição pendente ao abrir detalhes da série', async () => {
+    const localId = MOCK_LOOKUPS.locais[0].id
+    const espacoInativoId = '44444444-4444-4444-8444-444444444444'
+    const serieComEspacoInativo = {
+      ...MOCK_SERIES[0],
+      modalidade: 'PRESENCIAL',
+      localId,
+      espacoId: espacoInativoId,
+      urlOnline: null,
+    }
+
+    let resolverEspacosHistoricos: ((value: any[]) => void) | undefined
+    const espacosHistoricosPendentes = new Promise<any[]>(resolve => {
+      resolverEspacosHistoricos = resolve
+    })
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/series-recorrencia') return [serieComEspacoInativo]
+      if (url === '/locais') return MOCK_LOOKUPS.locais
+      if (url === '/espacos-locais?ativo=true') return []
+      if (url === `/espacos-locais?localId=${localId}`) return espacosHistoricosPendentes as any
+      if (url === '/membros') return MOCK_LOOKUPS.membros
+      if (url === '/regionais') return MOCK_LOOKUPS.regionais
+      if (url === '/administracoes') return MOCK_LOOKUPS.administracoes
+      if (url === '/setores') return MOCK_LOOKUPS.setores
+      if (url === '/casas') return MOCK_LOOKUPS.casas
+      if (url === '/grupos-trabalho') return MOCK_LOOKUPS.gruposTrabalho
+      return []
+    })
+
+    render(<SeriesView />)
+    await waitFor(() => expect(screen.getByText('Reunião Semanal')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByText('Editar'))
+    fireEvent.click(screen.getByText('Ver'))
+
+    const detalhes = await screen.findByRole('dialog', { name: 'Detalhes da Série' })
+    expect(detalhes).toBeInTheDocument()
+
+    resolverEspacosHistoricos?.([
+      { id: espacoInativoId, localId, nome: 'Sala Histórica', ativo: false },
+    ])
+    await espacosHistoricosPendentes
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: 'Detalhes da Série' })).toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: 'Editar Série de Recorrência' })).not.toBeInTheDocument()
+    })
+  })
+
+  it('deve cancelar edição pendente ao inativar a série', async () => {
+    const localId = MOCK_LOOKUPS.locais[0].id
+    const espacoInativoId = '55555555-5555-4555-8555-555555555555'
+    const serieComEspacoInativo = {
+      ...MOCK_SERIES[0],
+      modalidade: 'PRESENCIAL',
+      localId,
+      espacoId: espacoInativoId,
+      urlOnline: null,
+    }
+
+    let resolverEspacosHistoricos: ((value: any[]) => void) | undefined
+    const espacosHistoricosPendentes = new Promise<any[]>(resolve => {
+      resolverEspacosHistoricos = resolve
+    })
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/series-recorrencia') return [serieComEspacoInativo]
+      if (url === '/locais') return MOCK_LOOKUPS.locais
+      if (url === '/espacos-locais?ativo=true') return []
+      if (url === `/espacos-locais?localId=${localId}`) return espacosHistoricosPendentes as any
+      if (url === '/membros') return MOCK_LOOKUPS.membros
+      if (url === '/regionais') return MOCK_LOOKUPS.regionais
+      if (url === '/administracoes') return MOCK_LOOKUPS.administracoes
+      if (url === '/setores') return MOCK_LOOKUPS.setores
+      if (url === '/casas') return MOCK_LOOKUPS.casas
+      if (url === '/grupos-trabalho') return MOCK_LOOKUPS.gruposTrabalho
+      return []
+    })
+
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({})
+
+    render(<SeriesView />)
+    await waitFor(() => expect(screen.getByText('Reunião Semanal')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByText('Editar'))
+    fireEvent.click(screen.getByText('Inativar'))
+
+    const confirmacao = await screen.findByRole('dialog', { name: 'Inativar Série' })
+    fireEvent.click(within(confirmacao).getByText('Sim, Inativar Futuros'))
+
+    await waitFor(() => {
+      expect(apiClient.patchWithAuth).toHaveBeenCalledWith(
+        '/series-recorrencia/f47ac10b-58cc-4372-a567-0e02b2c3d479',
+        { updateMode: 'ALL', changes: { ativo: false } }
+      )
+    })
+
+    resolverEspacosHistoricos?.([
+      { id: espacoInativoId, localId, nome: 'Sala Histórica', ativo: false },
+    ])
+    await espacosHistoricosPendentes
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Editar Série de Recorrência' })).not.toBeInTheDocument()
+    })
+    expect(apiClient.patchWithAuth).toHaveBeenCalledTimes(1)
+  })
+
   it('deve abrir inativação, exigir confirmação e enviar PATCH com updateMode ALL e ativo falso', async () => {
     render(<SeriesView />)
 
