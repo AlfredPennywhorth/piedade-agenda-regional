@@ -349,6 +349,7 @@ membrosRouter.post('/', async (c) => {
 
     const id = crypto.randomUUID()
     const agoraCriacao = new Date().toISOString()
+    const membroAtivo = parsed.ativo
     const vinculoDco = {
       id: crypto.randomUUID(),
       membroId: id,
@@ -358,7 +359,9 @@ membrosRouter.post('/', async (c) => {
       createdAt: agoraCriacao,
       updatedAt: agoraCriacao,
     }
-    const sincronizacoesDco = await prepararSincronizacaoConvocacoes(db, vinculoDco, true)
+    const sincronizacoesDco = membroAtivo
+      ? await prepararSincronizacaoConvocacoes(db, vinculoDco, true)
+      : []
 
     await executarOperacaoComAudit(
       db,
