@@ -84,6 +84,58 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     expect(json.id).toBeDefined()
   })
 
+  it('1b. Não deve sincronizar membro inativo em convocações DCO futuras', async () => {
+    const funcaoDco = sqlite.prepare(
+      "SELECT id FROM funcoes WHERE codigo = 'DCO' AND ativo = 1"
+    ).get() as { id: string }
+
+    sqlite.exec(`
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, casa_id, ativo)
+      VALUES
+        ('evento-dco-inativo', 'Evento DCO Futuro', 'ONLINE',
+         '2030-01-01T12:00:00.000Z', '2030-01-01T13:00:00.000Z', '${casaId}', 1);
+
+      INSERT INTO convocacoes
+        (id, evento_id, status, publicada_em, ativo)
+      VALUES
+        ('conv-dco-inativo', 'evento-dco-inativo', 'PUBLICADA', CURRENT_TIMESTAMP, 1);
+
+      INSERT INTO convocacao_funcoes
+        (id, convocacao_id, funcao_id)
+      VALUES
+        ('cf-dco-inativo', 'conv-dco-inativo', '${funcaoDco.id}');
+    `)
+
+    const res = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'Pessoa Inativa',
+        dataOrdenacao: '2000-01-01',
+        codigoCarteirinha: 'TESTE-INATIVO',
+        casaId,
+        ativo: false,
+      }),
+    })
+
+    const json = (await res.json()) as MembroResponse
+
+    expect(res.status).toBe(201)
+    expect(json.ativo).toBe(false)
+
+    const vinculoDco = sqlite.prepare(
+      'SELECT ativo FROM vinculos_funcionais WHERE membro_id = ? AND funcao_id = ?'
+    ).get(json.id, funcaoDco.id) as { ativo: number }
+
+    expect(vinculoDco.ativo).toBe(0)
+
+    const destinatarios = sqlite.prepare(
+      'SELECT COUNT(*) AS total FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
+    ).get('conv-dco-inativo', json.id) as { total: number }
+
+    expect(destinatarios.total).toBe(0)
+  })
+
   it('2. Deve rejeitar membro com Casa inexistente', async () => {
     const res = await req('/api/v1/membros', {
       method: 'POST',
