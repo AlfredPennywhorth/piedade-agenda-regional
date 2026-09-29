@@ -81,6 +81,21 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
+
+          TABLE_RESULT="$(pnpm --filter @piedade/worker exec wrangler d1 execute piedade-agenda-db-prod --remote --env production --command "SELECT COUNT(*) AS total FROM sqlite_master WHERE type = 'table' AND name = 'convocacoes';" --json)"
+          TABLE_EXISTS="$(D1_RESULT="$TABLE_RESULT" node <<'NODE'
+          const payload = JSON.parse(process.env.D1_RESULT || '[]')
+          const entries = Array.isArray(payload) ? payload : [payload]
+          const rows = entries.flatMap((entry) => Array.isArray(entry?.results) ? entry.results : [])
+          process.stdout.write(Number(rows[0]?.total ?? 0) > 0 ? 'true' : 'false')
+          NODE
+          )"
+
+          if [ "$TABLE_EXISTS" != "true" ]; then
+            echo "Preflight D1: tabela convocacoes ainda não existe; banco será inicializado pelas migrations."
+            exit 0
+          fi
+
           RESULT="$(pnpm --filter @piedade/worker exec wrangler d1 execute piedade-agenda-db-prod --remote --env production --command "SELECT evento_id, COUNT(*) AS quantidade FROM convocacoes GROUP BY evento_id HAVING COUNT(*) > 1;" --json)"
           D1_RESULT="$RESULT" node <<'NODE'
           const payload = JSON.parse(process.env.D1_RESULT || '[]')
