@@ -515,6 +515,11 @@ describe('LocaisView', () => {
     expect(await within(dialog).findByText('Sala Antiga')).toBeInTheDocument()
     expect(within(dialog).queryByText('Sala Nova')).not.toBeInTheDocument()
 
+    const botaoSaveReaberto = within(dialog).getByRole('button', { name: /salvando/i })
+    expect(botaoSaveReaberto).toBeDisabled()
+    fireEvent.click(botaoSaveReaberto)
+    expect(apiClient.postWithAuth).toHaveBeenCalledTimes(1)
+
     await act(async () => {
       resolverSave?.({})
       await savePendente
@@ -522,7 +527,9 @@ describe('LocaisView', () => {
 
     await waitFor(() => {
       expect(within(dialog).getByText('Sala Nova')).toBeInTheDocument()
+      expect(within(dialog).getByRole('button', { name: /adicionar espaço/i })).not.toBeDisabled()
     })
+    expect(apiClient.postWithAuth).toHaveBeenCalledTimes(1)
     expect(chamadasEspacos).toBe(3)
   })
 
