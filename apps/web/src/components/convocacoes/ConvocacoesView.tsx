@@ -270,11 +270,22 @@ export function ConvocacoesView() {
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
 
   const setoresFiltrados = setores
-    .filter(item => !filtroAdministracaoId || item.administracaoId === filtroAdministracaoId)
+    .filter(item => {
+      if (filtroAdministracaoId) return item.administracaoId === filtroAdministracaoId
+      if (!filtroRegionalId) return true
+      return administracoes.find(adm => adm.id === item.administracaoId)?.regionalId === filtroRegionalId
+    })
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
 
   const casasFiltradas = casas
-    .filter(item => !filtroSetorId || item.setorId === filtroSetorId)
+    .filter(item => {
+      if (filtroSetorId) return item.setorId === filtroSetorId
+      const setor = setores.find(set => set.id === item.setorId)
+      if (!setor) return false
+      if (filtroAdministracaoId) return setor.administracaoId === filtroAdministracaoId
+      if (!filtroRegionalId) return true
+      return administracoes.find(adm => adm.id === setor.administracaoId)?.regionalId === filtroRegionalId
+    })
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
 
   const gruposTrabalhoFiltrados = gruposTrabalho
