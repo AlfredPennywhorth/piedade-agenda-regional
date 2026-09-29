@@ -247,6 +247,10 @@ export const vinculosFuncionais = sqliteTable(
     casaId: text('casa_id').references(() => casas.id),
     grupoTrabalhoId: text('grupo_trabalho_id').references(() => gruposTrabalho.id),
 
+    // Origem explícita para vínculos gerados pelo fluxo institucional de Membros.
+    // NULL representa vínculo manual/legado/sem origem positiva conhecida.
+    origem: text('origem'),
+
     ativo: ativoDefault,
     ...timestampsS02,
   },
