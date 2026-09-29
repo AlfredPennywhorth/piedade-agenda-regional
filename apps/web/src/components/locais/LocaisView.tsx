@@ -93,6 +93,7 @@ export function LocaisView() {
   const [espacosOpen, setEspacosOpen] = useState(false)
   const [localEspacos, setLocalEspacos] = useState<Local | null>(null)
   const [espacos, setEspacos] = useState<EspacoLocal[]>([])
+  const espacosConsultaSeq = useRef(0)
   const [espacoEditandoId, setEspacoEditandoId] = useState<string | null>(null)
   const [espacoForm, setEspacoForm] = useState({ nome: '', descricao: '', capacidade: '', ativo: true })
   const [espacoErro, setEspacoErro] = useState<string | null>(null)
@@ -193,17 +194,30 @@ export function LocaisView() {
   }
 
   const abrirEspacos = async (local: Local) => {
+    const consultaAtual = ++espacosConsultaSeq.current
     setLocalEspacos(local)
+    setEspacos([])
     setEspacosOpen(true)
     setEspacoEditandoId(null)
     setEspacoForm({ nome: '', descricao: '', capacidade: '', ativo: true })
     setEspacoErro(null)
+
     try {
       const data = await apiClient.fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${local.id}`)
+      if (consultaAtual !== espacosConsultaSeq.current) return
       setEspacos(data || [])
     } catch (err: any) {
+      if (consultaAtual !== espacosConsultaSeq.current) return
       setEspacoErro(err.message || 'Erro ao carregar espaços do Local')
     }
+  }
+
+  const fecharEspacos = () => {
+    espacosConsultaSeq.current += 1
+    setEspacosOpen(false)
+    setLocalEspacos(null)
+    setEspacos([])
+    setEspacoErro(null)
   }
 
   const salvarEspaco = async (e: React.FormEvent) => {
@@ -752,7 +766,7 @@ export function LocaisView() {
                 <h3 id="modal-espacos-title" className="text-lg font-semibold text-slate-900">Espaços do Local</h3>
                 <p className="text-sm text-slate-500">{localEspacos.nome}</p>
               </div>
-              <button onClick={() => setEspacosOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              <button onClick={fecharEspacos} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
             <div className="p-6 overflow-y-auto space-y-6">
               {espacoErro && <div role="alert" className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{espacoErro}</div>}
