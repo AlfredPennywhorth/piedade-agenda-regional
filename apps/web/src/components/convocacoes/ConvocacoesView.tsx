@@ -549,6 +549,7 @@ export function ConvocacoesView() {
                     Evento
                   </label>
                   <select
+                    aria-label="Evento da convocação"
                     value={formData.eventoId}
                     onChange={(e) => setFormData({ ...formData, eventoId: e.target.value })}
                     disabled={!!editandoId || salvando}
