@@ -548,12 +548,13 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     expect(resMover.status).toBe(200)
 
     const vinculosAntes = sqlite.prepare(
-      `SELECT COUNT(*) AS total
+      `SELECT origem
        FROM vinculos_funcionais vf
        INNER JOIN funcoes f ON f.id = vf.funcao_id
        WHERE vf.membro_id = ? AND f.codigo = 'DCO'`
-    ).get(criado.id) as { total: number }
-    expect(vinculosAntes.total).toBeGreaterThanOrEqual(2)
+    ).all(criado.id) as Array<{ origem: string | null }>
+    expect(vinculosAntes.length).toBeGreaterThanOrEqual(2)
+    expect(vinculosAntes.every(vinculo => vinculo.origem === 'MEMBRO_AUTOMATICO')).toBe(true)
 
     const resDelete = await req(`/api/v1/membros/${criado.id}`, {
       method: 'DELETE',
@@ -565,6 +566,43 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
       'SELECT COUNT(*) AS total FROM vinculos_funcionais WHERE membro_id = ?'
     ).get(criado.id) as { total: number }
     expect(vinculosDepois.total).toBe(0)
+  })
+
+
+  it('31. Deve preservar DCO legado sem origem e bloquear exclusão', async () => {
+    const membroLegadoId = '44444444-4444-4444-8444-444444444444'
+    const funcaoDco = sqlite.prepare(
+      "SELECT id FROM funcoes WHERE codigo = 'DCO' AND ativo = 1"
+    ).get() as { id: string }
+
+    sqlite.exec(`
+      INSERT INTO membros
+        (id, nome, celular, data_ordenacao, codigo_carteirinha, casa_id, ativo)
+      VALUES
+        ('${membroLegadoId}', 'Membro Legado DCO', '11961111111',
+         '2004-01-01', 'TESTE-31', '${casaId}', 1);
+
+      INSERT INTO vinculos_funcionais
+        (id, membro_id, funcao_id, casa_id, origem, ativo)
+      VALUES
+        ('vinculo-dco-legado', '${membroLegadoId}', '${funcaoDco.id}',
+         '${casaId}', NULL, 1);
+    `)
+
+    const resDelete = await req(`/api/v1/membros/${membroLegadoId}`, {
+      method: 'DELETE',
+    })
+
+    const jsonDelete = await resDelete.json() as any
+    expect(resDelete.status).toBe(409)
+    expect(jsonDelete.code).toBe('MEMBRO_POSSUI_DEPENDENCIAS')
+
+    const legadoPreservado = sqlite.prepare(
+      'SELECT origem FROM vinculos_funcionais WHERE id = ?'
+    ).get('vinculo-dco-legado') as { origem: string | null } | undefined
+
+    expect(legadoPreservado).toBeDefined()
+    expect(legadoPreservado?.origem).toBeNull()
   })
 
 })
