@@ -392,7 +392,7 @@ export function setupDb(sqlite: any) {
       FOREIGN KEY (evento_id) REFERENCES eventos(id),
       CONSTRAINT check_status_convocacao CHECK (status IN ('RASCUNHO','PUBLICADA','CANCELADA'))
     );
-    CREATE INDEX IF NOT EXISTS idx_convocacoes_evento_id ON convocacoes (evento_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_convocacoes_evento_unico ON convocacoes (evento_id);
     CREATE INDEX IF NOT EXISTS idx_convocacoes_status ON convocacoes (status);
 
     CREATE TRIGGER IF NOT EXISTS trg_evento_nao_inativar_com_convocacao_ativa
