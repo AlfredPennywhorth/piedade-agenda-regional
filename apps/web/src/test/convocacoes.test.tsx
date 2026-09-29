@@ -222,20 +222,49 @@ describe('ConvocacoesView', () => {
     expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).not.toHaveTextContent('GT Setor 2')
     expect(await screen.findByText('Minha observação rascunho')).toBeInTheDocument()
 
+    fireEvent.change(screen.getByLabelText('Filtrar por Grupo de Trabalho'), {
+      target: { value: gtSetor.id },
+    })
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveValue(gtSetor.id)
+
     fireEvent.change(screen.getByLabelText('Filtrar por Administração'), {
       target: { value: adm1.id },
     })
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveValue('')
     expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).not.toHaveTextContent('GT Regional 1')
     expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveTextContent('GT Administração 1')
     expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveTextContent('GT Setor 1')
     expect(await screen.findByText('Minha observação rascunho')).toBeInTheDocument()
 
+    fireEvent.change(screen.getByLabelText('Filtrar por Grupo de Trabalho'), {
+      target: { value: gtSetor.id },
+    })
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveValue(gtSetor.id)
+
     fireEvent.change(screen.getByLabelText('Filtrar por Setor'), {
       target: { value: setor1.id },
     })
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveValue('')
     expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveTextContent('GT Setor 1')
     expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).not.toHaveTextContent('GT Administração 1')
     expect(await screen.findByText('Minha observação rascunho')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Casa de Oração'), {
+      target: { value: casa1.id },
+    })
+    expect(screen.getByLabelText('Filtrar por Casa de Oração')).toHaveValue(casa1.id)
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Grupo de Trabalho'), {
+      target: { value: gtSetor.id },
+    })
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveValue(gtSetor.id)
+    expect(screen.getByLabelText('Filtrar por Casa de Oração')).toHaveValue('')
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Casa de Oração'), {
+      target: { value: casa1.id },
+    })
+    expect(screen.getByLabelText('Filtrar por Casa de Oração')).toHaveValue(casa1.id)
+    expect(screen.getByLabelText('Filtrar por Grupo de Trabalho')).toHaveValue('')
 
     fireEvent.change(screen.getByLabelText('Filtrar por Regional'), {
       target: { value: reg2.id },
