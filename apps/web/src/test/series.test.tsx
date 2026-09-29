@@ -323,6 +323,56 @@ describe('SeriesView', () => {
     expect(await screen.findByRole('dialog', { name: 'Confirmar Edição de Série' })).toBeInTheDocument()
   })
 
+  it('deve ignorar lookup histórico atrasado ao abrir Nova Série', async () => {
+    const localId = MOCK_LOOKUPS.locais[0].id
+    const espacoInativoId = '33333333-3333-4333-8333-333333333333'
+    const serieComEspacoInativo = {
+      ...MOCK_SERIES[0],
+      modalidade: 'PRESENCIAL',
+      localId,
+      espacoId: espacoInativoId,
+      urlOnline: null,
+    }
+
+    let resolverEspacosHistoricos: ((value: any[]) => void) | undefined
+    const espacosHistoricosPendentes = new Promise<any[]>(resolve => {
+      resolverEspacosHistoricos = resolve
+    })
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/series-recorrencia') return [serieComEspacoInativo]
+      if (url === '/locais') return MOCK_LOOKUPS.locais
+      if (url === '/espacos-locais?ativo=true') return []
+      if (url === `/espacos-locais?localId=${localId}`) {
+        return espacosHistoricosPendentes as any
+      }
+      if (url === '/membros') return MOCK_LOOKUPS.membros
+      if (url === '/regionais') return MOCK_LOOKUPS.regionais
+      if (url === '/administracoes') return MOCK_LOOKUPS.administracoes
+      if (url === '/setores') return MOCK_LOOKUPS.setores
+      if (url === '/casas') return MOCK_LOOKUPS.casas
+      if (url === '/grupos-trabalho') return MOCK_LOOKUPS.gruposTrabalho
+      return []
+    })
+
+    render(<SeriesView />)
+    await waitFor(() => expect(screen.getByText('Reunião Semanal')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByText('Editar'))
+    fireEvent.click(screen.getByText('+ Nova Série'))
+
+    const dialogNovo = await screen.findByRole('dialog', { name: 'Nova Série de Recorrência' })
+    expect(within(dialogNovo).getByLabelText(/Título \*/i)).toHaveValue('')
+
+    resolverEspacosHistoricos?.([
+      { id: espacoInativoId, localId, nome: 'Sala Histórica', ativo: false },
+    ])
+    await espacosHistoricosPendentes
+
+    expect(screen.getByRole('dialog', { name: 'Nova Série de Recorrência' })).toBeInTheDocument()
+    expect(within(dialogNovo).getByLabelText(/Título \*/i)).toHaveValue('')
+  })
+
   it('deve abrir inativação, exigir confirmação e enviar PATCH com updateMode ALL e ativo falso', async () => {
     render(<SeriesView />)
 
