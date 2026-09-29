@@ -74,6 +74,28 @@ jobs:
           sed -i "s|__D1_DATABASE_ID__|$D1_DATABASE_ID|" apps/worker/wrangler.toml
           grep -q "$D1_DATABASE_ID" apps/worker/wrangler.toml
 
+      - name: Preflight D1 — reject duplicate convocacoes per event
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          RESULT="$(pnpm --filter @piedade/worker exec wrangler d1 execute piedade-agenda-db-prod --remote --env production --command "SELECT evento_id, COUNT(*) AS quantidade FROM convocacoes GROUP BY evento_id HAVING COUNT(*) > 1;" --json)"
+          D1_RESULT="$RESULT" node <<'NODE'
+          const payload = JSON.parse(process.env.D1_RESULT || '[]')
+          const entries = Array.isArray(payload) ? payload : [payload]
+          const rows = entries.flatMap((entry) => Array.isArray(entry?.results) ? entry.results : [])
+
+          if (rows.length > 0) {
+            console.error('Bloqueio de release: existem convocacoes duplicadas por evento no D1 de Produção.')
+            console.error(JSON.stringify(rows, null, 2))
+            process.exit(1)
+          }
+
+          console.log('Preflight D1: nenhuma duplicidade de evento_id em convocacoes.')
+          NODE
+
       - name: Apply D1 migrations
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
