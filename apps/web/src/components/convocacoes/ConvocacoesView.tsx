@@ -412,6 +412,7 @@ export function ConvocacoesView() {
                   setFiltroAdministracaoId(e.target.value)
                   setFiltroSetorId('')
                   setFiltroCasaId('')
+                  setFiltroGrupoTrabalhoId('')
                 }}
                 className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-sm"
               >
@@ -430,6 +431,7 @@ export function ConvocacoesView() {
                 onChange={e => {
                   setFiltroSetorId(e.target.value)
                   setFiltroCasaId('')
+                  setFiltroGrupoTrabalhoId('')
                 }}
                 className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-sm"
               >
@@ -445,7 +447,11 @@ export function ConvocacoesView() {
               <select
                 aria-label="Filtrar por Casa de Oração"
                 value={filtroCasaId}
-                onChange={e => setFiltroCasaId(e.target.value)}
+                onChange={e => {
+                  const valor = e.target.value
+                  setFiltroCasaId(valor)
+                  if (valor) setFiltroGrupoTrabalhoId('')
+                }}
                 className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-sm"
               >
                 <option value="">Todas</option>
@@ -460,7 +466,11 @@ export function ConvocacoesView() {
               <select
                 aria-label="Filtrar por Grupo de Trabalho"
                 value={filtroGrupoTrabalhoId}
-                onChange={e => setFiltroGrupoTrabalhoId(e.target.value)}
+                onChange={e => {
+                  const valor = e.target.value
+                  setFiltroGrupoTrabalhoId(valor)
+                  if (valor) setFiltroCasaId('')
+                }}
                 className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-sm"
               >
                 <option value="">Todos</option>
