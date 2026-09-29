@@ -135,6 +135,32 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
     expect(await screen.findByText('Vínculo Funcional criado com sucesso!')).toBeInTheDocument()
   })
 
+  it('2b. Criação: deve ocultar funções inativas do seletor', async () => {
+    const FUNCAO_INATIVA_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/membros') return mockMembros
+      if (endpoint === '/funcoes') return [
+        ...mockFuncoes,
+        { id: FUNCAO_INATIVA_ID, nome: 'Diácono Casa de Oração', ativo: false },
+      ]
+      if (endpoint === '/regionais') return mockRegionais
+      if (endpoint === '/administracoes') return mockAdministracoes
+      if (endpoint === '/setores') return mockSetores
+      if (endpoint === '/casas') return mockCasas
+      if (endpoint === '/grupos-trabalho') return []
+      if (endpoint === '/vinculos-funcionais') return []
+      throw new Error('Not found')
+    })
+
+    render(<VinculosFuncionaisView />)
+    await screen.findByText('Nenhum vínculo funcional cadastrado até o momento.')
+    fireEvent.click(screen.getByText('+ Novo Vínculo'))
+
+    const seletor = screen.getByLabelText(/Função \*/i)
+    expect(seletor).toHaveTextContent('Ancião')
+    expect(seletor).not.toHaveTextContent('Diácono Casa de Oração')
+  })
+
   it('3. Validação: rejeição de nenhum escopo (exibição de erro Zod/Form)', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
       if (endpoint === '/membros') return mockMembros
