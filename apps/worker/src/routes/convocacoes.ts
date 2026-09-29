@@ -137,6 +137,24 @@ convocacoesRouter.post('/', async c => {
       return c.json({ error: 'Acesso não autorizado para gerir a convocação', code: 'FORBIDDEN' }, 403)
     }
 
+    const convocacaoExistente = await db
+      .select({ id: convocacoes.id, status: convocacoes.status })
+      .from(convocacoes)
+      .where(eq(convocacoes.eventoId, parsed.eventoId))
+      .get()
+
+    if (convocacaoExistente) {
+      return c.json(
+        {
+          error: 'Este evento já possui convocação',
+          code: 'CONVOCACAO_EVENTO_EXISTENTE',
+          convocacaoId: convocacaoExistente.id,
+          status: convocacaoExistente.status,
+        },
+        409
+      )
+    }
+
     const convocacaoId = crypto.randomUUID()
     const nowIso = new Date().toISOString()
 
