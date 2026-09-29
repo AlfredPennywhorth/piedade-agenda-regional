@@ -228,7 +228,7 @@ export function ConvocacoesView() {
   const resolverEscopoEvento = (evento?: EventoLookup) => {
     if (!evento) return { regionalId: '', administracaoId: '', setorId: '', casaId: '', grupoTrabalhoId: '' }
 
-    let casaId = evento.casaId || ''
+    const casaId = evento.casaId || ''
     let setorId = evento.setorId || ''
     let administracaoId = evento.administracaoId || ''
     let regionalId = evento.regionalId || ''
