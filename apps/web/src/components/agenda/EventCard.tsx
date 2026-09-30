@@ -47,7 +47,7 @@ export function EventCard({ item, onClick }: EventCardProps) {
     <button
       onClick={onClick}
       className={`w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-brand-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-300 ${
-        item.conflito?.atenuado ? 'opacity-55' : ''
+        item.conflito?.atenuado ? 'opacity-50' : ''
       }`}
     >
       <div className="flex gap-4">
