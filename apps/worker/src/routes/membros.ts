@@ -6,6 +6,7 @@ import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, regionaisAdministradas } from '../security/permissoes'
 import { listarVinculosVisiveis, prepararSincronizacaoConvocacoes, queriesSincronizacaoConvocacoes } from './vinculos_funcionais'
 import { executarOperacaoComAudit, executarOperacaoComAudits } from '../services/auditoria'
+import { queriesSincronizacaoDcoAtual } from '../services/sincronizacao-dco'
 
 export const membrosRouter = new Hono<any>()
 
@@ -474,7 +475,7 @@ membrosRouter.patch('/:id', async (c) => {
           .where(eq(contasAcesso.membroId, id))
           .get()
       : null
-    const funcaoDco = moveuCasa || reativouMembro ? await obterFuncaoDco(db) : null
+    const funcaoDco = moveuCasa ? await obterFuncaoDco(db) : null
     const vinculoDcoDestinoExistente = moveuCasa && funcaoDco
       ? await db
           .select()
@@ -510,25 +511,8 @@ membrosRouter.patch('/:id', async (c) => {
           updatedAt: agoraAtualizacao,
         }
       : null
-    const vinculoDcoParaSincronizar = novoVinculoDco ?? (
-      reativouMembro && funcaoDco
-        ? await db
-            .select()
-            .from(vinculosFuncionais)
-            .where(
-              and(
-                eq(vinculosFuncionais.membroId, id),
-                eq(vinculosFuncionais.funcaoId, funcaoDco.id),
-                eq(vinculosFuncionais.casaId, casaFinalId),
-                eq(vinculosFuncionais.origem, 'MEMBRO_AUTOMATICO'),
-                eq(vinculosFuncionais.ativo, true)
-              )
-            )
-            .get()
-        : null
-    )
-    const sincronizacoesDco = vinculoDcoParaSincronizar && membroAtivoFinal
-      ? await prepararSincronizacaoConvocacoes(db, vinculoDcoParaSincronizar, true)
+    const sincronizacoesDco = novoVinculoDco && membroAtivoFinal
+      ? await prepararSincronizacaoConvocacoes(db, novoVinculoDco, true)
       : []
 
     if (moveuCasa) {
@@ -627,13 +611,8 @@ membrosRouter.patch('/:id', async (c) => {
           qdb.update(membros)
             .set({ ...parsed, updatedAt: agoraAtualizacao })
             .where(eq(membros.id, id)),
-          ...(vinculoDcoParaSincronizar
-            ? queriesSincronizacaoConvocacoes(
-                qdb,
-                vinculoDcoParaSincronizar,
-                sincronizacoesDco,
-                agoraAtualizacao
-              )
+          ...(reativouMembro
+            ? queriesSincronizacaoDcoAtual(qdb, agoraAtualizacao, { membroId: id })
             : []),
         ],
         {

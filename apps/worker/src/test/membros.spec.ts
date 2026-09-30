@@ -805,4 +805,126 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     expect(evidencias.total).toBe(totalEsperado)
   })
 
+  const prepararConcorrenciaDco = async () => {
+    const resCreate = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'Membro Concorrência Reativação',
+        dataOrdenacao: '2005-01-01',
+        codigoCarteirinha: 'TESTE-CONCORRENCIA',
+        casaId,
+        ativo: false,
+      }),
+    })
+    expect(resCreate.status).toBe(201)
+    const criado = await resCreate.json() as MembroResponse
+    const vinculo = sqlite.prepare(
+      'SELECT id, funcao_id FROM vinculos_funcionais WHERE membro_id = ?'
+    ).get(criado.id) as { id: string; funcao_id: string }
+    sqlite.exec(`
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, casa_id, ativo)
+      VALUES ('evento-race-dco', 'Evento concorrência DCO', 'ONLINE',
+        '2030-03-01T12:00:00.000Z', '2030-03-01T13:00:00.000Z', '${casaId}', 1);
+      INSERT INTO convocacoes (id, evento_id, status, ativo)
+      VALUES ('conv-race-dco', 'evento-race-dco', 'RASCUNHO', 1);
+      INSERT INTO convocacao_funcoes (id, convocacao_id, funcao_id)
+      VALUES ('cf-race-dco', 'conv-race-dco', '${vinculo.funcao_id}');
+    `)
+    return { criado, vinculo }
+  }
+
+  it.each(['publicar-antes', 'reativar-antes'])('35. Deriva DCO atomicamente com %s entre leitura e batch', async ordem => {
+    const { criado, vinculo } = await prepararConcorrenciaDco()
+    const reativar = () => req(`/api/v1/membros/${criado.id}`, {
+      method: 'PATCH', body: JSON.stringify({ ativo: true }),
+    })
+    const publicar = () => req('/api/v1/convocacoes/conv-race-dco/publicar', { method: 'POST' })
+    const executarAtomico = batch.executeAtomic
+    const atomicSpy = vi.spyOn(batch, 'executeAtomic').mockImplementationOnce(async (banco, queries) => {
+      const concorrente = await (ordem === 'publicar-antes' ? publicar() : reativar())
+      expect(concorrente.status).toBe(200)
+      return executarAtomico(banco, queries)
+    })
+    try {
+      const resposta = await (ordem === 'publicar-antes' ? reativar() : publicar())
+      expect(atomicSpy).toHaveBeenCalled()
+      expect(resposta.status).toBe(200)
+      if (ordem === 'reativar-antes') {
+        expect(await resposta.json()).toMatchObject({ destinatariosGerados: 1 })
+        const audit = sqlite.prepare(
+          "SELECT contexto FROM auditoria_logs WHERE acao = 'CONVOCACAO_PUBLICADA' AND recurso_id = ?"
+        ).get('conv-race-dco') as { contexto: string }
+        expect(JSON.parse(audit.contexto)).toMatchObject({ totalDestinatarios: 1 })
+      }
+    } finally {
+      atomicSpy.mockRestore()
+    }
+    expect(sqlite.prepare('SELECT ativo FROM membros WHERE id = ?').get(criado.id)).toMatchObject({ ativo: 1 })
+    expect(sqlite.prepare('SELECT status FROM convocacoes WHERE id = ?').get('conv-race-dco'))
+      .toMatchObject({ status: 'PUBLICADA' })
+    expect(sqlite.prepare(
+      'SELECT count(*) AS total FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
+    ).get('conv-race-dco', criado.id)).toMatchObject({ total: 1 })
+    expect(sqlite.prepare(
+      'SELECT count(*) AS total FROM convocacao_destinatario_evidencias WHERE vinculo_funcional_id = ?'
+    ).get(vinculo.id)).toMatchObject({ total: 1 })
+  })
+
+  it.each([
+    { ativo: false },
+    { regionalId, casaId: null },
+    { ativo: true },
+  ])('36. Revalida DCO modificado pelo PATCH concorrente %j', async patch => {
+    const { criado, vinculo } = await prepararConcorrenciaDco()
+    expect((await req('/api/v1/convocacoes/conv-race-dco/publicar', { method: 'POST' })).status).toBe(200)
+    const executarAtomico = batch.executeAtomic
+    const atomicSpy = vi.spyOn(batch, 'executeAtomic').mockImplementationOnce(async (banco, queries) => {
+      const resPatch = await req(`/api/v1/vinculos-funcionais/${vinculo.id}`, {
+        method: 'PATCH', body: JSON.stringify(patch),
+      })
+      expect(resPatch.status).toBe(200)
+      return executarAtomico(banco, queries)
+    })
+    try {
+      const resposta = await req(`/api/v1/membros/${criado.id}`, {
+        method: 'PATCH', body: JSON.stringify({ ativo: true }),
+      })
+      expect(atomicSpy).toHaveBeenCalled()
+      expect(resposta.status).toBe(200)
+    } finally {
+      atomicSpy.mockRestore()
+    }
+    expect(sqlite.prepare('SELECT origem FROM vinculos_funcionais WHERE id = ?').get(vinculo.id))
+      .toMatchObject({ origem: null })
+    expect(sqlite.prepare(
+      'SELECT count(*) AS total FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
+    ).get('conv-race-dco', criado.id)).toMatchObject({ total: 0 })
+    expect(sqlite.prepare(
+      'SELECT count(*) AS total FROM convocacao_destinatario_evidencias WHERE vinculo_funcional_id = ?'
+    ).get(vinculo.id)).toMatchObject({ total: 0 })
+  })
+
+  it('37. Reverte reativação, destinatário e auditoria se a evidência DCO falhar', async () => {
+    const { criado, vinculo } = await prepararConcorrenciaDco()
+    expect((await req('/api/v1/convocacoes/conv-race-dco/publicar', { method: 'POST' })).status).toBe(200)
+    sqlite.exec(`
+      CREATE TRIGGER falhar_evidencia_reativacao
+      BEFORE INSERT ON convocacao_destinatario_evidencias
+      WHEN NEW.vinculo_funcional_id = '${vinculo.id}'
+      BEGIN SELECT RAISE(ABORT, 'FALHA_EVIDENCIA_TESTE'); END;
+    `)
+    const resposta = await req(`/api/v1/membros/${criado.id}`, {
+      method: 'PATCH', body: JSON.stringify({ ativo: true }),
+    })
+    expect(resposta.status).toBe(400)
+    expect(sqlite.prepare('SELECT ativo FROM membros WHERE id = ?').get(criado.id))
+      .toMatchObject({ ativo: 0 })
+    expect(sqlite.prepare(
+      'SELECT id FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
+    ).get('conv-race-dco', criado.id)).toBeUndefined()
+    expect(sqlite.prepare(
+      "SELECT id FROM auditoria_logs WHERE acao = 'MEMBRO_ATUALIZADO' AND recurso_id = ?"
+    ).get(criado.id)).toBeUndefined()
+  })
+
 })
