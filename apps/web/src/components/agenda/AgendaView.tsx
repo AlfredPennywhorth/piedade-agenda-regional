@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fetchWithAuth, postWithAuth } from '../../api/apiClient'
 import { AgendaItem } from './types'
 import { EventoDetalhe } from './EventoDetalhe'
@@ -10,11 +10,14 @@ export function AgendaView() {
   const [error, setError] = useState<string | null>(null)
   const [selectedItem, setSelectedItem] = useState<AgendaItem | null>(null)
   const [priorizandoEventoId, setPriorizandoEventoId] = useState<string | null>(null)
+  const geracaoCargaAgenda = useRef(0)
 
   const carregarAgenda = async (
     rsvpRecemSalvo?: { destinatarioId: string; rsvp: AgendaItem['rsvp'] }
   ) => {
+    const geracao = ++geracaoCargaAgenda.current
     const data = await fetchWithAuth<AgendaItem[]>('/minha-agenda')
+    if (geracao !== geracaoCargaAgenda.current) return
     const now = new Date()
     const upcoming = data
       .filter(item => new Date(item.evento.fimEm) > now)
