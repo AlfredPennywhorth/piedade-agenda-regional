@@ -25,12 +25,19 @@ export function CalendarioView() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<AgendaItem | null>(null)
   const geracaoCargaAgenda = useRef(0)
+  const selectedDateRef = useRef<Date | null>(null)
 
   const carregarAgenda = async (
     rsvpRecemSalvo?: { destinatarioId: string; rsvp: AgendaItem['rsvp'] }
   ) => {
     const geracao = ++geracaoCargaAgenda.current
-    const data = await fetchWithAuth<AgendaItem[]>('/minha-agenda')
+    let data: AgendaItem[]
+    try {
+      data = await fetchWithAuth<AgendaItem[]>('/minha-agenda')
+    } catch (err) {
+      if (geracao !== geracaoCargaAgenda.current) return
+      throw err
+    }
     if (geracao !== geracaoCargaAgenda.current) return
     const atualizados = data.map(item =>
       rsvpRecemSalvo && item.destinatarioId === rsvpRecemSalvo.destinatarioId
@@ -40,8 +47,9 @@ export function CalendarioView() {
 
     setItems(atualizados)
     setSelectedDayEvents(current => {
-      if (!current || !selectedDate) return current
-      const chaveSelecionada = `${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`
+      const dataSelecionada = selectedDateRef.current
+      if (!current || !dataSelecionada) return current
+      const chaveSelecionada = `${dataSelecionada.getFullYear()}-${dataSelecionada.getMonth()}-${dataSelecionada.getDate()}`
       return atualizados.filter(item => chaveDiaSaoPaulo(item.evento.inicioEm) === chaveSelecionada)
     })
     setSelectedEvent(current => {
@@ -105,7 +113,9 @@ export function CalendarioView() {
   }, {} as Record<string, AgendaItem[]>)
 
   const handleDayClick = (day: number, dayEvents: AgendaItem[]) => {
-    setSelectedDate(new Date(year, month, day))
+    const novaData = new Date(year, month, day)
+    selectedDateRef.current = novaData
+    setSelectedDate(novaData)
     setSelectedDayEvents(dayEvents)
   }
 
