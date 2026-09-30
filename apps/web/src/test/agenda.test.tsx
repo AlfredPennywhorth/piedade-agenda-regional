@@ -418,7 +418,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
       }
       if (endpoint === '/minha-agenda') {
         leiturasAgenda += 1
-        return leiturasAgenda === 1 ? comConflito : mockEventos
+        return leiturasAgenda <= 2 ? comConflito : mockEventos
       }
       return []
     })
