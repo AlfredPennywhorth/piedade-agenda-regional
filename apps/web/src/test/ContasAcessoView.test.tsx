@@ -240,6 +240,27 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(mensagem).not.toContain('redefinição do seu PIN')
   })
 
+  it('bloqueia envio pelo WhatsApp quando o celular é malformado', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([
+      { ...contaAtiva, celular: '123' },
+    ])
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-celular-invalido',
+      expiraEm: '2099-01-01T12:30:00.000Z',
+      membroId: 'membro-1',
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Redefinir PIN' }))
+    await screen.findByLabelText('Link temporário de Pessoa Teste')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar pelo WhatsApp' }))
+
+    expect(window.open).not.toHaveBeenCalled()
+    expect(await screen.findByText('O celular informado não é válido para envio pelo WhatsApp.')).toBeDefined()
+    expect(screen.getByLabelText('Link temporário de Pessoa Teste')).toBeDefined()
+  })
+
   it('não oferece envio pelo WhatsApp sem celular válido e mantém o link disponível', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([
       { ...contaAtiva, celular: null },
