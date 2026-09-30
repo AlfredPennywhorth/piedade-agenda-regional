@@ -58,7 +58,12 @@ function montarMapaConflitos(records: RegistroAgenda[]) {
   const mapa = new Map<string, Array<{ eventoId: string; tipo: 'SOBREPOSICAO' | 'PROXIMIDADE' }>>()
 
   for (let i = 0; i < ativos.length; i++) {
+    const fimAtual = new Date(ativos[i].evento.fimEm).getTime()
+
     for (let j = i + 1; j < ativos.length; j++) {
+      const inicioSeguinte = new Date(ativos[j].evento.inicioEm).getTime()
+      if (inicioSeguinte > fimAtual + JANELA_TRANSICAO_MS) break
+
       if (ativos[i].evento.id === ativos[j].evento.id) continue
       const tipo = tipoConflito(ativos[i], ativos[j])
       if (!tipo) continue
