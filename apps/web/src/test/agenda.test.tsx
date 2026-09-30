@@ -286,7 +286,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     render(<App />)
 
     const card = await screen.findByRole('button', { name: /Reunião de Setor/i })
-    expect(card.className).toContain('opacity-55')
+    expect(card.className).toContain('opacity-50')
     expect(within(card).getByText('Conflito')).toBeInTheDocument()
   })
 
