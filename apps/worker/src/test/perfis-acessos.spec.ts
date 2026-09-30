@@ -157,6 +157,7 @@ describe('Perfis, escopos e governança — PR-ACC-03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: body.tokenAtivacao,
+        codigoCarteirinha: 'CARTEIRA-MASTER',
         celular: '11999990001',
         pin: '123456',
         confirmacaoPin: '123456',
@@ -359,6 +360,7 @@ describe('Perfis, escopos e governança — PR-ACC-03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: primeiroBody.tokenAtivacao,
+        codigoCarteirinha: 'CARTEIRA-MASTER',
         celular: '11999990001',
         pin: '123456',
         confirmacaoPin: '123456',
@@ -371,6 +373,7 @@ describe('Perfis, escopos e governança — PR-ACC-03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: segundoBody.tokenAtivacao,
+        codigoCarteirinha: 'CARTEIRA-MASTER',
         celular: '11999990001',
         pin: '123456',
         confirmacaoPin: '123456',
