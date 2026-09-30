@@ -123,7 +123,7 @@ describe('ContasAcessoView — PR-ACC-05', () => {
       membroId: 'membro-2',
     })
 
-    render(<ContasAcessoView />)
+    render(<ContasAcessoView podeGerenciarSessoes />)
 
     const artigoOutraPessoa = (await screen.findByText('Outra Pessoa')).closest('article')
     expect(artigoOutraPessoa).not.toBeNull()
@@ -295,6 +295,14 @@ describe('ContasAcessoView — PR-ACC-05', () => {
   })
 
 
+  it('oculta gestão de sessões quando o operador não é Master', async () => {
+    render(<ContasAcessoView />)
+
+    await screen.findByText('Pessoa Teste')
+    expect(screen.queryByRole('button', { name: 'Sessões ativas' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Revogar todas' })).toBeNull()
+  })
+
   it('lista sessões ativas e revoga somente a sessão escolhida', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
       if (endpoint === '/admin/acessos') return [contaAtiva] as any
@@ -325,7 +333,7 @@ describe('ContasAcessoView — PR-ACC-05', () => {
       sessaoId: 'sessao-1',
     })
 
-    render(<ContasAcessoView />)
+    render(<ContasAcessoView podeGerenciarSessoes />)
     fireEvent.click(await screen.findByRole('button', { name: 'Sessões ativas' }))
 
     expect(await screen.findByText('Chrome em Windows')).toBeDefined()
@@ -349,7 +357,7 @@ describe('ContasAcessoView — PR-ACC-05', () => {
       contaAcessoId: 'conta-1',
     })
 
-    render(<ContasAcessoView />)
+    render(<ContasAcessoView podeGerenciarSessoes />)
     fireEvent.click(await screen.findByRole('button', { name: 'Revogar todas' }))
 
     await waitFor(() => {
@@ -377,7 +385,7 @@ describe('ContasAcessoView — PR-ACC-05', () => {
       contaAcessoId: 'conta-2',
     })
 
-    render(<ContasAcessoView />)
+    render(<ContasAcessoView podeGerenciarSessoes />)
 
     const artigoOutraPessoa = (await screen.findByText('Outra Pessoa')).closest('article')
     expect(artigoOutraPessoa).not.toBeNull()

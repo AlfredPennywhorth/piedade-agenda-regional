@@ -521,9 +521,52 @@ describe('Administração de contas — PR-ACC-05', () => {
   })
 
 
-  it('lista sessões ativas com identificação segura e permite revogar uma sessão específica', async () => {
-    const tokenAdmin = 'token-admin-sessoes-individuais'
-    await criarSessao('sessao-admin-individual', 'conta-admin', 'membro-admin', tokenAdmin)
+  it('impede Administrador regional de listar ou revogar sessões', async () => {
+    const tokenAdmin = 'token-admin-sem-gestao-sessoes'
+    await criarSessao('sessao-admin-sem-gestao-sessoes', 'conta-admin', 'membro-admin', tokenAdmin)
+    await criarSessao('sessao-alvo-protegida', 'conta-reset', 'membro-reset', 'token-alvo-protegida')
+
+    const listar = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-reset/sessoes',
+      { headers: { Authorization: `Bearer ${tokenAdmin}` } }
+    )
+    expect(listar.status).toBe(403)
+
+    const revogarUma = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-reset/sessoes/sessao-alvo-protegida/revogar',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenAdmin}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }
+    )
+    expect(revogarUma.status).toBe(403)
+
+    const revogarTodas = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-reset/revogar-sessoes',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenAdmin}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }
+    )
+    expect(revogarTodas.status).toBe(403)
+
+    const sessao = sqlite.prepare(
+      `SELECT revogado_em FROM sessoes WHERE id = 'sessao-alvo-protegida'`
+    ).get() as any
+    expect(sessao.revogado_em).toBeNull()
+  })
+
+  it('lista sessões ativas com identificação segura e permite ao Master revogar uma sessão específica', async () => {
+    const tokenMaster = 'token-master-sessoes-individuais'
+    await criarSessao('sessao-master-individual', 'conta-master', 'membro-master', tokenMaster)
     await criarSessao('sessao-alvo-1', 'conta-reset', 'membro-reset', 'token-alvo-1')
     await criarSessao('sessao-alvo-2', 'conta-reset', 'membro-reset', 'token-alvo-2')
     await criarSessao('sessao-expirada-inatividade', 'conta-reset', 'membro-reset', 'token-expirada')
@@ -552,7 +595,7 @@ describe('Administração de contas — PR-ACC-05', () => {
     const listar = await requisicao(
       '/api/v1/admin/acessos/membros/membro-reset/sessoes',
       {
-        headers: { Authorization: `Bearer ${tokenAdmin}` },
+        headers: { Authorization: `Bearer ${tokenMaster}` },
       }
     )
 
@@ -574,7 +617,7 @@ describe('Administração de contas — PR-ACC-05', () => {
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${tokenAdmin}`,
+          Authorization: `Bearer ${tokenMaster}`,
           'Content-Type': 'application/json',
         },
         body: '{}',
@@ -604,9 +647,9 @@ describe('Administração de contas — PR-ACC-05', () => {
     })
   })
 
-  it('não permite revogar sessão de outra conta pelo membro alvo', async () => {
-    const tokenAdmin = 'token-admin-sessao-fora'
-    await criarSessao('sessao-admin-fora', 'conta-admin', 'membro-admin', tokenAdmin)
+  it('não permite ao Master revogar sessão de outra conta pelo membro alvo', async () => {
+    const tokenMaster = 'token-master-sessao-fora'
+    await criarSessao('sessao-master-fora', 'conta-master', 'membro-master', tokenMaster)
     await criarSessao('sessao-outra-conta', 'conta-outra', 'membro-outra-regional', 'token-outra')
 
     const response = await requisicao(
@@ -614,7 +657,7 @@ describe('Administração de contas — PR-ACC-05', () => {
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${tokenAdmin}`,
+          Authorization: `Bearer ${tokenMaster}`,
           'Content-Type': 'application/json',
         },
         body: '{}',
@@ -628,9 +671,9 @@ describe('Administração de contas — PR-ACC-05', () => {
     expect(sessao.revogado_em).toBeNull()
   })
 
-  it('revoga sessões manualmente sem alterar o estado da conta', async () => {
-    const tokenAdmin = 'token-admin-revogacao'
-    await criarSessao('sessao-admin-revogacao', 'conta-admin', 'membro-admin', tokenAdmin)
+  it('permite ao Master revogar todas as sessões sem alterar o estado da conta', async () => {
+    const tokenMaster = 'token-master-revogacao'
+    await criarSessao('sessao-master-revogacao', 'conta-master', 'membro-master', tokenMaster)
     await criarSessao('sessao-alvo-revogacao', 'conta-reset', 'membro-reset', 'token-alvo-revogacao')
 
     const response = await requisicao(
@@ -638,7 +681,7 @@ describe('Administração de contas — PR-ACC-05', () => {
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${tokenAdmin}`,
+          Authorization: `Bearer ${tokenMaster}`,
           'Content-Type': 'application/json',
         },
         body: '{}',
@@ -662,7 +705,7 @@ describe('Administração de contas — PR-ACC-05', () => {
     ).get() as any
     expect(auditoria).toMatchObject({
       acao: 'SESSOES_REVOGADAS',
-      ator_conta_acesso_id: 'conta-admin',
+      ator_conta_acesso_id: 'conta-master',
     })
   })
 

@@ -76,9 +76,13 @@ const formatarDataHora = formatarExpiracao
 
 interface ContasAcessoViewProps {
   onPendenciasAtualizadas?: (quantidade: number) => void
+  podeGerenciarSessoes?: boolean
 }
 
-export function ContasAcessoView({ onPendenciasAtualizadas }: ContasAcessoViewProps = {}) {
+export function ContasAcessoView({
+  onPendenciasAtualizadas,
+  podeGerenciarSessoes = false,
+}: ContasAcessoViewProps = {}) {
   const [contas, setContas] = useState<ContaAdministrada[]>([])
   const [carregando, setCarregando] = useState(true)
   const [processando, setProcessando] = useState<string | null>(null)
@@ -386,22 +390,26 @@ export function ContasAcessoView({ onPendenciasAtualizadas }: ContasAcessoViewPr
                 )}
                 {conta.contaAcessoId && conta.status === 'ATIVA' && (
                   <>
-                    <button
-                      type="button"
-                      disabled={processando === conta.membroId}
-                      onClick={() => void carregarSessoes(conta)}
-                      className="rounded-lg border border-slate-400 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
-                    >
-                      {sessoesAbertasMembroId === conta.membroId ? 'Ocultar sessões' : 'Sessões ativas'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={processando === conta.membroId}
-                      onClick={() => void revogarSessoes(conta)}
-                      className="rounded-lg border border-slate-400 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
-                    >
-                      Revogar todas
-                    </button>
+                    {podeGerenciarSessoes && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={processando === conta.membroId}
+                          onClick={() => void carregarSessoes(conta)}
+                          className="rounded-lg border border-slate-400 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                        >
+                          {sessoesAbertasMembroId === conta.membroId ? 'Ocultar sessões' : 'Sessões ativas'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={processando === conta.membroId}
+                          onClick={() => void revogarSessoes(conta)}
+                          className="rounded-lg border border-slate-400 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                        >
+                          Revogar todas
+                        </button>
+                      </>
+                    )}
                     <button
                       type="button"
                       disabled={processando === conta.membroId}
@@ -424,7 +432,7 @@ export function ContasAcessoView({ onPendenciasAtualizadas }: ContasAcessoViewPr
                 )}
               </div>
             </div>
-            {conta.contaAcessoId && conta.status === 'ATIVA' && sessoesAbertasMembroId === conta.membroId && (
+            {podeGerenciarSessoes && conta.contaAcessoId && conta.status === 'ATIVA' && sessoesAbertasMembroId === conta.membroId && (
               <section className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-label={`Sessões ativas de ${conta.nome}`}>
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div>
