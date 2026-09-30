@@ -607,7 +607,7 @@ describe('Administração de contas — PR-ACC-05', () => {
   it('não permite revogar sessão de outra conta pelo membro alvo', async () => {
     const tokenAdmin = 'token-admin-sessao-fora'
     await criarSessao('sessao-admin-fora', 'conta-admin', 'membro-admin', tokenAdmin)
-    await criarSessao('sessao-outra-conta', 'conta-outra', 'membro-outra', 'token-outra')
+    await criarSessao('sessao-outra-conta', 'conta-outra', 'membro-outra-regional', 'token-outra')
 
     const response = await requisicao(
       '/api/v1/admin/acessos/membros/membro-reset/sessoes/sessao-outra-conta/revogar',
