@@ -37,6 +37,7 @@ function App() {
   const [capacidades, setCapacidades] = useState<CapacidadesFrontend>({})
   const [nomeUsuario, setNomeUsuario] = useState('')
   const [recuperacoesPinPendentes, setRecuperacoesPinPendentes] = useState(0)
+  const [revisaoEscopoAutorizado, setRevisaoEscopoAutorizado] = useState(0)
   const [estadoSessao, setEstadoSessao] = useState<'verificando' | 'autenticada' | 'anonima'>('verificando')
   const [tokenAtivacao, setTokenAtivacao] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search)
@@ -56,6 +57,7 @@ function App() {
       }>('/auth/me')
       setNomeUsuario(data.nome || '')
       setCapacidades(data.capacidades || {})
+      setRevisaoEscopoAutorizado(revisao => revisao + 1)
       setEstadoSessao('autenticada')
     } catch {
       limparTokenSessao()
@@ -91,7 +93,7 @@ function App() {
     return () => {
       ativo = false
     }
-  }, [estadoSessao, capacidades.podeAdministrarAcessos])
+  }, [estadoSessao, capacidades.podeAdministrarAcessos, revisaoEscopoAutorizado])
 
   const podeAcessarAba = (tab: typeof currentTab) => {
     if (tab === 'portaria') {
