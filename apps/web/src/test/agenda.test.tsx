@@ -213,6 +213,59 @@ describe('S07 - Minha Agenda e Calendário', () => {
     })
   })
 
+  it('3d. recalcula conflitos depois de alterar o RSVP', async () => {
+    const comConflito = JSON.parse(JSON.stringify(mockEventos))
+    comConflito[0].conflito = {
+      tipo: 'SOBREPOSICAO',
+      janelaTransicaoMinutos: 60,
+      priorizado: false,
+      atenuado: false,
+      eventos: [{
+        eventoId: '2',
+        titulo: 'Encontro Online',
+        inicioEm: comConflito[1].evento.inicioEm,
+        fimEm: comConflito[1].evento.fimEm,
+        tipo: 'SOBREPOSICAO',
+      }],
+    }
+
+    let leiturasAgenda = 0
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/auth/me') return { nome: 'Pessoa Teste', capacidades: {} }
+      if (endpoint === '/governanca/responsabilidade-regional') {
+        return { versao: 'teste', texto: 'Responsabilidades', acessos: [] }
+      }
+      if (endpoint.includes('/convocacoes/') && endpoint.includes('/acompanhamento-rsvp')) {
+        return { data: [], meta: { total: 0, page: 1, lastPage: 1 } }
+      }
+      if (endpoint === '/minha-agenda') {
+        leiturasAgenda += 1
+        return leiturasAgenda === 1 ? comConflito : mockEventos
+      }
+      return []
+    })
+    vi.mocked(apiClient.putWithAuth).mockResolvedValue({})
+
+    render(<App />)
+
+    expect(await screen.findByText('Conflito de horário')).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: /Reunião de Setor/i }))
+
+    const dialog = within(await screen.findByRole('dialog'))
+    fireEvent.click(dialog.getByLabelText('✗ Não vou participar'))
+    fireEvent.change(dialog.getByPlaceholderText(/justifique sua ausência/i), {
+      target: { value: 'Outro compromisso' },
+    })
+    fireEvent.click(dialog.getByText('Confirmar Ausência'))
+
+    await waitFor(() => {
+      expect(leiturasAgenda).toBeGreaterThanOrEqual(2)
+    })
+    await waitFor(() => {
+      expect(screen.queryByText('Conflito de horário')).not.toBeInTheDocument()
+    })
+  })
+
   it('3d. atenua visualmente compromisso não priorizado', async () => {
     const comPrioridade = JSON.parse(JSON.stringify(mockEventos))
     comPrioridade[0].conflito = {
