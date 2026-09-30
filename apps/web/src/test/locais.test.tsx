@@ -50,6 +50,40 @@ describe('LocaisView', () => {
     })
   })
 
+  it('deve filtrar locais por nome, endereço, cidade e CEP', async () => {
+    const locais = [
+      mockLocais[0],
+      {
+        id: '2',
+        nome: 'Salão Regional',
+        endereco: 'Avenida B',
+        numero: '200',
+        bairro: 'Vila Prudente',
+        cidade: 'Campinas',
+        uf: 'SP',
+        cep: '13000-000',
+        ativo: true,
+      },
+    ]
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValueOnce(locais)
+
+    render(<LocaisView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Templo Central')).toBeInTheDocument()
+      expect(screen.getByText('Salão Regional')).toBeInTheDocument()
+    })
+
+    const filtro = screen.getByLabelText('Pesquisar locais')
+    fireEvent.change(filtro, { target: { value: '13000' } })
+
+    expect(screen.queryByText('Templo Central')).not.toBeInTheDocument()
+    expect(screen.getByText('Salão Regional')).toBeInTheDocument()
+
+    fireEvent.change(filtro, { target: { value: 'inexistente' } })
+    expect(screen.getByText('Nenhum local encontrado para a pesquisa informada.')).toBeInTheDocument()
+  })
+
   it('deve exibir detalhes de um local em diálogo acessível', async () => {
     vi.mocked(apiClient.fetchWithAuth)
       .mockResolvedValueOnce(mockLocais) // list
