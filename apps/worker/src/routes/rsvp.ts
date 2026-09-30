@@ -139,7 +139,7 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
         .where(eq(agendaPrioridadesConflito.membroId, membroId))
         .all()
 
-      prioridadesConflitantesIds = prioridadesDoMembro
+      prioridadesConflitantesIds = (prioridadesDoMembro as Array<{ id: string; conflitoParChave: string }>)
         .filter(prioridade => prioridade.conflitoParChave.split('|').includes(record.eventoId))
         .map(prioridade => prioridade.id)
     }
