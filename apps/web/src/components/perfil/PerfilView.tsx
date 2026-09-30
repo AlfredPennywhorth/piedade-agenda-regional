@@ -31,6 +31,16 @@ interface PerfilData {
   }
 }
 
+function formatarDataBrasileira(valor: string | null) {
+  if (!valor) return 'Não informada'
+
+  const data = valor.substring(0, 10)
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(data)
+  if (!match) return valor
+
+  return `${match[3]}/${match[2]}/${match[1]}`
+}
+
 export function PerfilView() {
   const [perfil, setPerfil] = useState<PerfilData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -192,7 +202,7 @@ export function PerfilView() {
           </div>
           <div>
             <dt className="text-xs font-semibold text-slate-500">Data de ordenação</dt>
-            <dd className="text-slate-800">{perfil.dataOrdenacao || 'Não informada'}</dd>
+            <dd className="text-slate-800">{formatarDataBrasileira(perfil.dataOrdenacao)}</dd>
           </div>
           <div>
             <dt className="text-xs font-semibold text-slate-500">Status da conta</dt>
