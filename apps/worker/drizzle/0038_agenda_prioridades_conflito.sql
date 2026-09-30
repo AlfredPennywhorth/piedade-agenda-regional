@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS agenda_prioridades_conflito (
   id text PRIMARY KEY NOT NULL,
   membro_id text NOT NULL,
   evento_id text NOT NULL,
+  conflito_chave text NOT NULL,
   priorizado_em text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
   created_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
   updated_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
