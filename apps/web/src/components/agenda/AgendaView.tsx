@@ -36,12 +36,16 @@ export function AgendaView() {
   }, [])
 
   const handleRsvpUpdated = (destinatarioId: string, rsvp: any) => {
-    setItems(current => current.map(item => 
+    setItems(current => current.map(item =>
       item.destinatarioId === destinatarioId ? { ...item, rsvp } : item
     ))
     if (selectedItem?.destinatarioId === destinatarioId) {
       setSelectedItem({ ...selectedItem, rsvp })
     }
+
+    void carregarAgenda().catch((err: any) => {
+      setError(err.message || 'Não foi possível atualizar os conflitos da agenda.')
+    })
   }
 
   const priorizar = async (item: AgendaItem) => {
