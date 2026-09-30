@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { ContasAcessoView } from '../components/acessos/ContasAcessoView'
 import * as apiClient from '../api/apiClient'
 
@@ -101,9 +101,39 @@ describe('ContasAcessoView — PR-ACC-05', () => {
         {}
       )
     })
-    const campo = await screen.findByLabelText('Link temporário')
+    const campo = await screen.findByLabelText('Link temporário de Pessoa Teste')
     expect((campo as HTMLInputElement).value).toContain('ativacao=token-temporario')
     expect(localStorage.getItem('token-temporario')).toBeNull()
+  })
+
+  it('exibe o link e o feedback junto da conta em que a ação foi executada', async () => {
+    const outraConta = {
+      ...contaAtiva,
+      membroId: 'membro-2',
+      nome: 'Outra Pessoa',
+      codigoCarteirinha: 'CARTEIRA-2',
+      contaAcessoId: 'conta-2',
+      acessos: [],
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([contaAtiva, outraConta])
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-contextual',
+      expiraEm: '2099-01-01T00:00:00.000Z',
+      membroId: 'membro-2',
+    })
+
+    render(<ContasAcessoView />)
+
+    const artigoOutraPessoa = (await screen.findByText('Outra Pessoa')).closest('article')
+    expect(artigoOutraPessoa).not.toBeNull()
+    fireEvent.click(within(artigoOutraPessoa!).getByRole('button', { name: 'Redefinir PIN' }))
+
+    const campo = await within(artigoOutraPessoa!).findByLabelText('Link temporário de Outra Pessoa')
+    expect((campo as HTMLInputElement).value).toContain('ativacao=token-contextual')
+
+    const artigoPessoaTeste = screen.getByText('Pessoa Teste').closest('article')
+    expect(artigoPessoaTeste).not.toBeNull()
+    expect(within(artigoPessoaTeste!).queryByText('Link temporário gerado')).toBeNull()
   })
 
   it('não redefine PIN quando a confirmação é cancelada', async () => {
@@ -135,6 +165,39 @@ describe('ContasAcessoView — PR-ACC-05', () => {
       )
     })
     expect(await screen.findByText('Todas as sessões da conta foram revogadas.')).toBeDefined()
+  })
+
+  it('exibe o sucesso de revogação no cartão da conta correspondente', async () => {
+    const outraConta = {
+      ...contaAtiva,
+      membroId: 'membro-2',
+      nome: 'Outra Pessoa',
+      codigoCarteirinha: 'CARTEIRA-2',
+      contaAcessoId: 'conta-2',
+      acessos: [],
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([contaAtiva, outraConta])
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      message: 'Sessões revogadas',
+      membroId: 'membro-2',
+      contaAcessoId: 'conta-2',
+    })
+
+    render(<ContasAcessoView />)
+
+    const artigoOutraPessoa = (await screen.findByText('Outra Pessoa')).closest('article')
+    expect(artigoOutraPessoa).not.toBeNull()
+    fireEvent.click(within(artigoOutraPessoa!).getByRole('button', { name: 'Revogar sessões' }))
+
+    expect(
+      await within(artigoOutraPessoa!).findByText('Todas as sessões da conta foram revogadas.')
+    ).toBeDefined()
+
+    const artigoPessoaTeste = screen.getByText('Pessoa Teste').closest('article')
+    expect(artigoPessoaTeste).not.toBeNull()
+    expect(
+      within(artigoPessoaTeste!).queryByText('Todas as sessões da conta foram revogadas.')
+    ).toBeNull()
   })
 
   it('atribui Administrador do Sistema a uma Regional', async () => {
