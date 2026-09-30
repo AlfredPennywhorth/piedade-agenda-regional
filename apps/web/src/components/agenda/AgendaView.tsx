@@ -16,7 +16,13 @@ export function AgendaView() {
     rsvpRecemSalvo?: { destinatarioId: string; rsvp: AgendaItem['rsvp'] }
   ) => {
     const geracao = ++geracaoCargaAgenda.current
-    const data = await fetchWithAuth<AgendaItem[]>('/minha-agenda')
+    let data: AgendaItem[]
+    try {
+      data = await fetchWithAuth<AgendaItem[]>('/minha-agenda')
+    } catch (err) {
+      if (geracao !== geracaoCargaAgenda.current) return
+      throw err
+    }
     if (geracao !== geracaoCargaAgenda.current) return
     const now = new Date()
     const upcoming = data
