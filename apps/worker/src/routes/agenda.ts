@@ -1,30 +1,107 @@
 import { Hono } from 'hono'
 import { eq, and, asc, inArray } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, locais, espacosLocal, rsvp, eventoRefeicoes, checkins } from '../db/schema'
+import {
+  eventos,
+  convocacoes,
+  convocacaoDestinatarios,
+  locais,
+  espacosLocal,
+  rsvp,
+  eventoRefeicoes,
+  checkins,
+  agendaPrioridadesConflito,
+} from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
+import { executeAtomic } from '../db/batch'
 
 export const agendaRouter = new Hono<{ Variables: Variables }>()
 
 agendaRouter.use('*', authMiddleware)
 
-agendaRouter.get('/', async (c) => {
-  const db = c.get('db')
-  const membroId = c.get('membroId')
+const JANELA_TRANSICAO_MINUTOS = 60
+const JANELA_TRANSICAO_MS = JANELA_TRANSICAO_MINUTOS * 60 * 1000
 
-  if (!db || !membroId) {
-    return c.json({ error: 'Sessão ou banco indisponível', code: 'INTERNAL_ERROR' }, 500)
+type RegistroAgenda = {
+  evento: {
+    id: string
+    titulo: string
+    inicioEm: string
+    fimEm: string
+  }
+  convocacao: any
+  local: any
+  espaco: any
+  destinatario: any
+  rsvp: any
+  checkin: any
+}
+
+function tipoConflito(a: RegistroAgenda, b: RegistroAgenda): 'SOBREPOSICAO' | 'PROXIMIDADE' | null {
+  const inicioA = new Date(a.evento.inicioEm).getTime()
+  const fimA = new Date(a.evento.fimEm).getTime()
+  const inicioB = new Date(b.evento.inicioEm).getTime()
+  const fimB = new Date(b.evento.fimEm).getTime()
+
+  if (inicioA < fimB && inicioB < fimA) return 'SOBREPOSICAO'
+
+  const distancia = inicioB >= fimA
+    ? inicioB - fimA
+    : inicioA >= fimB
+      ? inicioA - fimB
+      : 0
+
+  return distancia <= JANELA_TRANSICAO_MS ? 'PROXIMIDADE' : null
+}
+
+function montarMapaConflitos(records: RegistroAgenda[]) {
+  const ativos = records.filter(record => record.rsvp?.resposta !== 'NAO_PARTICIPAREI')
+  const mapa = new Map<string, Array<{ eventoId: string; tipo: 'SOBREPOSICAO' | 'PROXIMIDADE' }>>()
+
+  for (let i = 0; i < ativos.length; i++) {
+    for (let j = i + 1; j < ativos.length; j++) {
+      const tipo = tipoConflito(ativos[i], ativos[j])
+      if (!tipo) continue
+
+      const aId = ativos[i].evento.id
+      const bId = ativos[j].evento.id
+      mapa.set(aId, [...(mapa.get(aId) ?? []), { eventoId: bId, tipo }])
+      mapa.set(bId, [...(mapa.get(bId) ?? []), { eventoId: aId, tipo }])
+    }
   }
 
-  try {
-    const records = await db.select({
-      evento: eventos,
-      convocacao: convocacoes,
-      local: locais,
-      espaco: espacosLocal,
-      destinatario: convocacaoDestinatarios,
-      rsvp: rsvp,
-      checkin: checkins
-    })
+  return mapa
+}
+
+function componenteConflito(
+  eventoId: string,
+  mapa: Map<string, Array<{ eventoId: string; tipo: 'SOBREPOSICAO' | 'PROXIMIDADE' }>>
+) {
+  const visitados = new Set<string>()
+  const fila = [eventoId]
+
+  while (fila.length > 0) {
+    const atual = fila.shift()!
+    if (visitados.has(atual)) continue
+    visitados.add(atual)
+
+    for (const vizinho of mapa.get(atual) ?? []) {
+      if (!visitados.has(vizinho.eventoId)) fila.push(vizinho.eventoId)
+    }
+  }
+
+  return [...visitados]
+}
+
+async function buscarRegistrosAgenda(db: any, membroId: string): Promise<RegistroAgenda[]> {
+  return db.select({
+    evento: eventos,
+    convocacao: convocacoes,
+    local: locais,
+    espaco: espacosLocal,
+    destinatario: convocacaoDestinatarios,
+    rsvp,
+    checkin: checkins,
+  })
     .from(eventos)
     .innerJoin(convocacoes, eq(eventos.id, convocacoes.eventoId))
     .innerJoin(convocacaoDestinatarios, eq(convocacoes.id, convocacaoDestinatarios.convocacaoId))
@@ -48,46 +125,93 @@ agendaRouter.get('/', async (c) => {
     )
     .orderBy(asc(eventos.inicioEm))
     .all()
+}
 
-    type AgendaRecord = {
-      evento: { id: string }
-      rsvp: { id: string } | null
-    }
+agendaRouter.get('/', async (c) => {
+  const db = c.get('db')
+  const membroId = c.get('membroId')
 
-    const eventoIds = records.map((r: AgendaRecord) => r.evento.id)
+  if (!db || !membroId) {
+    return c.json({ error: 'Sessão ou banco indisponível', code: 'INTERNAL_ERROR' }, 500)
+  }
+
+  try {
+    const records = await buscarRegistrosAgenda(db, membroId)
+    const eventoIds = records.map(record => record.evento.id)
+    const mapaConflitos = montarMapaConflitos(records)
 
     let refOferecidas: any[] = []
+    let prioridades: Array<{ eventoId: string }> = []
 
     if (eventoIds.length > 0) {
-      refOferecidas = await db.select()
-        .from(eventoRefeicoes)
-        .where(and(inArray(eventoRefeicoes.eventoId, eventoIds), eq(eventoRefeicoes.ativo, true)))
-        .all()
+      ;[refOferecidas, prioridades] = await Promise.all([
+        db.select()
+          .from(eventoRefeicoes)
+          .where(and(inArray(eventoRefeicoes.eventoId, eventoIds), eq(eventoRefeicoes.ativo, true)))
+          .all(),
+        db.select({ eventoId: agendaPrioridadesConflito.eventoId })
+          .from(agendaPrioridadesConflito)
+          .where(
+            and(
+              eq(agendaPrioridadesConflito.membroId, membroId),
+              inArray(agendaPrioridadesConflito.eventoId, eventoIds)
+            )
+          )
+          .all(),
+      ])
     }
 
-    const result = records.map((r: any) => {
-      const eventoMeals = refOferecidas.filter(ro => ro.eventoId === r.evento.id).map(ro => ro.tipo)
-      
+    const prioridadesIds = new Set(prioridades.map(prioridade => prioridade.eventoId))
+    const porId = new Map(records.map(record => [record.evento.id, record]))
+
+    const result = records.map((record: any) => {
+      const eventoMeals = refOferecidas
+        .filter(refeicao => refeicao.eventoId === record.evento.id)
+        .map(refeicao => refeicao.tipo)
+
+      const conflitosDiretos = mapaConflitos.get(record.evento.id) ?? []
+      const componente = conflitosDiretos.length > 0
+        ? componenteConflito(record.evento.id, mapaConflitos)
+        : []
+      const prioridadeDoGrupo = componente.find(id => prioridadesIds.has(id)) ?? null
+      const temSobreposicao = conflitosDiretos.some(conflito => conflito.tipo === 'SOBREPOSICAO')
+
       return {
         evento: {
-          ...r.evento,
-          refeicoesOferecidas: eventoMeals
+          ...record.evento,
+          refeicoesOferecidas: eventoMeals,
         },
-        convocacao: r.convocacao,
-        local: r.local,
-        espaco: r.espaco,
-        destinatarioId: r.destinatario.id,
-        rsvp: r.rsvp ? {
-          resposta: r.rsvp.resposta,
-          justificativa: r.rsvp.justificativa,
-          periodosParticipacao: r.rsvp.periodosParticipacao
+        convocacao: record.convocacao,
+        local: record.local,
+        espaco: record.espaco,
+        destinatarioId: record.destinatario.id,
+        rsvp: record.rsvp ? {
+          resposta: record.rsvp.resposta,
+          justificativa: record.rsvp.justificativa,
+          periodosParticipacao: record.rsvp.periodosParticipacao,
         } : null,
-        checkin: r.checkin ? {
-          id: r.checkin.id,
-          dataHoraCheckin: r.checkin.dataHoraCheckin,
-          forma: r.checkin.forma,
-          operadorMembroId: r.checkin.operadorMembroId
-        } : null
+        checkin: record.checkin ? {
+          id: record.checkin.id,
+          dataHoraCheckin: record.checkin.dataHoraCheckin,
+          forma: record.checkin.forma,
+          operadorMembroId: record.checkin.operadorMembroId,
+        } : null,
+        conflito: conflitosDiretos.length === 0 ? null : {
+          tipo: temSobreposicao ? 'SOBREPOSICAO' : 'PROXIMIDADE',
+          janelaTransicaoMinutos: JANELA_TRANSICAO_MINUTOS,
+          priorizado: prioridadeDoGrupo === record.evento.id,
+          atenuado: prioridadeDoGrupo !== null && prioridadeDoGrupo !== record.evento.id,
+          eventos: conflitosDiretos.map(conflito => {
+            const outro = porId.get(conflito.eventoId)!
+            return {
+              eventoId: outro.evento.id,
+              titulo: outro.evento.titulo,
+              inicioEm: outro.evento.inicioEm,
+              fimEm: outro.evento.fimEm,
+              tipo: conflito.tipo,
+            }
+          }),
+        },
       }
     })
 
@@ -95,4 +219,52 @@ agendaRouter.get('/', async (c) => {
   } catch (error: any) {
     return c.json({ error: error.message || 'Falha ao consultar agenda' }, 500)
   }
+})
+
+agendaRouter.post('/prioridade/:eventoId', async c => {
+  const db = c.get('db')
+  const membroId = c.get('membroId')
+  const eventoId = c.req.param('eventoId')
+
+  if (!db || !membroId) {
+    return c.json({ error: 'Sessão ou banco indisponível', code: 'INTERNAL_ERROR' }, 500)
+  }
+
+  const records = await buscarRegistrosAgenda(db, membroId)
+  const selecionado = records.find(record => record.evento.id === eventoId)
+  if (!selecionado) {
+    return c.json({ error: 'Evento não encontrado na agenda do membro', code: 'NOT_FOUND' }, 404)
+  }
+
+  const mapaConflitos = montarMapaConflitos(records)
+  if ((mapaConflitos.get(eventoId) ?? []).length === 0) {
+    return c.json({ error: 'O evento não possui conflito de agenda ativo', code: 'SEM_CONFLITO' }, 409)
+  }
+
+  const grupo = componenteConflito(eventoId, mapaConflitos)
+  const agora = new Date().toISOString()
+  const prioridadeId = crypto.randomUUID()
+
+  await executeAtomic(db, tx => [
+    tx.delete(agendaPrioridadesConflito).where(
+      and(
+        eq(agendaPrioridadesConflito.membroId, membroId),
+        inArray(agendaPrioridadesConflito.eventoId, grupo)
+      )
+    ),
+    tx.insert(agendaPrioridadesConflito).values({
+      id: prioridadeId,
+      membroId,
+      eventoId,
+      priorizadoEm: agora,
+      createdAt: agora,
+      updatedAt: agora,
+    }),
+  ])
+
+  return c.json({
+    message: 'Compromisso priorizado',
+    eventoId,
+    eventosConflitantes: grupo.filter(id => id !== eventoId),
+  }, 200)
 })
