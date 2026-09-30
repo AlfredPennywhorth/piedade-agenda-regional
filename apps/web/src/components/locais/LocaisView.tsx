@@ -124,8 +124,10 @@ export function LocaisView() {
     const termo = filtroBusca.trim().toLocaleLowerCase('pt-BR')
     if (!termo) return locais
 
-    return locais.filter(local =>
-      [
+    const termoDigitos = termo.replace(/\D/g, '')
+
+    return locais.filter(local => {
+      const encontrouTexto = [
         local.nome,
         local.endereco,
         local.numero,
@@ -136,7 +138,12 @@ export function LocaisView() {
       ]
         .filter(Boolean)
         .some(valor => String(valor).toLocaleLowerCase('pt-BR').includes(termo))
-    )
+
+      if (encontrouTexto) return true
+
+      const cepDigitos = (local.cep || '').replace(/\D/g, '')
+      return termoDigitos.length > 0 && cepDigitos.includes(termoDigitos)
+    })
   }, [filtroBusca, locais])
 
   const handleOpenCreate = () => {
