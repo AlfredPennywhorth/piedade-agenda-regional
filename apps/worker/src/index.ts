@@ -37,6 +37,7 @@ import { adminMembrosApp } from './routes/admin/membros'
 import { adminAcessosApp } from './routes/admin/acessos'
 import { adminPreCadastrosMinisteriaisApp } from './routes/admin/pre-cadastros-ministeriais'
 import { locaisRouter } from './routes/locais'
+import { espacosLocaisRouter } from './routes/espacos-locais'
 import { eventosRouter } from './routes/eventos'
 import { eventoRefeicoesRouter } from './routes/evento-refeicoes'
 import { seriesRecorrenciaRouter } from './routes/series-recorrencia'
@@ -163,6 +164,7 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   // Rotas da API (S04 e S05 - Locais, Eventos e Recorrência)
   // ============================================================
   app.route('/api/v1/locais', locaisRouter)
+  app.route('/api/v1/espacos-locais', espacosLocaisRouter)
   app.route('/api/v1/eventos', eventosRouter)
   app.route('/api/v1/eventos', eventoRefeicoesRouter)
   app.route('/api/v1/series-recorrencia', seriesRecorrenciaRouter)

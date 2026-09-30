@@ -36,6 +36,7 @@ const mockEventos = [
     },
     convocacao: { id: 'c1', observacoes: 'Levar caderno' },
     local: { nome: 'Sede Regional', endereco: 'Rua X' },
+    espaco: { id: 'esp-1', nome: 'Sala A' },
     destinatarioId: 'dest-1',
     rsvp: null
   },
@@ -157,6 +158,24 @@ describe('S07 - Minha Agenda e Calendário', () => {
     expect(screen.getByText('HIBRIDO')).toBeInTheDocument()
     expect(screen.getByText('ONLINE')).toBeInTheDocument()
     expect(screen.getByText('Sede Regional')).toBeInTheDocument()
+  })
+
+  it('3b. Exibe o espaço interno no detalhe e no compartilhamento', async () => {
+    mockAgenda(mockEventos)
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+    render(<App />)
+
+    fireEvent.click(await screen.findByText('Reunião de Setor'))
+    const dialog = within(await screen.findByRole('dialog'))
+
+    expect(dialog.getByText('Espaço: Sala A')).toBeInTheDocument()
+
+    fireEvent.click(dialog.getByLabelText('Compartilhar no WhatsApp'))
+    expect(openSpy).toHaveBeenCalled()
+    const url = String(openSpy.mock.calls[0]?.[0] ?? '')
+    expect(decodeURIComponent(url)).toContain('Espaço: Sala A')
+
+    openSpy.mockRestore()
   })
 
   it('4. Navega para Calendário e exibe grid mensal', async () => {

@@ -7,6 +7,7 @@ import { executeAtomic } from '../db/batch'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, podeGerenciarAgendaNoEscopo, regionaisAdministradas } from '../security/permissoes'
 import { criarAuditQuery, executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
+import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
 export const seriesRecorrenciaRouter = new Hono<any>()
 
@@ -198,6 +199,13 @@ seriesRecorrenciaRouter.post('/', async (c) => {
   try {
     const body = await c.req.json()
     const parsed = SerieCreate.parse(body)
+
+    if (!(await espacoAtivoPertenceAoLocal(db, parsed.localId, parsed.espacoId))) {
+      if (await espacoPertenceAoLocal(db, parsed.localId, parsed.espacoId)) {
+        return c.json({ error: 'O espaço selecionado está inativo', code: 'ESPACO_INATIVO' }, 409)
+      }
+      return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
+    }
     
     if (!(await podeGerenciarEntidade(c, parsed))) {
       return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
@@ -221,6 +229,7 @@ seriesRecorrenciaRouter.post('/', async (c) => {
         pauta: serieBaseData.pauta,
         modalidade: serieBaseData.modalidade,
         localId: serieBaseData.localId,
+        espacoId: serieBaseData.espacoId,
         urlOnline: serieBaseData.urlOnline,
         organizadorMembroId: serieBaseData.organizadorMembroId,
         regionalId: serieBaseData.regionalId,
@@ -265,7 +274,7 @@ seriesRecorrenciaRouter.post('/', async (c) => {
     return c.json({ serie: resultSerie, generatedOccurrences: eventosToInsert.length }, 201)
   } catch (err: any) {
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
-      return c.json({ error: 'Local ou Escopo vinculado não existe' }, 400)
+      return c.json({ error: 'Local, Espaço ou Escopo vinculado não existe' }, 400)
     }
     if (err.message && err.message.includes('CHECK constraint failed')) {
       return c.json({ error: 'Violação de regra de negócio no banco' }, 400)
@@ -304,6 +313,16 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
 
       const mergedEvent = { ...existingEvent, ...parsed.changes }
       EventoCreate.parse(mergedEvent) // Valida regras S04
+      const espacoFoiAlterado = parsed.changes.espacoId !== undefined && parsed.changes.espacoId !== existingEvent.espacoId
+      const espacoValido = espacoFoiAlterado
+        ? await espacoAtivoPertenceAoLocal(db, mergedEvent.localId, mergedEvent.espacoId)
+        : await espacoPertenceAoLocal(db, mergedEvent.localId, mergedEvent.espacoId)
+      if (!espacoValido) {
+        if (espacoFoiAlterado && await espacoPertenceAoLocal(db, mergedEvent.localId, mergedEvent.espacoId)) {
+          return c.json({ error: 'O espaço selecionado está inativo', code: 'ESPACO_INATIVO' }, 409)
+        }
+        return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
+      }
       if (!(await podeGerenciarEntidade(c, mergedEvent))) {
         return c.json({ error: 'Acesso não autorizado para mover o evento para este escopo', code: 'FORBIDDEN' }, 403)
       }
@@ -344,6 +363,12 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
 
       if (!apenasDesativacao) {
         SerieCreate.parse(mergedSerieData)
+        if (!(await espacoAtivoPertenceAoLocal(db, mergedSerieData.localId, mergedSerieData.espacoId))) {
+          if (await espacoPertenceAoLocal(db, mergedSerieData.localId, mergedSerieData.espacoId)) {
+            return c.json({ error: 'O espaço selecionado está inativo', code: 'ESPACO_INATIVO' }, 409)
+          }
+          return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
+        }
         if (!(await podeGerenciarEntidade(c, mergedSerieData))) {
           return c.json({ error: 'Acesso não autorizado para mover a série para este escopo', code: 'FORBIDDEN' }, 403)
         }
@@ -405,6 +430,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
           pauta: serieBaseData.pauta,
           modalidade: serieBaseData.modalidade,
           localId: serieBaseData.localId,
+          espacoId: serieBaseData.espacoId,
           urlOnline: serieBaseData.urlOnline,
           organizadorMembroId: serieBaseData.organizadorMembroId,
           regionalId: serieBaseData.regionalId,
@@ -489,6 +515,12 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         ...parsed.changes,
         dataInicio: newStartDateStr
       })
+      if (!(await espacoAtivoPertenceAoLocal(db, serieBData.localId, serieBData.espacoId))) {
+        if (await espacoPertenceAoLocal(db, serieBData.localId, serieBData.espacoId)) {
+          return c.json({ error: 'O espaço selecionado está inativo', code: 'ESPACO_INATIVO' }, 409)
+        }
+        return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
+      }
       if (!(await podeGerenciarEntidade(c, serieBData))) {
         return c.json({ error: 'Acesso não autorizado para mover a série para este escopo', code: 'FORBIDDEN' }, 403)
       }
@@ -531,6 +563,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
             pauta: serieBaseData.pauta,
             modalidade: serieBaseData.modalidade,
             localId: serieBaseData.localId,
+            espacoId: serieBaseData.espacoId,
             urlOnline: serieBaseData.urlOnline,
             organizadorMembroId: serieBaseData.organizadorMembroId,
             regionalId: serieBaseData.regionalId,
@@ -632,7 +665,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       )
     }
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
-      return c.json({ error: 'Local ou Escopo vinculado não existe' }, 400)
+      return c.json({ error: 'Local, Espaço ou Escopo vinculado não existe' }, 400)
     }
     if (err.message && err.message.includes('CHECK constraint failed')) {
       return c.json({ error: 'Violação de regra de negócio no banco (ex: escopo único)' }, 400)

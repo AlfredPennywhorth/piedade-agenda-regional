@@ -4,6 +4,7 @@ import { ApiError } from '../../api/apiClient'
 
 export interface Lookups {
   locais: { id: string; nome: string }[]
+  espacos: { id: string; localId: string; nome: string; ativo: boolean }[]
   membros: { id: string; nome: string }[]
   regionais: { id: string; nome: string }[]
   administracoes: { id: string; nome: string }[]
@@ -41,7 +42,7 @@ export function SerieFormModal({
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState<boolean>(false)
 
-  const { locais, membros, regionais, administracoes, setores, casas, gruposTrabalho } = lookups
+  const { locais, espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho } = lookups
 
   useEffect(() => {
     if (isOpen) {
@@ -60,6 +61,7 @@ export function SerieFormModal({
       ...prev,
       modalidade: mod,
       localId: mod === 'ONLINE' ? '' : prev.localId,
+      espacoId: mod === 'ONLINE' ? '' : prev.espacoId,
       urlOnline: mod === 'PRESENCIAL' ? '' : prev.urlOnline
     }))
   }
@@ -91,11 +93,24 @@ export function SerieFormModal({
     setErrosForm({})
     setErro(null)
     
+    if (formData.espacoId) {
+      const espacoSelecionado = espacos.find(espaco => espaco.id === formData.espacoId)
+      if (!espacoSelecionado || !espacoSelecionado.ativo) {
+        setErrosForm({
+          espacoId: espacoSelecionado
+            ? 'O espaço atual está inativo. Selecione um espaço ativo ou deixe o Local inteiro.'
+            : 'O espaço atual não está disponível. Selecione outro espaço ou deixe o Local inteiro.',
+        })
+        return
+      }
+    }
+
     const payload = {
       ...formData,
       descricao: formData.descricao || null,
       pauta: formData.pauta || null,
       localId: formData.modalidade === 'ONLINE' ? null : (formData.localId || null),
+      espacoId: formData.modalidade === 'ONLINE' ? null : (formData.espacoId || null),
       urlOnline: formData.modalidade === 'PRESENCIAL' ? null : (formData.urlOnline || null),
       organizadorMembroId: formData.organizadorMembroId || null,
       regionalId: formData.regionalId || null,
@@ -345,7 +360,7 @@ export function SerieFormModal({
                         <select
                           id="localId"
                           value={formData.localId || ''}
-                          onChange={e => setFormData({ ...formData, localId: e.target.value })}
+                          onChange={e => setFormData({ ...formData, localId: e.target.value, espacoId: '' })}
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         >
                           <option value="">Selecione...</option>
@@ -354,6 +369,31 @@ export function SerieFormModal({
                           ))}
                         </select>
                         {errosForm.localId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.localId}</p>}
+                      </div>
+                    )}
+
+                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.localId && (
+                      <div>
+                        <label htmlFor="espacoId" className="block text-sm font-medium text-slate-700 mb-1">Espaço</label>
+                        <select
+                          id="espacoId"
+                          value={formData.espacoId || ''}
+                          onChange={e => setFormData({ ...formData, espacoId: e.target.value })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                        >
+                          <option value="">Local inteiro / não especificado</option>
+                          {espacos
+                            .filter(espaco =>
+                              espaco.localId === formData.localId &&
+                              (espaco.ativo || espaco.id === formData.espacoId)
+                            )
+                            .map(espaco => (
+                              <option key={espaco.id} value={espaco.id}>
+                                {espaco.nome}{espaco.ativo ? '' : ' (inativo — substitua ou limpe)'}
+                              </option>
+                            ))}
+                        </select>
+                        {errosForm.espacoId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.espacoId}</p>}
                       </div>
                     )}
 
@@ -390,7 +430,7 @@ export function SerieFormModal({
                         <option value="regional">Regional</option>
                         <option value="administracao">Administração</option>
                         <option value="setor">Setor</option>
-                        <option value="casa">Casa</option>
+                        <option value="casa">Casa de Oração</option>
                         <option value="grupoTrabalho">Grupo de Trabalho</option>
                       </select>
                     </div>
@@ -440,7 +480,7 @@ export function SerieFormModal({
                       )}
                       {tipoEscopo === 'casa' && (
                         <>
-                          <label htmlFor="casaId" className="block text-xs font-medium text-slate-700 mb-1">Casa *</label>
+                          <label htmlFor="casaId" className="block text-xs font-medium text-slate-700 mb-1">Casa de Oração *</label>
                           <select
                             id="casaId"
                             value={formData.casaId || ''}

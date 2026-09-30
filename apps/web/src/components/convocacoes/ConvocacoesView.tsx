@@ -9,11 +9,40 @@ interface EventoLookup {
   inicioEm: string
   fimEm: string
   ativo?: boolean
+  regionalId?: string | null
+  administracaoId?: string | null
+  setorId?: string | null
+  casaId?: string | null
+  grupoTrabalhoId?: string | null
 }
+
+interface RegionalLookup { id: string; nome: string }
+interface AdministracaoLookup { id: string; nome: string; regionalId: string }
+interface SetorLookup { id: string; nome: string; administracaoId: string }
+interface CasaLookup { id: string; nome: string; setorId: string }
+interface GrupoTrabalhoLookup {
+  id: string
+  nome: string
+  regionalId?: string | null
+  administracaoId?: string | null
+  setorId?: string | null
+}
+type FiltroStatus = 'ATIVAS' | 'RASCUNHO' | 'PUBLICADA' | 'CANCELADA' | 'TODAS'
 
 export function ConvocacoesView() {
   const [convocacoes, setConvocacoes] = useState<Convocacao[]>([])
   const [eventosLookup, setEventosLookup] = useState<EventoLookup[]>([])
+  const [regionais, setRegionais] = useState<RegionalLookup[]>([])
+  const [administracoes, setAdministracoes] = useState<AdministracaoLookup[]>([])
+  const [setores, setSetores] = useState<SetorLookup[]>([])
+  const [casas, setCasas] = useState<CasaLookup[]>([])
+  const [gruposTrabalho, setGruposTrabalho] = useState<GrupoTrabalhoLookup[]>([])
+  const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>('ATIVAS')
+  const [filtroRegionalId, setFiltroRegionalId] = useState('')
+  const [filtroAdministracaoId, setFiltroAdministracaoId] = useState('')
+  const [filtroSetorId, setFiltroSetorId] = useState('')
+  const [filtroCasaId, setFiltroCasaId] = useState('')
+  const [filtroGrupoTrabalhoId, setFiltroGrupoTrabalhoId] = useState('')
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -65,12 +94,30 @@ export function ConvocacoesView() {
     setLoading(true)
     setErro(null)
     try {
-      const [convData, eventosData] = await Promise.all([
+      const [
+        convData,
+        eventosData,
+        regionaisData,
+        administracoesData,
+        setoresData,
+        casasData,
+        gruposTrabalhoData,
+      ] = await Promise.all([
         fetchWithAuth<Convocacao[]>('/convocacoes'),
-        fetchWithAuth<EventoLookup[]>('/eventos')
+        fetchWithAuth<EventoLookup[]>('/eventos'),
+        fetchWithAuth<RegionalLookup[]>('/regionais'),
+        fetchWithAuth<AdministracaoLookup[]>('/administracoes'),
+        fetchWithAuth<SetorLookup[]>('/setores'),
+        fetchWithAuth<CasaLookup[]>('/casas'),
+        fetchWithAuth<GrupoTrabalhoLookup[]>('/grupos-trabalho'),
       ])
       setConvocacoes(convData || [])
       setEventosLookup(eventosData || [])
+      setRegionais(regionaisData || [])
+      setAdministracoes(administracoesData || [])
+      setSetores(setoresData || [])
+      setCasas(casasData || [])
+      setGruposTrabalho(gruposTrabalhoData || [])
     } catch (err: unknown) {
       if (err instanceof Error) {
         setErro(err.message)
@@ -177,18 +224,123 @@ export function ConvocacoesView() {
     return `${evento.titulo} — ${dataHora}`
   }
 
+  const getEvento = (eventoId: string) => eventosLookup.find(e => e.id === eventoId)
+
   const getNomeEvento = (eventoId: string) => {
-    const ev = eventosLookup.find(e => e.id === eventoId)
+    const ev = getEvento(eventoId)
     return ev ? ev.titulo : 'Evento não encontrado'
   }
+
+  const resolverEscopoGrupoTrabalho = (grupo?: GrupoTrabalhoLookup) => {
+    if (!grupo) return { regionalId: '', administracaoId: '', setorId: '' }
+
+    const setorId = grupo.setorId || ''
+    let administracaoId = grupo.administracaoId || ''
+    let regionalId = grupo.regionalId || ''
+
+    if (setorId && !administracaoId) {
+      administracaoId = setores.find(item => item.id === setorId)?.administracaoId || ''
+    }
+    if (administracaoId && !regionalId) {
+      regionalId = administracoes.find(item => item.id === administracaoId)?.regionalId || ''
+    }
+
+    return { regionalId, administracaoId, setorId }
+  }
+
+  const resolverEscopoEvento = (evento?: EventoLookup) => {
+    if (!evento) return { regionalId: '', administracaoId: '', setorId: '', casaId: '', grupoTrabalhoId: '' }
+
+    const casaId = evento.casaId || ''
+    let setorId = evento.setorId || ''
+    let administracaoId = evento.administracaoId || ''
+    let regionalId = evento.regionalId || ''
+    const grupoTrabalhoId = evento.grupoTrabalhoId || ''
+
+    if (casaId && !setorId) setorId = casas.find(item => item.id === casaId)?.setorId || ''
+    if (setorId && !administracaoId) administracaoId = setores.find(item => item.id === setorId)?.administracaoId || ''
+    if (administracaoId && !regionalId) regionalId = administracoes.find(item => item.id === administracaoId)?.regionalId || ''
+
+    if (grupoTrabalhoId) {
+      const escopoGt = resolverEscopoGrupoTrabalho(
+        gruposTrabalho.find(item => item.id === grupoTrabalhoId)
+      )
+      if (!setorId) setorId = escopoGt.setorId
+      if (!administracaoId) administracaoId = escopoGt.administracaoId
+      if (!regionalId) regionalId = escopoGt.regionalId
+    }
+
+    return { regionalId, administracaoId, setorId, casaId, grupoTrabalhoId }
+  }
+
+  const formatarEscopoEvento = (evento?: EventoLookup) => {
+    if (!evento) return ''
+    if (evento.grupoTrabalhoId) {
+      return `GT: ${gruposTrabalho.find(item => item.id === evento.grupoTrabalhoId)?.nome || 'não identificado'}`
+    }
+    if (evento.casaId) return `Casa: ${casas.find(item => item.id === evento.casaId)?.nome || 'não identificada'}`
+    if (evento.setorId) return `Setor: ${setores.find(item => item.id === evento.setorId)?.nome || 'não identificado'}`
+    if (evento.administracaoId) return `Administração: ${administracoes.find(item => item.id === evento.administracaoId)?.nome || 'não identificada'}`
+    if (evento.regionalId) return `Regional: ${regionais.find(item => item.id === evento.regionalId)?.nome || 'não identificada'}`
+    return ''
+  }
+
+  const idsEventosComConvocacao = new Set(convocacoes.map(conv => conv.eventoId))
 
   const eventosDisponiveis = eventosLookup
     .filter(ev => {
       if (editandoId && ev.id === formData.eventoId) return true
       if (ev.ativo === false) return false
-      return new Date(ev.fimEm).getTime() >= Date.now()
+      if (new Date(ev.fimEm).getTime() < Date.now()) return false
+      return !idsEventosComConvocacao.has(ev.id)
     })
     .sort((a, b) => new Date(a.inicioEm).getTime() - new Date(b.inicioEm).getTime())
+
+  const administracoesFiltradas = administracoes
+    .filter(item => !filtroRegionalId || item.regionalId === filtroRegionalId)
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+
+  const setoresFiltrados = setores
+    .filter(item => {
+      if (filtroAdministracaoId) return item.administracaoId === filtroAdministracaoId
+      if (!filtroRegionalId) return true
+      return administracoes.find(adm => adm.id === item.administracaoId)?.regionalId === filtroRegionalId
+    })
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+
+  const casasFiltradas = casas
+    .filter(item => {
+      if (filtroSetorId) return item.setorId === filtroSetorId
+      const setor = setores.find(set => set.id === item.setorId)
+      if (!setor) return false
+      if (filtroAdministracaoId) return setor.administracaoId === filtroAdministracaoId
+      if (!filtroRegionalId) return true
+      return administracoes.find(adm => adm.id === setor.administracaoId)?.regionalId === filtroRegionalId
+    })
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+
+  const gruposTrabalhoFiltrados = gruposTrabalho
+    .filter(item => {
+      const escopo = resolverEscopoGrupoTrabalho(item)
+      if (filtroRegionalId && escopo.regionalId !== filtroRegionalId) return false
+      if (filtroAdministracaoId && escopo.administracaoId !== filtroAdministracaoId) return false
+      if (filtroSetorId && escopo.setorId !== filtroSetorId) return false
+      return true
+    })
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+
+  const convocacoesFiltradas = convocacoes.filter(conv => {
+    if (filtroStatus === 'ATIVAS' && conv.status === 'CANCELADA') return false
+    if (filtroStatus !== 'ATIVAS' && filtroStatus !== 'TODAS' && conv.status !== filtroStatus) return false
+
+    const escopo = resolverEscopoEvento(getEvento(conv.eventoId))
+    if (filtroRegionalId && escopo.regionalId !== filtroRegionalId) return false
+    if (filtroAdministracaoId && escopo.administracaoId !== filtroAdministracaoId) return false
+    if (filtroSetorId && escopo.setorId !== filtroSetorId) return false
+    if (filtroCasaId && escopo.casaId !== filtroCasaId) return false
+    if (filtroGrupoTrabalhoId && escopo.grupoTrabalhoId !== filtroGrupoTrabalhoId) return false
+    return true
+  })
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-5xl mx-auto">
@@ -211,6 +363,143 @@ export function ConvocacoesView() {
         </div>
       )}
 
+      {!loading && (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <label className="text-xs font-semibold text-slate-700">
+              Status
+              <select
+                aria-label="Filtrar por status"
+                value={filtroStatus}
+                onChange={e => setFiltroStatus(e.target.value as FiltroStatus)}
+                className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-sm"
+              >
+                <option value="ATIVAS">Ativas (sem canceladas)</option>
+                <option value="RASCUNHO">Rascunho</option>
+                <option value="PUBLICADA">Publicada</option>
+                <option value="CANCELADA">Cancelada</option>
+                <option value="TODAS">Todas</option>
+              </select>
+            </label>
+
+            <label className="text-xs font-semibold text-slate-700">
+              Regional
+              <select
+                aria-label="Filtrar por Regional"
+                value={filtroRegionalId}
+                onChange={e => {
+                  setFiltroRegionalId(e.target.value)
+                  setFiltroAdministracaoId('')
+                  setFiltroSetorId('')
+                  setFiltroCasaId('')
+                  setFiltroGrupoTrabalhoId('')
+                }}
+                className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-sm"
+              >
+                <option value="">Todas</option>
+                {[...regionais].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(item => (
+                  <option key={item.id} value={item.id}>{item.nome}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-xs font-semibold text-slate-700">
+              Administração
+              <select
+                aria-label="Filtrar por Administração"
+                value={filtroAdministracaoId}
+                onChange={e => {
+                  setFiltroAdministracaoId(e.target.value)
+                  setFiltroSetorId('')
+                  setFiltroCasaId('')
+                  setFiltroGrupoTrabalhoId('')
+                }}
+                className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-sm"
+              >
+                <option value="">Todas</option>
+                {administracoesFiltradas.map(item => (
+                  <option key={item.id} value={item.id}>{item.nome}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-xs font-semibold text-slate-700">
+              Setor
+              <select
+                aria-label="Filtrar por Setor"
+                value={filtroSetorId}
+                onChange={e => {
+                  setFiltroSetorId(e.target.value)
+                  setFiltroCasaId('')
+                  setFiltroGrupoTrabalhoId('')
+                }}
+                className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-sm"
+              >
+                <option value="">Todos</option>
+                {setoresFiltrados.map(item => (
+                  <option key={item.id} value={item.id}>{item.nome}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-xs font-semibold text-slate-700">
+              Casa de Oração
+              <select
+                aria-label="Filtrar por Casa de Oração"
+                value={filtroCasaId}
+                onChange={e => {
+                  const valor = e.target.value
+                  setFiltroCasaId(valor)
+                  if (valor) setFiltroGrupoTrabalhoId('')
+                }}
+                className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-sm"
+              >
+                <option value="">Todas</option>
+                {casasFiltradas.map(item => (
+                  <option key={item.id} value={item.id}>{item.nome}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-xs font-semibold text-slate-700">
+              Grupo de Trabalho
+              <select
+                aria-label="Filtrar por Grupo de Trabalho"
+                value={filtroGrupoTrabalhoId}
+                onChange={e => {
+                  const valor = e.target.value
+                  setFiltroGrupoTrabalhoId(valor)
+                  if (valor) setFiltroCasaId('')
+                }}
+                className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-sm"
+              >
+                <option value="">Todos</option>
+                {gruposTrabalhoFiltrados.map(item => (
+                  <option key={item.id} value={item.id}>{item.nome}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="flex items-center justify-between gap-3 flex-wrap text-xs text-slate-500">
+            <span>{convocacoesFiltradas.length} de {convocacoes.length} convocação(ões) exibida(s)</span>
+            <button
+              type="button"
+              onClick={() => {
+                setFiltroStatus('ATIVAS')
+                setFiltroRegionalId('')
+                setFiltroAdministracaoId('')
+                setFiltroSetorId('')
+                setFiltroCasaId('')
+                setFiltroGrupoTrabalhoId('')
+              }}
+              className="text-brand-700 hover:underline font-medium"
+            >
+              Limpar filtros
+            </button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center p-8 text-slate-500">
           Carregando convocações...
@@ -219,13 +508,25 @@ export function ConvocacoesView() {
         <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-slate-200">
           <p className="text-slate-500">Nenhuma convocação encontrada.</p>
         </div>
+      ) : convocacoesFiltradas.length === 0 ? (
+        <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-slate-200">
+          <p className="text-slate-500">Nenhuma convocação corresponde aos filtros selecionados.</p>
+        </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <ul className="divide-y divide-slate-200">
-            {convocacoes.map(conv => (
+            {convocacoesFiltradas.map(conv => (
               <li key={conv.id} className="p-4 hover:bg-slate-50 flex flex-col sm:flex-row justify-between gap-4">
                 <div>
                   <h3 className="font-semibold text-slate-900">{getNomeEvento(conv.eventoId)}</h3>
+                  {getEvento(conv.eventoId) && (
+                    <p className="text-sm text-slate-500">
+                      {formatarEvento(getEvento(conv.eventoId)!)}
+                    </p>
+                  )}
+                  {formatarEscopoEvento(getEvento(conv.eventoId)) && (
+                    <p className="text-sm text-slate-500">{formatarEscopoEvento(getEvento(conv.eventoId))}</p>
+                  )}
                   <p className="text-sm text-slate-500">
                     Status: <span className="font-medium text-slate-700">{conv.status}</span>
                   </p>
@@ -258,12 +559,14 @@ export function ConvocacoesView() {
                       Acompanhar RSVP
                     </button>
                   )}
-                  <button
-                    onClick={() => handleClickEditar(conv)}
-                    className="text-brand-600 hover:text-brand-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
-                  >
-                    Editar
-                  </button>
+                  {conv.status === 'RASCUNHO' && (
+                    <button
+                      onClick={() => handleClickEditar(conv)}
+                      className="text-brand-600 hover:text-brand-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
+                    >
+                      Editar
+                    </button>
+                  )}
                   {conv.status !== 'CANCELADA' && (
                     <button
                       onClick={() => setActionConfirm({ type: 'CANCELAR', convocacao: conv })}
@@ -306,6 +609,7 @@ export function ConvocacoesView() {
                     Evento
                   </label>
                   <select
+                    aria-label="Evento da convocação"
                     value={formData.eventoId}
                     onChange={(e) => setFormData({ ...formData, eventoId: e.target.value })}
                     disabled={!!editandoId || salvando}

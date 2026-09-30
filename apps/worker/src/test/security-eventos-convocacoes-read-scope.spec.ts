@@ -21,6 +21,7 @@ describe('PR-SEC-01 — leitura de Eventos e Convocações por escopo', () => {
     membroA: '99999999-9999-4999-8999-999999999999',
     eventoA: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     eventoB: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    eventoB2: 'abababab-abab-4bab-8bab-abababababab',
     convocacaoB: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
     convocacaoB2: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
     funcao: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
@@ -83,11 +84,12 @@ describe('PR-SEC-01 — leitura de Eventos e Convocações por escopo', () => {
         (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo)
       VALUES
         ('${id.eventoA}', 'Evento A', 'ONLINE', '2030-01-01T12:00:00.000Z', '2030-01-01T13:00:00.000Z', '${id.regionalA}', 1),
-        ('${id.eventoB}', 'Evento B', 'ONLINE', '2030-01-02T12:00:00.000Z', '2030-01-02T13:00:00.000Z', '${id.regionalB}', 1);
+        ('${id.eventoB}', 'Evento B', 'ONLINE', '2030-01-02T12:00:00.000Z', '2030-01-02T13:00:00.000Z', '${id.regionalB}', 1),
+        ('${id.eventoB2}', 'Evento B2', 'ONLINE', '2030-01-03T12:00:00.000Z', '2030-01-03T13:00:00.000Z', '${id.regionalB}', 1);
 
       INSERT INTO convocacoes (id, evento_id, status, ativo) VALUES
         ('${id.convocacaoB}', '${id.eventoB}', 'PUBLICADA', 1),
-        ('${id.convocacaoB2}', '${id.eventoB}', 'PUBLICADA', 1);
+        ('${id.convocacaoB2}', '${id.eventoB2}', 'PUBLICADA', 1);
 
       INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id)
       VALUES ('13131313-1313-4313-8313-131313131313', '${id.convocacaoB}', '${id.membroA}');

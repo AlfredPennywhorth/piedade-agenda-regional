@@ -109,6 +109,17 @@ export function setupDb(sqlite: any) {
     END;
 
     CREATE TABLE IF NOT EXISTS funcoes (id text PRIMARY KEY NOT NULL, nome text NOT NULL, codigo text, descricao text, ativo integer DEFAULT true NOT NULL, created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_funcoes_dco_unico
+      ON funcoes(codigo)
+      WHERE codigo = 'DCO';
+    INSERT OR IGNORE INTO funcoes (id, nome, codigo, descricao, ativo)
+      VALUES (
+        'd0c0d0c0-0000-4000-8000-000000000001',
+        'Diácono Casa de Oração',
+        'DCO',
+        'Função canônica vinculada automaticamente ao Diácono em sua Casa de Oração.',
+        1
+      );
     
     CREATE TABLE IF NOT EXISTS vinculos_funcionais (
       id text PRIMARY KEY NOT NULL,
@@ -119,6 +130,7 @@ export function setupDb(sqlite: any) {
       setor_id text,
       casa_id text,
       grupo_trabalho_id text,
+      origem text,
       ativo integer DEFAULT true NOT NULL,
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -256,6 +268,19 @@ export function setupDb(sqlite: any) {
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS espacos_local (
+      id text PRIMARY KEY NOT NULL,
+      local_id text NOT NULL,
+      nome text NOT NULL,
+      descricao text,
+      capacidade integer,
+      ativo integer DEFAULT true NOT NULL,
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      FOREIGN KEY (local_id) REFERENCES locais(id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_espacos_local_nome_ativo ON espacos_local(local_id, nome) WHERE ativo = 1;
+
     CREATE TABLE IF NOT EXISTS series_recorrencia (
       id text PRIMARY KEY NOT NULL,
       titulo text NOT NULL,
@@ -273,6 +298,7 @@ export function setupDb(sqlite: any) {
       dia_mes integer,
       posicao_semana_mes integer,
       local_id text,
+      espaco_id text,
       url_online text,
       organizador_membro_id text,
       regional_id text,
@@ -285,6 +311,7 @@ export function setupDb(sqlite: any) {
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       FOREIGN KEY (local_id) REFERENCES locais(id),
+      FOREIGN KEY (espaco_id) REFERENCES espacos_local(id),
       FOREIGN KEY (organizador_membro_id) REFERENCES membros(id),
       FOREIGN KEY (regional_id) REFERENCES regionais(id),
       FOREIGN KEY (administracao_id) REFERENCES administracoes(id),
@@ -312,6 +339,7 @@ export function setupDb(sqlite: any) {
       inicio_em text NOT NULL,
       fim_em text NOT NULL,
       local_id text,
+      espaco_id text,
       url_online text,
       organizador_membro_id text,
       regional_id text,
@@ -330,6 +358,7 @@ export function setupDb(sqlite: any) {
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       FOREIGN KEY (local_id) REFERENCES locais(id),
+      FOREIGN KEY (espaco_id) REFERENCES espacos_local(id),
       FOREIGN KEY (organizador_membro_id) REFERENCES membros(id),
       FOREIGN KEY (regional_id) REFERENCES regionais(id),
       FOREIGN KEY (administracao_id) REFERENCES administracoes(id),
@@ -364,7 +393,7 @@ export function setupDb(sqlite: any) {
       FOREIGN KEY (evento_id) REFERENCES eventos(id),
       CONSTRAINT check_status_convocacao CHECK (status IN ('RASCUNHO','PUBLICADA','CANCELADA'))
     );
-    CREATE INDEX IF NOT EXISTS idx_convocacoes_evento_id ON convocacoes (evento_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_convocacoes_evento_unico ON convocacoes (evento_id);
     CREATE INDEX IF NOT EXISTS idx_convocacoes_status ON convocacoes (status);
 
     CREATE TRIGGER IF NOT EXISTS trg_evento_nao_inativar_com_convocacao_ativa

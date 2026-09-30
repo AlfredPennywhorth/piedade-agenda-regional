@@ -1,11 +1,12 @@
 import { Hono } from 'hono'
 import { and, eq, inArray, or } from 'drizzle-orm'
-import { acessosConta, administracoes, casas, contasAcesso, membros, setores, tentativasAcesso, vinculosFuncionais } from '../db/schema'
+import { acessosConta, administracoes, casas, contasAcesso, funcoes, membros, setores, tentativasAcesso, vinculosFuncionais } from '../db/schema'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, regionaisAdministradas } from '../security/permissoes'
-import { listarVinculosVisiveis } from './vinculos_funcionais'
+import { listarVinculosVisiveis, prepararSincronizacaoConvocacoes, queriesSincronizacaoConvocacoes } from './vinculos_funcionais'
 import { executarOperacaoComAudit, executarOperacaoComAudits } from '../services/auditoria'
+import { queriesSincronizacaoDcoAtual } from '../services/sincronizacao-dco'
 
 export const membrosRouter = new Hono<any>()
 
@@ -87,6 +88,14 @@ function podeAdministrarRegionalDoContexto(contexto: any, regionalId: string | n
 
 function podeEscreverMembros(contexto: any): boolean {
   return eMasterSistema(contexto) || regionaisAdministradas(contexto).size > 0
+}
+
+async function obterFuncaoDco(db: any) {
+  return db
+    .select({ id: funcoes.id })
+    .from(funcoes)
+    .where(and(eq(funcoes.codigo, 'DCO'), eq(funcoes.ativo, true)))
+    .get()
 }
 
 async function membroPossuiMasterAtivo(db: any, membroId: string): Promise<boolean> {
@@ -213,7 +222,9 @@ membrosRouter.get('/', async (c) => {
   const visibilidade = await idsMembrosVisiveis(c)
 
   if (visibilidade === null) {
-    return c.json(await db.select(membroPublico).from(membros).all())
+    const data = await db.select(membroPublico).from(membros).all()
+    data.sort((a: { id: string; nome: string }, b: { id: string; nome: string }) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
+    return c.json(data)
   }
 
   const ids = Array.from(visibilidade.ids)
@@ -239,7 +250,7 @@ membrosRouter.get('/', async (c) => {
     }
   }
 
-  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  data.sort((a: { id: string; nome: string }, b: { id: string; nome: string }) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
   return c.json(data)
 })
 
@@ -329,10 +340,38 @@ membrosRouter.post('/', async (c) => {
       }
     }
 
+    const funcaoDco = await obterFuncaoDco(db)
+    if (!funcaoDco) {
+      return c.json(
+        { error: 'Função Diácono Casa de Oração (DCO) não cadastrada ou inativa', code: 'FUNCAO_DCO_INDISPONIVEL' },
+        409
+      )
+    }
+
     const id = crypto.randomUUID()
+    const agoraCriacao = new Date().toISOString()
+    const membroAtivo = parsed.ativo
+    const vinculoDco = {
+      id: crypto.randomUUID(),
+      membroId: id,
+      funcaoId: funcaoDco.id,
+      casaId: parsed.casaId,
+      origem: 'MEMBRO_AUTOMATICO',
+      ativo: true,
+      createdAt: agoraCriacao,
+      updatedAt: agoraCriacao,
+    }
+    const sincronizacoesDco = membroAtivo
+      ? await prepararSincronizacaoConvocacoes(db, vinculoDco, true)
+      : []
+
     await executarOperacaoComAudit(
       db,
-      (qdb) => [qdb.insert(membros).values({ id, ...parsed })],
+      (qdb) => [
+        qdb.insert(membros).values({ id, ...parsed }),
+        qdb.insert(vinculosFuncionais).values(vinculoDco),
+        ...queriesSincronizacaoConvocacoes(qdb, vinculoDco, sincronizacoesDco, agoraCriacao),
+      ],
       {
         acao: 'MEMBRO_CRIADO',
         atorMembroId: c.get('membroId') || null,
@@ -426,6 +465,8 @@ membrosRouter.patch('/:id', async (c) => {
     const atorContaAcessoId = c.get('contaAcessoId') || null
     const camposAlterados = Object.keys(parsed)
     const moveuCasa = casaFinalId !== existing.casaId
+    const membroAtivoFinal = parsed.ativo ?? existing.ativo
+    const reativouMembro = !existing.ativo && membroAtivoFinal
     const agoraAtualizacao = new Date().toISOString()
     const contaDoMembro = moveuCasa
       ? await db
@@ -434,6 +475,45 @@ membrosRouter.patch('/:id', async (c) => {
           .where(eq(contasAcesso.membroId, id))
           .get()
       : null
+    const funcaoDco = moveuCasa ? await obterFuncaoDco(db) : null
+    const vinculoDcoDestinoExistente = moveuCasa && funcaoDco
+      ? await db
+          .select()
+          .from(vinculosFuncionais)
+          .where(
+            and(
+              eq(vinculosFuncionais.membroId, id),
+              eq(vinculosFuncionais.funcaoId, funcaoDco.id),
+              eq(vinculosFuncionais.casaId, casaFinalId),
+              eq(vinculosFuncionais.ativo, true)
+            )
+          )
+          .get()
+      : null
+
+    if (moveuCasa && !funcaoDco) {
+      return c.json(
+        { error: 'Função Diácono Casa de Oração (DCO) não cadastrada ou inativa', code: 'FUNCAO_DCO_INDISPONIVEL' },
+        409
+      )
+    }
+
+    const novoVinculoDcoId = vinculoDcoDestinoExistente?.id ?? crypto.randomUUID()
+    const novoVinculoDco = moveuCasa && funcaoDco
+      ? {
+          id: novoVinculoDcoId,
+          membroId: id,
+          funcaoId: funcaoDco.id,
+          casaId: casaFinalId,
+          origem: vinculoDcoDestinoExistente?.origem ?? 'MEMBRO_AUTOMATICO',
+          ativo: true,
+          createdAt: agoraAtualizacao,
+          updatedAt: agoraAtualizacao,
+        }
+      : null
+    const sincronizacoesDco = novoVinculoDco && membroAtivoFinal
+      ? await prepararSincronizacaoConvocacoes(db, novoVinculoDco, true)
+      : []
 
     if (moveuCasa) {
       await executarOperacaoComAudits(
@@ -444,6 +524,33 @@ membrosRouter.patch('/:id', async (c) => {
               .set({ ...parsed, updatedAt: agoraAtualizacao })
               .where(eq(membros.id, id))
           ]
+
+          queries.push(
+            qdb.update(vinculosFuncionais)
+              .set({ ativo: false, updatedAt: agoraAtualizacao })
+              .where(
+                and(
+                  eq(vinculosFuncionais.membroId, id),
+                  eq(vinculosFuncionais.funcaoId, funcaoDco!.id),
+                  eq(vinculosFuncionais.casaId, existing.casaId),
+                  eq(vinculosFuncionais.ativo, true)
+                )
+              )
+          )
+
+          if (!vinculoDcoDestinoExistente && novoVinculoDco) {
+            queries.push(qdb.insert(vinculosFuncionais).values(novoVinculoDco))
+          }
+          if (novoVinculoDco) {
+            queries.push(
+              ...queriesSincronizacaoConvocacoes(
+                qdb,
+                novoVinculoDco,
+                sincronizacoesDco,
+                agoraAtualizacao
+              )
+            )
+          }
 
           if (contaDoMembro) {
             queries.push(
@@ -503,7 +610,10 @@ membrosRouter.patch('/:id', async (c) => {
         (qdb) => [
           qdb.update(membros)
             .set({ ...parsed, updatedAt: agoraAtualizacao })
-            .where(eq(membros.id, id))
+            .where(eq(membros.id, id)),
+          ...(reativouMembro
+            ? queriesSincronizacaoDcoAtual(qdb, agoraAtualizacao, { membroId: id })
+            : []),
         ],
         {
           acao: 'MEMBRO_ATUALIZADO',
@@ -549,9 +659,24 @@ membrosRouter.delete('/:id', async (c) => {
   }
 
   try {
+    const funcaoDco = await obterFuncaoDco(db)
+
     await executarOperacaoComAudit(
       db,
-      qdb => [qdb.delete(membros).where(eq(membros.id, id))],
+      qdb => [
+        ...(funcaoDco
+          ? [
+              qdb.delete(vinculosFuncionais).where(
+                and(
+                  eq(vinculosFuncionais.membroId, id),
+                  eq(vinculosFuncionais.funcaoId, funcaoDco.id),
+                  eq(vinculosFuncionais.origem, 'MEMBRO_AUTOMATICO')
+                )
+              ),
+            ]
+          : []),
+        qdb.delete(membros).where(eq(membros.id, id)),
+      ],
       {
         acao: 'MEMBRO_EXCLUIDO',
         atorMembroId: c.get('membroId') || null,
@@ -580,4 +705,3 @@ membrosRouter.delete('/:id', async (c) => {
     return c.json({ error: 'Não foi possível excluir o membro' }, 400)
   }
 })
-

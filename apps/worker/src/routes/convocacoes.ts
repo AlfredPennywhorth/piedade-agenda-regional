@@ -13,6 +13,7 @@ import {
 } from '../db/schema'
 import { ConvocacaoCreate, ConvocacaoUpdate, ConvocacaoFuncaoCreate, AcompanhamentoRsvpQuerySchema } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
+import { queriesSincronizacaoDcoAtual } from '../services/sincronizacao-dco'
 import {
   criarAuditQuery,
   extrairEscopoDoEvento,
@@ -137,6 +138,24 @@ convocacoesRouter.post('/', async c => {
       return c.json({ error: 'Acesso não autorizado para gerir a convocação', code: 'FORBIDDEN' }, 403)
     }
 
+    const convocacaoExistente = await db
+      .select({ id: convocacoes.id, status: convocacoes.status })
+      .from(convocacoes)
+      .where(eq(convocacoes.eventoId, parsed.eventoId))
+      .get()
+
+    if (convocacaoExistente) {
+      return c.json(
+        {
+          error: 'Este evento já possui convocação',
+          code: 'CONVOCACAO_EVENTO_EXISTENTE',
+          convocacaoId: convocacaoExistente.id,
+          status: convocacaoExistente.status,
+        },
+        409
+      )
+    }
+
     const convocacaoId = crypto.randomUUID()
     const nowIso = new Date().toISOString()
 
@@ -169,6 +188,18 @@ convocacoesRouter.post('/', async c => {
   } catch (err: any) {
     if (err.message && err.message.includes('CONVOCACAO_EM_EVENTO_INATIVO')) {
       return c.json({ error: 'Evento associado não existe ou inativo' }, 409)
+    }
+    if (
+      err.message &&
+      (
+        err.message.includes('UNIQUE constraint failed: convocacoes.evento_id') ||
+        err.message.includes('idx_convocacoes_evento_unico')
+      )
+    ) {
+      return c.json(
+        { error: 'Este evento já possui convocação', code: 'CONVOCACAO_EVENTO_EXISTENTE' },
+        409
+      )
     }
     return c.json({ error: err.issues || err.message }, 400)
   }
@@ -505,6 +536,9 @@ convocacoesRouter.post('/:id/publicar', async c => {
       for (const lote of emLotes(evidenciasToInsert, 15)) {
         queries.push(qdb.insert(convocacaoDestinatarioEvidencias).values(lote))
       }
+      // Inclui DCO automáticos reativados após a preparação do snapshot.
+      // A publicação e a reativação consultam o estado efetivo dentro do batch.
+      queries.push(...queriesSincronizacaoDcoAtual(qdb, nowIso, { convocacaoId: id }))
 
       // 3. AUDITORIA
       queries.push(
@@ -515,10 +549,11 @@ convocacoesRouter.post('/:id/publicar', async c => {
           recursoId: id,
           escopoTipo,
           escopoId,
-          contexto: {
-            eventoId: convocacao.eventoId,
-            totalDestinatarios: destinatariosToInsert.length,
-          },
+          contexto: sql`json_object(
+            'eventoId', ${convocacao.eventoId},
+            'totalDestinatarios', (SELECT count(*) FROM ${convocacaoDestinatarios}
+              WHERE ${convocacaoDestinatarios.convocacaoId} = ${id})
+          )` as any,
         })
       )
 
@@ -538,7 +573,9 @@ convocacoesRouter.post('/:id/publicar', async c => {
       return queries
     })
 
-    return c.json({ success: true, destinatariosGerados: destinatariosToInsert.length })
+    const total = await db.select({ total: sql<number>`count(*)` })
+      .from(convocacaoDestinatarios).where(eq(convocacaoDestinatarios.convocacaoId, id)).get()
+    return c.json({ success: true, destinatariosGerados: total.total })
   } catch (err: any) {
     if (err.message && err.message.includes('check_status_convocacao')) {
       return c.json(

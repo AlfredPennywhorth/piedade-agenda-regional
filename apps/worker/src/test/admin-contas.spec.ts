@@ -234,6 +234,31 @@ describe('Administração de contas — PR-ACC-05', () => {
     })
   })
 
+  it('não gera link de ativação para conta já ativa', async () => {
+    const tokenAdmin = 'token-admin-ativacao-conta-ativa'
+    await criarSessao('sessao-admin-ativacao-conta-ativa', 'conta-admin', 'membro-admin', tokenAdmin)
+
+    const response = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-reset/link-ativacao',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenAdmin}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }
+    )
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'CONTA_JA_ATIVA' })
+
+    const links = sqlite.prepare(
+      "SELECT COUNT(*) AS total FROM links_ativacao WHERE conta_acesso_id = 'conta-reset'"
+    ).get() as any
+    expect(links.total).toBe(0)
+  })
+
   it('redefine PIN, revoga sessões e links anteriores e registra auditoria', async () => {
     const tokenAdmin = 'token-admin-reset'
     const tokenAnterior = 'token-sessao-anterior'

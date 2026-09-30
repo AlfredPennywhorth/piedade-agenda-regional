@@ -29,7 +29,9 @@ casasRouter.get('/', async (c) => {
   const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
 
   if (visiveis.tudo) {
-    return c.json(await db.select().from(casas).all())
+    const data = await db.select().from(casas).all()
+    data.sort((a: typeof casas.$inferSelect, b: typeof casas.$inferSelect) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
+    return c.json(data)
   }
 
   const ids = Array.from(visiveis.casasIds)
@@ -44,7 +46,7 @@ casasRouter.get('/', async (c) => {
     data.push(...parcial)
   }
 
-  data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  data.sort((a: typeof casas.$inferSelect, b: typeof casas.$inferSelect) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
   return c.json(data)
 })
 

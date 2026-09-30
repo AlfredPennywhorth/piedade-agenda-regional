@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput, SerieCreateInput, createUtcDateFromSaoPaulo } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import { SerieFormModal, TipoEscopo } from '../series/SerieFormModal'
@@ -13,6 +13,13 @@ import type { Membro } from '../membros/MembrosView'
 interface Local {
   id: string
   nome: string
+}
+
+interface EspacoLocal {
+  id: string
+  localId: string
+  nome: string
+  ativo: boolean
 }
 
 interface SerieResponse {
@@ -31,6 +38,7 @@ interface SerieResponse {
   diaMes: number | null
   posicaoSemanaMes: number | null
   localId: string | null
+  espacoId: string | null
   urlOnline: string | null
   organizadorMembroId: string | null
   regionalId: string | null
@@ -51,6 +59,7 @@ export interface Evento {
   inicioEm: string
   fimEm: string
   localId: string | null
+  espacoId: string | null
   urlOnline: string | null
   organizadorMembroId: string | null
   regionalId: string | null
@@ -71,6 +80,7 @@ export function EventosView() {
   
   // Lookups
   const [locais, setLocais] = useState<Local[]>([])
+  const [espacos, setEspacos] = useState<EspacoLocal[]>([])
   const [membros, setMembros] = useState<Membro[]>([])
   const [regionais, setRegionais] = useState<Regional[]>([])
   const [administracoes, setAdministracoes] = useState<Administracao[]>([])
@@ -108,6 +118,7 @@ export function EventosView() {
     inicioEm: '',
     fimEm: '',
     localId: '',
+    espacoId: '',
     urlOnline: '',
     organizadorMembroId: '',
     regionalId: '',
@@ -122,17 +133,19 @@ export function EventosView() {
   const [tipoEscopo, setTipoEscopo] = useState<'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | ''>('')
   
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
+  const eventoFormConsultaSeq = useRef(0)
 
   const carregarDados = async () => {
     setLoading(true)
     setErro(null)
     try {
       const [
-        eventosData, locaisData, membrosData, regionaisData,
+        eventosData, locaisData, espacosData, membrosData, regionaisData,
         administracoesData, setoresData, casasData, gruposData
       ] = await Promise.all([
         fetchWithAuth<Evento[]>('/eventos'),
         fetchWithAuth<Local[]>('/locais'),
+        fetchWithAuth<EspacoLocal[]>('/espacos-locais?ativo=true'),
         fetchWithAuth<Membro[]>('/membros'),
         fetchWithAuth<Regional[]>('/regionais'),
         fetchWithAuth<Administracao[]>('/administracoes'),
@@ -143,6 +156,7 @@ export function EventosView() {
       
       setEventos(eventosData || [])
       setLocais(locaisData || [])
+      setEspacos(espacosData || [])
       setMembros(membrosData || [])
       setRegionais(regionaisData || [])
       setAdministracoes(administracoesData || [])
@@ -193,6 +207,7 @@ export function EventosView() {
       ...prev,
       modalidade: mod,
       localId: mod === 'ONLINE' ? '' : prev.localId,
+      espacoId: mod === 'ONLINE' ? '' : prev.espacoId,
       urlOnline: mod === 'PRESENCIAL' ? '' : prev.urlOnline
     }))
   }
@@ -224,9 +239,17 @@ export function EventosView() {
     }
   }
 
+  const fecharFormularioEvento = () => {
+    eventoFormConsultaSeq.current += 1
+    setFormOpen(false)
+    setCarregandoDetalhes(false)
+  }
+
   const abrirFormCriar = () => {
+    eventoFormConsultaSeq.current += 1
     setEventoEditandoId(null)
     setEventoEditandoSerieId(null)
+    setCarregandoDetalhes(false)
     setFormData({
       titulo: '',
       descricao: '',
@@ -235,6 +258,7 @@ export function EventosView() {
       inicioEm: '',
       fimEm: '',
       localId: '',
+      espacoId: '',
       urlOnline: '',
       organizadorMembroId: '',
       regionalId: '',
@@ -260,6 +284,7 @@ export function EventosView() {
   }
 
   const abrirFormEditar = async (id: string, serieId: string | null) => {
+    const consultaAtual = ++eventoFormConsultaSeq.current
     setEventoEditandoId(id)
     setEventoEditandoSerieId(serieId)
     setCarregandoDetalhes(true)
@@ -270,6 +295,22 @@ export function EventosView() {
 
     try {
       const item = await fetchWithAuth<Evento>(`/eventos/${id}`)
+      if (consultaAtual !== eventoFormConsultaSeq.current) return
+
+      // A listagem padrão traz apenas espaços ativos. Ao editar um evento
+      // histórico, preserve o espaço inativo já vinculado sem torná-lo
+      // disponível para novas atribuições.
+      if (item.espacoId && item.localId && !espacos.some(espaco => espaco.id === item.espacoId)) {
+        const espacosDoLocal = await fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${item.localId}`)
+        if (consultaAtual !== eventoFormConsultaSeq.current) return
+
+        const espacoAtual = (espacosDoLocal || []).find(espaco => espaco.id === item.espacoId)
+        if (espacoAtual) {
+          setEspacos(prev => prev.some(espaco => espaco.id === espacoAtual.id) ? prev : [...prev, espacoAtual])
+        }
+      }
+
+      if (consultaAtual !== eventoFormConsultaSeq.current) return
       
       let tipo: any = ''
       if (item.regionalId) tipo = 'regional'
@@ -287,6 +328,7 @@ export function EventosView() {
         inicioEm: formatDatetimeLocal(item.inicioEm),
         fimEm: formatDatetimeLocal(item.fimEm),
         localId: item.localId || '',
+        espacoId: item.espacoId || '',
         urlOnline: item.urlOnline || '',
         organizadorMembroId: item.organizadorMembroId || '',
         regionalId: item.regionalId || '',
@@ -298,10 +340,13 @@ export function EventosView() {
         ativo: item.ativo ?? true,
       })
     } catch (err: any) {
+      if (consultaAtual !== eventoFormConsultaSeq.current) return
       setErro(err.message || 'Erro ao carregar evento.')
       setFormOpen(false)
     } finally {
-      setCarregandoDetalhes(false)
+      if (consultaAtual === eventoFormConsultaSeq.current) {
+        setCarregandoDetalhes(false)
+      }
     }
   }
 
@@ -338,6 +383,7 @@ export function EventosView() {
         diaMes: serie.diaMes,
         posicaoSemanaMes: serie.posicaoSemanaMes,
         localId: serie.localId || '',
+        espacoId: serie.espacoId || '',
         urlOnline: serie.urlOnline || '',
         organizadorMembroId: serie.organizadorMembroId || '',
         regionalId: serie.regionalId || '',
@@ -375,6 +421,7 @@ export function EventosView() {
       descricao: formData.descricao || null,
       pauta: formData.pauta || null,
       localId: formData.localId || null,
+      espacoId: formData.espacoId || null,
       urlOnline: formData.urlOnline || null,
       organizadorMembroId: formData.organizadorMembroId || null,
       regionalId: formData.regionalId || null,
@@ -410,6 +457,7 @@ export function EventosView() {
         setConfirmacaoThisAberto({
           ...parsed.data,
           localId: parsed.data.modalidade === 'ONLINE' ? null : parsed.data.localId,
+          espacoId: parsed.data.modalidade === 'ONLINE' ? null : parsed.data.espacoId,
           urlOnline: parsed.data.modalidade === 'PRESENCIAL' ? null : parsed.data.urlOnline,
         })
         return
@@ -419,6 +467,7 @@ export function EventosView() {
         const updatePayload = {
           ...parsed.data,
           localId: parsed.data.modalidade === 'ONLINE' ? null : parsed.data.localId,
+          espacoId: parsed.data.modalidade === 'ONLINE' ? null : parsed.data.espacoId,
           urlOnline: parsed.data.modalidade === 'PRESENCIAL' ? null : parsed.data.urlOnline,
         }
         await patchWithAuth(`/eventos/${eventoEditandoId}`, updatePayload)
@@ -426,7 +475,7 @@ export function EventosView() {
         await postWithAuth('/eventos', parsed.data)
       }
 
-      setFormOpen(false)
+      fecharFormularioEvento()
       carregarDados()
     } catch (err: any) {
       if (err instanceof ApiError && err.body?.error) {
@@ -475,14 +524,14 @@ export function EventosView() {
       const {
         titulo, descricao, pauta, modalidade, frequencia, dataInicio,
         dataFim, horarioInicio, horarioFim, diaSemana, diaMes,
-        posicaoSemanaMes, localId, urlOnline, organizadorMembroId, regionalId,
+        posicaoSemanaMes, localId, espacoId, urlOnline, organizadorMembroId, regionalId,
         administracaoId, setorId, casaId, grupoTrabalhoId, observacoes, ativo
       } = confirmacaoFutureAberto
 
       const changes = {
         titulo, descricao, pauta, modalidade, frequencia, intervalo: 1, dataInicio,
         dataFim, horarioInicio, horarioFim, diaSemana, diaMes,
-        posicaoSemanaMes, localId, urlOnline, organizadorMembroId, regionalId,
+        posicaoSemanaMes, localId, espacoId, urlOnline, organizadorMembroId, regionalId,
         administracaoId, setorId, casaId, grupoTrabalhoId, observacoes, ativo
       }
 
@@ -642,7 +691,7 @@ export function EventosView() {
               <h3 id="modal-form-title" className="text-lg font-semibold text-slate-900">
                 {eventoEditandoId ? 'Editar Evento' : 'Novo Evento'}
               </h3>
-              <button onClick={() => setFormOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              <button onClick={fecharFormularioEvento} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
             
             <form onSubmit={handleSubmit} noValidate className="p-6 overflow-y-auto space-y-6">
@@ -716,7 +765,7 @@ export function EventosView() {
                         <select
                           id="localId"
                           value={formData.localId || ''}
-                          onChange={e => setFormData({ ...formData, localId: e.target.value })}
+                          onChange={e => setFormData({ ...formData, localId: e.target.value, espacoId: '' })}
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         >
                           <option value="">Selecione...</option>
@@ -725,6 +774,31 @@ export function EventosView() {
                           ))}
                         </select>
                         {errosForm.localId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.localId}</p>}
+                      </div>
+                    )}
+
+                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.localId && (
+                      <div>
+                        <label htmlFor="espacoId" className="block text-sm font-medium text-slate-700 mb-1">Espaço</label>
+                        <select
+                          id="espacoId"
+                          value={formData.espacoId || ''}
+                          onChange={e => setFormData({ ...formData, espacoId: e.target.value })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                        >
+                          <option value="">Local inteiro / não especificado</option>
+                          {espacos
+                            .filter(espaco =>
+                              espaco.localId === formData.localId &&
+                              (espaco.ativo || (Boolean(eventoEditandoId) && espaco.id === formData.espacoId))
+                            )
+                            .map(espaco => (
+                              <option key={espaco.id} value={espaco.id}>
+                                {espaco.nome}{espaco.ativo ? '' : ' (inativo)'}
+                              </option>
+                            ))}
+                        </select>
+                        {errosForm.espacoId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.espacoId}</p>}
                       </div>
                     )}
 
@@ -759,7 +833,7 @@ export function EventosView() {
                             <option value="regional">Regional</option>
                             <option value="administracao">Administração</option>
                             <option value="setor">Setor</option>
-                            <option value="casa">Casa</option>
+                            <option value="casa">Casa de Oração</option>
                             <option value="grupoTrabalho">Grupo de Trabalho</option>
                           </select>
                         </div>
@@ -809,7 +883,7 @@ export function EventosView() {
                           )}
                           {tipoEscopo === 'casa' && (
                             <>
-                              <label htmlFor="casaId" className="block text-xs font-medium text-slate-700 mb-1">Casa *</label>
+                              <label htmlFor="casaId" className="block text-xs font-medium text-slate-700 mb-1">Casa de Oração *</label>
                               <select
                                 id="casaId"
                                 value={formData.casaId || ''}
@@ -906,7 +980,7 @@ export function EventosView() {
                   <div className="pt-4 border-t border-slate-100 flex justify-end gap-3">
                     <button
                       type="button"
-                      onClick={() => setFormOpen(false)}
+                      onClick={fecharFormularioEvento}
                       className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
                     >
                       Cancelar
@@ -1092,7 +1166,7 @@ export function EventosView() {
         title="Editar Evento Recorrente (Este e os próximos)"
         initialData={serieInitialData}
         initialTipoEscopo={serieInitialTipoEscopo}
-        lookups={{ locais, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
+        lookups={{ locais, espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
         onSubmit={handleSerieSubmit}
         externalError={erro}
       />

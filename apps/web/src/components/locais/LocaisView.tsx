@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { LocalCreate } from '@piedade/shared'
+import { EspacoLocalCreate, LocalCreate } from '@piedade/shared'
 import * as apiClient from '../../api/apiClient'
 
 interface Local {
@@ -17,6 +17,15 @@ interface Local {
   longitude?: number | null
   urlMaps?: string | null
   urlWaze?: string | null
+  ativo: boolean
+}
+
+interface EspacoLocal {
+  id: string
+  localId: string
+  nome: string
+  descricao?: string | null
+  capacidade?: number | null
   ativo: boolean
 }
 
@@ -80,6 +89,18 @@ export function LocaisView() {
   
   const [detailOpen, setDetailOpen] = useState(false)
   const [selectedLocal, setSelectedLocal] = useState<Local | null>(null)
+
+  const [espacosOpen, setEspacosOpen] = useState(false)
+  const [localEspacos, setLocalEspacos] = useState<Local | null>(null)
+  const [espacos, setEspacos] = useState<EspacoLocal[]>([])
+  const espacosConsultaSeq = useRef(0)
+  const localEspacosAtivoIdRef = useRef<string | null>(null)
+  const [espacoEditandoId, setEspacoEditandoId] = useState<string | null>(null)
+  const [espacoForm, setEspacoForm] = useState({ nome: '', descricao: '', capacidade: '', ativo: true })
+  const [espacoErro, setEspacoErro] = useState<string | null>(null)
+  const [salvandoEspaco, setSalvandoEspaco] = useState(false)
+  const espacoSaveSeq = useRef(0)
+  const espacosSavePendentesRef = useRef(new Map<string, number>())
 
   const fetchLocais = async () => {
     try {
@@ -173,6 +194,110 @@ export function LocaisView() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const abrirEspacos = async (local: Local) => {
+    const consultaAtual = ++espacosConsultaSeq.current
+    localEspacosAtivoIdRef.current = local.id
+    setLocalEspacos(local)
+    setEspacos([])
+    setEspacosOpen(true)
+    setEspacoEditandoId(null)
+    setEspacoForm({ nome: '', descricao: '', capacidade: '', ativo: true })
+    setEspacoErro(null)
+    setSalvandoEspaco(espacosSavePendentesRef.current.has(local.id))
+
+    try {
+      const data = await apiClient.fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${local.id}`)
+      if (consultaAtual !== espacosConsultaSeq.current) return
+      setEspacos(data || [])
+    } catch (err: any) {
+      if (consultaAtual !== espacosConsultaSeq.current) return
+      setEspacoErro(err.message || 'Erro ao carregar espaços do Local')
+    }
+  }
+
+  const fecharEspacos = () => {
+    espacosConsultaSeq.current += 1
+    localEspacosAtivoIdRef.current = null
+    setEspacosOpen(false)
+    setLocalEspacos(null)
+    setEspacos([])
+    setEspacoErro(null)
+  }
+
+  const salvarEspaco = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!localEspacos) return
+    const localIdSalvo = localEspacos.id
+
+    // Impede uma segunda mutação concorrente para o mesmo Local, inclusive
+    // quando o modal foi fechado e reaberto enquanto o primeiro save aguardava.
+    if (espacosSavePendentesRef.current.has(localIdSalvo)) return
+
+    const payload = {
+      localId: localIdSalvo,
+      nome: espacoForm.nome,
+      descricao: espacoForm.descricao || null,
+      capacidade: espacoForm.capacidade ? Number(espacoForm.capacidade) : null,
+      ativo: espacoForm.ativo,
+    }
+    const parsed = EspacoLocalCreate.safeParse(payload)
+    if (!parsed.success) {
+      setEspacoErro(parsed.error.issues[0]?.message || 'Dados inválidos')
+      return
+    }
+
+    const operacaoSave = ++espacoSaveSeq.current
+    espacosSavePendentesRef.current.set(localIdSalvo, operacaoSave)
+    setSalvandoEspaco(true)
+    setEspacoErro(null)
+    try {
+      if (espacoEditandoId) {
+        await apiClient.patchWithAuth(`/espacos-locais/${espacoEditandoId}`, parsed.data)
+      } else {
+        await apiClient.postWithAuth('/espacos-locais', parsed.data)
+      }
+
+      // Se outro Local estiver aberto (ou o modal estiver fechado), não aplique
+      // o resultado deste save. Reabrir o MESMO Local, porém, deve receber o
+      // refresh pós-save.
+      if (localEspacosAtivoIdRef.current !== localIdSalvo) return
+
+      // Invalida uma listagem do mesmo Local iniciada antes da conclusão da
+      // mutação, evitando que uma resposta pré-save sobrescreva o refresh.
+      const refreshAtual = ++espacosConsultaSeq.current
+      const data = await apiClient.fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${localIdSalvo}`)
+      if (
+        localEspacosAtivoIdRef.current !== localIdSalvo ||
+        refreshAtual !== espacosConsultaSeq.current
+      ) return
+
+      setEspacos(data || [])
+      setEspacoEditandoId(null)
+      setEspacoForm({ nome: '', descricao: '', capacidade: '', ativo: true })
+    } catch (err: any) {
+      if (localEspacosAtivoIdRef.current !== localIdSalvo) return
+      setEspacoErro(err.message || 'Erro ao salvar espaço')
+    } finally {
+      // Só a operação que ainda detém o lock deste Local pode liberá-lo.
+      if (espacosSavePendentesRef.current.get(localIdSalvo) === operacaoSave) {
+        espacosSavePendentesRef.current.delete(localIdSalvo)
+        if (localEspacosAtivoIdRef.current === localIdSalvo) {
+          setSalvandoEspaco(false)
+        }
+      }
+    }
+  }
+
+  const editarEspaco = (espaco: EspacoLocal) => {
+    setEspacoEditandoId(espaco.id)
+    setEspacoForm({
+      nome: espaco.nome,
+      descricao: espaco.descricao || '',
+      capacidade: espaco.capacidade ? String(espaco.capacidade) : '',
+      ativo: espaco.ativo,
+    })
   }
 
   const formatarCep = (valor: string) => {
@@ -396,6 +521,12 @@ export function LocaisView() {
                         className="text-brand-600 hover:text-brand-900 font-medium"
                       >
                         Ver
+                      </button>
+                      <button
+                        onClick={() => void abrirEspacos(local)}
+                        className="text-emerald-700 hover:text-emerald-900 font-medium"
+                      >
+                        Espaços
                       </button>
                       <button
                         onClick={() => handleOpenEdit(local.id)}
@@ -659,6 +790,64 @@ export function LocaisView() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {espacosOpen && localEspacos && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div role="dialog" aria-modal="true" aria-labelledby="modal-espacos-title" className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 id="modal-espacos-title" className="text-lg font-semibold text-slate-900">Espaços do Local</h3>
+                <p className="text-sm text-slate-500">{localEspacos.nome}</p>
+              </div>
+              <button onClick={fecharEspacos} className="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-6">
+              {espacoErro && <div role="alert" className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{espacoErro}</div>}
+              <form onSubmit={salvarEspaco} className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 border rounded-xl bg-slate-50">
+                <div>
+                  <label htmlFor="espacoNome" className="block text-sm font-medium text-slate-700 mb-1">Nome do Espaço *</label>
+                  <input id="espacoNome" value={espacoForm.nome} onChange={e => setEspacoForm({ ...espacoForm, nome: e.target.value })} className="w-full p-2.5 border rounded-lg text-sm" placeholder="Ex: Salão de Reunião" />
+                </div>
+                <div>
+                  <label htmlFor="espacoCapacidade" className="block text-sm font-medium text-slate-700 mb-1">Capacidade</label>
+                  <input id="espacoCapacidade" type="number" min="1" value={espacoForm.capacidade} onChange={e => setEspacoForm({ ...espacoForm, capacidade: e.target.value })} className="w-full p-2.5 border rounded-lg text-sm" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="espacoDescricao" className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
+                  <input id="espacoDescricao" value={espacoForm.descricao} onChange={e => setEspacoForm({ ...espacoForm, descricao: e.target.value })} className="w-full p-2.5 border rounded-lg text-sm" />
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={espacoForm.ativo} onChange={e => setEspacoForm({ ...espacoForm, ativo: e.target.checked })} />
+                  Espaço ativo
+                </label>
+                <div className="flex justify-end gap-2">
+                  {espacoEditandoId && <button type="button" onClick={() => { setEspacoEditandoId(null); setEspacoForm({ nome: '', descricao: '', capacidade: '', ativo: true }) }} className="px-3 py-2 text-sm">Cancelar edição</button>}
+                  <button type="submit" disabled={salvandoEspaco} className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm disabled:opacity-50">{salvandoEspaco ? 'Salvando...' : espacoEditandoId ? 'Atualizar Espaço' : '+ Adicionar Espaço'}</button>
+                </div>
+              </form>
+              <div className="border rounded-xl overflow-hidden">
+                {espacos.length === 0 ? (
+                  <p className="p-4 text-sm text-slate-500">Nenhum espaço cadastrado para este Local.</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50"><tr><th className="text-left px-4 py-3">Espaço</th><th className="text-left px-4 py-3">Capacidade</th><th className="text-left px-4 py-3">Status</th><th className="px-4 py-3"></th></tr></thead>
+                    <tbody className="divide-y">
+                      {espacos.map(espaco => (
+                        <tr key={espaco.id}>
+                          <td className="px-4 py-3">{espaco.nome}</td>
+                          <td className="px-4 py-3">{espaco.capacidade ?? '—'}</td>
+                          <td className="px-4 py-3">{espaco.ativo ? 'Ativo' : 'Inativo'}</td>
+                          <td className="px-4 py-3 text-right"><button onClick={() => editarEspaco(espaco)} className="text-brand-700 font-medium">Editar</button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

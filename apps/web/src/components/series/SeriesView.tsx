@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { SerieCreateInput } from '@piedade/shared'
 import { SerieFormModal } from './SerieFormModal'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
@@ -12,6 +12,13 @@ import type { Membro } from '../membros/MembrosView'
 interface Local {
   id: string
   nome: string
+}
+
+interface EspacoLocal {
+  id: string
+  localId: string
+  nome: string
+  ativo: boolean
 }
 
 export interface SerieRecorrencia {
@@ -30,6 +37,7 @@ export interface SerieRecorrencia {
   diaMes: number | null
   posicaoSemanaMes: number | null
   localId: string | null
+  espacoId: string | null
   urlOnline: string | null
   organizadorMembroId: string | null
   regionalId: string | null
@@ -48,6 +56,7 @@ export function SeriesView() {
   
   // Lookups
   const [locais, setLocais] = useState<Local[]>([])
+  const [espacos, setEspacos] = useState<EspacoLocal[]>([])
   const [membros, setMembros] = useState<Membro[]>([])
   const [regionais, setRegionais] = useState<Regional[]>([])
   const [administracoes, setAdministracoes] = useState<Administracao[]>([])
@@ -64,6 +73,7 @@ export function SeriesView() {
   const [salvando, setSalvando] = useState<boolean>(false)
   
   const [serieEditandoId, setSerieEditandoId] = useState<string | null>(null)
+  const serieFormConsultaSeq = useRef(0)
   const [confirmacaoEditar, setConfirmacaoEditar] = useState<Partial<SerieCreateInput> | null>(null)
   const [confirmacaoInativar, setConfirmacaoInativar] = useState<SerieRecorrencia | null>(null)
 
@@ -85,6 +95,7 @@ export function SeriesView() {
     diaMes: 1,
     posicaoSemanaMes: 1,
     localId: '',
+    espacoId: '',
     urlOnline: '',
     organizadorMembroId: '',
     regionalId: '',
@@ -107,6 +118,7 @@ export function SeriesView() {
       const seriesPromise = fetchWithAuth<SerieRecorrencia[]>('/series-recorrencia')
       const lookupsPromise = Promise.allSettled([
         fetchWithAuth<Local[]>('/locais'),
+        fetchWithAuth<EspacoLocal[]>('/espacos-locais?ativo=true'),
         fetchWithAuth<Membro[]>('/membros'),
         fetchWithAuth<Regional[]>('/regionais'),
         fetchWithAuth<Administracao[]>('/administracoes'),
@@ -122,6 +134,7 @@ export function SeriesView() {
 
       const setters = [
         (valor: unknown) => setLocais(valor as Local[]),
+        (valor: unknown) => setEspacos(valor as EspacoLocal[]),
         (valor: unknown) => setMembros(valor as Membro[]),
         (valor: unknown) => setRegionais(valor as Regional[]),
         (valor: unknown) => setAdministracoes(valor as Administracao[]),
@@ -153,9 +166,27 @@ export function SeriesView() {
     carregarDados()
   }, [])
 
+  const invalidarEdicaoPendente = () => {
+    serieFormConsultaSeq.current += 1
+  }
 
+  const fecharFormulario = () => {
+    invalidarEdicaoPendente()
+    setFormOpen(false)
+  }
+
+  const abrirDetalhes = (serie: SerieRecorrencia) => {
+    invalidarEdicaoPendente()
+    setSerieDetalhe(serie)
+  }
+
+  const abrirInativacao = (serie: SerieRecorrencia) => {
+    invalidarEdicaoPendente()
+    setConfirmacaoInativar(serie)
+  }
 
   const abrirFormCriar = () => {
+    invalidarEdicaoPendente()
     setSerieEditandoId(null)
     setFormData({
       titulo: '',
@@ -172,6 +203,7 @@ export function SeriesView() {
       diaMes: null,
       posicaoSemanaMes: null,
       localId: '',
+      espacoId: '',
       urlOnline: '',
       organizadorMembroId: '',
       regionalId: '',
@@ -187,7 +219,35 @@ export function SeriesView() {
     setFormOpen(true)
   }
 
-  const abrirFormEditar = (serie: SerieRecorrencia) => {
+  const abrirFormEditar = async (serie: SerieRecorrencia) => {
+    const consultaAtual = ++serieFormConsultaSeq.current
+    setErro(null)
+
+    if (
+      serie.espacoId &&
+      serie.localId &&
+      !espacos.some(espaco => espaco.id === serie.espacoId)
+    ) {
+      try {
+        const espacosDoLocal = await fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${serie.localId}`)
+        if (consultaAtual !== serieFormConsultaSeq.current) return
+
+        const espacoAtual = (espacosDoLocal || []).find(espaco => espaco.id === serie.espacoId)
+        if (espacoAtual) {
+          setEspacos(prev =>
+            prev.some(espaco => espaco.id === espacoAtual.id)
+              ? prev
+              : [...prev, espacoAtual]
+          )
+        }
+      } catch {
+        if (consultaAtual !== serieFormConsultaSeq.current) return
+        setLookupAviso('Não foi possível carregar o espaço histórico desta série. Selecione outro espaço ou limpe o campo antes de salvar.')
+      }
+    }
+
+    if (consultaAtual !== serieFormConsultaSeq.current) return
+
     setSerieEditandoId(serie.id)
     setFormData({
       titulo: serie.titulo,
@@ -204,6 +264,7 @@ export function SeriesView() {
       diaMes: serie.diaMes,
       posicaoSemanaMes: serie.posicaoSemanaMes,
       localId: serie.localId || '',
+      espacoId: serie.espacoId || '',
       urlOnline: serie.urlOnline || '',
       organizadorMembroId: serie.organizadorMembroId || '',
       regionalId: serie.regionalId || '',
@@ -238,7 +299,7 @@ export function SeriesView() {
       }
       await patchWithAuth(`/series-recorrencia/${serieEditandoId}`, payload)
       setConfirmacaoEditar(null)
-      setFormOpen(false)
+      fecharFormulario()
       carregarDados()
     } catch (err: unknown) {
       if (err instanceof ApiError && err.body?.error) {
@@ -355,14 +416,14 @@ export function SeriesView() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right space-x-3">
-                      <button onClick={() => setSerieDetalhe(item)} className="text-brand-600 hover:text-brand-900 font-medium">
+                      <button onClick={() => abrirDetalhes(item)} className="text-brand-600 hover:text-brand-900 font-medium">
                         Ver
                       </button>
                       <button onClick={() => abrirFormEditar(item)} className="text-blue-600 hover:text-blue-900 font-medium">
                         Editar
                       </button>
                       {item.ativo && (
-                        <button onClick={() => setConfirmacaoInativar(item)} className="text-red-600 hover:text-red-900 font-medium">
+                        <button onClick={() => abrirInativacao(item)} className="text-red-600 hover:text-red-900 font-medium">
                           Inativar
                         </button>
                       )}
@@ -378,11 +439,11 @@ export function SeriesView() {
       {/* Modal Formulário */}
       <SerieFormModal
         isOpen={formOpen}
-        onClose={() => setFormOpen(false)}
+        onClose={fecharFormulario}
         title={serieEditandoId ? 'Editar Série de Recorrência' : 'Nova Série de Recorrência'}
         initialData={formData}
         initialTipoEscopo={tipoEscopo}
-        lookups={{ locais, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
+        lookups={{ locais, espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
         externalError={formOpen ? (erro ?? lookupAviso) : null}
         onSubmit={async (data) => {
           if (serieEditandoId) {
@@ -391,7 +452,7 @@ export function SeriesView() {
             setSalvando(true)
             try {
               await postWithAuth('/series-recorrencia', data)
-              setFormOpen(false)
+              fecharFormulario()
               carregarDados()
             } catch (err: unknown) {
               setSalvando(false)

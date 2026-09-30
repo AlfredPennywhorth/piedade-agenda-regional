@@ -18,13 +18,16 @@ regionaisRouter.get('/', async (c) => {
   const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
 
   if (visiveis.tudo) {
-    return c.json(await db.select().from(regionais).all())
+    const data = await db.select().from(regionais).all()
+    data.sort((a: typeof regionais.$inferSelect, b: typeof regionais.$inferSelect) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
+    return c.json(data)
   }
 
   const ids = Array.from(visiveis.regionaisIds)
   if (ids.length === 0) return c.json([])
 
   const data = await db.select().from(regionais).where(inArray(regionais.id, ids)).all()
+  data.sort((a: typeof regionais.$inferSelect, b: typeof regionais.$inferSelect) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
   return c.json(data)
 })
 

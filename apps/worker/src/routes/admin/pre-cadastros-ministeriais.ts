@@ -3,6 +3,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { CreateMembroSchema } from '@piedade/shared'
 import { executeAtomic } from '../../db/batch'
+import { prepararSincronizacaoConvocacoes, queriesSincronizacaoConvocacoes } from '../vinculos_funcionais'
 import { authMiddleware, Variables } from '../../middleware/auth'
 import {
   eMasterSistema,
@@ -285,8 +286,32 @@ adminPreCadastrosMinisteriaisApp.post('/:id/finalizar', async c => {
     }
   }
 
+  const funcaoDco = await db
+    .select({ id: schema.funcoes.id })
+    .from(schema.funcoes)
+    .where(and(eq(schema.funcoes.codigo, 'DCO'), eq(schema.funcoes.ativo, true)))
+    .get()
+
+  if (!funcaoDco) {
+    return c.json(
+      { error: 'Função Diácono Casa de Oração (DCO) não cadastrada ou inativa', code: 'FUNCAO_DCO_INDISPONIVEL' },
+      409
+    )
+  }
+
   const membroId = crypto.randomUUID()
   const agora = new Date().toISOString()
+  const vinculoDco = {
+    id: crypto.randomUUID(),
+    membroId,
+    funcaoId: funcaoDco.id,
+    casaId,
+    origem: 'MEMBRO_AUTOMATICO',
+    ativo: true,
+    createdAt: agora,
+    updatedAt: agora,
+  }
+  const sincronizacoesDco = await prepararSincronizacaoConvocacoes(db, vinculoDco, true)
 
   try {
     await executeAtomic(db, tx => [
@@ -296,6 +321,8 @@ adminPreCadastrosMinisteriaisApp.post('/:id/finalizar', async c => {
         createdAt: agora,
         updatedAt: agora,
       }),
+      tx.insert(schema.vinculosFuncionais).values(vinculoDco),
+      ...queriesSincronizacaoConvocacoes(tx, vinculoDco, sincronizacoesDco, agora),
       tx
         .update(schema.preCadastrosMinisteriais)
         .set({
