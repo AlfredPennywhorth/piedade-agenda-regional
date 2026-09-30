@@ -329,6 +329,27 @@ describe('S07 - Minha Agenda', () => {
     expect(eventoA.conflito.atenuado).toBe(false)
     expect(eventoB.conflito.priorizado).toBe(false)
     expect(eventoB.conflito.atenuado).toBe(false)
+
+    const repriorizar = await req('/api/v1/minha-agenda/prioridade/ev-recria-a', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    })
+    expect(repriorizar.status).toBe(200)
+
+    const versoesDoPar = sqlite
+      .prepare(`
+        SELECT COUNT(*) AS total
+        FROM agenda_prioridades_conflito
+        WHERE membro_id = ?
+          AND conflito_par_chave = ?
+      `)
+      .get(membroId, 'ev-recria-a|ev-recria-b') as { total: number }
+
+    expect(versoesDoPar.total).toBe(1)
   })
 
 })
