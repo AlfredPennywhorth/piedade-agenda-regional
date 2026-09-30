@@ -786,6 +786,7 @@ describe('Autenticação e Sessões S03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token,
+        codigoCarteirinha: 'CARTEIRA-NORMAL',
         celular: '11977777777',
         pin: '654321',
         confirmacaoPin: '654321',
