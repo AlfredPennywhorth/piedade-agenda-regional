@@ -735,6 +735,30 @@ export const convocacaoDestinatarioEvidencias = sqliteTable(
   })
 )
 
+export const agendaPrioridadesConflito = sqliteTable(
+  'agenda_prioridades_conflito',
+  {
+    id: text('id').primaryKey(),
+    membroId: text('membro_id')
+      .notNull()
+      .references(() => membros.id),
+    eventoId: text('evento_id')
+      .notNull()
+      .references(() => eventos.id),
+    priorizadoEm: text('priorizado_em')
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+    ...timestampsS02,
+  },
+  table => ({
+    uniqueMembroEvento: uniqueIndex('idx_agenda_prioridade_membro_evento').on(
+      table.membroId,
+      table.eventoId
+    ),
+    idxMembro: index('idx_agenda_prioridade_membro').on(table.membroId),
+  })
+)
+
 export const rsvp = sqliteTable(
   'rsvp',
   {
