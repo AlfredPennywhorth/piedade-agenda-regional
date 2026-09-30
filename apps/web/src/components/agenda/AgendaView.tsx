@@ -101,20 +101,22 @@ export function AgendaView() {
           {item.conflito && (
             <div
               className={`rounded-xl border p-3 text-sm ${
-                item.conflito.priorizado
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-                  : item.conflito.atenuado
-                    ? 'border-slate-200 bg-slate-50 text-slate-600'
+                item.conflito.atenuado
+                  ? 'border-slate-200 bg-slate-50 text-slate-600'
+                  : item.conflito.priorizado
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
                     : 'border-amber-300 bg-amber-50 text-amber-950'
               }`}
               role="status"
             >
               <p className="font-semibold">
-                {item.conflito.priorizado
-                  ? 'Compromisso priorizado'
-                  : item.conflito.tipo === 'SOBREPOSICAO'
-                    ? 'Conflito de horário'
-                    : 'Compromissos muito próximos'}
+                {item.conflito.priorizado && item.conflito.atenuado
+                  ? 'Prioridade parcial'
+                  : item.conflito.priorizado
+                    ? 'Compromisso priorizado'
+                    : item.conflito.tipo === 'SOBREPOSICAO'
+                      ? 'Conflito de horário'
+                      : 'Compromissos muito próximos'}
               </p>
               <p className="mt-1 text-xs">
                 {item.conflito.eventos.length === 1
@@ -124,7 +126,7 @@ export function AgendaView() {
                   ? ` A janela de transição considerada é de ${item.conflito.janelaTransicaoMinutos} minutos.`
                   : ''}
               </p>
-              {!item.conflito.priorizado && (
+              {(!item.conflito.priorizado || item.conflito.atenuado) && (
                 <button
                   type="button"
                   disabled={priorizandoEventoId !== null}
