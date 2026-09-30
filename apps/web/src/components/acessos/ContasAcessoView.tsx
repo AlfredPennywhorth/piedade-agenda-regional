@@ -28,6 +28,13 @@ interface LinkTemporario {
   membroId: string
 }
 
+interface FeedbackConta {
+  membroId: string
+  tipo: 'status' | 'alert'
+  mensagem?: string
+  linkTemporario?: string
+}
+
 function montarLink(token: string) {
   const url = new URL(window.location.origin + window.location.pathname)
   url.searchParams.set('ativacao', token)
@@ -38,17 +45,16 @@ export function ContasAcessoView() {
   const [contas, setContas] = useState<ContaAdministrada[]>([])
   const [carregando, setCarregando] = useState(true)
   const [processando, setProcessando] = useState<string | null>(null)
-  const [erro, setErro] = useState<string | null>(null)
-  const [mensagem, setMensagem] = useState<string | null>(null)
-  const [linkTemporario, setLinkTemporario] = useState<string | null>(null)
+  const [erroGlobal, setErroGlobal] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<FeedbackConta | null>(null)
   const [gerenciandoMembroId, setGerenciandoMembroId] = useState<string | null>(null)
 
   const carregar = async () => {
-    setErro(null)
+    setErroGlobal(null)
     try {
       setContas(await fetchWithAuth<ContaAdministrada[]>('/admin/acessos'))
     } catch (error) {
-      setErro(error instanceof ApiError ? error.message : 'Não foi possível carregar as contas.')
+      setErroGlobal(error instanceof ApiError ? error.message : 'Não foi possível carregar as contas.')
     } finally {
       setCarregando(false)
     }
@@ -57,6 +63,13 @@ export function ContasAcessoView() {
   useEffect(() => {
     void carregar()
   }, [])
+
+  useEffect(() => {
+    if (!feedback) return
+    const elemento = document.getElementById(`feedback-conta-${feedback.membroId}`)
+    elemento?.scrollIntoView?.({ block: 'nearest' })
+    elemento?.focus()
+  }, [feedback])
 
   const gerarLink = async (conta: ContaAdministrada, redefinicao: boolean) => {
     if (
@@ -69,17 +82,24 @@ export function ContasAcessoView() {
     }
 
     setProcessando(conta.membroId)
-    setErro(null)
-    setLinkTemporario(null)
+    setFeedback(null)
     try {
       const endpoint = redefinicao
         ? `/admin/acessos/membros/${conta.membroId}/reset-pin`
         : `/admin/acessos/membros/${conta.membroId}/link-ativacao`
       const resposta = await postWithAuth<LinkTemporario>(endpoint, {})
-      setLinkTemporario(montarLink(resposta.token))
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'status',
+        linkTemporario: montarLink(resposta.token),
+      })
       await carregar()
     } catch (error) {
-      setErro(error instanceof ApiError ? error.message : 'Não foi possível gerar o link.')
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'alert',
+        mensagem: error instanceof ApiError ? error.message : 'Não foi possível gerar o link.',
+      })
     } finally {
       setProcessando(null)
     }
@@ -90,14 +110,21 @@ export function ContasAcessoView() {
     if (!window.confirm(`Confirma ${verbo} a conta de ${conta.nome}?`)) return
 
     setProcessando(conta.membroId)
-    setErro(null)
-    setMensagem(null)
+    setFeedback(null)
     try {
       await patchWithAuth(`/admin/acessos/membros/${conta.membroId}/status`, { status })
-      setMensagem(status === 'BLOQUEADA' ? 'Conta bloqueada e sessões revogadas.' : 'Conta desbloqueada.')
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'status',
+        mensagem: status === 'BLOQUEADA' ? 'Conta bloqueada e sessões revogadas.' : 'Conta desbloqueada.',
+      })
       await carregar()
     } catch (error) {
-      setErro(error instanceof ApiError ? error.message : 'Não foi possível alterar a conta.')
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'alert',
+        mensagem: error instanceof ApiError ? error.message : 'Não foi possível alterar a conta.',
+      })
     } finally {
       setProcessando(null)
     }
@@ -107,24 +134,35 @@ export function ContasAcessoView() {
     if (!window.confirm(`Revogar todas as sessões de ${conta.nome}?`)) return
 
     setProcessando(conta.membroId)
-    setErro(null)
-    setMensagem(null)
+    setFeedback(null)
     try {
       await postWithAuth(`/admin/acessos/membros/${conta.membroId}/revogar-sessoes`, {})
-      setMensagem('Todas as sessões da conta foram revogadas.')
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'status',
+        mensagem: 'Todas as sessões da conta foram revogadas.',
+      })
     } catch (error) {
-      setErro(error instanceof ApiError ? error.message : 'Não foi possível revogar as sessões.')
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'alert',
+        mensagem: error instanceof ApiError ? error.message : 'Não foi possível revogar as sessões.',
+      })
     } finally {
       setProcessando(null)
     }
   }
 
-  const copiarLink = async () => {
-    if (!linkTemporario) return
+  const copiarLink = async (membroId: string, linkTemporario: string) => {
     try {
       await navigator.clipboard.writeText(linkTemporario)
     } catch {
-      setErro('Não foi possível copiar automaticamente. Selecione o link e copie manualmente.')
+      setFeedback({
+        membroId,
+        tipo: 'alert',
+        mensagem: 'Não foi possível copiar automaticamente. Selecione o link e copie manualmente.',
+        linkTemporario,
+      })
     }
   }
 
@@ -141,38 +179,9 @@ export function ContasAcessoView() {
         </p>
       </header>
 
-      {mensagem && (
-        <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-          {mensagem}
-        </div>
-      )}
-
-      {erro && (
+      {erroGlobal && (
         <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          {erro}
-        </div>
-      )}
-
-      {linkTemporario && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-3">
-          <p className="font-semibold text-amber-900">Link temporário gerado</p>
-          <p className="text-xs text-amber-800">
-            Copie agora e envie somente ao titular. O link é individual, temporário e de uso único.
-          </p>
-          <input
-            readOnly
-            value={linkTemporario}
-            aria-label="Link temporário"
-            className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs"
-          />
-          <div className="flex gap-2">
-            <button type="button" onClick={() => void copiarLink()} className="rounded-lg bg-brand-700 px-3 py-2 text-sm font-semibold text-white">
-              Copiar link
-            </button>
-            <button type="button" onClick={() => setLinkTemporario(null)} className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-white">
-              Ocultar
-            </button>
-          </div>
+          {erroGlobal}
         </div>
       )}
 
@@ -255,6 +264,52 @@ export function ContasAcessoView() {
                 )}
               </div>
             </div>
+            {feedback?.membroId === conta.membroId && (
+              <div
+                id={`feedback-conta-${conta.membroId}`}
+                tabIndex={-1}
+                role={feedback.tipo === 'alert' ? 'alert' : 'status'}
+                className={`mt-3 rounded-lg border p-3 text-sm outline-none focus:ring-2 focus:ring-brand-500 ${ 
+                  feedback.tipo === 'alert'
+                    ? 'border-red-200 bg-red-50 text-red-700'
+                    : feedback.linkTemporario
+                      ? 'border-amber-300 bg-amber-50 text-amber-900'
+                      : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                }`}
+              >
+                {feedback.mensagem && <p>{feedback.mensagem}</p>}
+                {feedback.linkTemporario && (
+                  <div className="space-y-3">
+                    <p className="font-semibold">Link temporário gerado</p>
+                    <p className="text-xs">
+                      Copie agora e envie somente ao titular. O link é individual, temporário e de uso único.
+                    </p>
+                    <input
+                      readOnly
+                      value={feedback.linkTemporario}
+                      aria-label={`Link temporário de ${conta.nome}`}
+                      className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs text-slate-900"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void copiarLink(conta.membroId, feedback.linkTemporario!)}
+                        className="rounded-lg bg-brand-700 px-3 py-2 text-sm font-semibold text-white"
+                      >
+                        Copiar link
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFeedback(null)}
+                        className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-white"
+                      >
+                        Ocultar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {conta.acessos.length > 0 && (
               <ul className="mt-3 flex flex-wrap gap-2" aria-label="Perfis ativos">
                 {conta.acessos.map(acesso => (
