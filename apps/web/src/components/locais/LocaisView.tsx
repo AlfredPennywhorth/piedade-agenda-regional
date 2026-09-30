@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { EspacoLocalCreate, LocalCreate } from '@piedade/shared'
 import * as apiClient from '../../api/apiClient'
 
@@ -60,6 +60,7 @@ export function LocaisView() {
   const [locais, setLocais] = useState<Local[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [filtroBusca, setFiltroBusca] = useState('')
   
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -118,6 +119,25 @@ export function LocaisView() {
   useEffect(() => {
     fetchLocais()
   }, [])
+
+  const locaisFiltrados = useMemo(() => {
+    const termo = filtroBusca.trim().toLocaleLowerCase('pt-BR')
+    if (!termo) return locais
+
+    return locais.filter(local =>
+      [
+        local.nome,
+        local.endereco,
+        local.numero,
+        local.bairro,
+        local.cidade,
+        local.uf,
+        local.cep,
+      ]
+        .filter(Boolean)
+        .some(valor => String(valor).toLocaleLowerCase('pt-BR').includes(termo))
+    )
+  }, [filtroBusca, locais])
 
   const handleOpenCreate = () => {
     cepAbortControllerRef.current?.abort()
@@ -477,11 +497,27 @@ export function LocaisView() {
         </div>
       )}
 
+      {!loading && !error && locais.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <label htmlFor="filtro-locais" className="mb-1 block text-xs font-semibold text-slate-700">
+            Pesquisar locais
+          </label>
+          <input
+            id="filtro-locais"
+            type="search"
+            value={filtroBusca}
+            onChange={event => setFiltroBusca(event.target.value)}
+            placeholder="Nome, endereço, bairro, cidade, UF ou CEP"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+      )}
+
       {loading && !formOpen && !detailOpen ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
         </div>
-      ) : !error && (locais || []).length === 0 ? (
+      ) : !error && locais.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-slate-200 shadow-sm">
           <p className="text-slate-500 mb-4">Nenhum local cadastrado.</p>
           <button
@@ -490,6 +526,10 @@ export function LocaisView() {
           >
             Cadastrar primeiro local
           </button>
+        </div>
+      ) : !error && locaisFiltrados.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-xl border border-slate-200 shadow-sm">
+          <p className="text-slate-500">Nenhum local encontrado para a pesquisa informada.</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -505,7 +545,7 @@ export function LocaisView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-slate-700">
-                {locais.map((local) => (
+                {locaisFiltrados.map((local) => (
                   <tr key={local.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4 font-medium text-slate-900">{local.nome}</td>
                     <td className="px-6 py-4">{local.endereco}, {local.numero}</td>
