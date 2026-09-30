@@ -6,6 +6,7 @@ import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, regionaisAdministradas } from '../security/permissoes'
 import { listarVinculosVisiveis, prepararSincronizacaoConvocacoes, queriesSincronizacaoConvocacoes } from './vinculos_funcionais'
 import { executarOperacaoComAudit, executarOperacaoComAudits } from '../services/auditoria'
+import { queriesSincronizacaoDcoAtual } from '../services/sincronizacao-dco'
 
 export const membrosRouter = new Hono<any>()
 
@@ -464,6 +465,8 @@ membrosRouter.patch('/:id', async (c) => {
     const atorContaAcessoId = c.get('contaAcessoId') || null
     const camposAlterados = Object.keys(parsed)
     const moveuCasa = casaFinalId !== existing.casaId
+    const membroAtivoFinal = parsed.ativo ?? existing.ativo
+    const reativouMembro = !existing.ativo && membroAtivoFinal
     const agoraAtualizacao = new Date().toISOString()
     const contaDoMembro = moveuCasa
       ? await db
@@ -508,7 +511,6 @@ membrosRouter.patch('/:id', async (c) => {
           updatedAt: agoraAtualizacao,
         }
       : null
-    const membroAtivoFinal = parsed.ativo ?? existing.ativo
     const sincronizacoesDco = novoVinculoDco && membroAtivoFinal
       ? await prepararSincronizacaoConvocacoes(db, novoVinculoDco, true)
       : []
@@ -608,7 +610,10 @@ membrosRouter.patch('/:id', async (c) => {
         (qdb) => [
           qdb.update(membros)
             .set({ ...parsed, updatedAt: agoraAtualizacao })
-            .where(eq(membros.id, id))
+            .where(eq(membros.id, id)),
+          ...(reativouMembro
+            ? queriesSincronizacaoDcoAtual(qdb, agoraAtualizacao, { membroId: id })
+            : []),
         ],
         {
           acao: 'MEMBRO_ATUALIZADO',
