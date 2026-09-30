@@ -472,6 +472,7 @@ export function setupDb(sqlite: any) {
       id text PRIMARY KEY NOT NULL,
       membro_id text NOT NULL,
       evento_id text NOT NULL,
+      conflito_chave text NOT NULL,
       priorizado_em text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
       created_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
       updated_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
