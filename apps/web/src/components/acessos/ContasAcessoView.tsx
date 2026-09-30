@@ -31,8 +31,12 @@ interface LinkTemporario {
 interface FeedbackConta {
   membroId: string
   tipo: 'status' | 'alert'
-  mensagem?: string
-  linkTemporario?: string
+  mensagem: string
+}
+
+interface LinkTemporarioContextual {
+  membroId: string
+  url: string
 }
 
 function montarLink(token: string) {
@@ -47,6 +51,7 @@ export function ContasAcessoView() {
   const [processando, setProcessando] = useState<string | null>(null)
   const [erroGlobal, setErroGlobal] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<FeedbackConta | null>(null)
+  const [linkTemporario, setLinkTemporario] = useState<LinkTemporarioContextual | null>(null)
   const [gerenciandoMembroId, setGerenciandoMembroId] = useState<string | null>(null)
 
   const carregar = async () => {
@@ -65,11 +70,12 @@ export function ContasAcessoView() {
   }, [])
 
   useEffect(() => {
-    if (!feedback) return
-    const elemento = document.getElementById(`feedback-conta-${feedback.membroId}`)
+    const membroId = feedback?.membroId ?? linkTemporario?.membroId
+    if (!membroId) return
+    const elemento = document.getElementById(`feedback-conta-${membroId}`)
     elemento?.scrollIntoView?.({ block: 'nearest' })
     elemento?.focus()
-  }, [feedback])
+  }, [feedback, linkTemporario])
 
   const gerarLink = async (conta: ContaAdministrada, redefinicao: boolean) => {
     if (
@@ -88,10 +94,9 @@ export function ContasAcessoView() {
         ? `/admin/acessos/membros/${conta.membroId}/reset-pin`
         : `/admin/acessos/membros/${conta.membroId}/link-ativacao`
       const resposta = await postWithAuth<LinkTemporario>(endpoint, {})
-      setFeedback({
+      setLinkTemporario({
         membroId: conta.membroId,
-        tipo: 'status',
-        linkTemporario: montarLink(resposta.token),
+        url: montarLink(resposta.token),
       })
       await carregar()
     } catch (error) {
@@ -153,15 +158,14 @@ export function ContasAcessoView() {
     }
   }
 
-  const copiarLink = async (membroId: string, linkTemporario: string) => {
+  const copiarLink = async (membroId: string, url: string) => {
     try {
-      await navigator.clipboard.writeText(linkTemporario)
+      await navigator.clipboard.writeText(url)
     } catch {
       setFeedback({
         membroId,
         tipo: 'alert',
         mensagem: 'Não foi possível copiar automaticamente. Selecione o link e copie manualmente.',
-        linkTemporario,
       })
     }
   }
@@ -264,47 +268,54 @@ export function ContasAcessoView() {
                 )}
               </div>
             </div>
-            {feedback?.membroId === conta.membroId && (
+            {(feedback?.membroId === conta.membroId || linkTemporario?.membroId === conta.membroId) && (
               <div
                 id={`feedback-conta-${conta.membroId}`}
                 tabIndex={-1}
-                role={feedback.tipo === 'alert' ? 'alert' : 'status'}
-                className={`mt-3 rounded-lg border p-3 text-sm outline-none focus:ring-2 focus:ring-brand-500 ${ 
-                  feedback.tipo === 'alert'
-                    ? 'border-red-200 bg-red-50 text-red-700'
-                    : feedback.linkTemporario
-                      ? 'border-amber-300 bg-amber-50 text-amber-900'
-                      : 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                }`}
+                className="mt-3 space-y-3 outline-none focus:ring-2 focus:ring-brand-500"
               >
-                {feedback.mensagem && <p>{feedback.mensagem}</p>}
-                {feedback.linkTemporario && (
-                  <div className="space-y-3">
-                    <p className="font-semibold">Link temporário gerado</p>
-                    <p className="text-xs">
-                      Copie agora e envie somente ao titular. O link é individual, temporário e de uso único.
-                    </p>
-                    <input
-                      readOnly
-                      value={feedback.linkTemporario}
-                      aria-label={`Link temporário de ${conta.nome}`}
-                      className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs text-slate-900"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void copiarLink(conta.membroId, feedback.linkTemporario!)}
-                        className="rounded-lg bg-brand-700 px-3 py-2 text-sm font-semibold text-white"
-                      >
-                        Copiar link
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFeedback(null)}
-                        className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-white"
-                      >
-                        Ocultar
-                      </button>
+                {feedback?.membroId === conta.membroId && (
+                  <div
+                    role={feedback.tipo === 'alert' ? 'alert' : 'status'}
+                    className={`rounded-lg border p-3 text-sm ${
+                      feedback.tipo === 'alert'
+                        ? 'border-red-200 bg-red-50 text-red-700'
+                        : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    }`}
+                  >
+                    {feedback.mensagem}
+                  </div>
+                )}
+
+                {linkTemporario?.membroId === conta.membroId && (
+                  <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                    <div className="space-y-3">
+                      <p className="font-semibold">Link temporário gerado</p>
+                      <p className="text-xs">
+                        Copie agora e envie somente ao titular. O link é individual, temporário e de uso único.
+                      </p>
+                      <input
+                        readOnly
+                        value={linkTemporario.url}
+                        aria-label={`Link temporário de ${conta.nome}`}
+                        className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void copiarLink(conta.membroId, linkTemporario.url)}
+                          className="rounded-lg bg-brand-700 px-3 py-2 text-sm font-semibold text-white"
+                        >
+                          Copiar link
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLinkTemporario(null)}
+                          className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-white"
+                        >
+                          Ocultar
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
