@@ -38,14 +38,14 @@ describe('Autenticação e Sessões S03', () => {
       INSERT INTO setores (id, administracao_id, nome) VALUES ('${setorId}', '${admId}', 'Set 1');
       INSERT INTO casas (id, setor_id, nome) VALUES ('${casaId}', '${setorId}', 'Casa 1');
       
-      INSERT INTO membros (id, nome, celular, casa_id, ativo)
-      VALUES ('${membroId}', 'João Silva', '11999999999', '${casaId}', 1);
+      INSERT INTO membros (id, nome, celular, codigo_carteirinha, casa_id, ativo)
+      VALUES ('${membroId}', 'João Silva', '11999999999', 'CARTEIRA-1', '${casaId}', 1);
 
-      INSERT INTO membros (id, nome, celular, casa_id, ativo)
-      VALUES ('${membroInativoId}', 'Maria Silva', '11988888888', '${casaId}', 0);
+      INSERT INTO membros (id, nome, celular, codigo_carteirinha, casa_id, ativo)
+      VALUES ('${membroInativoId}', 'Maria Silva', '11988888888', 'CARTEIRA-INATIVA', '${casaId}', 0);
       
-      INSERT INTO membros (id, nome, celular, casa_id, ativo)
-      VALUES ('${membroAtivoNormalizadoId}', 'Pedro Normalizado', '11977777777', '${casaId}', 1);
+      INSERT INTO membros (id, nome, celular, codigo_carteirinha, casa_id, ativo)
+      VALUES ('${membroAtivoNormalizadoId}', 'Pedro Normalizado', '11977777777', 'CARTEIRA-NORMAL', '${casaId}', 1);
       
       INSERT INTO funcoes (id, nome) VALUES ('func-1', 'Função 1');
       INSERT INTO vinculos_funcionais (id, membro_id, funcao_id, regional_id, ativo) VALUES ('vinc-1', '${membroId}', 'func-1', '${regionalId}', 1);
@@ -99,6 +99,7 @@ describe('Autenticação e Sessões S03', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        codigoCarteirinha: 'CARTEIRA-1',
         celular: '11999999999',
         pin: '123456',
         confirmacaoPin: '123456',
@@ -113,6 +114,7 @@ describe('Autenticação e Sessões S03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: '',
+        codigoCarteirinha: 'CARTEIRA-1',
         celular: '11999999999',
         pin: '123456',
         confirmacaoPin: '123456',
@@ -127,6 +129,7 @@ describe('Autenticação e Sessões S03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: 'inexistente12345678',
+        codigoCarteirinha: 'CARTEIRA-1',
         celular: '11999999999',
         pin: '123456',
         confirmacaoPin: '123456',
@@ -141,6 +144,7 @@ describe('Autenticação e Sessões S03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
+        codigoCarteirinha: 'CARTEIRA-1',
         pin: '123456',
         confirmacaoPin: '123456',
       }),
@@ -154,6 +158,7 @@ describe('Autenticação e Sessões S03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
+        codigoCarteirinha: 'CARTEIRA-1',
         celular: '11000000000',
         pin: '123456',
         confirmacaoPin: '123456',
@@ -166,6 +171,7 @@ describe('Autenticação e Sessões S03', () => {
     const { ativacaoSchema } = await import('@piedade/shared')
     const parsed = ativacaoSchema.safeParse({
       token: tokenAtivacaoPuro,
+        codigoCarteirinha: 'CARTEIRA-1',
       celular: '11999999999',
       pin: '123456',
       confirmacaoPin: '123456',
@@ -177,6 +183,7 @@ describe('Autenticação e Sessões S03', () => {
     const { ativacaoSchema } = await import('@piedade/shared')
     const parsed = ativacaoSchema.parse({
       token: tokenAtivacaoPuro,
+        codigoCarteirinha: 'CARTEIRA-1',
       celular: '11999999999',
       dataNascimento: '2000-01-01',
       pin: '123456',
@@ -185,12 +192,30 @@ describe('Autenticação e Sessões S03', () => {
     expect('dataNascimento' in parsed).toBe(false)
   })
 
+  it('12.1 Ativação falha se carteirinha não conferir com o cadastro', async () => {
+    const res = await req('/api/v1/auth/ativar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: tokenAtivacaoPuro,
+        codigoCarteirinha: 'CARTEIRA-ERRADA',
+        celular: '11999999999',
+        pin: '123456',
+        confirmacaoPin: '123456',
+      }),
+    })
+    expect(res.status).toBe(400)
+    const json = (await res.json()) as any
+    expect(json.error).toBe('Dados informados não conferem com o cadastro')
+  })
+
   it('13. Ativação falha se PIN não for enviado', async () => {
     const res = await req('/api/v1/auth/ativar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
+        codigoCarteirinha: 'CARTEIRA-1',
         celular: '11999999999',
         confirmacaoPin: '123456',
       }),
@@ -204,6 +229,7 @@ describe('Autenticação e Sessões S03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
+        codigoCarteirinha: 'CARTEIRA-1',
         celular: '11999999999',
         pin: '12345',
         confirmacaoPin: '12345',
@@ -218,6 +244,7 @@ describe('Autenticação e Sessões S03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
+        codigoCarteirinha: 'CARTEIRA-1',
         celular: '11999999999',
         pin: '123456',
       }),
@@ -231,6 +258,7 @@ describe('Autenticação e Sessões S03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
+        codigoCarteirinha: 'CARTEIRA-1',
         celular: '11999999999',
         pin: '123456',
         confirmacaoPin: '654321',
@@ -246,6 +274,7 @@ describe('Autenticação e Sessões S03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
+        codigoCarteirinha: 'CARTEIRA-1',
         celular: '11999999999',
         pin: '123456',
         confirmacaoPin: '123456',
@@ -264,6 +293,7 @@ describe('Autenticação e Sessões S03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
+        codigoCarteirinha: 'CARTEIRA-1',
         celular: '11999999999',
         pin: '123456',
         confirmacaoPin: '123456',
@@ -284,6 +314,7 @@ describe('Autenticação e Sessões S03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
+        codigoCarteirinha: 'CARTEIRA-1',
         celular: '11999999999',
         pin: '123456',
         confirmacaoPin: '123456',
@@ -300,6 +331,7 @@ describe('Autenticação e Sessões S03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
+        codigoCarteirinha: 'CARTEIRA-1',
         celular: '11999999999',
         pin: '123456',
         confirmacaoPin: '123456',
@@ -359,6 +391,7 @@ describe('Autenticação e Sessões S03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: tokenAtivacaoPuro,
+        codigoCarteirinha: 'CARTEIRA-1',
         celular: '11999999999',
         pin: '123456',
         confirmacaoPin: '123456',
@@ -665,6 +698,7 @@ describe('Autenticação e Sessões S03', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token,
+        codigoCarteirinha: 'CARTEIRA-1',
         celular: '11999999999',
         pin: '654321',
         confirmacaoPin: '654321',
