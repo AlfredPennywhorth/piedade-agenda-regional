@@ -73,6 +73,10 @@ function montarMapaConflitos(records: RegistroAgenda[]) {
   return mapa
 }
 
+function chaveConflito(eventoIds: string[]) {
+  return eventoIds.slice().sort().join('|')
+}
+
 function componenteConflito(
   eventoId: string,
   mapa: Map<string, Array<{ eventoId: string; tipo: 'SOBREPOSICAO' | 'PROXIMIDADE' }>>
@@ -143,7 +147,7 @@ agendaRouter.get('/', async (c) => {
     const mapaConflitos = montarMapaConflitos(records)
 
     let refOferecidas: any[] = []
-    let prioridades: Array<{ eventoId: string }> = []
+    let prioridades: Array<{ eventoId: string; conflitoChave: string }> = []
 
     if (eventoIds.length > 0) {
       ;[refOferecidas, prioridades] = await Promise.all([
@@ -151,7 +155,10 @@ agendaRouter.get('/', async (c) => {
           .from(eventoRefeicoes)
           .where(and(inArray(eventoRefeicoes.eventoId, eventoIds), eq(eventoRefeicoes.ativo, true)))
           .all(),
-        db.select({ eventoId: agendaPrioridadesConflito.eventoId })
+        db.select({
+          eventoId: agendaPrioridadesConflito.eventoId,
+          conflitoChave: agendaPrioridadesConflito.conflitoChave,
+        })
           .from(agendaPrioridadesConflito)
           .where(
             and(
@@ -163,7 +170,6 @@ agendaRouter.get('/', async (c) => {
       ])
     }
 
-    const prioridadesIds = new Set(prioridades.map(prioridade => prioridade.eventoId))
     const porId = new Map(records.map(record => [record.evento.id, record]))
 
     const result = records.map((record: any) => {
@@ -175,7 +181,12 @@ agendaRouter.get('/', async (c) => {
       const componente = conflitosDiretos.length > 0
         ? componenteConflito(record.evento.id, mapaConflitos)
         : []
-      const prioridadeDoGrupo = componente.find(id => prioridadesIds.has(id)) ?? null
+      const chaveGrupo = chaveConflito(componente)
+      const prioridadeDoGrupo = prioridades.find(
+        prioridade =>
+          componente.includes(prioridade.eventoId) &&
+          prioridade.conflitoChave === chaveGrupo
+      )?.eventoId ?? null
       const temSobreposicao = conflitosDiretos.some(conflito => conflito.tipo === 'SOBREPOSICAO')
 
       return {
@@ -244,6 +255,7 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
   }
 
   const grupo = componenteConflito(eventoId, mapaConflitos)
+  const conflitoChave = chaveConflito(grupo)
   const agora = new Date().toISOString()
   const prioridadeId = crypto.randomUUID()
 
@@ -258,6 +270,7 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
       id: prioridadeId,
       membroId,
       eventoId,
+      conflitoChave,
       priorizadoEm: agora,
       createdAt: agora,
       updatedAt: agora,
