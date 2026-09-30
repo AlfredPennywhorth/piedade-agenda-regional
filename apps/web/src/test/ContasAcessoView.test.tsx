@@ -203,7 +203,8 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(destino.searchParams.get('phone')).toBe('5511999990000')
 
     const mensagem = destino.searchParams.get('text') || ''
-    expect(mensagem).toContain('Pessoa Teste')
+    expect(mensagem).toContain('Caro irmão Pessoa Teste.')
+    expect(mensagem).toContain('A paz de Deus!')
     expect(mensagem).toContain('ativacao=token-whatsapp')
     expect(mensagem).toContain('válido até')
     expect(mensagem).toContain('horário de São Paulo')
