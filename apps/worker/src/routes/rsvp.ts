@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { eq, and } from 'drizzle-orm'
-import { rsvp, convocacoes, convocacaoDestinatarios, eventos } from '../db/schema'
+import { eq, and, inArray } from 'drizzle-orm'
+import { rsvp, convocacoes, convocacaoDestinatarios, eventos, agendaPrioridadesConflito } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { RsvpUpsert } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
@@ -129,6 +129,21 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
     
     const rsvpId = existingRsvp ? existingRsvp.id : crypto.randomUUID()
 
+    let prioridadesConflitantesIds: string[] = []
+    if (parsed.resposta === 'NAO_PARTICIPAREI') {
+      const prioridadesDoMembro = await db.select({
+        id: agendaPrioridadesConflito.id,
+        conflitoParChave: agendaPrioridadesConflito.conflitoParChave,
+      })
+        .from(agendaPrioridadesConflito)
+        .where(eq(agendaPrioridadesConflito.membroId, membroId))
+        .all()
+
+      prioridadesConflitantesIds = prioridadesDoMembro
+        .filter(prioridade => prioridade.conflitoParChave.split('|').includes(record.eventoId))
+        .map(prioridade => prioridade.id)
+    }
+
     const { escopoTipo, escopoId } = extrairEscopoDoEvento(record)
     
     // Execute de forma atômica (D1 Batch ou Transaction local)
@@ -158,6 +173,14 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
           }
         })
       txQueries.push(txRsvp)
+
+      if (prioridadesConflitantesIds.length > 0) {
+        txQueries.push(
+          tx.delete(agendaPrioridadesConflito).where(
+            inArray(agendaPrioridadesConflito.id, prioridadesConflitantesIds)
+          )
+        )
+      }
 
       const auditQuery = criarAuditQuery(tx, {
         acao: 'RSVP_REGISTRADO',
