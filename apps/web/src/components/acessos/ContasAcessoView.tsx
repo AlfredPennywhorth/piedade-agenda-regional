@@ -217,7 +217,8 @@ export function ContasAcessoView() {
         : 'Foi gerado um link individual para redefinição do seu PIN na Agenda Regional São Paulo.'
 
     const mensagem = [
-      `Olá, ${conta.nome}.`,
+      `Caro irmão ${conta.nome}.`,
+      'A paz de Deus!',
       orientacao,
       link.url,
       `O link é válido até ${formatarExpiracao(link.expiraEm)} (horário de São Paulo).`,
