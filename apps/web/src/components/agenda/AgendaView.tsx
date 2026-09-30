@@ -53,6 +53,7 @@ export function AgendaView() {
   }, [])
 
   const handleRsvpUpdated = (destinatarioId: string, rsvp: any) => {
+    setError(null)
     setItems(current => current.map(item =>
       item.destinatarioId === destinatarioId ? { ...item, rsvp } : item
     ))
