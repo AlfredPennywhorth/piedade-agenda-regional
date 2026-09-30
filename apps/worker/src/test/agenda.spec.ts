@@ -266,4 +266,69 @@ describe('S07 - Minha Agenda', () => {
   })
 
 
+
+  it('3. Não restaura prioridade antiga quando o mesmo conflito é recriado após RSVP', async () => {
+    sqlite.exec(`
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo)
+      VALUES
+        ('ev-recria-a', 'Evento Recria A', 'PRESENCIAL', '2026-01-04T10:00:00Z', '2026-01-04T11:00:00Z', 'reg-1', 1),
+        ('ev-recria-b', 'Evento Recria B', 'PRESENCIAL', '2026-01-04T10:30:00Z', '2026-01-04T11:30:00Z', 'reg-1', 1);
+
+      INSERT INTO convocacoes (id, evento_id, status, ativo)
+      VALUES
+        ('conv-recria-a', 'ev-recria-a', 'PUBLICADA', 1),
+        ('conv-recria-b', 'ev-recria-b', 'PUBLICADA', 1);
+
+      INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id)
+      VALUES
+        ('dest-recria-a', 'conv-recria-a', '${membroId}'),
+        ('dest-recria-b', 'conv-recria-b', '${membroId}');
+
+      INSERT INTO rsvp
+        (id, convocacao_destinatario_id, resposta, respondido_em, atualizado_em)
+      VALUES
+        ('rsvp-recria-b', 'dest-recria-b', 'PARTICIPAREI', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+    `)
+
+    const priorizar = await req('/api/v1/minha-agenda/prioridade/ev-recria-a', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    })
+    expect(priorizar.status).toBe(200)
+
+    sqlite.exec(`
+      UPDATE rsvp
+      SET resposta = 'NAO_PARTICIPAREI', atualizado_em = '2026-01-01T00:01:00Z'
+      WHERE id = 'rsvp-recria-b';
+    `)
+
+    const semConflito = await req('/api/v1/minha-agenda', {
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    })
+    const agendaSemConflito = await semConflito.json() as any[]
+    expect(agendaSemConflito.find(item => item.evento.id === 'ev-recria-a').conflito).toBeNull()
+
+    sqlite.exec(`
+      UPDATE rsvp
+      SET resposta = 'PARTICIPAREI', atualizado_em = '2026-01-01T00:02:00Z'
+      WHERE id = 'rsvp-recria-b';
+    `)
+
+    const recriado = await req('/api/v1/minha-agenda', {
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    })
+    const agendaRecriada = await recriado.json() as any[]
+    const eventoA = agendaRecriada.find(item => item.evento.id === 'ev-recria-a')
+    const eventoB = agendaRecriada.find(item => item.evento.id === 'ev-recria-b')
+
+    expect(eventoA.conflito.priorizado).toBe(false)
+    expect(eventoA.conflito.atenuado).toBe(false)
+    expect(eventoB.conflito.priorizado).toBe(false)
+    expect(eventoB.conflito.atenuado).toBe(false)
+  })
+
 })
