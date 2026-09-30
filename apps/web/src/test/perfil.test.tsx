@@ -19,7 +19,7 @@ describe('PerfilView', () => {
     vi.clearAllMocks()
   })
 
-  it('deve exibir a data de ordenação retornada por /auth/me', async () => {
+  it('deve exibir a data de ordenação em formato brasileiro', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockResolvedValueOnce({
       id: 'membro-1',
       nome: 'Pessoa Teste',
@@ -46,7 +46,7 @@ describe('PerfilView', () => {
     render(<PerfilView />)
 
     await waitFor(() => {
-      expect(screen.getByText('2010-03-15')).toBeInTheDocument()
+      expect(screen.getByText('15/03/2010')).toBeInTheDocument()
     })
     expect(apiClient.fetchWithAuth).toHaveBeenCalledWith('/auth/me')
   })
