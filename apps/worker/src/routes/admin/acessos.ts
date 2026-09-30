@@ -765,7 +765,7 @@ adminAcessosApp.post('/membros/:id/sessoes/:sessaoId/revogar', async c => {
       recursoId: conta.id,
       escopoTipo: 'REGIONAL',
       escopoId: regionalId,
-      contexto: JSON.stringify({ membroId, sessaoId }),
+      contexto: { membroId, sessaoId },
       criadoEm: agora,
     }),
   ])
