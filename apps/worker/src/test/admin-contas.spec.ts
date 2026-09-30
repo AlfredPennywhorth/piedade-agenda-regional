@@ -520,6 +520,102 @@ describe('Administração de contas — PR-ACC-05', () => {
     expect((await response.json()) as any).toMatchObject({ code: 'AUTO_BLOQUEIO' })
   })
 
+
+  it('lista sessões ativas com identificação segura e permite revogar uma sessão específica', async () => {
+    const tokenAdmin = 'token-admin-sessoes-individuais'
+    await criarSessao('sessao-admin-individual', 'conta-admin', 'membro-admin', tokenAdmin)
+    await criarSessao('sessao-alvo-1', 'conta-reset', 'membro-reset', 'token-alvo-1')
+    await criarSessao('sessao-alvo-2', 'conta-reset', 'membro-reset', 'token-alvo-2')
+
+    sqlite.prepare(
+      `UPDATE sessoes
+       SET user_agent = ?, ultimo_acesso_em = ?
+       WHERE id = ?`
+    ).run(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36',
+      '2026-09-30T18:00:00.000Z',
+      'sessao-alvo-1'
+    )
+
+    const listar = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-reset/sessoes',
+      {
+        headers: { Authorization: `Bearer ${tokenAdmin}` },
+      }
+    )
+
+    expect(listar.status).toBe(200)
+    const sessoes = (await listar.json()) as any[]
+    expect(sessoes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'sessao-alvo-1',
+          ultimoAcessoEm: '2026-09-30T18:00:00.000Z',
+          dispositivo: 'Chrome em Windows',
+        }),
+        expect.objectContaining({ id: 'sessao-alvo-2' }),
+      ])
+    )
+
+    const revogar = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-reset/sessoes/sessao-alvo-1/revogar',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenAdmin}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }
+    )
+
+    expect(revogar.status).toBe(200)
+
+    const revogada = sqlite.prepare(
+      `SELECT revogado_em FROM sessoes WHERE id = 'sessao-alvo-1'`
+    ).get() as any
+    const preservada = sqlite.prepare(
+      `SELECT revogado_em FROM sessoes WHERE id = 'sessao-alvo-2'`
+    ).get() as any
+
+    expect(revogada.revogado_em).toBeTruthy()
+    expect(preservada.revogado_em).toBeNull()
+
+    const auditoria = sqlite.prepare(
+      `SELECT acao, contexto FROM auditoria_logs
+       WHERE recurso_id = 'conta-reset' AND acao = 'SESSAO_REVOGADA'`
+    ).get() as any
+    expect(auditoria.acao).toBe('SESSAO_REVOGADA')
+    expect(JSON.parse(auditoria.contexto)).toMatchObject({
+      membroId: 'membro-reset',
+      sessaoId: 'sessao-alvo-1',
+    })
+  })
+
+  it('não permite revogar sessão de outra conta pelo membro alvo', async () => {
+    const tokenAdmin = 'token-admin-sessao-fora'
+    await criarSessao('sessao-admin-fora', 'conta-admin', 'membro-admin', tokenAdmin)
+    await criarSessao('sessao-outra-conta', 'conta-outra', 'membro-outra', 'token-outra')
+
+    const response = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-reset/sessoes/sessao-outra-conta/revogar',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenAdmin}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }
+    )
+
+    expect(response.status).toBe(404)
+    const sessao = sqlite.prepare(
+      `SELECT revogado_em FROM sessoes WHERE id = 'sessao-outra-conta'`
+    ).get() as any
+    expect(sessao.revogado_em).toBeNull()
+  })
+
   it('revoga sessões manualmente sem alterar o estado da conta', async () => {
     const tokenAdmin = 'token-admin-revogacao'
     await criarSessao('sessao-admin-revogacao', 'conta-admin', 'membro-admin', tokenAdmin)
