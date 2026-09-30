@@ -325,12 +325,22 @@ adminAcessosApp.post('/membros/:id/link-ativacao', async c => {
       id: schema.membros.id,
       ativo: schema.membros.ativo,
       casaId: schema.membros.casaId,
+      codigoCarteirinha: schema.membros.codigoCarteirinha,
     })
     .from(schema.membros)
     .where(eq(schema.membros.id, membroId))
     .get()
   if (!membro || !membro.ativo) {
     return c.json({ error: 'Membro não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
+  }
+  if (!membro.codigoCarteirinha) {
+    return c.json(
+      {
+        error: 'Cadastre o código da carteirinha antes de gerar o link de ativação.',
+        code: 'CARTEIRINHA_OBRIGATORIA',
+      },
+      409
+    )
   }
 
   const contaExistente = await db
@@ -475,6 +485,21 @@ adminAcessosApp.post('/membros/:id/reset-pin', async c => {
   }
   if (await eUltimoMasterOperacional(db, conta.id)) {
     return c.json({ error: 'O último Master operacional não pode ter o PIN redefinido', code: 'ULTIMO_MASTER' }, 409)
+  }
+
+  const membro = await db
+    .select({ codigoCarteirinha: schema.membros.codigoCarteirinha })
+    .from(schema.membros)
+    .where(eq(schema.membros.id, membroId))
+    .get()
+  if (!membro?.codigoCarteirinha) {
+    return c.json(
+      {
+        error: 'Cadastre o código da carteirinha antes de redefinir o PIN.',
+        code: 'CARTEIRINHA_OBRIGATORIA',
+      },
+      409
+    )
   }
 
   const agora = new Date()
