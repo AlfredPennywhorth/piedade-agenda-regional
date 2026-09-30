@@ -83,6 +83,27 @@ describe('S07 - Minha Agenda', () => {
     expect(json[0].rsvp).toBeNull()
   })
 
+  it('2. Não cria autoconflito quando há histórico de check-in retificado', async () => {
+    sqlite.exec(`
+      INSERT INTO checkins
+        (id, convocacao_destinatario_id, evento_id, membro_id, forma, status)
+      VALUES
+        ('check-retificado', 'dest-1', 'ev-1', '${membroId}', 'MANUAL', 'RETIFICADO'),
+        ('check-ativo', 'dest-1', 'ev-1', '${membroId}', 'MANUAL', 'ATIVO');
+    `)
+
+    const res = await req('/api/v1/minha-agenda', {
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    })
+    expect(res.status).toBe(200)
+
+    const agenda = await res.json() as any[]
+    const evento = agenda.find(item => item.evento.id === 'ev-1')
+    expect(agenda.filter(item => item.evento.id === 'ev-1')).toHaveLength(1)
+    expect(evento.conflito).toBeNull()
+    expect(evento.checkin.id).toBe('check-ativo')
+  })
+
   it('2. Detecta sobreposição/proximidade e permite ao membro escolher a prioridade', async () => {
     sqlite.exec(`
       INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo)
