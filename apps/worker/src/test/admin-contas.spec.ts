@@ -39,7 +39,7 @@ describe('Administração de contas — PR-ACC-05', () => {
         ('membro-comum', 'Usuário Comum', '11900000003', '2000-01-03', 'CART-COMUM', 'casa-1', 1),
         ('membro-sem-conta', 'Pessoa Sem Conta', '11900000004', '2000-01-04', 'CART-SEM-CONTA', 'casa-1', 1),
         ('membro-reset', 'Pessoa Reset', '11900000005', '2000-01-05', 'CART-RESET', 'casa-1', 1),
-        ('membro-sem-carteira', 'Pessoa Legada', '11900000007', '2000-01-07', NULL, 'casa-1', 1),
+        ('membro-sem-carteira', 'Pessoa Legada', '11900000008', '2000-01-08', NULL, 'casa-1', 1),
         ('membro-outra-regional', 'Pessoa Outra Regional', '11900000006', '2000-01-06', 'CART-OUTRA', 'casa-2', 1);
 
       INSERT INTO contas_acesso
