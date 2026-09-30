@@ -82,4 +82,63 @@ describe('S07 - Minha Agenda', () => {
     expect(json[0].destinatarioId).toBe('dest-1')
     expect(json[0].rsvp).toBeNull()
   })
+
+  it('2. Detecta sobreposição/proximidade e permite ao membro escolher a prioridade', async () => {
+    sqlite.exec(`
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo)
+      VALUES
+        ('ev-2', 'Evento Sobreposto', 'PRESENCIAL', '2026-01-01T10:30:00Z', '2026-01-01T11:30:00Z', 'reg-1', 1),
+        ('ev-3', 'Evento Próximo', 'PRESENCIAL', '2026-01-01T12:30:00Z', '2026-01-01T13:30:00Z', 'reg-1', 1);
+
+      INSERT INTO convocacoes (id, evento_id, status, ativo)
+      VALUES
+        ('conv-2', 'ev-2', 'PUBLICADA', 1),
+        ('conv-3', 'ev-3', 'PUBLICADA', 1);
+
+      INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id)
+      VALUES
+        ('dest-2', 'conv-2', '${membroId}'),
+        ('dest-3', 'conv-3', '${membroId}');
+    `)
+
+    const antes = await req('/api/v1/minha-agenda', {
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    })
+    expect(antes.status).toBe(200)
+
+    const agendaAntes = await antes.json() as any[]
+    const ev1 = agendaAntes.find(item => item.evento.id === 'ev-1')
+    const ev2 = agendaAntes.find(item => item.evento.id === 'ev-2')
+    const ev3 = agendaAntes.find(item => item.evento.id === 'ev-3')
+
+    expect(ev1.conflito.tipo).toBe('SOBREPOSICAO')
+    expect(ev2.conflito.eventos).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ eventoId: 'ev-1', tipo: 'SOBREPOSICAO' }),
+        expect.objectContaining({ eventoId: 'ev-3', tipo: 'PROXIMIDADE' }),
+      ])
+    )
+    expect(ev3.conflito.tipo).toBe('PROXIMIDADE')
+    expect(ev3.conflito.janelaTransicaoMinutos).toBe(60)
+
+    const priorizar = await req('/api/v1/minha-agenda/prioridade/ev-2', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    })
+    expect(priorizar.status).toBe(200)
+
+    const depois = await req('/api/v1/minha-agenda', {
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    })
+    const agendaDepois = await depois.json() as any[]
+
+    expect(agendaDepois.find(item => item.evento.id === 'ev-2').conflito.priorizado).toBe(true)
+    expect(agendaDepois.find(item => item.evento.id === 'ev-1').conflito.atenuado).toBe(true)
+    expect(agendaDepois.find(item => item.evento.id === 'ev-3').conflito.atenuado).toBe(true)
+  })
+
 })
