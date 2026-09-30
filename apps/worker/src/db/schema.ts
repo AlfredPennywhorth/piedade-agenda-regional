@@ -752,9 +752,9 @@ export const agendaPrioridadesConflito = sqliteTable(
     ...timestampsS02,
   },
   table => ({
-    uniqueMembroEvento: uniqueIndex('idx_agenda_prioridade_membro_evento').on(
+    uniqueMembroConflito: uniqueIndex('idx_agenda_prioridade_membro_conflito').on(
       table.membroId,
-      table.eventoId
+      table.conflitoChave
     ),
     idxMembro: index('idx_agenda_prioridade_membro').on(table.membroId),
   })
