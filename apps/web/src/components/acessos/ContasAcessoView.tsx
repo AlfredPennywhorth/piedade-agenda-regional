@@ -37,12 +37,31 @@ interface FeedbackConta {
 interface LinkTemporarioContextual {
   membroId: string
   url: string
+  expiraEm: string
+  tipo: 'ATIVACAO' | 'REDEFINICAO'
 }
 
 function montarLink(token: string) {
   const url = new URL(window.location.origin + window.location.pathname)
   url.searchParams.set('ativacao', token)
   return url.toString()
+}
+
+function normalizarCelularWhatsApp(celular: string) {
+  const digitos = celular.replace(/\D/g, '')
+  if (digitos.startsWith('55') && (digitos.length === 12 || digitos.length === 13)) return digitos
+  if (digitos.length === 10 || digitos.length === 11) return `55${digitos}`
+  return null
+}
+
+function formatarExpiracao(expiraEm: string) {
+  const data = new Date(expiraEm)
+  if (Number.isNaN(data.getTime())) return expiraEm
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'America/Sao_Paulo',
+  }).format(data)
 }
 
 export function ContasAcessoView() {
@@ -97,6 +116,8 @@ export function ContasAcessoView() {
       setLinkTemporario({
         membroId: conta.membroId,
         url: montarLink(resposta.token),
+        expiraEm: resposta.expiraEm,
+        tipo: redefinicao ? 'REDEFINICAO' : 'ATIVACAO',
       })
       await carregar()
     } catch (error) {
@@ -168,6 +189,46 @@ export function ContasAcessoView() {
         mensagem: 'Não foi possível copiar automaticamente. Selecione o link e copie manualmente.',
       })
     }
+  }
+
+  const abrirWhatsApp = (conta: ContaAdministrada, link: LinkTemporarioContextual) => {
+    if (!conta.celular) {
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'alert',
+        mensagem: 'Cadastre um celular antes de enviar o link pelo WhatsApp.',
+      })
+      return
+    }
+
+    const telefone = normalizarCelularWhatsApp(conta.celular)
+    if (!telefone) {
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'alert',
+        mensagem: 'O celular informado não é válido para envio pelo WhatsApp.',
+      })
+      return
+    }
+
+    const orientacao =
+      link.tipo === 'ATIVACAO'
+        ? 'Foi gerado um link individual para ativação da sua conta na Agenda Regional São Paulo. Acesse-o para criar seu PIN.'
+        : 'Foi gerado um link individual para redefinição do seu PIN na Agenda Regional São Paulo.'
+
+    const mensagem = [
+      `Caro irmão ${conta.nome}.`,
+      'A paz de Deus!',
+      orientacao,
+      link.url,
+      `O link é válido até ${formatarExpiracao(link.expiraEm)} (horário de São Paulo).`,
+      'Use-o apenas para a sua conta e não compartilhe este link com outras pessoas.',
+    ].join('\n\n')
+
+    const whatsappUrl = new URL('https://web.whatsapp.com/send')
+    whatsappUrl.searchParams.set('phone', telefone)
+    whatsappUrl.searchParams.set('text', mensagem)
+    window.open(whatsappUrl.toString(), '_blank', 'noopener,noreferrer')
   }
 
   if (carregando) {
@@ -300,13 +361,23 @@ export function ContasAcessoView() {
                         aria-label={`Link temporário de ${conta.nome}`}
                         className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs text-slate-900"
                       />
-                      <div className="flex gap-2">
+                      <p className="text-xs">
+                        Validade: {formatarExpiracao(linkTemporario.expiraEm)}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
                           onClick={() => void copiarLink(conta.membroId, linkTemporario.url)}
                           className="rounded-lg bg-brand-700 px-3 py-2 text-sm font-semibold text-white"
                         >
                           Copiar link
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => abrirWhatsApp(conta, linkTemporario)}
+                          className="rounded-lg border border-emerald-600 px-3 py-2 text-sm font-semibold text-emerald-700"
+                        >
+                          Enviar pelo WhatsApp
                         </button>
                         <button
                           type="button"

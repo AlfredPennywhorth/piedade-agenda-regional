@@ -49,6 +49,7 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     vi.clearAllMocks()
     vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([contaAtiva])
     vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.spyOn(window, 'open').mockImplementation(() => null)
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText: vi.fn().mockResolvedValue(undefined) },
@@ -176,6 +177,109 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(
       within(artigoPessoaTeste!).getByLabelText('Link temporário de Pessoa Teste')
     ).toBeDefined()
+  })
+
+  it('abre o WhatsApp Web com telefone, link, validade e orientação de segurança', async () => {
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-whatsapp',
+      expiraEm: '2099-01-01T12:30:00.000Z',
+      membroId: 'membro-1',
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Redefinir PIN' }))
+
+    await screen.findByLabelText('Link temporário de Pessoa Teste')
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar pelo WhatsApp' }))
+
+    expect(window.open).toHaveBeenCalledTimes(1)
+    const [url, alvo, recursos] = vi.mocked(window.open).mock.calls[0]
+    expect(alvo).toBe('_blank')
+    expect(recursos).toBe('noopener,noreferrer')
+
+    const destino = new URL(String(url))
+    expect(destino.origin).toBe('https://web.whatsapp.com')
+    expect(destino.pathname).toBe('/send')
+    expect(destino.searchParams.get('phone')).toBe('5511999990000')
+
+    const mensagem = destino.searchParams.get('text') || ''
+    expect(mensagem).toContain('Caro irmão Pessoa Teste.')
+    expect(mensagem).toContain('A paz de Deus!')
+    expect(mensagem).toContain('ativacao=token-whatsapp')
+    expect(mensagem).toContain('válido até')
+    expect(mensagem).toContain('horário de São Paulo')
+    expect(mensagem).toContain('não compartilhe')
+  })
+
+  it('distingue ativação de conta na mensagem do WhatsApp', async () => {
+    const contaSemAcesso = {
+      ...contaAtiva,
+      contaAcessoId: null,
+      status: null,
+      acessos: [],
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([contaSemAcesso])
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-ativacao',
+      expiraEm: '2099-01-01T12:30:00.000Z',
+      membroId: 'membro-1',
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Gerar ativação' }))
+
+    await screen.findByLabelText('Link temporário de Pessoa Teste')
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar pelo WhatsApp' }))
+
+    const [url] = vi.mocked(window.open).mock.calls[0]
+    const destino = new URL(String(url))
+    const mensagem = destino.searchParams.get('text') || ''
+
+    expect(mensagem).toContain('ativação da sua conta')
+    expect(mensagem).toContain('criar seu PIN')
+    expect(mensagem).not.toContain('redefinição do seu PIN')
+  })
+
+  it('bloqueia envio pelo WhatsApp quando o celular é malformado', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([
+      { ...contaAtiva, celular: '123' },
+    ])
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-celular-invalido',
+      expiraEm: '2099-01-01T12:30:00.000Z',
+      membroId: 'membro-1',
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Redefinir PIN' }))
+    await screen.findByLabelText('Link temporário de Pessoa Teste')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar pelo WhatsApp' }))
+
+    expect(window.open).not.toHaveBeenCalled()
+    expect(await screen.findByText('O celular informado não é válido para envio pelo WhatsApp.')).toBeDefined()
+    expect(screen.getByLabelText('Link temporário de Pessoa Teste')).toBeDefined()
+  })
+
+  it('não oferece envio pelo WhatsApp sem celular válido e mantém o link disponível', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([
+      { ...contaAtiva, celular: null },
+    ])
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-sem-celular',
+      expiraEm: '2099-01-01T12:30:00.000Z',
+      membroId: 'membro-1',
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Redefinir PIN' }))
+    await screen.findByLabelText('Link temporário de Pessoa Teste')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar pelo WhatsApp' }))
+
+    expect(window.open).not.toHaveBeenCalled()
+    expect(await screen.findByText('Cadastre um celular antes de enviar o link pelo WhatsApp.')).toBeDefined()
+    expect(screen.getByLabelText('Link temporário de Pessoa Teste')).toBeDefined()
   })
 
   it('não redefine PIN quando a confirmação é cancelada', async () => {
