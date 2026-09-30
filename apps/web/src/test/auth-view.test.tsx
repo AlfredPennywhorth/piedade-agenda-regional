@@ -60,6 +60,9 @@ describe('AuthView — ativação e login', () => {
     expect(screen.getByRole('heading', { name: 'Ativar conta de acesso' })).toBeDefined()
     expect(screen.queryByDisplayValue('token-secreto-do-link')).toBeNull()
 
+    fireEvent.change(screen.getByLabelText('Código da carteirinha'), {
+      target: { value: 'CARTEIRA-TESTE' },
+    })
     fireEvent.change(screen.getByLabelText('Celular'), {
       target: { value: '11988887777' },
     })
@@ -74,6 +77,7 @@ describe('AuthView — ativação e login', () => {
     await waitFor(() => {
       expect(apiClient.postPublic).toHaveBeenCalledWith('/auth/ativar', {
         token: 'token-secreto-do-link',
+        codigoCarteirinha: 'CARTEIRA-TESTE',
         celular: '11988887777',
         pin: '654321',
         confirmacaoPin: '654321',
