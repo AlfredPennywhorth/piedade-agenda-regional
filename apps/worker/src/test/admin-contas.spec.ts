@@ -526,6 +526,7 @@ describe('Administração de contas — PR-ACC-05', () => {
     await criarSessao('sessao-admin-individual', 'conta-admin', 'membro-admin', tokenAdmin)
     await criarSessao('sessao-alvo-1', 'conta-reset', 'membro-reset', 'token-alvo-1')
     await criarSessao('sessao-alvo-2', 'conta-reset', 'membro-reset', 'token-alvo-2')
+    await criarSessao('sessao-expirada-inatividade', 'conta-reset', 'membro-reset', 'token-expirada')
 
     sqlite.prepare(
       `UPDATE sessoes
@@ -533,8 +534,19 @@ describe('Administração de contas — PR-ACC-05', () => {
        WHERE id = ?`
     ).run(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36',
-      '2026-09-30T18:00:00.000Z',
+      new Date(Date.now() - 60 * 60 * 1000).toISOString(),
       'sessao-alvo-1'
+    )
+
+    sqlite.prepare(
+      `UPDATE sessoes
+       SET created_at = ?, ultimo_acesso_em = ?, expira_em = ?
+       WHERE id = ?`
+    ).run(
+      new Date(Date.now() - 13 * 60 * 60 * 1000).toISOString(),
+      new Date(Date.now() - 13 * 60 * 60 * 1000).toISOString(),
+      new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+      'sessao-expirada-inatividade'
     )
 
     const listar = await requisicao(
@@ -550,12 +562,12 @@ describe('Administração de contas — PR-ACC-05', () => {
       expect.arrayContaining([
         expect.objectContaining({
           id: 'sessao-alvo-1',
-          ultimoAcessoEm: '2026-09-30T18:00:00.000Z',
           dispositivo: 'Chrome em Windows',
         }),
         expect.objectContaining({ id: 'sessao-alvo-2' }),
       ])
     )
+    expect(sessoes.some(sessao => sessao.id === 'sessao-expirada-inatividade')).toBe(false)
 
     const revogar = await requisicao(
       '/api/v1/admin/acessos/membros/membro-reset/sessoes/sessao-alvo-1/revogar',
