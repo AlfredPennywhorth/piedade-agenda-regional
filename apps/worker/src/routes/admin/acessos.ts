@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
-import { and, eq, gt, inArray, isNull } from 'drizzle-orm'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { executeAtomic } from '../../db/batch'
 import { gerarTokenAleatorio, hashToken } from '../../security/tokens'
-import { authMiddleware, Variables } from '../../middleware/auth'
+import { authMiddleware, sessaoEstaAtiva, Variables } from '../../middleware/auth'
 import {
   eMasterSistema,
   obterRegionalDoEscopo,
@@ -681,27 +681,23 @@ adminAcessosApp.get('/membros/:id/sessoes', async c => {
     return c.json({ error: 'Conta de acesso não encontrada', code: 'NOT_FOUND' }, 404)
   }
 
-  const agora = new Date().toISOString()
+  const instanteAtual = Date.now()
   const sessoes = await db
     .select({
       id: schema.sessoes.id,
       createdAt: schema.sessoes.createdAt,
       ultimoAcessoEm: schema.sessoes.ultimoAcessoEm,
       expiraEm: schema.sessoes.expiraEm,
+      revogadoEm: schema.sessoes.revogadoEm,
       userAgent: schema.sessoes.userAgent,
     })
     .from(schema.sessoes)
-    .where(
-      and(
-        eq(schema.sessoes.contaAcessoId, conta.id),
-        isNull(schema.sessoes.revogadoEm),
-        gt(schema.sessoes.expiraEm, agora)
-      )
-    )
+    .where(eq(schema.sessoes.contaAcessoId, conta.id))
     .all()
 
   return c.json(
     sessoes
+      .filter((sessao: any) => sessaoEstaAtiva(sessao, instanteAtual))
       .sort((a: any, b: any) =>
         (b.ultimoAcessoEm ?? b.createdAt).localeCompare(a.ultimoAcessoEm ?? a.createdAt)
       )
