@@ -113,7 +113,8 @@ async function buscarRegistrosAgenda(db: any, membroId: string): Promise<Registr
       checkins,
       and(
         eq(checkins.eventoId, eventos.id),
-        eq(checkins.membroId, membroId)
+        eq(checkins.membroId, membroId),
+        eq(checkins.status, 'ATIVO')
       )
     )
     .where(
