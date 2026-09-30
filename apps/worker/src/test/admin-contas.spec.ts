@@ -39,6 +39,7 @@ describe('Administração de contas — PR-ACC-05', () => {
         ('membro-comum', 'Usuário Comum', '11900000003', '2000-01-03', 'CART-COMUM', 'casa-1', 1),
         ('membro-sem-conta', 'Pessoa Sem Conta', '11900000004', '2000-01-04', 'CART-SEM-CONTA', 'casa-1', 1),
         ('membro-reset', 'Pessoa Reset', '11900000005', '2000-01-05', 'CART-RESET', 'casa-1', 1),
+        ('membro-sem-carteira', 'Pessoa Legada', '11900000007', '2000-01-07', NULL, 'casa-1', 1),
         ('membro-outra-regional', 'Pessoa Outra Regional', '11900000006', '2000-01-06', 'CART-OUTRA', 'casa-2', 1);
 
       INSERT INTO contas_acesso
@@ -48,6 +49,7 @@ describe('Administração de contas — PR-ACC-05', () => {
         ('conta-master', 'membro-master', 'ATIVA', 'hash-master', 'salt-master', CURRENT_TIMESTAMP),
         ('conta-comum', 'membro-comum', 'ATIVA', 'hash-comum', 'salt-comum', CURRENT_TIMESTAMP),
         ('conta-reset', 'membro-reset', 'ATIVA', 'hash-antigo', 'salt-antigo', CURRENT_TIMESTAMP),
+        ('conta-sem-carteira', 'membro-sem-carteira', 'ATIVA', 'hash-legado', 'salt-legado', CURRENT_TIMESTAMP),
         ('conta-outra', 'membro-outra-regional', 'ATIVA', 'hash-outra', 'salt-outra', CURRENT_TIMESTAMP);
 
       INSERT INTO acessos_conta
@@ -255,6 +257,75 @@ describe('Administração de contas — PR-ACC-05', () => {
 
     const links = sqlite.prepare(
       "SELECT COUNT(*) AS total FROM links_ativacao WHERE conta_acesso_id = 'conta-reset'"
+    ).get() as any
+    expect(links.total).toBe(0)
+  })
+
+  it('não gera link de ativação quando a carteirinha ainda não está cadastrada', async () => {
+    const tokenAdmin = 'token-admin-sem-carteira-link'
+    await criarSessao('sessao-admin-sem-carteira-link', 'conta-admin', 'membro-admin', tokenAdmin)
+
+    sqlite.prepare(`UPDATE contas_acesso SET status = 'PENDENTE_ATIVACAO' WHERE id = 'conta-sem-carteira'`).run()
+
+    const response = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-sem-carteira/link-ativacao',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenAdmin}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }
+    )
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'CARTEIRINHA_OBRIGATORIA' })
+    const links = sqlite.prepare(
+      "SELECT COUNT(*) AS total FROM links_ativacao WHERE conta_acesso_id = 'conta-sem-carteira'"
+    ).get() as any
+    expect(links.total).toBe(0)
+
+    sqlite.prepare(`UPDATE contas_acesso SET status = 'ATIVA' WHERE id = 'conta-sem-carteira'`).run()
+  })
+
+  it('não redefine PIN sem carteirinha e preserva a conta e as sessões', async () => {
+    const tokenAdmin = 'token-admin-sem-carteira-reset'
+    const tokenLegado = 'token-legado-ativo'
+    await criarSessao('sessao-admin-sem-carteira-reset', 'conta-admin', 'membro-admin', tokenAdmin)
+    await criarSessao('sessao-legada', 'conta-sem-carteira', 'membro-sem-carteira', tokenLegado)
+
+    const response = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-sem-carteira/reset-pin',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenAdmin}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }
+    )
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'CARTEIRINHA_OBRIGATORIA' })
+
+    const conta = sqlite.prepare(
+      "SELECT status, pin_hash, pin_salt FROM contas_acesso WHERE id = 'conta-sem-carteira'"
+    ).get() as any
+    expect(conta).toMatchObject({
+      status: 'ATIVA',
+      pin_hash: 'hash-legado',
+      pin_salt: 'salt-legado',
+    })
+
+    const sessao = sqlite.prepare(
+      "SELECT revogado_em FROM sessoes WHERE id = 'sessao-legada'"
+    ).get() as any
+    expect(sessao.revogado_em).toBeNull()
+
+    const links = sqlite.prepare(
+      "SELECT COUNT(*) AS total FROM links_ativacao WHERE conta_acesso_id = 'conta-sem-carteira'"
     ).get() as any
     expect(links.total).toBe(0)
   })
