@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS agenda_prioridades_conflito (
   FOREIGN KEY (evento_id) REFERENCES eventos(id)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_agenda_prioridade_membro_evento
-  ON agenda_prioridades_conflito (membro_id, evento_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_agenda_prioridade_membro_conflito
+  ON agenda_prioridades_conflito (membro_id, conflito_chave);
 
 CREATE INDEX IF NOT EXISTS idx_agenda_prioridade_membro
   ON agenda_prioridades_conflito (membro_id);
