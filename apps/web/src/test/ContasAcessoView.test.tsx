@@ -385,7 +385,7 @@ describe('ContasAcessoView — PR-ACC-05', () => {
       contaAcessoId: 'conta-2',
     })
 
-    render(<ContasAcessoView />)
+    render(<ContasAcessoView podeGerenciarSessoes />)
 
     const artigoOutraPessoa = (await screen.findByText('Outra Pessoa')).closest('article')
     expect(artigoOutraPessoa).not.toBeNull()
