@@ -51,7 +51,7 @@ function normalizarCelularWhatsApp(celular: string) {
   const digitos = celular.replace(/\D/g, '')
   if (digitos.startsWith('55') && (digitos.length === 12 || digitos.length === 13)) return digitos
   if (digitos.length === 10 || digitos.length === 11) return `55${digitos}`
-  return digitos
+  return null
 }
 
 function formatarExpiracao(expiraEm: string) {
