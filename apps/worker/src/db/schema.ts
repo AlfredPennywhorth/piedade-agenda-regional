@@ -745,6 +745,7 @@ export const agendaPrioridadesConflito = sqliteTable(
     eventoId: text('evento_id')
       .notNull()
       .references(() => eventos.id),
+    conflitoChave: text('conflito_chave').notNull(),
     priorizadoEm: text('priorizado_em')
       .notNull()
       .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
