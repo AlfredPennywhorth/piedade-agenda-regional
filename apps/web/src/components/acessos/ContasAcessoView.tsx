@@ -133,6 +133,10 @@ export function ContasAcessoView({ onPendenciasAtualizadas }: ContasAcessoViewPr
         ? `/admin/acessos/membros/${conta.membroId}/reset-pin`
         : `/admin/acessos/membros/${conta.membroId}/link-ativacao`
       const resposta = await postWithAuth<LinkTemporario>(endpoint, {})
+      if (redefinicao) {
+        setSessoesAbertasMembroId(null)
+        setSessoesPorMembro(atual => ({ ...atual, [conta.membroId]: [] }))
+      }
       setLinkTemporario({
         membroId: conta.membroId,
         url: montarLink(resposta.token),
@@ -159,6 +163,10 @@ export function ContasAcessoView({ onPendenciasAtualizadas }: ContasAcessoViewPr
     setFeedback(null)
     try {
       await patchWithAuth(`/admin/acessos/membros/${conta.membroId}/status`, { status })
+      if (status === 'BLOQUEADA') {
+        setSessoesAbertasMembroId(null)
+        setSessoesPorMembro(atual => ({ ...atual, [conta.membroId]: [] }))
+      }
       setFeedback({
         membroId: conta.membroId,
         tipo: 'status',
@@ -212,10 +220,10 @@ export function ContasAcessoView({ onPendenciasAtualizadas }: ContasAcessoViewPr
         `/admin/acessos/membros/${conta.membroId}/sessoes/${sessao.id}/revogar`,
         {}
       )
-      const sessoes = await fetchWithAuth<SessaoAdministrada[]>(
-        `/admin/acessos/membros/${conta.membroId}/sessoes`
-      )
-      setSessoesPorMembro(atual => ({ ...atual, [conta.membroId]: sessoes }))
+      setSessoesPorMembro(atual => ({
+        ...atual,
+        [conta.membroId]: (atual[conta.membroId] ?? []).filter(item => item.id !== sessao.id),
+      }))
       setFeedback({
         membroId: conta.membroId,
         tipo: 'status',
@@ -416,7 +424,7 @@ export function ContasAcessoView({ onPendenciasAtualizadas }: ContasAcessoViewPr
                 )}
               </div>
             </div>
-            {conta.contaAcessoId && sessoesAbertasMembroId === conta.membroId && (
+            {conta.contaAcessoId && conta.status === 'ATIVA' && sessoesAbertasMembroId === conta.membroId && (
               <section className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-label={`Sessões ativas de ${conta.nome}`}>
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div>
