@@ -205,7 +205,10 @@ function App() {
       {currentTab === 'vinculos-funcionais' && capacidades.podeAdministrarPessoas === true && <VinculosFuncionaisView />}
       {currentTab === 'locais' && capacidades.podeGerirAgenda === true && <LocaisView />}
       {currentTab === 'acessos' && capacidades.podeAdministrarAcessos === true && (
-        <ContasAcessoView onPendenciasAtualizadas={setRecuperacoesPinPendentes} />
+        <ContasAcessoView
+          onPendenciasAtualizadas={setRecuperacoesPinPendentes}
+          podeGerenciarSessoes={capacidades.podeGerenciarSessoes === true}
+        />
       )}
       
       {currentTab === 'avisos' && (
