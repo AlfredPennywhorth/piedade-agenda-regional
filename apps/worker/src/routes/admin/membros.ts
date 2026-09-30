@@ -28,6 +28,16 @@ adminMembrosApp.post('/:id/link-ativacao', async c => {
     return c.json({ error: 'Membro não encontrado ou inativo' }, 404)
   }
 
+  if (!membro.codigoCarteirinha) {
+    return c.json(
+      {
+        error: 'Cadastre o código da carteirinha antes de gerar o link de ativação.',
+        code: 'CARTEIRINHA_OBRIGATORIA',
+      },
+      409
+    )
+  }
+
   const [contaExistente] = await db
     .select()
     .from(schema.contasAcesso)
@@ -119,6 +129,22 @@ adminMembrosApp.post('/:id/reset-autenticacao', async c => {
 
   if (conta.status === 'BLOQUEADA' || conta.status === 'DESATIVADA') {
     return c.json({ error: 'Conta indisponível para redefinição', code: 'CONTA_INDISPONIVEL' }, 409)
+  }
+
+  const [membro] = await db
+    .select({ codigoCarteirinha: schema.membros.codigoCarteirinha })
+    .from(schema.membros)
+    .where(eq(schema.membros.id, membroId))
+    .limit(1)
+
+  if (!membro?.codigoCarteirinha) {
+    return c.json(
+      {
+        error: 'Cadastre o código da carteirinha antes de redefinir o PIN.',
+        code: 'CARTEIRINHA_OBRIGATORIA',
+      },
+      409
+    )
   }
 
   const agora = new Date()
