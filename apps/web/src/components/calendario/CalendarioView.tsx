@@ -24,11 +24,14 @@ export function CalendarioView() {
   const [selectedDayEvents, setSelectedDayEvents] = useState<AgendaItem[] | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<AgendaItem | null>(null)
+  const geracaoCargaAgenda = useRef(0)
 
   const carregarAgenda = async (
     rsvpRecemSalvo?: { destinatarioId: string; rsvp: AgendaItem['rsvp'] }
   ) => {
+    const geracao = ++geracaoCargaAgenda.current
     const data = await fetchWithAuth<AgendaItem[]>('/minha-agenda')
+    if (geracao !== geracaoCargaAgenda.current) return
     const atualizados = data.map(item =>
       rsvpRecemSalvo && item.destinatarioId === rsvpRecemSalvo.destinatarioId
         ? { ...item, rsvp: rsvpRecemSalvo.rsvp }
