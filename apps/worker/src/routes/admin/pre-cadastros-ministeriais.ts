@@ -355,7 +355,26 @@ adminPreCadastrosMinisteriaisApp.post('/:id/finalizar', async c => {
         criadoEm: agora,
       }),
     ])
-  } catch {
+  } catch (error) {
+    const erroObjeto = error && typeof error === 'object' ? error as Record<string, unknown> : null
+    const codigoErro =
+      typeof erroObjeto?.code === 'string' && /^[A-Z0-9_:-]{1,80}$/.test(erroObjeto.code)
+        ? erroObjeto.code
+        : null
+    const nomeErro =
+      error instanceof Error && /^[A-Za-z0-9_.:-]{1,80}$/.test(error.name)
+        ? error.name
+        : 'ErroDesconhecido'
+
+    console.error('Falha ao finalizar pré-cadastro ministerial', {
+      preCadastroId: preCadastro.id,
+      membroId,
+      casaId,
+      funcaoDcoId: funcaoDco.id,
+      sincronizacoesDco: sincronizacoesDco.length,
+      nomeErro,
+      codigoErro,
+    })
     return c.json(
       { error: 'Não foi possível finalizar o pré-cadastro', code: 'FINALIZACAO_FALHOU' },
       409
