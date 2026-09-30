@@ -73,8 +73,8 @@ function montarMapaConflitos(records: RegistroAgenda[]) {
   return mapa
 }
 
-function chaveConflito(eventoIds: string[]) {
-  return eventoIds.slice().sort().join('|')
+function chaveConflitoPar(eventoAId: string, eventoBId: string) {
+  return [eventoAId, eventoBId].sort().join('|')
 }
 
 async function buscarRegistrosAgenda(db: any, membroId: string): Promise<RegistroAgenda[]> {
@@ -158,29 +158,22 @@ agendaRouter.get('/', async (c) => {
         .map(refeicao => refeicao.tipo)
 
       const conflitosDiretos = mapaConflitos.get(record.evento.id) ?? []
-      const prioridadeAtual = prioridades.find(prioridade => prioridade.eventoId === record.evento.id)
-      const chaveDiretaAtual = chaveConflito([
-        record.evento.id,
-        ...conflitosDiretos.map(conflito => conflito.eventoId),
-      ])
-      const priorizado = Boolean(
-        prioridadeAtual && prioridadeAtual.conflitoChave === chaveDiretaAtual
+      const escolhasDiretas = conflitosDiretos
+        .map(conflito => {
+          const conflitoChave = chaveConflitoPar(record.evento.id, conflito.eventoId)
+          const prioridade = prioridades.find(item => item.conflitoChave === conflitoChave)
+          return prioridade ? { conflito, prioridade } : null
+        })
+        .filter(Boolean) as Array<{
+          conflito: { eventoId: string; tipo: 'SOBREPOSICAO' | 'PROXIMIDADE' }
+          prioridade: { eventoId: string; conflitoChave: string }
+        }>
+      const priorizado = escolhasDiretas.some(
+        escolha => escolha.prioridade.eventoId === record.evento.id
       )
-
-      const atenuado = !priorizado && conflitosDiretos.some(conflito => {
-        const prioridadeVizinha = prioridades.find(
-          prioridade => prioridade.eventoId === conflito.eventoId
-        )
-        if (!prioridadeVizinha) return false
-
-        const conflitosDoVizinho = mapaConflitos.get(conflito.eventoId) ?? []
-        const chaveVizinhaAtual = chaveConflito([
-          conflito.eventoId,
-          ...conflitosDoVizinho.map(item => item.eventoId),
-        ])
-
-        return prioridadeVizinha.conflitoChave === chaveVizinhaAtual
-      })
+      const atenuado = escolhasDiretas.some(
+        escolha => escolha.prioridade.eventoId !== record.evento.id
+      )
       const temSobreposicao = conflitosDiretos.some(conflito => conflito.tipo === 'SOBREPOSICAO')
 
       return {
@@ -249,27 +242,29 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
   }
 
   const conflitosDiretos = mapaConflitos.get(eventoId) ?? []
-  const grupoDireto = [eventoId, ...conflitosDiretos.map(conflito => conflito.eventoId)]
-  const conflitoChave = chaveConflito(grupoDireto)
+  const conflitoChaves = conflitosDiretos.map(conflito =>
+    chaveConflitoPar(eventoId, conflito.eventoId)
+  )
   const agora = new Date().toISOString()
-  const prioridadeId = crypto.randomUUID()
 
   await executeAtomic(db, tx => [
     tx.delete(agendaPrioridadesConflito).where(
       and(
         eq(agendaPrioridadesConflito.membroId, membroId),
-        inArray(agendaPrioridadesConflito.eventoId, grupoDireto)
+        inArray(agendaPrioridadesConflito.conflitoChave, conflitoChaves)
       )
     ),
-    tx.insert(agendaPrioridadesConflito).values({
-      id: prioridadeId,
-      membroId,
-      eventoId,
-      conflitoChave,
-      priorizadoEm: agora,
-      createdAt: agora,
-      updatedAt: agora,
-    }),
+    ...conflitoChaves.map(conflitoChave =>
+      tx.insert(agendaPrioridadesConflito).values({
+        id: crypto.randomUUID(),
+        membroId,
+        eventoId,
+        conflitoChave,
+        priorizadoEm: agora,
+        createdAt: agora,
+        updatedAt: agora,
+      })
+    ),
   ])
 
   return c.json({
