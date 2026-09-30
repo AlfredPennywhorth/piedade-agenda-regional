@@ -267,12 +267,12 @@ describe('S07 - Minha Agenda', () => {
 
 
 
-  it('3. Não restaura prioridade antiga quando o mesmo conflito é recriado após RSVP', async () => {
+  it('3. Preserva prioridade em RSVP equivalente e não a restaura após sair do conflito', async () => {
     sqlite.exec(`
       INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo)
       VALUES
-        ('ev-recria-a', 'Evento Recria A', 'PRESENCIAL', '2026-01-04T10:00:00Z', '2026-01-04T11:00:00Z', 'reg-1', 1),
-        ('ev-recria-b', 'Evento Recria B', 'PRESENCIAL', '2026-01-04T10:30:00Z', '2026-01-04T11:30:00Z', 'reg-1', 1);
+        ('ev-recria-a', 'Evento Recria A', 'PRESENCIAL', '2027-01-04T10:00:00Z', '2027-01-04T11:00:00Z', 'reg-1', 1),
+        ('ev-recria-b', 'Evento Recria B', 'PRESENCIAL', '2027-01-04T10:30:00Z', '2027-01-04T11:30:00Z', 'reg-1', 1);
 
       INSERT INTO convocacoes (id, evento_id, status, ativo)
       VALUES
@@ -287,7 +287,7 @@ describe('S07 - Minha Agenda', () => {
       INSERT INTO rsvp
         (id, convocacao_destinatario_id, resposta, respondido_em, atualizado_em)
       VALUES
-        ('rsvp-recria-b', 'dest-recria-b', 'PARTICIPAREI', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+        ('rsvp-recria-b', 'dest-recria-b', 'PARTICIPAREI', '2026-09-30T00:00:00Z', '2026-09-30T00:00:00Z');
     `)
 
     const priorizar = await req('/api/v1/minha-agenda/prioridade/ev-recria-a', {
@@ -300,11 +300,34 @@ describe('S07 - Minha Agenda', () => {
     })
     expect(priorizar.status).toBe(200)
 
-    sqlite.exec(`
-      UPDATE rsvp
-      SET resposta = 'NAO_PARTICIPAREI', atualizado_em = '2026-01-01T00:01:00Z'
-      WHERE id = 'rsvp-recria-b';
-    `)
+    const salvarEquivalente = await req('/api/v1/minha-agenda/rsvp/dest-recria-b', {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI' }),
+    })
+    expect(salvarEquivalente.status).toBe(200)
+
+    const aposEquivalente = await req('/api/v1/minha-agenda', {
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    })
+    const agendaEquivalente = await aposEquivalente.json() as any[]
+    expect(agendaEquivalente.find(item => item.evento.id === 'ev-recria-a').conflito.priorizado).toBe(true)
+
+    const sairDoConflito = await req('/api/v1/minha-agenda/rsvp/dest-recria-b', {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        resposta: 'NAO_PARTICIPAREI',
+        justificativa: 'Outro compromisso',
+      }),
+    })
+    expect(sairDoConflito.status).toBe(200)
 
     const semConflito = await req('/api/v1/minha-agenda', {
       headers: { Authorization: `Bearer ${sessionToken}` }
@@ -312,11 +335,15 @@ describe('S07 - Minha Agenda', () => {
     const agendaSemConflito = await semConflito.json() as any[]
     expect(agendaSemConflito.find(item => item.evento.id === 'ev-recria-a').conflito).toBeNull()
 
-    sqlite.exec(`
-      UPDATE rsvp
-      SET resposta = 'PARTICIPAREI', atualizado_em = '2026-01-01T00:02:00Z'
-      WHERE id = 'rsvp-recria-b';
-    `)
+    const voltarAoConflito = await req('/api/v1/minha-agenda/rsvp/dest-recria-b', {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI' }),
+    })
+    expect(voltarAoConflito.status).toBe(200)
 
     const recriado = await req('/api/v1/minha-agenda', {
       headers: { Authorization: `Bearer ${sessionToken}` }
@@ -329,6 +356,17 @@ describe('S07 - Minha Agenda', () => {
     expect(eventoA.conflito.atenuado).toBe(false)
     expect(eventoB.conflito.priorizado).toBe(false)
     expect(eventoB.conflito.atenuado).toBe(false)
+
+    const linhasAposSaida = sqlite
+      .prepare(`
+        SELECT COUNT(*) AS total
+        FROM agenda_prioridades_conflito
+        WHERE membro_id = ?
+          AND conflito_par_chave = ?
+      `)
+      .get(membroId, 'ev-recria-a|ev-recria-b') as { total: number }
+
+    expect(linhasAposSaida.total).toBe(0)
 
     const repriorizar = await req('/api/v1/minha-agenda/prioridade/ev-recria-a', {
       method: 'POST',
