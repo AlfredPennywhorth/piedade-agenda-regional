@@ -80,6 +80,11 @@ describe('LocaisView', () => {
     expect(screen.queryByText('Templo Central')).not.toBeInTheDocument()
     expect(screen.getByText('Salão Regional')).toBeInTheDocument()
 
+    fireEvent.change(filtro, { target: { value: '13000000' } })
+
+    expect(screen.queryByText('Templo Central')).not.toBeInTheDocument()
+    expect(screen.getByText('Salão Regional')).toBeInTheDocument()
+
     fireEvent.change(filtro, { target: { value: 'inexistente' } })
     expect(screen.getByText('Nenhum local encontrado para a pesquisa informada.')).toBeInTheDocument()
   })
