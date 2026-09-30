@@ -89,12 +89,18 @@ function assinaturaConflito(record: RegistroAgenda) {
   ].join('@')
 }
 
+function chaveParEstavel(eventoAId: string, eventoBId: string) {
+  return [eventoAId, eventoBId].sort().join('|')
+}
+
 function chaveConflitoPar(
   a: RegistroAgenda,
   b: RegistroAgenda,
   tipo: 'SOBREPOSICAO' | 'PROXIMIDADE'
 ) {
-  return [...[a, b].sort((x, y) => x.evento.id.localeCompare(y.evento.id)).map(assinaturaConflito), tipo].join('|')
+  return [chaveParEstavel(a.evento.id, b.evento.id), ...[a, b]
+    .sort((x, y) => x.evento.id.localeCompare(y.evento.id))
+    .map(assinaturaConflito), tipo].join('|')
 }
 
 async function buscarRegistrosAgenda(db: any, membroId: string): Promise<RegistroAgenda[]> {
@@ -147,7 +153,7 @@ agendaRouter.get('/', async (c) => {
     const mapaConflitos = montarMapaConflitos(records)
 
     let refOferecidas: any[] = []
-    let prioridades: Array<{ eventoId: string; conflitoChave: string }> = []
+    let prioridades: Array<{ eventoId: string; conflitoParChave: string; conflitoChave: string }> = []
 
     if (eventoIds.length > 0) {
       ;[refOferecidas, prioridades] = await Promise.all([
@@ -157,6 +163,7 @@ agendaRouter.get('/', async (c) => {
           .all(),
         db.select({
           eventoId: agendaPrioridadesConflito.eventoId,
+          conflitoParChave: agendaPrioridadesConflito.conflitoParChave,
           conflitoChave: agendaPrioridadesConflito.conflitoChave,
         })
           .from(agendaPrioridadesConflito)
@@ -265,25 +272,30 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
 
   const conflitosDiretos = mapaConflitos.get(eventoId) ?? []
   const porId = new Map(records.map(record => [record.evento.id, record]))
-  const conflitoChaves = conflitosDiretos.map(conflito => {
+  const conflitosPersistidos = conflitosDiretos.map(conflito => {
     const outro = porId.get(conflito.eventoId)
     if (!outro) throw new Error('Conflito aponta para evento ausente da agenda')
-    return chaveConflitoPar(selecionado, outro, conflito.tipo)
+    return {
+      conflitoParChave: chaveParEstavel(eventoId, conflito.eventoId),
+      conflitoChave: chaveConflitoPar(selecionado, outro, conflito.tipo),
+    }
   })
+  const conflitoParChaves = conflitosPersistidos.map(item => item.conflitoParChave)
   const agora = new Date().toISOString()
 
   await executeAtomic(db, tx => [
     tx.delete(agendaPrioridadesConflito).where(
       and(
         eq(agendaPrioridadesConflito.membroId, membroId),
-        inArray(agendaPrioridadesConflito.conflitoChave, conflitoChaves)
+        inArray(agendaPrioridadesConflito.conflitoParChave, conflitoParChaves)
       )
     ),
-    ...conflitoChaves.map(conflitoChave =>
+    ...conflitosPersistidos.map(({ conflitoParChave, conflitoChave }) =>
       tx.insert(agendaPrioridadesConflito).values({
         id: crypto.randomUUID(),
         membroId,
         eventoId,
+        conflitoParChave,
         conflitoChave,
         priorizadoEm: agora,
         createdAt: agora,
