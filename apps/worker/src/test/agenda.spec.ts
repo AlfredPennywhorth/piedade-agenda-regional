@@ -160,6 +160,53 @@ describe('S07 - Minha Agenda', () => {
     expect(eventoC.conflito.atenuado).toBe(false)
   })
 
+  it('2. Atenua apenas compromissos em conflito direto', async () => {
+    sqlite.exec(`
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo)
+      VALUES
+        ('ev-chain-a', 'Evento Cadeia A', 'PRESENCIAL', '2026-01-03T10:00:00Z', '2026-01-03T11:00:00Z', 'reg-1', 1),
+        ('ev-chain-b', 'Evento Cadeia B', 'PRESENCIAL', '2026-01-03T11:30:00Z', '2026-01-03T12:30:00Z', 'reg-1', 1),
+        ('ev-chain-c', 'Evento Cadeia C', 'PRESENCIAL', '2026-01-03T13:00:00Z', '2026-01-03T14:00:00Z', 'reg-1', 1);
+
+      INSERT INTO convocacoes (id, evento_id, status, ativo)
+      VALUES
+        ('conv-chain-a', 'ev-chain-a', 'PUBLICADA', 1),
+        ('conv-chain-b', 'ev-chain-b', 'PUBLICADA', 1),
+        ('conv-chain-c', 'ev-chain-c', 'PUBLICADA', 1);
+
+      INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id)
+      VALUES
+        ('dest-chain-a', 'conv-chain-a', '${membroId}'),
+        ('dest-chain-b', 'conv-chain-b', '${membroId}'),
+        ('dest-chain-c', 'conv-chain-c', '${membroId}');
+    `)
+
+    const priorizar = await req('/api/v1/minha-agenda/prioridade/ev-chain-a', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    })
+    expect(priorizar.status).toBe(200)
+
+    const res = await req('/api/v1/minha-agenda', {
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    })
+    const agenda = await res.json() as any[]
+
+    const a = agenda.find(item => item.evento.id === 'ev-chain-a')
+    const b = agenda.find(item => item.evento.id === 'ev-chain-b')
+    const cItem = agenda.find(item => item.evento.id === 'ev-chain-c')
+
+    expect(a.conflito.priorizado).toBe(true)
+    expect(a.conflito.atenuado).toBe(false)
+    expect(b.conflito.atenuado).toBe(true)
+    expect(cItem.conflito.priorizado).toBe(false)
+    expect(cItem.conflito.atenuado).toBe(false)
+  })
+
   it('2. Detecta sobreposição/proximidade e permite ao membro escolher a prioridade', async () => {
     sqlite.exec(`
       INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo)
