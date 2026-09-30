@@ -104,6 +104,62 @@ describe('S07 - Minha Agenda', () => {
     expect(evento.checkin.id).toBe('check-ativo')
   })
 
+  it('2. Invalida prioridade antiga quando o grupo de conflito muda', async () => {
+    sqlite.exec(`
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo)
+      VALUES
+        ('ev-a', 'Evento A', 'PRESENCIAL', '2026-01-02T10:00:00Z', '2026-01-02T11:00:00Z', 'reg-1', 1),
+        ('ev-b', 'Evento B', 'PRESENCIAL', '2026-01-02T10:30:00Z', '2026-01-02T11:30:00Z', 'reg-1', 1);
+
+      INSERT INTO convocacoes (id, evento_id, status, ativo)
+      VALUES
+        ('conv-a', 'ev-a', 'PUBLICADA', 1),
+        ('conv-b', 'ev-b', 'PUBLICADA', 1);
+
+      INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id)
+      VALUES
+        ('dest-a', 'conv-a', '${membroId}'),
+        ('dest-b', 'conv-b', '${membroId}');
+    `)
+
+    const priorizar = await req('/api/v1/minha-agenda/prioridade/ev-a', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    })
+    expect(priorizar.status).toBe(200)
+
+    sqlite.exec(`
+      UPDATE eventos
+      SET inicio_em = '2026-01-02T13:00:00Z', fim_em = '2026-01-02T14:00:00Z'
+      WHERE id = 'ev-b';
+
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo)
+      VALUES ('ev-c', 'Evento C', 'PRESENCIAL', '2026-01-02T10:15:00Z', '2026-01-02T10:45:00Z', 'reg-1', 1);
+
+      INSERT INTO convocacoes (id, evento_id, status, ativo)
+      VALUES ('conv-c', 'ev-c', 'PUBLICADA', 1);
+
+      INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id)
+      VALUES ('dest-c', 'conv-c', '${membroId}');
+    `)
+
+    const res = await req('/api/v1/minha-agenda', {
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    })
+    const agenda = await res.json() as any[]
+    const eventoA = agenda.find(item => item.evento.id === 'ev-a')
+    const eventoC = agenda.find(item => item.evento.id === 'ev-c')
+
+    expect(eventoA.conflito.priorizado).toBe(false)
+    expect(eventoA.conflito.atenuado).toBe(false)
+    expect(eventoC.conflito.priorizado).toBe(false)
+    expect(eventoC.conflito.atenuado).toBe(false)
+  })
+
   it('2. Detecta sobreposição/proximidade e permite ao membro escolher a prioridade', async () => {
     sqlite.exec(`
       INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo)
