@@ -64,7 +64,11 @@ function formatarExpiracao(expiraEm: string) {
   }).format(data)
 }
 
-export function ContasAcessoView() {
+interface ContasAcessoViewProps {
+  onPendenciasAtualizadas?: (quantidade: number) => void
+}
+
+export function ContasAcessoView({ onPendenciasAtualizadas }: ContasAcessoViewProps = {}) {
   const [contas, setContas] = useState<ContaAdministrada[]>([])
   const [carregando, setCarregando] = useState(true)
   const [processando, setProcessando] = useState<string | null>(null)
@@ -76,7 +80,11 @@ export function ContasAcessoView() {
   const carregar = async () => {
     setErroGlobal(null)
     try {
-      setContas(await fetchWithAuth<ContaAdministrada[]>('/admin/acessos'))
+      const dados = await fetchWithAuth<ContaAdministrada[]>('/admin/acessos')
+      setContas(dados)
+      onPendenciasAtualizadas?.(
+        dados.filter(conta => conta.recuperacaoPinPendente === true).length
+      )
     } catch (error) {
       setErroGlobal(error instanceof ApiError ? error.message : 'Não foi possível carregar as contas.')
     } finally {
@@ -251,7 +259,9 @@ export function ContasAcessoView() {
       )}
 
       <div className="space-y-3">
-        {contas.map(conta => (
+        {[...contas]
+          .sort((a, b) => Number(Boolean(b.recuperacaoPinPendente)) - Number(Boolean(a.recuperacaoPinPendente)))
+          .map(conta => (
           <article key={conta.membroId} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>

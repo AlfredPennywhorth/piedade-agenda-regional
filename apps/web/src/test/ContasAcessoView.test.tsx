@@ -428,4 +428,41 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(await screen.findByText('Administração Centro')).toBeDefined()
   })
 
+
+  it('informa a quantidade de recuperações pendentes e prioriza essas contas', async () => {
+    const onPendenciasAtualizadas = vi.fn()
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValueOnce([
+      {
+        membroId: 'membro-1',
+        nome: 'Sem pendência',
+        celular: '11911111111',
+        codigoCarteirinha: 'C1',
+        contaAcessoId: 'conta-1',
+        status: 'ATIVA',
+        ativadoEm: null,
+        recuperacaoPinPendente: false,
+        recuperacaoPinSolicitadaEm: null,
+        acessos: [],
+      },
+      {
+        membroId: 'membro-2',
+        nome: 'Com pendência',
+        celular: '11922222222',
+        codigoCarteirinha: 'C2',
+        contaAcessoId: 'conta-2',
+        status: 'ATIVA',
+        ativadoEm: null,
+        recuperacaoPinPendente: true,
+        recuperacaoPinSolicitadaEm: '2026-09-30T15:00:00.000Z',
+        acessos: [],
+      },
+    ])
+
+    render(<ContasAcessoView onPendenciasAtualizadas={onPendenciasAtualizadas} />)
+
+    await waitFor(() => expect(onPendenciasAtualizadas).toHaveBeenCalledWith(1))
+    const titulos = screen.getAllByRole('heading', { level: 3 }).map(item => item.textContent)
+    expect(titulos.slice(0, 2)).toEqual(['Com pendência', 'Sem pendência'])
+  })
+
 })
