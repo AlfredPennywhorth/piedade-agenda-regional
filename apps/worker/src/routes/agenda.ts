@@ -59,6 +59,7 @@ function montarMapaConflitos(records: RegistroAgenda[]) {
 
   for (let i = 0; i < ativos.length; i++) {
     for (let j = i + 1; j < ativos.length; j++) {
+      if (ativos[i].evento.id === ativos[j].evento.id) continue
       const tipo = tipoConflito(ativos[i], ativos[j])
       if (!tipo) continue
 
