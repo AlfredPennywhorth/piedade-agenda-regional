@@ -206,7 +206,37 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(mensagem).toContain('Pessoa Teste')
     expect(mensagem).toContain('ativacao=token-whatsapp')
     expect(mensagem).toContain('válido até')
+    expect(mensagem).toContain('horário de São Paulo')
     expect(mensagem).toContain('não compartilhe')
+  })
+
+  it('distingue ativação de conta na mensagem do WhatsApp', async () => {
+    const contaSemAcesso = {
+      ...contaAtiva,
+      contaAcessoId: null,
+      status: null,
+      acessos: [],
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([contaSemAcesso])
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-ativacao',
+      expiraEm: '2099-01-01T12:30:00.000Z',
+      membroId: 'membro-1',
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Gerar ativação' }))
+
+    await screen.findByLabelText('Link temporário de Pessoa Teste')
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar pelo WhatsApp' }))
+
+    const [url] = vi.mocked(window.open).mock.calls[0]
+    const destino = new URL(String(url))
+    const mensagem = destino.searchParams.get('text') || ''
+
+    expect(mensagem).toContain('ativação da sua conta')
+    expect(mensagem).toContain('criar seu PIN')
+    expect(mensagem).not.toContain('redefinição do seu PIN')
   })
 
   it('não oferece envio pelo WhatsApp sem celular válido e mantém o link disponível', async () => {
