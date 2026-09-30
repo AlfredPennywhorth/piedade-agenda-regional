@@ -136,6 +136,48 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(within(artigoPessoaTeste!).queryByText('Link temporário gerado')).toBeNull()
   })
 
+  it('preserva link temporário ao executar ação não relacionada em outra conta', async () => {
+    const outraConta = {
+      ...contaAtiva,
+      membroId: 'membro-2',
+      nome: 'Outra Pessoa',
+      codigoCarteirinha: 'CARTEIRA-2',
+      contaAcessoId: 'conta-2',
+      acessos: [],
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([contaAtiva, outraConta])
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-preservado',
+      expiraEm: '2099-01-01T00:00:00.000Z',
+      membroId: 'membro-1',
+    })
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValue({
+      membroId: 'membro-2',
+      contaAcessoId: 'conta-2',
+      status: 'BLOQUEADA',
+    })
+
+    render(<ContasAcessoView />)
+
+    const artigoPessoaTeste = (await screen.findByText('Pessoa Teste')).closest('article')
+    const artigoOutraPessoa = screen.getByText('Outra Pessoa').closest('article')
+    expect(artigoPessoaTeste).not.toBeNull()
+    expect(artigoOutraPessoa).not.toBeNull()
+
+    fireEvent.click(within(artigoPessoaTeste!).getByRole('button', { name: 'Redefinir PIN' }))
+    const campo = await within(artigoPessoaTeste!).findByLabelText('Link temporário de Pessoa Teste')
+    expect((campo as HTMLInputElement).value).toContain('ativacao=token-preservado')
+
+    fireEvent.click(within(artigoOutraPessoa!).getByRole('button', { name: 'Bloquear' }))
+
+    expect(
+      await within(artigoOutraPessoa!).findByText('Conta bloqueada e sessões revogadas.')
+    ).toBeDefined()
+    expect(
+      within(artigoPessoaTeste!).getByLabelText('Link temporário de Pessoa Teste')
+    ).toBeDefined()
+  })
+
   it('não redefine PIN quando a confirmação é cancelada', async () => {
     vi.mocked(window.confirm).mockReturnValueOnce(false)
 
