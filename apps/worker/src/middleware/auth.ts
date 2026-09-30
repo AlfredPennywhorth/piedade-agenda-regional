@@ -11,9 +11,26 @@ export type Variables = {
   contextoPermissoes: ContextoPermissoes
 }
 
-const INATIVIDADE_MAXIMA_MS = 12 * 60 * 60 * 1000
-const VALIDADE_ABSOLUTA_MS = 30 * 24 * 60 * 60 * 1000
+export const INATIVIDADE_MAXIMA_MS = 12 * 60 * 60 * 1000
+export const VALIDADE_ABSOLUTA_MS = 30 * 24 * 60 * 60 * 1000
 const INTERVALO_ATUALIZACAO_ATIVIDADE_MS = 5 * 60 * 1000
+
+export function sessaoEstaAtiva(
+  sessao: { createdAt: string; ultimoAcessoEm?: string | null; expiraEm: string; revogadoEm?: string | null },
+  instanteAtual = Date.now()
+): boolean {
+  if (sessao.revogadoEm) return false
+
+  const criadaEm = new Date(sessao.createdAt).getTime()
+  const ultimoAcessoEm = new Date(sessao.ultimoAcessoEm ?? sessao.createdAt).getTime()
+  const expiraEm = new Date(sessao.expiraEm).getTime()
+
+  return (
+    instanteAtual - ultimoAcessoEm < INATIVIDADE_MAXIMA_MS &&
+    instanteAtual - criadaEm < VALIDADE_ABSOLUTA_MS &&
+    expiraEm > instanteAtual
+  )
+}
 
 export async function authMiddleware(c: Context<{ Variables: Variables }>, next: Next) {
   const authHeader = c.req.header('Authorization')
@@ -58,13 +75,8 @@ export async function authMiddleware(c: Context<{ Variables: Variables }>, next:
 
   const { sessao, conta, membro } = result
   const instanteAtual = Date.now()
-  const criadaEm = new Date(sessao.createdAt).getTime()
-  const ultimoAcessoEm = new Date(sessao.ultimoAcessoEm ?? sessao.createdAt).getTime()
-  const expiradaPorInatividade = instanteAtual - ultimoAcessoEm >= INATIVIDADE_MAXIMA_MS
-  const expiradaPorIdade = instanteAtual - criadaEm >= VALIDADE_ABSOLUTA_MS
-  const expiradaPorPrazo = new Date(sessao.expiraEm).getTime() <= instanteAtual
 
-  if (expiradaPorInatividade || expiradaPorIdade || expiradaPorPrazo) {
+  if (!sessaoEstaAtiva(sessao, instanteAtual)) {
     return c.json({ error: 'Sessão inválida ou expirada', code: 'UNAUTHORIZED' }, 401)
   }
 
@@ -72,6 +84,7 @@ export async function authMiddleware(c: Context<{ Variables: Variables }>, next:
     return c.json({ error: 'Acesso bloqueado', code: 'FORBIDDEN' }, 403)
   }
 
+  const ultimoAcessoEm = new Date(sessao.ultimoAcessoEm ?? sessao.createdAt).getTime()
   if (instanteAtual - ultimoAcessoEm >= INTERVALO_ATUALIZACAO_ATIVIDADE_MS) {
     await db
       .update(schema.sessoes)

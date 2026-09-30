@@ -294,6 +294,54 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     )
   })
 
+
+  it('lista sessões ativas e revoga somente a sessão escolhida', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva] as any
+      if (endpoint === '/admin/acessos/membros/membro-1/sessoes') {
+        return [
+          {
+            id: 'sessao-1',
+            criadoEm: '2026-09-30T12:00:00.000Z',
+            ultimoAcessoEm: '2026-09-30T15:00:00.000Z',
+            expiraEm: '2026-10-30T12:00:00.000Z',
+            dispositivo: 'Chrome em Windows',
+          },
+          {
+            id: 'sessao-2',
+            criadoEm: '2026-09-30T13:00:00.000Z',
+            ultimoAcessoEm: null,
+            expiraEm: '2026-10-30T13:00:00.000Z',
+            dispositivo: null,
+          },
+        ] as any
+      }
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      message: 'Sessão revogada',
+      membroId: 'membro-1',
+      contaAcessoId: 'conta-1',
+      sessaoId: 'sessao-1',
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Sessões ativas' }))
+
+    expect(await screen.findByText('Chrome em Windows')).toBeDefined()
+    expect(screen.getByText('Dispositivo não identificado')).toBeDefined()
+
+    const botoesRevogar = screen.getAllByRole('button', { name: 'Revogar esta sessão' })
+    fireEvent.click(botoesRevogar[0])
+
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith(
+        '/admin/acessos/membros/membro-1/sessoes/sessao-1/revogar',
+        {}
+      )
+    })
+  })
+
   it('revoga sessões após confirmação explícita', async () => {
     vi.mocked(apiClient.postWithAuth).mockResolvedValue({
       message: 'Sessões revogadas',
@@ -302,7 +350,7 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     })
 
     render(<ContasAcessoView />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Revogar sessões' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Revogar todas' }))
 
     await waitFor(() => {
       expect(apiClient.postWithAuth).toHaveBeenCalledWith(
@@ -333,7 +381,7 @@ describe('ContasAcessoView — PR-ACC-05', () => {
 
     const artigoOutraPessoa = (await screen.findByText('Outra Pessoa')).closest('article')
     expect(artigoOutraPessoa).not.toBeNull()
-    fireEvent.click(within(artigoOutraPessoa!).getByRole('button', { name: 'Revogar sessões' }))
+    fireEvent.click(within(artigoOutraPessoa!).getByRole('button', { name: 'Revogar todas' }))
 
     expect(
       await within(artigoOutraPessoa!).findByText('Todas as sessões da conta foram revogadas.')

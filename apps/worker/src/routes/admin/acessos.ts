@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
-import { and, eq, inArray, isNull } from 'drizzle-orm'
+import { and, eq, gt, inArray, isNull } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { executeAtomic } from '../../db/batch'
 import { gerarTokenAleatorio, hashToken } from '../../security/tokens'
-import { authMiddleware, Variables } from '../../middleware/auth'
+import { authMiddleware, sessaoEstaAtiva, Variables } from '../../middleware/auth'
 import {
   eMasterSistema,
   obterRegionalDoEscopo,
@@ -636,6 +636,147 @@ adminAcessosApp.patch('/membros/:id/status', async c => {
 
   await executeAtomic(db, () => consultas)
   return c.json({ membroId, contaAcessoId: conta.id, status: body.status }, 200)
+})
+
+
+function descreverDispositivo(userAgent: string | null): string | null {
+  if (!userAgent) return null
+
+  const sistema =
+    /iPhone/i.test(userAgent) ? 'iPhone'
+      : /iPad/i.test(userAgent) ? 'iPad'
+        : /Android/i.test(userAgent) ? 'Android'
+          : /Windows/i.test(userAgent) ? 'Windows'
+            : /Macintosh|Mac OS X/i.test(userAgent) ? 'macOS'
+              : /Linux/i.test(userAgent) ? 'Linux'
+                : null
+
+  const navegador =
+    /Edg\//i.test(userAgent) ? 'Edge'
+      : /Firefox\//i.test(userAgent) ? 'Firefox'
+        : /Chrome\//i.test(userAgent) ? 'Chrome'
+          : /Safari\//i.test(userAgent) ? 'Safari'
+            : null
+
+  if (sistema && navegador) return `${navegador} em ${sistema}`
+  return navegador ?? sistema
+}
+
+adminAcessosApp.get('/membros/:id/sessoes', async c => {
+  const db = c.get('db')
+  const contexto = c.get('contextoPermissoes')
+  const membroId = c.req.param('id')
+
+  if (!(await podeAdministrarMembro(db, contexto, membroId))) {
+    return c.json({ error: 'Acesso não autorizado', code: 'FORBIDDEN' }, 403)
+  }
+
+  const conta = await db
+    .select({ id: schema.contasAcesso.id })
+    .from(schema.contasAcesso)
+    .where(eq(schema.contasAcesso.membroId, membroId))
+    .get()
+
+  if (!conta) {
+    return c.json({ error: 'Conta de acesso não encontrada', code: 'NOT_FOUND' }, 404)
+  }
+
+  const instanteAtual = Date.now()
+  const sessoes = await db
+    .select({
+      id: schema.sessoes.id,
+      createdAt: schema.sessoes.createdAt,
+      ultimoAcessoEm: schema.sessoes.ultimoAcessoEm,
+      expiraEm: schema.sessoes.expiraEm,
+      revogadoEm: schema.sessoes.revogadoEm,
+      userAgent: schema.sessoes.userAgent,
+    })
+    .from(schema.sessoes)
+    .where(
+      and(
+        eq(schema.sessoes.contaAcessoId, conta.id),
+        isNull(schema.sessoes.revogadoEm),
+        gt(schema.sessoes.expiraEm, new Date(instanteAtual).toISOString())
+      )
+    )
+    .all()
+
+  return c.json(
+    sessoes
+      .filter((sessao: any) => sessaoEstaAtiva(sessao, instanteAtual))
+      .sort((a: any, b: any) =>
+        (b.ultimoAcessoEm ?? b.createdAt).localeCompare(a.ultimoAcessoEm ?? a.createdAt)
+      )
+      .map((sessao: any) => ({
+        id: sessao.id,
+        criadoEm: sessao.createdAt,
+        ultimoAcessoEm: sessao.ultimoAcessoEm,
+        expiraEm: sessao.expiraEm,
+        dispositivo: descreverDispositivo(sessao.userAgent),
+      })),
+    200
+  )
+})
+
+adminAcessosApp.post('/membros/:id/sessoes/:sessaoId/revogar', async c => {
+  const db = c.get('db')
+  const contexto = c.get('contextoPermissoes')
+  const atorContaAcessoId = c.get('contaAcessoId')
+  const atorMembroId = c.get('membroId')
+  const membroId = c.req.param('id')
+  const sessaoId = c.req.param('sessaoId')
+
+  if (!(await podeAdministrarMembro(db, contexto, membroId))) {
+    return c.json({ error: 'Acesso não autorizado', code: 'FORBIDDEN' }, 403)
+  }
+
+  const conta = await db
+    .select({ id: schema.contasAcesso.id })
+    .from(schema.contasAcesso)
+    .where(eq(schema.contasAcesso.membroId, membroId))
+    .get()
+
+  if (!conta) {
+    return c.json({ error: 'Conta de acesso não encontrada', code: 'NOT_FOUND' }, 404)
+  }
+
+  const sessao = await db
+    .select({ id: schema.sessoes.id })
+    .from(schema.sessoes)
+    .where(
+      and(
+        eq(schema.sessoes.id, sessaoId),
+        eq(schema.sessoes.contaAcessoId, conta.id),
+        isNull(schema.sessoes.revogadoEm)
+      )
+    )
+    .get()
+
+  if (!sessao) {
+    return c.json({ error: 'Sessão ativa não encontrada', code: 'SESSAO_NAO_ENCONTRADA' }, 404)
+  }
+
+  const agora = new Date().toISOString()
+  const regionalId = await regionalDoMembro(db, membroId)
+  await executeAtomic(db, tx => [
+    tx.update(schema.sessoes)
+      .set({ revogadoEm: agora })
+      .where(and(eq(schema.sessoes.id, sessaoId), isNull(schema.sessoes.revogadoEm))),
+    tx.insert(schema.auditoriaLogs).values({
+      id: crypto.randomUUID(),
+      acao: 'SESSAO_REVOGADA',
+      atorMembroId,
+      atorContaAcessoId,
+      recursoTipo: 'CONTA_ACESSO',
+      recursoId: conta.id,
+      escopoTipo: 'REGIONAL',
+      escopoId: regionalId,
+      contexto: { membroId, sessaoId },
+      criadoEm: agora,
+    }),
+  ])
+
+  return c.json({ message: 'Sessão revogada', membroId, contaAcessoId: conta.id, sessaoId }, 200)
 })
 
 adminAcessosApp.post('/membros/:id/revogar-sessoes', async c => {

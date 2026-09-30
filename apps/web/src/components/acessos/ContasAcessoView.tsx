@@ -28,6 +28,14 @@ interface LinkTemporario {
   membroId: string
 }
 
+interface SessaoAdministrada {
+  id: string
+  criadoEm: string
+  ultimoAcessoEm: string | null
+  expiraEm: string
+  dispositivo: string | null
+}
+
 interface FeedbackConta {
   membroId: string
   tipo: 'status' | 'alert'
@@ -64,6 +72,8 @@ function formatarExpiracao(expiraEm: string) {
   }).format(data)
 }
 
+const formatarDataHora = formatarExpiracao
+
 interface ContasAcessoViewProps {
   onPendenciasAtualizadas?: (quantidade: number) => void
 }
@@ -76,6 +86,8 @@ export function ContasAcessoView({ onPendenciasAtualizadas }: ContasAcessoViewPr
   const [feedback, setFeedback] = useState<FeedbackConta | null>(null)
   const [linkTemporario, setLinkTemporario] = useState<LinkTemporarioContextual | null>(null)
   const [gerenciandoMembroId, setGerenciandoMembroId] = useState<string | null>(null)
+  const [sessoesAbertasMembroId, setSessoesAbertasMembroId] = useState<string | null>(null)
+  const [sessoesPorMembro, setSessoesPorMembro] = useState<Record<string, SessaoAdministrada[]>>({})
 
   const carregar = async () => {
     setErroGlobal(null)
@@ -121,6 +133,10 @@ export function ContasAcessoView({ onPendenciasAtualizadas }: ContasAcessoViewPr
         ? `/admin/acessos/membros/${conta.membroId}/reset-pin`
         : `/admin/acessos/membros/${conta.membroId}/link-ativacao`
       const resposta = await postWithAuth<LinkTemporario>(endpoint, {})
+      if (redefinicao) {
+        setSessoesAbertasMembroId(null)
+        setSessoesPorMembro(atual => ({ ...atual, [conta.membroId]: [] }))
+      }
       setLinkTemporario({
         membroId: conta.membroId,
         url: montarLink(resposta.token),
@@ -147,6 +163,10 @@ export function ContasAcessoView({ onPendenciasAtualizadas }: ContasAcessoViewPr
     setFeedback(null)
     try {
       await patchWithAuth(`/admin/acessos/membros/${conta.membroId}/status`, { status })
+      if (status === 'BLOQUEADA') {
+        setSessoesAbertasMembroId(null)
+        setSessoesPorMembro(atual => ({ ...atual, [conta.membroId]: [] }))
+      }
       setFeedback({
         membroId: conta.membroId,
         tipo: 'status',
@@ -164,6 +184,62 @@ export function ContasAcessoView({ onPendenciasAtualizadas }: ContasAcessoViewPr
     }
   }
 
+
+  const carregarSessoes = async (conta: ContaAdministrada) => {
+    if (sessoesAbertasMembroId === conta.membroId) {
+      setSessoesAbertasMembroId(null)
+      return
+    }
+
+    setProcessando(conta.membroId)
+    setFeedback(null)
+    try {
+      const sessoes = await fetchWithAuth<SessaoAdministrada[]>(
+        `/admin/acessos/membros/${conta.membroId}/sessoes`
+      )
+      setSessoesPorMembro(atual => ({ ...atual, [conta.membroId]: sessoes }))
+      setSessoesAbertasMembroId(conta.membroId)
+    } catch (error) {
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'alert',
+        mensagem: error instanceof ApiError ? error.message : 'Não foi possível carregar as sessões.',
+      })
+    } finally {
+      setProcessando(null)
+    }
+  }
+
+  const revogarSessao = async (conta: ContaAdministrada, sessao: SessaoAdministrada) => {
+    if (!window.confirm(`Revogar esta sessão de ${conta.nome}?`)) return
+
+    setProcessando(conta.membroId)
+    setFeedback(null)
+    try {
+      await postWithAuth(
+        `/admin/acessos/membros/${conta.membroId}/sessoes/${sessao.id}/revogar`,
+        {}
+      )
+      setSessoesPorMembro(atual => ({
+        ...atual,
+        [conta.membroId]: (atual[conta.membroId] ?? []).filter(item => item.id !== sessao.id),
+      }))
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'status',
+        mensagem: 'Sessão revogada com sucesso.',
+      })
+    } catch (error) {
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'alert',
+        mensagem: error instanceof ApiError ? error.message : 'Não foi possível revogar a sessão.',
+      })
+    } finally {
+      setProcessando(null)
+    }
+  }
+
   const revogarSessoes = async (conta: ContaAdministrada) => {
     if (!window.confirm(`Revogar todas as sessões de ${conta.nome}?`)) return
 
@@ -171,6 +247,7 @@ export function ContasAcessoView({ onPendenciasAtualizadas }: ContasAcessoViewPr
     setFeedback(null)
     try {
       await postWithAuth(`/admin/acessos/membros/${conta.membroId}/revogar-sessoes`, {})
+      setSessoesPorMembro(atual => ({ ...atual, [conta.membroId]: [] }))
       setFeedback({
         membroId: conta.membroId,
         tipo: 'status',
@@ -312,10 +389,18 @@ export function ContasAcessoView({ onPendenciasAtualizadas }: ContasAcessoViewPr
                     <button
                       type="button"
                       disabled={processando === conta.membroId}
+                      onClick={() => void carregarSessoes(conta)}
+                      className="rounded-lg border border-slate-400 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                    >
+                      {sessoesAbertasMembroId === conta.membroId ? 'Ocultar sessões' : 'Sessões ativas'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={processando === conta.membroId}
                       onClick={() => void revogarSessoes(conta)}
                       className="rounded-lg border border-slate-400 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
                     >
-                      Revogar sessões
+                      Revogar todas
                     </button>
                     <button
                       type="button"
@@ -339,6 +424,52 @@ export function ContasAcessoView({ onPendenciasAtualizadas }: ContasAcessoViewPr
                 )}
               </div>
             </div>
+            {conta.contaAcessoId && conta.status === 'ATIVA' && sessoesAbertasMembroId === conta.membroId && (
+              <section className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-label={`Sessões ativas de ${conta.nome}`}>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900">Sessões ativas</h4>
+                    <p className="text-xs text-slate-500">
+                      Dispositivo aproximado com base nas informações do navegador.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-white px-2 py-1 text-xs text-slate-600">
+                    {(sessoesPorMembro[conta.membroId] ?? []).length}
+                  </span>
+                </div>
+                {(sessoesPorMembro[conta.membroId] ?? []).length === 0 ? (
+                  <p className="text-sm text-slate-600">Nenhuma sessão ativa.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {(sessoesPorMembro[conta.membroId] ?? []).map(sessao => (
+                      <li key={sessao.id} className="rounded-lg border border-slate-200 bg-white p-3">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="text-xs text-slate-600">
+                            <p className="font-semibold text-slate-800">
+                              {sessao.dispositivo || 'Dispositivo não identificado'}
+                            </p>
+                            <p>Criada em: {formatarDataHora(sessao.criadoEm)}</p>
+                            <p>
+                              Último uso: {sessao.ultimoAcessoEm
+                                ? formatarDataHora(sessao.ultimoAcessoEm)
+                                : 'sem uso posterior ao login'}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={processando === conta.membroId}
+                            onClick={() => void revogarSessao(conta, sessao)}
+                            className="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50"
+                          >
+                            Revogar esta sessão
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )}
             {(feedback?.membroId === conta.membroId || linkTemporario?.membroId === conta.membroId) && (
               <div
                 id={`feedback-conta-${conta.membroId}`}
