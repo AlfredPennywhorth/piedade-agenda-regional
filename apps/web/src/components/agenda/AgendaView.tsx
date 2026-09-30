@@ -11,10 +11,18 @@ export function AgendaView() {
   const [selectedItem, setSelectedItem] = useState<AgendaItem | null>(null)
   const [priorizandoEventoId, setPriorizandoEventoId] = useState<string | null>(null)
 
-  const carregarAgenda = async () => {
+  const carregarAgenda = async (
+    rsvpRecemSalvo?: { destinatarioId: string; rsvp: AgendaItem['rsvp'] }
+  ) => {
     const data = await fetchWithAuth<AgendaItem[]>('/minha-agenda')
     const now = new Date()
-    const upcoming = data.filter(item => new Date(item.evento.fimEm) > now)
+    const upcoming = data
+      .filter(item => new Date(item.evento.fimEm) > now)
+      .map(item =>
+        rsvpRecemSalvo && item.destinatarioId === rsvpRecemSalvo.destinatarioId
+          ? { ...item, rsvp: rsvpRecemSalvo.rsvp }
+          : item
+      )
     setItems(upcoming)
     setSelectedItem(current => {
       if (!current) return null
@@ -43,7 +51,7 @@ export function AgendaView() {
       setSelectedItem({ ...selectedItem, rsvp })
     }
 
-    void carregarAgenda().catch((err: any) => {
+    void carregarAgenda({ destinatarioId, rsvp }).catch((err: any) => {
       setError(err.message || 'Não foi possível atualizar os conflitos da agenda.')
     })
   }
