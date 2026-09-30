@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS agenda_prioridades_conflito (
   id text PRIMARY KEY NOT NULL,
   membro_id text NOT NULL,
   evento_id text NOT NULL,
+  conflito_par_chave text NOT NULL,
   conflito_chave text NOT NULL,
   priorizado_em text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
   created_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
@@ -12,6 +13,9 @@ CREATE TABLE IF NOT EXISTS agenda_prioridades_conflito (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_agenda_prioridade_membro_conflito
   ON agenda_prioridades_conflito (membro_id, conflito_chave);
+
+CREATE INDEX IF NOT EXISTS idx_agenda_prioridade_membro_par
+  ON agenda_prioridades_conflito (membro_id, conflito_par_chave);
 
 CREATE INDEX IF NOT EXISTS idx_agenda_prioridade_membro
   ON agenda_prioridades_conflito (membro_id);
