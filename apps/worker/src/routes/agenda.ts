@@ -78,8 +78,23 @@ function montarMapaConflitos(records: RegistroAgenda[]) {
   return mapa
 }
 
-function chaveConflitoPar(eventoAId: string, eventoBId: string) {
-  return [eventoAId, eventoBId].sort().join('|')
+function assinaturaConflito(record: RegistroAgenda) {
+  return [
+    record.evento.id,
+    record.evento.inicioEm,
+    record.evento.fimEm,
+    (record.evento as any).updatedAt ?? '',
+    record.rsvp?.resposta ?? '',
+    record.rsvp?.atualizadoEm ?? '',
+  ].join('@')
+}
+
+function chaveConflitoPar(
+  a: RegistroAgenda,
+  b: RegistroAgenda,
+  tipo: 'SOBREPOSICAO' | 'PROXIMIDADE'
+) {
+  return [...[a, b].sort((x, y) => x.evento.id.localeCompare(y.evento.id)).map(assinaturaConflito), tipo].join('|')
 }
 
 async function buscarRegistrosAgenda(db: any, membroId: string): Promise<RegistroAgenda[]> {
@@ -165,7 +180,9 @@ agendaRouter.get('/', async (c) => {
       const conflitosDiretos = mapaConflitos.get(record.evento.id) ?? []
       const escolhasDiretas = conflitosDiretos
         .map(conflito => {
-          const conflitoChave = chaveConflitoPar(record.evento.id, conflito.eventoId)
+          const outro = porId.get(conflito.eventoId)
+          if (!outro) return null
+          const conflitoChave = chaveConflitoPar(record, outro, conflito.tipo)
           const prioridade = prioridades.find(item => item.conflitoChave === conflitoChave)
           return prioridade ? { conflito, prioridade } : null
         })
@@ -247,9 +264,12 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
   }
 
   const conflitosDiretos = mapaConflitos.get(eventoId) ?? []
-  const conflitoChaves = conflitosDiretos.map(conflito =>
-    chaveConflitoPar(eventoId, conflito.eventoId)
-  )
+  const porId = new Map(records.map(record => [record.evento.id, record]))
+  const conflitoChaves = conflitosDiretos.map(conflito => {
+    const outro = porId.get(conflito.eventoId)
+    if (!outro) throw new Error('Conflito aponta para evento ausente da agenda')
+    return chaveConflitoPar(selecionado, outro, conflito.tipo)
+  })
   const agora = new Date().toISOString()
 
   await executeAtomic(db, tx => [
