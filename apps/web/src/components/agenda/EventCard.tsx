@@ -88,7 +88,12 @@ export function EventCard({ item, onClick }: EventCardProps) {
             <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">
               {item.evento.modalidade}
             </span>
-            {item.conflito?.priorizado && (
+            {item.conflito?.priorizado && item.conflito.atenuado && (
+              <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">
+                Prioridade parcial
+              </span>
+            )}
+            {item.conflito?.priorizado && !item.conflito.atenuado && (
               <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">
                 Prioridade escolhida
               </span>
