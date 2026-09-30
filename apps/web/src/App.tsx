@@ -36,6 +36,7 @@ function App() {
   const [currentTab, setCurrentTab] = useState<'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes' | 'acessos'>('agenda')
   const [capacidades, setCapacidades] = useState<CapacidadesFrontend>({})
   const [nomeUsuario, setNomeUsuario] = useState('')
+  const [recuperacoesPinPendentes, setRecuperacoesPinPendentes] = useState(0)
   const [estadoSessao, setEstadoSessao] = useState<'verificando' | 'autenticada' | 'anonima'>('verificando')
   const [tokenAtivacao, setTokenAtivacao] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search)
@@ -67,6 +68,30 @@ function App() {
   useEffect(() => {
     carregarIdentidade()
   }, [])
+
+  useEffect(() => {
+    if (estadoSessao !== 'autenticada' || capacidades.podeAdministrarAcessos !== true) {
+      setRecuperacoesPinPendentes(0)
+      return
+    }
+
+    let ativo = true
+    void fetchWithAuth<Array<{ recuperacaoPinPendente?: boolean }>>('/admin/acessos')
+      .then(contas => {
+        if (ativo) {
+          setRecuperacoesPinPendentes(
+            contas.filter(conta => conta.recuperacaoPinPendente === true).length
+          )
+        }
+      })
+      .catch(() => {
+        // O alerta não deve bloquear a entrada no sistema se a consulta administrativa falhar.
+      })
+
+    return () => {
+      ativo = false
+    }
+  }, [estadoSessao, capacidades.podeAdministrarAcessos])
 
   const podeAcessarAba = (tab: typeof currentTab) => {
     if (tab === 'portaria') {
@@ -113,6 +138,7 @@ function App() {
       limparTokenSessao()
       setNomeUsuario('')
       setCapacidades({})
+      setRecuperacoesPinPendentes(0)
       setCurrentTab('agenda')
       setEstadoSessao('anonima')
     }
@@ -152,6 +178,7 @@ function App() {
       capacidades={capacidades}
       nomeUsuario={nomeUsuario}
       onLogout={sair}
+      recuperacoesPinPendentes={recuperacoesPinPendentes}
     >
       {currentTab === 'agenda' && <AgendaView />}
       {currentTab === 'eventos' && capacidades.podeGerirAgenda === true && <EventosView />}
@@ -175,7 +202,9 @@ function App() {
       {currentTab === 'funcoes' && capacidades.podeAdministrarFuncoes === true && <FuncoesView />}
       {currentTab === 'vinculos-funcionais' && capacidades.podeAdministrarPessoas === true && <VinculosFuncionaisView />}
       {currentTab === 'locais' && capacidades.podeGerirAgenda === true && <LocaisView />}
-      {currentTab === 'acessos' && capacidades.podeAdministrarAcessos === true && <ContasAcessoView />}
+      {currentTab === 'acessos' && capacidades.podeAdministrarAcessos === true && (
+        <ContasAcessoView onPendenciasAtualizadas={setRecuperacoesPinPendentes} />
+      )}
       
       {currentTab === 'avisos' && (
         <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
