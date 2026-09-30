@@ -814,6 +814,7 @@ export interface CapacidadesMembro {
   podeVisualizarAuditoria: boolean
   podeOperarPortaria: boolean
   podeAdministrarAcessos: boolean
+  podeGerenciarSessoes: boolean
   podeAdministrarRegionais: boolean
   podeAdministrarEstrutura: boolean
   podeAdministrarPessoas: boolean
@@ -832,6 +833,7 @@ export async function obterCapacidadesMembro(
       podeVisualizarAuditoria: false,
       podeOperarPortaria: false,
       podeAdministrarAcessos: false,
+      podeGerenciarSessoes: false,
       podeAdministrarRegionais: false,
       podeAdministrarEstrutura: false,
       podeAdministrarPessoas: false,
@@ -902,6 +904,7 @@ export async function obterCapacidadesMembro(
   const administraAlgumaRegional = regionaisAdministradas(contexto).size > 0
 
   const podeAdministrarAcessos = master || administraAlgumaRegional
+  const podeGerenciarSessoes = master
   const podeAdministrarRegionais = master
   const podeAdministrarEstrutura = master || administraAlgumaRegional
   const podeAdministrarPessoas = master || administraAlgumaRegional
@@ -924,6 +927,7 @@ export async function obterCapacidadesMembro(
     podeVisualizarAuditoria,
     podeOperarPortaria,
     podeAdministrarAcessos,
+    podeGerenciarSessoes,
     podeAdministrarRegionais,
     podeAdministrarEstrutura,
     podeAdministrarPessoas,
