@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, eq, inArray, isNull } from 'drizzle-orm'
+import { and, eq, gt, inArray, isNull } from 'drizzle-orm'
 import * as schema from '../../db/schema'
 import { executeAtomic } from '../../db/batch'
 import { gerarTokenAleatorio, hashToken } from '../../security/tokens'
@@ -692,7 +692,13 @@ adminAcessosApp.get('/membros/:id/sessoes', async c => {
       userAgent: schema.sessoes.userAgent,
     })
     .from(schema.sessoes)
-    .where(eq(schema.sessoes.contaAcessoId, conta.id))
+    .where(
+      and(
+        eq(schema.sessoes.contaAcessoId, conta.id),
+        isNull(schema.sessoes.revogadoEm),
+        gt(schema.sessoes.expiraEm, new Date(instanteAtual).toISOString())
+      )
+    )
     .all()
 
   return c.json(
