@@ -38,6 +38,7 @@ interface LinkTemporarioContextual {
   membroId: string
   url: string
   expiraEm: string
+  tipo: 'ATIVACAO' | 'REDEFINICAO'
 }
 
 function montarLink(token: string) {
@@ -59,6 +60,7 @@ function formatarExpiracao(expiraEm: string) {
   return new Intl.DateTimeFormat('pt-BR', {
     dateStyle: 'short',
     timeStyle: 'short',
+    timeZone: 'America/Sao_Paulo',
   }).format(data)
 }
 
@@ -115,6 +117,7 @@ export function ContasAcessoView() {
         membroId: conta.membroId,
         url: montarLink(resposta.token),
         expiraEm: resposta.expiraEm,
+        tipo: redefinicao ? 'REDEFINICAO' : 'ATIVACAO',
       })
       await carregar()
     } catch (error) {
@@ -208,11 +211,16 @@ export function ContasAcessoView() {
       return
     }
 
+    const orientacao =
+      link.tipo === 'ATIVACAO'
+        ? 'Foi gerado um link individual para ativação da sua conta na Agenda Regional São Paulo. Acesse-o para criar seu PIN.'
+        : 'Foi gerado um link individual para redefinição do seu PIN na Agenda Regional São Paulo.'
+
     const mensagem = [
       `Olá, ${conta.nome}.`,
-      'Foi gerado um link individual para redefinição do seu PIN na Agenda Regional São Paulo.',
+      orientacao,
       link.url,
-      `O link é válido até ${formatarExpiracao(link.expiraEm)}.`,
+      `O link é válido até ${formatarExpiracao(link.expiraEm)} (horário de São Paulo).`,
       'Use-o apenas para a sua conta e não compartilhe este link com outras pessoas.',
     ].join('\n\n')
 
