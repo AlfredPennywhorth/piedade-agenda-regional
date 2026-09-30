@@ -77,26 +77,6 @@ function chaveConflito(eventoIds: string[]) {
   return eventoIds.slice().sort().join('|')
 }
 
-function componenteConflito(
-  eventoId: string,
-  mapa: Map<string, Array<{ eventoId: string; tipo: 'SOBREPOSICAO' | 'PROXIMIDADE' }>>
-) {
-  const visitados = new Set<string>()
-  const fila = [eventoId]
-
-  while (fila.length > 0) {
-    const atual = fila.shift()!
-    if (visitados.has(atual)) continue
-    visitados.add(atual)
-
-    for (const vizinho of mapa.get(atual) ?? []) {
-      if (!visitados.has(vizinho.eventoId)) fila.push(vizinho.eventoId)
-    }
-  }
-
-  return [...visitados]
-}
-
 async function buscarRegistrosAgenda(db: any, membroId: string): Promise<RegistroAgenda[]> {
   return db.select({
     evento: eventos,
@@ -178,15 +158,29 @@ agendaRouter.get('/', async (c) => {
         .map(refeicao => refeicao.tipo)
 
       const conflitosDiretos = mapaConflitos.get(record.evento.id) ?? []
-      const componente = conflitosDiretos.length > 0
-        ? componenteConflito(record.evento.id, mapaConflitos)
-        : []
-      const chaveGrupo = chaveConflito(componente)
-      const prioridadeDoGrupo = prioridades.find(
-        prioridade =>
-          componente.includes(prioridade.eventoId) &&
-          prioridade.conflitoChave === chaveGrupo
-      )?.eventoId ?? null
+      const prioridadeAtual = prioridades.find(prioridade => prioridade.eventoId === record.evento.id)
+      const chaveDiretaAtual = chaveConflito([
+        record.evento.id,
+        ...conflitosDiretos.map(conflito => conflito.eventoId),
+      ])
+      const priorizado = Boolean(
+        prioridadeAtual && prioridadeAtual.conflitoChave === chaveDiretaAtual
+      )
+
+      const atenuado = !priorizado && conflitosDiretos.some(conflito => {
+        const prioridadeVizinha = prioridades.find(
+          prioridade => prioridade.eventoId === conflito.eventoId
+        )
+        if (!prioridadeVizinha) return false
+
+        const conflitosDoVizinho = mapaConflitos.get(conflito.eventoId) ?? []
+        const chaveVizinhaAtual = chaveConflito([
+          conflito.eventoId,
+          ...conflitosDoVizinho.map(item => item.eventoId),
+        ])
+
+        return prioridadeVizinha.conflitoChave === chaveVizinhaAtual
+      })
       const temSobreposicao = conflitosDiretos.some(conflito => conflito.tipo === 'SOBREPOSICAO')
 
       return {
@@ -212,8 +206,8 @@ agendaRouter.get('/', async (c) => {
         conflito: conflitosDiretos.length === 0 ? null : {
           tipo: temSobreposicao ? 'SOBREPOSICAO' : 'PROXIMIDADE',
           janelaTransicaoMinutos: JANELA_TRANSICAO_MINUTOS,
-          priorizado: prioridadeDoGrupo === record.evento.id,
-          atenuado: prioridadeDoGrupo !== null && prioridadeDoGrupo !== record.evento.id,
+          priorizado,
+          atenuado,
           eventos: conflitosDiretos.map(conflito => {
             const outro = porId.get(conflito.eventoId)!
             return {
@@ -254,8 +248,9 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
     return c.json({ error: 'O evento não possui conflito de agenda ativo', code: 'SEM_CONFLITO' }, 409)
   }
 
-  const grupo = componenteConflito(eventoId, mapaConflitos)
-  const conflitoChave = chaveConflito(grupo)
+  const conflitosDiretos = mapaConflitos.get(eventoId) ?? []
+  const grupoDireto = [eventoId, ...conflitosDiretos.map(conflito => conflito.eventoId)]
+  const conflitoChave = chaveConflito(grupoDireto)
   const agora = new Date().toISOString()
   const prioridadeId = crypto.randomUUID()
 
@@ -263,7 +258,7 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
     tx.delete(agendaPrioridadesConflito).where(
       and(
         eq(agendaPrioridadesConflito.membroId, membroId),
-        inArray(agendaPrioridadesConflito.eventoId, grupo)
+        inArray(agendaPrioridadesConflito.eventoId, grupoDireto)
       )
     ),
     tx.insert(agendaPrioridadesConflito).values({
@@ -280,6 +275,6 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
   return c.json({
     message: 'Compromisso priorizado',
     eventoId,
-    eventosConflitantes: grupo.filter(id => id !== eventoId),
+    eventosConflitantes: conflitosDiretos.map(conflito => conflito.eventoId),
   }, 200)
 })
