@@ -745,6 +745,7 @@ export const agendaPrioridadesConflito = sqliteTable(
     eventoId: text('evento_id')
       .notNull()
       .references(() => eventos.id),
+    conflitoParChave: text('conflito_par_chave').notNull(),
     conflitoChave: text('conflito_chave').notNull(),
     priorizadoEm: text('priorizado_em')
       .notNull()
@@ -755,6 +756,10 @@ export const agendaPrioridadesConflito = sqliteTable(
     uniqueMembroConflito: uniqueIndex('idx_agenda_prioridade_membro_conflito').on(
       table.membroId,
       table.conflitoChave
+    ),
+    idxMembroPar: index('idx_agenda_prioridade_membro_par').on(
+      table.membroId,
+      table.conflitoParChave
     ),
     idxMembro: index('idx_agenda_prioridade_membro').on(table.membroId),
   })
