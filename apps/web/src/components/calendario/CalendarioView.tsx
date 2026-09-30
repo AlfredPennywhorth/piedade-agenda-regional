@@ -4,6 +4,19 @@ import { AgendaItem } from '../agenda/types'
 import { EventCard } from '../agenda/EventCard'
 import { EventoDetalhe } from '../agenda/EventoDetalhe'
 
+function chaveDiaSaoPaulo(iso: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(new Date(iso))
+  const valores = Object.fromEntries(
+    parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value])
+  )
+  return `${valores.year}-${Number(valores.month) - 1}-${Number(valores.day)}`
+}
+
 export function CalendarioView() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [items, setItems] = useState<AgendaItem[]>([])
@@ -12,18 +25,39 @@ export function CalendarioView() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<AgendaItem | null>(null)
 
+  const carregarAgenda = async (
+    rsvpRecemSalvo?: { destinatarioId: string; rsvp: AgendaItem['rsvp'] }
+  ) => {
+    const data = await fetchWithAuth<AgendaItem[]>('/minha-agenda')
+    const atualizados = data.map(item =>
+      rsvpRecemSalvo && item.destinatarioId === rsvpRecemSalvo.destinatarioId
+        ? { ...item, rsvp: rsvpRecemSalvo.rsvp }
+        : item
+    )
+
+    setItems(atualizados)
+    setSelectedDayEvents(current => {
+      if (!current || !selectedDate) return current
+      const chaveSelecionada = `${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`
+      return atualizados.filter(item => chaveDiaSaoPaulo(item.evento.inicioEm) === chaveSelecionada)
+    })
+    setSelectedEvent(current => {
+      if (!current) return null
+      return atualizados.find(item => item.evento.id === current.evento.id) ?? null
+    })
+  }
+
   useEffect(() => {
     async function load() {
       try {
-        const data = await fetchWithAuth('/minha-agenda')
-        setItems(data)
+        await carregarAgenda()
       } catch (err) {
         console.error(err)
       } finally {
         setLoading(false)
       }
     }
-    load()
+    void load()
   }, [])
 
   const handleRsvpUpdated = (destinatarioId: string, rsvp: any) => {
@@ -36,6 +70,10 @@ export function CalendarioView() {
     if (selectedEvent?.destinatarioId === destinatarioId) {
       setSelectedEvent({ ...selectedEvent, rsvp })
     }
+
+    void carregarAgenda({ destinatarioId, rsvp }).catch(err => {
+      console.error(err)
+    })
   }
 
   const year = currentDate.getFullYear()
@@ -54,19 +92,6 @@ export function CalendarioView() {
   const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1))
 
   const today = new Date()
-
-  const chaveDiaSaoPaulo = (iso: string) => {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Sao_Paulo',
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-    }).formatToParts(new Date(iso))
-    const valores = Object.fromEntries(
-      parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value])
-    )
-    return `${valores.year}-${Number(valores.month) - 1}-${Number(valores.day)}`
-  }
 
   // Get events mapped by São Paulo operational day.
   const eventsByDay = items.reduce((acc, item) => {
