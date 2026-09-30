@@ -178,6 +178,65 @@ describe('S07 - Minha Agenda e Calendário', () => {
     openSpy.mockRestore()
   })
 
+  it('3c. alerta conflito e permite priorizar um compromisso', async () => {
+    const comConflito = JSON.parse(JSON.stringify(mockEventos))
+    comConflito[0].conflito = {
+      tipo: 'SOBREPOSICAO',
+      janelaTransicaoMinutos: 60,
+      priorizado: false,
+      atenuado: false,
+      eventos: [{
+        eventoId: '2',
+        titulo: 'Encontro Online',
+        inicioEm: comConflito[1].evento.inicioEm,
+        fimEm: comConflito[1].evento.fimEm,
+        tipo: 'SOBREPOSICAO',
+      }],
+    }
+
+    mockAgenda(comConflito)
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      message: 'Compromisso priorizado',
+      eventoId: '1',
+      eventosConflitantes: ['2'],
+    })
+
+    render(<App />)
+
+    expect(await screen.findByText('Conflito de horário')).toBeInTheDocument()
+    expect(screen.getByText('Também há: Encontro Online.')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Priorizar este compromisso' }))
+
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith('/minha-agenda/prioridade/1', {})
+    })
+  })
+
+  it('3d. atenua visualmente compromisso não priorizado', async () => {
+    const comPrioridade = JSON.parse(JSON.stringify(mockEventos))
+    comPrioridade[0].conflito = {
+      tipo: 'SOBREPOSICAO',
+      janelaTransicaoMinutos: 60,
+      priorizado: false,
+      atenuado: true,
+      eventos: [{
+        eventoId: '2',
+        titulo: 'Encontro Online',
+        inicioEm: comPrioridade[1].evento.inicioEm,
+        fimEm: comPrioridade[1].evento.fimEm,
+        tipo: 'SOBREPOSICAO',
+      }],
+    }
+
+    mockAgenda(comPrioridade)
+    render(<App />)
+
+    const card = await screen.findByRole('button', { name: /Reunião de Setor/i })
+    expect(card.className).toContain('opacity-55')
+    expect(within(card).getByText('Conflito')).toBeInTheDocument()
+  })
+
   it('4. Navega para Calendário e exibe grid mensal', async () => {
     mockAgenda(mockEventos)
     render(<App />)
