@@ -83,9 +83,6 @@ function assinaturaConflito(record: RegistroAgenda) {
     record.evento.id,
     record.evento.inicioEm,
     record.evento.fimEm,
-    (record.evento as any).updatedAt ?? '',
-    record.rsvp?.resposta ?? '',
-    record.rsvp?.atualizadoEm ?? '',
   ].join('@')
 }
 
