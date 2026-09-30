@@ -665,6 +665,9 @@ function descreverDispositivo(userAgent: string | null): string | null {
 adminAcessosApp.get('/membros/:id/sessoes', async c => {
   const db = c.get('db')
   const contexto = c.get('contextoPermissoes')
+  if (!eMasterSistema(contexto)) {
+    return c.json({ error: 'Gestão de sessões restrita ao Master do sistema', code: 'FORBIDDEN' }, 403)
+  }
   const membroId = c.req.param('id')
 
   if (!(await podeAdministrarMembro(db, contexto, membroId))) {
@@ -721,6 +724,9 @@ adminAcessosApp.get('/membros/:id/sessoes', async c => {
 adminAcessosApp.post('/membros/:id/sessoes/:sessaoId/revogar', async c => {
   const db = c.get('db')
   const contexto = c.get('contextoPermissoes')
+  if (!eMasterSistema(contexto)) {
+    return c.json({ error: 'Gestão de sessões restrita ao Master do sistema', code: 'FORBIDDEN' }, 403)
+  }
   const atorContaAcessoId = c.get('contaAcessoId')
   const atorMembroId = c.get('membroId')
   const membroId = c.req.param('id')
@@ -782,6 +788,9 @@ adminAcessosApp.post('/membros/:id/sessoes/:sessaoId/revogar', async c => {
 adminAcessosApp.post('/membros/:id/revogar-sessoes', async c => {
   const db = c.get('db')
   const contexto = c.get('contextoPermissoes')
+  if (!eMasterSistema(contexto)) {
+    return c.json({ error: 'Gestão de sessões restrita ao Master do sistema', code: 'FORBIDDEN' }, 403)
+  }
   const atorContaAcessoId = c.get('contaAcessoId')
   const atorMembroId = c.get('membroId')
   const membroId = c.req.param('id')
