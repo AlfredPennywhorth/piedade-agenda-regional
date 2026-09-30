@@ -315,7 +315,9 @@ describe('S07 - Minha Agenda e Calendário', () => {
 
     render(<App />)
 
-    expect(await screen.findByText('Prioridade parcial')).toBeInTheDocument()
+    const cardParcial = await screen.findByRole('button', { name: /Reunião de Setor/i })
+    expect(within(cardParcial).getByText('Prioridade parcial')).toBeInTheDocument()
+    expect(screen.getAllByText('Prioridade parcial').length).toBeGreaterThanOrEqual(2)
     const acao = screen.getByRole('button', { name: 'Priorizar este compromisso' })
     expect(acao).toBeInTheDocument()
 
