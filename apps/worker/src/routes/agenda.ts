@@ -21,6 +21,16 @@ agendaRouter.use('*', authMiddleware)
 const JANELA_TRANSICAO_MINUTOS = 60
 const JANELA_TRANSICAO_MS = JANELA_TRANSICAO_MINUTOS * 60 * 1000
 
+const MAX_IDS_POR_CONSULTA = 80
+
+function particionar<T>(itens: T[], tamanho = MAX_IDS_POR_CONSULTA): T[][] {
+  const partes: T[][] = []
+  for (let i = 0; i < itens.length; i += tamanho) {
+    partes.push(itens.slice(i, i + tamanho))
+  }
+  return partes
+}
+
 type AgendaPrioridadePersistida = {
   id: string
   membroId: string
@@ -178,25 +188,37 @@ agendaRouter.get('/', async (c) => {
     let prioridades: Array<{ eventoId: string; conflitoParChave: string; conflitoChave: string }> = []
 
     if (eventoIds.length > 0) {
-      ;[refOferecidas, prioridades] = await Promise.all([
-        db.select()
-          .from(eventoRefeicoes)
-          .where(and(inArray(eventoRefeicoes.eventoId, eventoIds), eq(eventoRefeicoes.ativo, true)))
-          .all(),
-        db.select({
-          eventoId: agendaPrioridadesConflito.eventoId,
-          conflitoParChave: agendaPrioridadesConflito.conflitoParChave,
-          conflitoChave: agendaPrioridadesConflito.conflitoChave,
-        })
-          .from(agendaPrioridadesConflito)
-          .where(
-            and(
-              eq(agendaPrioridadesConflito.membroId, membroId),
-              inArray(agendaPrioridadesConflito.eventoId, eventoIds)
-            )
+      const lotes = particionar(eventoIds)
+      const [refLotes, prioridadeLotes] = await Promise.all([
+        Promise.all(
+          lotes.map(ids =>
+            db.select()
+              .from(eventoRefeicoes)
+              .where(and(inArray(eventoRefeicoes.eventoId, ids), eq(eventoRefeicoes.ativo, true)))
+              .all()
           )
-          .all(),
+        ),
+        Promise.all(
+          lotes.map(ids =>
+            db.select({
+              eventoId: agendaPrioridadesConflito.eventoId,
+              conflitoParChave: agendaPrioridadesConflito.conflitoParChave,
+              conflitoChave: agendaPrioridadesConflito.conflitoChave,
+            })
+              .from(agendaPrioridadesConflito)
+              .where(
+                and(
+                  eq(agendaPrioridadesConflito.membroId, membroId),
+                  inArray(agendaPrioridadesConflito.eventoId, ids)
+                )
+              )
+              .all()
+          )
+        ),
       ])
+
+      refOferecidas = refLotes.flat()
+      prioridades = prioridadeLotes.flat()
     }
 
     const porId = new Map(records.map(record => [record.evento.id, record]))
