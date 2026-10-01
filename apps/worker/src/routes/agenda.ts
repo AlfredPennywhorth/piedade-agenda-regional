@@ -330,15 +330,20 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
     }
   })
   const conflitoParChaves = conflitosPersistidos.map(item => item.conflitoParChave)
-  const prioridadesAnteriores: AgendaPrioridadePersistida[] = await db.select()
-    .from(agendaPrioridadesConflito)
-    .where(
-      and(
-        eq(agendaPrioridadesConflito.membroId, membroId),
-        inArray(agendaPrioridadesConflito.conflitoParChave, conflitoParChaves)
-      )
+  const prioridadeLotes = await Promise.all(
+    particionar(conflitoParChaves).map(chaves =>
+      db.select()
+        .from(agendaPrioridadesConflito)
+        .where(
+          and(
+            eq(agendaPrioridadesConflito.membroId, membroId),
+            inArray(agendaPrioridadesConflito.conflitoParChave, chaves)
+          )
+        )
+        .all()
     )
-    .all()
+  )
+  const prioridadesAnteriores: AgendaPrioridadePersistida[] = prioridadeLotes.flat()
   const agora = new Date().toISOString()
   const tentativasPersistidas = conflitosPersistidos.map(({ conflitoParChave, conflitoChave }) => ({
     id: crypto.randomUUID(),
@@ -406,10 +411,12 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
     )
 
     await executeAtomic(db, tx => [
-      tx.delete(agendaPrioridadesConflito).where(
-        and(
-          eq(agendaPrioridadesConflito.membroId, membroId),
-          inArray(agendaPrioridadesConflito.id, idsTentativa)
+      ...particionar(idsTentativa).map(ids =>
+        tx.delete(agendaPrioridadesConflito).where(
+          and(
+            eq(agendaPrioridadesConflito.membroId, membroId),
+            inArray(agendaPrioridadesConflito.id, ids)
+          )
         )
       ),
       ...prioridadesRestauraveis.map(prioridade =>
@@ -435,14 +442,16 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
     .map(prioridade => prioridade.id)
 
   if (idsPrioridadesAntigas.length > 0) {
-    await executeAtomic(db, tx => [
-      tx.delete(agendaPrioridadesConflito).where(
-        and(
-          eq(agendaPrioridadesConflito.membroId, membroId),
-          inArray(agendaPrioridadesConflito.id, idsPrioridadesAntigas)
+    await executeAtomic(db, tx =>
+      particionar(idsPrioridadesAntigas).map(ids =>
+        tx.delete(agendaPrioridadesConflito).where(
+          and(
+            eq(agendaPrioridadesConflito.membroId, membroId),
+            inArray(agendaPrioridadesConflito.id, ids)
+          )
         )
-      ),
-    ])
+      )
+    )
   }
 
   return c.json({
