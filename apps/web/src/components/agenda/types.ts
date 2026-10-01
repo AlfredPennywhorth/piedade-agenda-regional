@@ -37,6 +37,7 @@ export interface AgendaItem {
     tipo: 'SOBREPOSICAO' | 'PROXIMIDADE'
     janelaTransicaoMinutos: number
     priorizado: boolean
+    conflitosResolvidos: boolean
     atenuado: boolean
     eventos: Array<{
       eventoId: string
