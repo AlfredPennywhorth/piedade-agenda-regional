@@ -38,31 +38,22 @@ function emLotes<T>(itens: T[], tamanho: number): T[][] {
 
 convocacoesRouter.use('*', authMiddleware)
 
-function hierarquiaVinculo(vinculo: {
-  regionalId?: string | null
-  administracaoId?: string | null
-  setorId?: string | null
-  casaId?: string | null
-  grupoTrabalhoId?: string | null
-}) {
-  if (vinculo.regionalId || vinculo.grupoTrabalhoId) return 4
-  if (vinculo.administracaoId) return 3
-  if (vinculo.setorId) return 2
-  if (vinculo.casaId) return 1
+function hierarquiaVinculo(escopoTipo: string | null) {
+  if (escopoTipo === 'REGIONAL' || escopoTipo === 'GRUPO_TRABALHO') return 4
+  if (escopoTipo === 'ADMINISTRACAO') return 3
+  if (escopoTipo === 'SETOR') return 2
+  if (escopoTipo === 'CASA') return 1
   return 0
 }
 
 function escolherMaiorVinculo<T extends {
-  funcaoNome: string
-  regionalId?: string | null
-  administracaoId?: string | null
-  setorId?: string | null
-  casaId?: string | null
-  grupoTrabalhoId?: string | null
+  funcaoNome: string | null
+  escopoTipo: string | null
 }>(vinculos: T[]): T | null {
   return [...vinculos].sort((a, b) => {
-    const nivel = hierarquiaVinculo(b) - hierarquiaVinculo(a)
-    return nivel !== 0 ? nivel : a.funcaoNome.localeCompare(b.funcaoNome, 'pt-BR')
+    const nivel = hierarquiaVinculo(b.escopoTipo) - hierarquiaVinculo(a.escopoTipo)
+    if (nivel !== 0) return nivel
+    return (a.funcaoNome ?? '').localeCompare(b.funcaoNome ?? '', 'pt-BR')
   })[0] ?? null
 }
 
@@ -759,12 +750,9 @@ convocacoesRouter.get('/:id/acompanhamento-rsvp', async c => {
     convocacaoDestinatarioId: string
     funcaoId: string
     vinculoFuncionalId: string
-    funcaoNome: string
-    regionalId: string | null
-    administracaoId: string | null
-    setorId: string | null
-    casaId: string | null
-    grupoTrabalhoId: string | null
+    funcaoNome: string | null
+    escopoTipo: string | null
+    escopoId: string | null
   }
 
   const destIds = destinatariosPage.map((d: DestinatarioPage) => d.destinatarioId)
@@ -773,16 +761,11 @@ convocacoesRouter.get('/:id/acompanhamento-rsvp', async c => {
       convocacaoDestinatarioId: convocacaoDestinatarioEvidencias.convocacaoDestinatarioId,
       funcaoId: convocacaoDestinatarioEvidencias.funcaoId,
       vinculoFuncionalId: convocacaoDestinatarioEvidencias.vinculoFuncionalId,
-      funcaoNome: funcoes.nome,
-      regionalId: vinculosFuncionais.regionalId,
-      administracaoId: vinculosFuncionais.administracaoId,
-      setorId: vinculosFuncionais.setorId,
-      casaId: vinculosFuncionais.casaId,
-      grupoTrabalhoId: vinculosFuncionais.grupoTrabalhoId
+      funcaoNome: convocacaoDestinatarioEvidencias.funcaoNomeSnapshot,
+      escopoTipo: convocacaoDestinatarioEvidencias.escopoTipoSnapshot,
+      escopoId: convocacaoDestinatarioEvidencias.escopoIdSnapshot
     })
     .from(convocacaoDestinatarioEvidencias)
-    .innerJoin(funcoes, eq(funcoes.id, convocacaoDestinatarioEvidencias.funcaoId))
-    .innerJoin(vinculosFuncionais, eq(vinculosFuncionais.id, convocacaoDestinatarioEvidencias.vinculoFuncionalId))
     .where(inArray(convocacaoDestinatarioEvidencias.convocacaoDestinatarioId, destIds))
     .all()
 
@@ -796,7 +779,7 @@ convocacoesRouter.get('/:id/acompanhamento-rsvp', async c => {
       membroId: d.membroId,
       membroNome: d.membroNome,
       respostaRsvp: d.respostaRsvp,
-      vinculo: vinculo ? {
+      vinculo: vinculo?.funcaoNome ? {
         funcaoId: vinculo.funcaoId,
         funcaoNome: vinculo.funcaoNome,
         vinculoFuncionalId: vinculo.vinculoFuncionalId,
