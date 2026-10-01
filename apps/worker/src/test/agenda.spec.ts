@@ -625,4 +625,61 @@ describe('S07 - Minha Agenda', () => {
     sqlite.exec('DROP TRIGGER trg_test_version_conflict;')
   })
 
+
+  it('8. Não apaga versão concorrente criada durante o cleanup', async () => {
+    const antiga = sqlite.prepare(`
+      SELECT id, conflito_par_chave AS par
+      FROM agenda_prioridades_conflito
+      WHERE membro_id = ? AND conflito_par_chave = ?
+      LIMIT 1
+    `).get(membroId, 'ev-version-a|ev-version-b') as { id: string; par: string } | undefined
+
+    if (!antiga) {
+      sqlite.prepare(`
+        INSERT INTO agenda_prioridades_conflito
+          (id, membro_id, evento_id, conflito_par_chave, conflito_chave)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        'prioridade-antiga-cleanup',
+        membroId,
+        'ev-version-a',
+        'ev-version-a|ev-version-b',
+        'versao-antiga-cleanup'
+      )
+    }
+
+    sqlite.exec(`
+      CREATE TRIGGER trg_cleanup_concorrente
+      BEFORE DELETE ON agenda_prioridades_conflito
+      WHEN OLD.conflito_par_chave = 'ev-version-a|ev-version-b'
+      BEGIN
+        INSERT OR IGNORE INTO agenda_prioridades_conflito
+          (id, membro_id, evento_id, conflito_par_chave, conflito_chave)
+        VALUES
+          ('prioridade-concorrente-cleanup', '${membroId}', 'ev-version-b',
+           'ev-version-a|ev-version-b', 'versao-concorrente-cleanup');
+      END;
+    `)
+
+    const res = await req('/api/v1/minha-agenda/prioridade/ev-version-a', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    })
+
+    expect(res.status).toBe(200)
+
+    const concorrente = sqlite.prepare(`
+      SELECT COUNT(*) AS total
+      FROM agenda_prioridades_conflito
+      WHERE id = 'prioridade-concorrente-cleanup'
+    `).get() as { total: number }
+
+    expect(concorrente.total).toBe(1)
+    sqlite.exec('DROP TRIGGER trg_cleanup_concorrente;')
+  })
+
 })
