@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
-import { eventos, funcoes, vinculosFuncionais } from '../db/schema'
+import { eventos, funcoes, vinculosFuncionais, convocacoes, convocacaoFuncoes } from '../db/schema'
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
-import { executarOperacaoComAudit, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
+import { executarOperacaoComAudit, executarOperacaoComAudits, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
 import { obterEscoposTerritoriaisVisiveis, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
@@ -231,6 +231,118 @@ eventosRouter.post('/', async (c) => {
     }
     return c.json({ error: err.issues || err.message }, 400)
   }
+})
+
+eventosRouter.post('/:id/cancelar', async (c) => {
+  const db = c.get('db')
+  const id = c.req.param('id')
+
+  const evento = await db.select().from(eventos).where(eq(eventos.id, id)).get()
+  if (!evento) return c.json({ error: 'Evento não encontrado' }, 404)
+  if (!evento.ativo) return c.json({ error: 'Evento já está cancelado', code: 'EVENTO_JA_CANCELADO' }, 409)
+
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+  const atorMembroId = c.get('membroId') || null
+  if (!atorMembroId || !escopoTipo || !escopoId) {
+    return c.json({ error: 'Escopo da Agenda indisponível', code: 'FORBIDDEN' }, 403)
+  }
+
+  const autorizado = await podeGerenciarAgendaNoEscopo(
+    db,
+    atorMembroId,
+    escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+    escopoId
+  )
+  if (!autorizado) {
+    return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
+  }
+
+  const convocacao = await db
+    .select()
+    .from(convocacoes)
+    .where(eq(convocacoes.eventoId, id))
+    .get()
+
+  if (convocacao?.status === 'PUBLICADA') {
+    return c.json({
+      error: 'O evento possui convocação PUBLICADA. Cancele primeiro a convocação antes de cancelar o evento.',
+      code: 'EVENTO_COM_CONVOCACAO_PUBLICADA'
+    }, 409)
+  }
+
+  const agoraIso = new Date().toISOString()
+  const audits: AuditLogData[] = []
+
+  if (convocacao && convocacao.status === 'RASCUNHO') {
+    audits.push({
+      acao: 'CONVOCACAO_CANCELADA',
+      atorMembroId,
+      recursoTipo: 'CONVOCACAO',
+      recursoId: convocacao.id,
+      escopoTipo,
+      escopoId,
+      contexto: {
+        eventoId: id,
+        motivo: 'CANCELAMENTO_EVENTO'
+      }
+    })
+  }
+
+  audits.push({
+    acao: 'EVENTO_CANCELADO',
+    atorMembroId,
+    recursoTipo: 'EVENTO',
+    recursoId: id,
+    escopoTipo,
+    escopoId,
+    contexto: {
+      titulo: evento.titulo,
+      convocacaoId: convocacao?.id ?? null,
+      convocacaoStatusAnterior: convocacao?.status ?? null
+    }
+  })
+
+  await executarOperacaoComAudits(
+    db,
+    qdb => {
+      const queries: any[] = []
+
+      if (convocacao?.status === 'RASCUNHO') {
+        queries.push(
+          qdb.delete(convocacaoFuncoes).where(eq(convocacaoFuncoes.convocacaoId, convocacao.id)),
+          qdb.update(convocacoes)
+            .set({
+              status: 'CANCELADA',
+              ativo: false,
+              canceladaEm: agoraIso,
+              updatedAt: agoraIso
+            })
+            .where(eq(convocacoes.id, convocacao.id))
+        )
+      }
+
+      queries.push(
+        qdb.update(eventos)
+          .set({
+            ativo: false,
+            recorrenciaExcecao: evento.serieRecorrenciaId ? true : evento.recorrenciaExcecao,
+            agendaRevisao: agoraIso,
+            updatedAt: agoraIso
+          })
+          .where(eq(eventos.id, id))
+      )
+
+      return queries
+    },
+    audits
+  )
+
+  return c.json({
+    success: true,
+    eventoId: id,
+    convocacaoId: convocacao?.id ?? null,
+    convocacaoCancelada: convocacao?.status === 'RASCUNHO'
+  })
 })
 
 eventosRouter.patch('/:id', async (c) => {
