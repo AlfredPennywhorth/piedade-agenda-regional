@@ -327,6 +327,39 @@ describe('S07 - Minha Agenda e Calendário', () => {
     })
   })
 
+  it('3f. exibe sobreposição e proximidade quando o compromisso tem conflitos mistos', async () => {
+    const misto = JSON.parse(JSON.stringify(mockEventos))
+    misto[0].conflito = {
+      tipo: 'SOBREPOSICAO',
+      janelaTransicaoMinutos: 60,
+      priorizado: false,
+      atenuado: false,
+      eventos: [
+        {
+          eventoId: '2',
+          titulo: 'Encontro Online',
+          inicioEm: misto[1].evento.inicioEm,
+          fimEm: misto[1].evento.fimEm,
+          tipo: 'SOBREPOSICAO',
+        },
+        {
+          eventoId: '3',
+          titulo: 'Compromisso Próximo',
+          inicioEm: misto[1].evento.fimEm,
+          fimEm: misto[1].evento.fimEm,
+          tipo: 'PROXIMIDADE',
+        },
+      ],
+    }
+
+    mockAgenda(misto)
+    render(<App />)
+
+    expect(await screen.findByText('Conflito de horário e compromissos próximos')).toBeInTheDocument()
+    expect(screen.getByText(/Encontro Online \(conflito de horário\)/)).toBeInTheDocument()
+    expect(screen.getByText(/Compromisso Próximo \(próximo, até 60 min de transição\)/)).toBeInTheDocument()
+  })
+
   it('4. Navega para Calendário e exibe grid mensal', async () => {
     mockAgenda(mockEventos)
     render(<App />)
