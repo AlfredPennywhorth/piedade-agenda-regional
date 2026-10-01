@@ -290,6 +290,13 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
           </div>
         )}
 
+        {item.vinculo?.funcaoNome && (
+          <div className="border-t border-slate-100 pt-6">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Vínculo da convocação</h3>
+            <p className="font-medium text-slate-900">{item.vinculo.funcaoNome}</p>
+          </div>
+        )}
+
         {item.convocacao.observacoes && (
           <div className="border-t border-slate-100 pt-6">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Observações</h3>
