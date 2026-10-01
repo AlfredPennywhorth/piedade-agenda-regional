@@ -225,6 +225,7 @@ agendaRouter.get('/', async (c) => {
       const priorizado = escolhasDiretas.some(
         escolha => escolha.prioridade.eventoId === record.evento.id
       )
+      const conflitosResolvidos = escolhasDiretas.length === conflitosDiretos.length
       const atenuado = escolhasDiretas.some(
         escolha => escolha.prioridade.eventoId !== record.evento.id
       )
@@ -254,6 +255,7 @@ agendaRouter.get('/', async (c) => {
           tipo: temSobreposicao ? 'SOBREPOSICAO' : 'PROXIMIDADE',
           janelaTransicaoMinutos: JANELA_TRANSICAO_MINUTOS,
           priorizado,
+          conflitosResolvidos,
           atenuado,
           eventos: conflitosDiretos.map(conflito => {
             const outro = porId.get(conflito.eventoId)!
