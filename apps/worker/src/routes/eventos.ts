@@ -289,6 +289,9 @@ eventosRouter.patch('/:id', async (c) => {
     // PMO Rule: Ao alterar uma ocorrência individual, preservar serie_recorrencia_id e marcar recorrencia_excecao = true.
     const isExcecao = existing.serieRecorrenciaId !== null ? true : existing.recorrenciaExcecao
     const nowIso = new Date().toISOString()
+    const horarioAlterado =
+      (parsed.inicioEm !== undefined && parsed.inicioEm !== existing.inicioEm) ||
+      (parsed.fimEm !== undefined && parsed.fimEm !== existing.fimEm)
 
     const atorMembroId = c.get('membroId') || null
 
@@ -310,7 +313,12 @@ eventosRouter.patch('/:id', async (c) => {
       db,
       (qdb) => [
         qdb.update(eventos)
-          .set({ ...parsed, recorrenciaExcecao: isExcecao, updatedAt: nowIso })
+          .set({
+            ...parsed,
+            recorrenciaExcecao: isExcecao,
+            agendaRevisao: horarioAlterado ? nowIso : existing.agendaRevisao,
+            updatedAt: nowIso,
+          })
           .where(eq(eventos.id, id))
       ],
       auditData
