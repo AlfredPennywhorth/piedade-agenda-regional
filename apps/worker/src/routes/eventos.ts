@@ -9,6 +9,10 @@ import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/e
 
 export const eventosRouter = new Hono<any>()
 
+function mesmoInstante(a: string, b: string) {
+  return new Date(a).getTime() === new Date(b).getTime()
+}
+
 function eventoVisivelNoEscopo(evento: any, escopos: any): boolean {
   if (escopos.tudo) return true
   if (evento.regionalId && escopos.regionaisIds.has(evento.regionalId)) return true
@@ -290,8 +294,8 @@ eventosRouter.patch('/:id', async (c) => {
     const isExcecao = existing.serieRecorrenciaId !== null ? true : existing.recorrenciaExcecao
     const nowIso = new Date().toISOString()
     const horarioAlterado =
-      (parsed.inicioEm !== undefined && parsed.inicioEm !== existing.inicioEm) ||
-      (parsed.fimEm !== undefined && parsed.fimEm !== existing.fimEm)
+      (parsed.inicioEm !== undefined && !mesmoInstante(parsed.inicioEm, existing.inicioEm)) ||
+      (parsed.fimEm !== undefined && !mesmoInstante(parsed.fimEm, existing.fimEm))
 
     const atorMembroId = c.get('membroId') || null
 
