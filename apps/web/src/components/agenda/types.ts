@@ -28,6 +28,11 @@ export interface AgendaItem {
     nome: string
   } | null
   destinatarioId: string
+  vinculo?: {
+    funcaoId: string
+    funcaoNome: string
+    vinculoFuncionalId: string
+  } | null
   rsvp: {
     resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI'
     justificativa?: string | null
