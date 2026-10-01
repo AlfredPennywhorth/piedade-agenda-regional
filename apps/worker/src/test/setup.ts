@@ -338,6 +338,7 @@ export function setupDb(sqlite: any) {
       modalidade text NOT NULL,
       inicio_em text NOT NULL,
       fim_em text NOT NULL,
+      agenda_revisao text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
       local_id text,
       espaco_id text,
       url_online text,
