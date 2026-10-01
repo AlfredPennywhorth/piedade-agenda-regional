@@ -21,6 +21,17 @@ agendaRouter.use('*', authMiddleware)
 const JANELA_TRANSICAO_MINUTOS = 60
 const JANELA_TRANSICAO_MS = JANELA_TRANSICAO_MINUTOS * 60 * 1000
 
+type AgendaPrioridadePersistida = {
+  id: string
+  membroId: string
+  eventoId: string
+  conflitoParChave: string
+  conflitoChave: string
+  priorizadoEm: string
+  createdAt: string
+  updatedAt: string
+}
+
 type RegistroAgenda = {
   evento: {
     id: string
@@ -177,6 +188,9 @@ agendaRouter.get('/', async (c) => {
     }
 
     const porId = new Map(records.map(record => [record.evento.id, record]))
+    const prioridadesPorConflito = new Map(
+      prioridades.map(prioridade => [prioridade.conflitoChave, prioridade])
+    )
 
     const result = records.map((record: any) => {
       const eventoMeals = refOferecidas
@@ -189,7 +203,7 @@ agendaRouter.get('/', async (c) => {
           const outro = porId.get(conflito.eventoId)
           if (!outro) return null
           const conflitoChave = chaveConflitoPar(record, outro, conflito.tipo)
-          const prioridade = prioridades.find(item => item.conflitoChave === conflitoChave)
+          const prioridade = prioridadesPorConflito.get(conflitoChave)
           return prioridade ? { conflito, prioridade } : null
         })
         .filter(Boolean) as Array<{
@@ -280,7 +294,7 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
     }
   })
   const conflitoParChaves = conflitosPersistidos.map(item => item.conflitoParChave)
-  const prioridadesAnteriores = await db.select()
+  const prioridadesAnteriores: AgendaPrioridadePersistida[] = await db.select()
     .from(agendaPrioridadesConflito)
     .where(
       and(
