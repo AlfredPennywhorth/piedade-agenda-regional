@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ConvocacaoCreate, ConvocacaoUpdate, ConvocacaoCreatePayload, ConvocacaoUpdatePayload, Convocacao } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import { ConvocacaoFuncoesModal } from './ConvocacaoFuncoesModal'
@@ -69,6 +69,7 @@ export function ConvocacoesView({
   const [actionConfirm, setActionConfirm] = useState<{ type: 'PUBLICAR' | 'CANCELAR', convocacao: Convocacao } | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const fluxoRetornoFocoRef = useRef<HTMLHeadingElement | null>(null)
 
   const handleActionConfirm = async () => {
     if (!actionConfirm) return
@@ -376,7 +377,13 @@ export function ConvocacoesView({
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Convocações</h2>
+          <h2
+            ref={fluxoRetornoFocoRef}
+            tabIndex={-1}
+            className="text-2xl font-bold text-slate-900"
+          >
+            Convocações
+          </h2>
           <p className="text-slate-600">Gerencie os rascunhos de convocações</p>
         </div>
         <button
@@ -749,6 +756,7 @@ export function ConvocacoesView({
       {gerenciandoFuncoesId && (
         <ConvocacaoFuncoesModal
           convocacaoId={gerenciandoFuncoesId}
+          returnFocusRef={gerenciandoFuncoesId === fluxoConvocacaoId ? fluxoRetornoFocoRef : undefined}
           onClose={() => {
             const concluindoFluxo = gerenciandoFuncoesId === fluxoConvocacaoId
             setGerenciandoFuncoesId(null)
