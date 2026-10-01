@@ -29,7 +29,13 @@ interface GrupoTrabalhoLookup {
 }
 type FiltroStatus = 'ATIVAS' | 'RASCUNHO' | 'PUBLICADA' | 'CANCELADA' | 'TODAS'
 
-export function ConvocacoesView() {
+export function ConvocacoesView({
+  initialEventoId,
+  onFluxoConcluido,
+}: {
+  initialEventoId?: string | null
+  onFluxoConcluido?: () => void
+}) {
   const [convocacoes, setConvocacoes] = useState<Convocacao[]>([])
   const [eventosLookup, setEventosLookup] = useState<EventoLookup[]>([])
   const [regionais, setRegionais] = useState<RegionalLookup[]>([])
@@ -50,6 +56,7 @@ export function ConvocacoesView() {
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [gerenciandoFuncoesId, setGerenciandoFuncoesId] = useState<string | null>(null)
+  const [fluxoConvocacaoId, setFluxoConvocacaoId] = useState<string | null>(null)
   const [acompanhamentoConvocacaoId, setAcompanhamentoConvocacaoId] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<ConvocacaoCreatePayload>({
@@ -133,6 +140,14 @@ export function ConvocacoesView() {
     carregarDados()
   }, [])
 
+  useEffect(() => {
+    if (!initialEventoId) return
+    setEditandoId(null)
+    setFormData({ eventoId: initialEventoId, observacoes: '' })
+    setErrosForm({})
+    setFormOpen(true)
+  }, [initialEventoId])
+
   const abrirFormCriar = () => {
     setEditandoId(null)
     setFormData({ eventoId: '', observacoes: '' })
@@ -190,13 +205,18 @@ export function ConvocacoesView() {
         setErrosForm(novosErros)
         return
       }
-      requisicao = postWithAuth('/convocacoes', payload)
+      requisicao = postWithAuth<Convocacao>('/convocacoes', payload)
     }
 
     setSalvando(true)
     try {
-      await requisicao
+      const resultado = await requisicao
       setFormOpen(false)
+      if (!editandoId && initialEventoId && resultado && typeof resultado === 'object' && 'id' in resultado) {
+        const criada = resultado as Convocacao
+        setFluxoConvocacaoId(criada.id)
+        setGerenciandoFuncoesId(criada.id)
+      }
       carregarDados()
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -719,7 +739,14 @@ export function ConvocacoesView() {
       {gerenciandoFuncoesId && (
         <ConvocacaoFuncoesModal
           convocacaoId={gerenciandoFuncoesId}
-          onClose={() => setGerenciandoFuncoesId(null)}
+          onClose={() => {
+            const concluindoFluxo = gerenciandoFuncoesId === fluxoConvocacaoId
+            setGerenciandoFuncoesId(null)
+            if (concluindoFluxo) {
+              setFluxoConvocacaoId(null)
+              onFluxoConcluido?.()
+            }
+          }}
         />
       )}
 
