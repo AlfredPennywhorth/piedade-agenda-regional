@@ -43,6 +43,7 @@ function hierarquiaVinculo(escopoTipo: string | null) {
 function escolherMaiorVinculo<T extends {
   funcaoNome: string | null
   escopoTipo: string | null
+  [key: string]: unknown
 }>(vinculos: T[]): T | null {
   return [...vinculos].sort((a, b) => {
     const nivel = hierarquiaVinculo(b.escopoTipo) - hierarquiaVinculo(a.escopoTipo)
