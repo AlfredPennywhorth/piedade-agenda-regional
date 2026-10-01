@@ -33,4 +33,18 @@ export interface AgendaItem {
     justificativa?: string | null
     periodosParticipacao?: string[] | null
   } | null
+  conflito?: {
+    tipo: 'SOBREPOSICAO' | 'PROXIMIDADE'
+    janelaTransicaoMinutos: number
+    priorizado: boolean
+    conflitosResolvidos: boolean
+    atenuado: boolean
+    eventos: Array<{
+      eventoId: string
+      titulo: string
+      inicioEm: string
+      fimEm: string
+      tipo: 'SOBREPOSICAO' | 'PROXIMIDADE'
+    }>
+  } | null
 }

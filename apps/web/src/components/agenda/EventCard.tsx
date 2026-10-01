@@ -46,7 +46,9 @@ export function EventCard({ item, onClick }: EventCardProps) {
   return (
     <button
       onClick={onClick}
-      className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-brand-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-300"
+      className={`w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-brand-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-300 ${
+        item.conflito?.atenuado ? 'opacity-50' : ''
+      }`}
     >
       <div className="flex gap-4">
         <div className="flex min-w-[74px] flex-col items-center justify-center rounded-xl bg-brand-50 px-3 py-3 text-brand-900">
@@ -86,6 +88,21 @@ export function EventCard({ item, onClick }: EventCardProps) {
             <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">
               {item.evento.modalidade}
             </span>
+            {item.conflito?.priorizado && item.conflito.atenuado && (
+              <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">
+                Prioridade parcial
+              </span>
+            )}
+            {item.conflito?.priorizado && !item.conflito.atenuado && (
+              <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">
+                Prioridade escolhida
+              </span>
+            )}
+            {item.conflito && !item.conflito.priorizado && (
+              <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">
+                Conflito
+              </span>
+            )}
             <span className="text-[11px] font-medium text-brand-700">Ver detalhes</span>
           </div>
         </div>

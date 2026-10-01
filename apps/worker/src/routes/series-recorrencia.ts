@@ -11,6 +11,10 @@ import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/e
 
 export const seriesRecorrenciaRouter = new Hono<any>()
 
+function mesmoInstante(a: string, b: string) {
+  return new Date(a).getTime() === new Date(b).getTime()
+}
+
 seriesRecorrenciaRouter.use('*', authMiddleware)
 
 interface EscoposAgendaAutorizados {
@@ -313,6 +317,9 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
 
       const mergedEvent = { ...existingEvent, ...parsed.changes }
       EventoCreate.parse(mergedEvent) // Valida regras S04
+      const horarioAlterado =
+        (parsed.changes.inicioEm !== undefined && !mesmoInstante(parsed.changes.inicioEm, existingEvent.inicioEm)) ||
+        (parsed.changes.fimEm !== undefined && !mesmoInstante(parsed.changes.fimEm, existingEvent.fimEm))
       const espacoFoiAlterado = parsed.changes.espacoId !== undefined && parsed.changes.espacoId !== existingEvent.espacoId
       const espacoValido = espacoFoiAlterado
         ? await espacoAtivoPertenceAoLocal(db, mergedEvent.localId, mergedEvent.espacoId)
@@ -337,6 +344,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
               recorrenciaOrigemInicioEm:
                 existingEvent.recorrenciaOrigemInicioEm ?? existingEvent.inicioEm,
               recorrenciaExcecao: true,
+              agendaRevisao: horarioAlterado ? nowIso : existingEvent.agendaRevisao,
               updatedAt: nowIso,
             })
             .where(eq(eventos.id, parsed.fromEventId))

@@ -9,6 +9,10 @@ import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/e
 
 export const eventosRouter = new Hono<any>()
 
+function mesmoInstante(a: string, b: string) {
+  return new Date(a).getTime() === new Date(b).getTime()
+}
+
 function eventoVisivelNoEscopo(evento: any, escopos: any): boolean {
   if (escopos.tudo) return true
   if (evento.regionalId && escopos.regionaisIds.has(evento.regionalId)) return true
@@ -289,6 +293,11 @@ eventosRouter.patch('/:id', async (c) => {
     // PMO Rule: Ao alterar uma ocorrência individual, preservar serie_recorrencia_id e marcar recorrencia_excecao = true.
     const isExcecao = existing.serieRecorrenciaId !== null ? true : existing.recorrenciaExcecao
     const nowIso = new Date().toISOString()
+    const horarioAlterado =
+      (parsed.inicioEm !== undefined && !mesmoInstante(parsed.inicioEm, existing.inicioEm)) ||
+      (parsed.fimEm !== undefined && !mesmoInstante(parsed.fimEm, existing.fimEm))
+    const ativacaoAlterada =
+      parsed.ativo !== undefined && parsed.ativo !== existing.ativo
 
     const atorMembroId = c.get('membroId') || null
 
@@ -310,7 +319,12 @@ eventosRouter.patch('/:id', async (c) => {
       db,
       (qdb) => [
         qdb.update(eventos)
-          .set({ ...parsed, recorrenciaExcecao: isExcecao, updatedAt: nowIso })
+          .set({
+            ...parsed,
+            recorrenciaExcecao: isExcecao,
+            agendaRevisao: horarioAlterado || ativacaoAlterada ? nowIso : existing.agendaRevisao,
+            updatedAt: nowIso,
+          })
           .where(eq(eventos.id, id))
       ],
       auditData

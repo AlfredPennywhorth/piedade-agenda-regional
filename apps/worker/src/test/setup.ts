@@ -338,6 +338,7 @@ export function setupDb(sqlite: any) {
       modalidade text NOT NULL,
       inicio_em text NOT NULL,
       fim_em text NOT NULL,
+      agenda_revisao text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
       local_id text,
       espaco_id text,
       url_online text,
@@ -467,6 +468,22 @@ export function setupDb(sqlite: any) {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_convocacao_evidencia_unica ON convocacao_destinatario_evidencias (convocacao_destinatario_id, funcao_id, vinculo_funcional_id);
     CREATE INDEX IF NOT EXISTS idx_convocacao_evidencias_dest_id ON convocacao_destinatario_evidencias (convocacao_destinatario_id);
+
+    CREATE TABLE IF NOT EXISTS agenda_prioridades_conflito (
+      id text PRIMARY KEY NOT NULL,
+      membro_id text NOT NULL,
+      evento_id text NOT NULL,
+      conflito_par_chave text NOT NULL,
+      conflito_chave text NOT NULL,
+      priorizado_em text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+      created_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+      updated_at text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+      FOREIGN KEY (membro_id) REFERENCES membros(id),
+      FOREIGN KEY (evento_id) REFERENCES eventos(id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_agenda_prioridade_membro_conflito ON agenda_prioridades_conflito (membro_id, conflito_chave);
+    CREATE INDEX IF NOT EXISTS idx_agenda_prioridade_membro_par ON agenda_prioridades_conflito (membro_id, conflito_par_chave);
+    CREATE INDEX IF NOT EXISTS idx_agenda_prioridade_membro ON agenda_prioridades_conflito (membro_id);
 
     CREATE TABLE IF NOT EXISTS rsvp (
       id text PRIMARY KEY NOT NULL,
