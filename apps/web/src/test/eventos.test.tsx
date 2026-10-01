@@ -94,6 +94,77 @@ describe('EventosView', () => {
     })
   })
 
+  it('deve continuar o fluxo para convocação após criar evento', async () => {
+    const onEventoCriado = vi.fn()
+    const novoEvento = {
+      ...mockEventos[0],
+      id: '88888888-8888-4888-8888-888888888888',
+      titulo: 'Evento do fluxo',
+      modalidade: 'ONLINE',
+      localId: null,
+      urlOnline: 'https://meet.google.com/fluxo',
+    }
+    vi.mocked(apiClient.postWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return novoEvento
+      return {}
+    })
+
+    render(<EventosView onEventoCriado={onEventoCriado} />)
+    await screen.findByText('Reunião Presencial')
+
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+
+    fireEvent.change(within(dialog).getByLabelText(/título/i), { target: { value: 'Evento do fluxo' } })
+    fireEvent.change(within(dialog).getByLabelText(/início/i), { target: { value: '2026-10-10T10:00' } })
+    fireEvent.change(within(dialog).getByLabelText(/fim/i), { target: { value: '2026-10-10T12:00' } })
+    fireEvent.change(within(dialog).getByLabelText(/modalidade/i), { target: { value: 'ONLINE' } })
+    fireEvent.change(within(dialog).getByLabelText(/url online/i), { target: { value: 'https://meet.google.com/fluxo' } })
+    fireEvent.change(within(dialog).getByLabelText(/tipo de escopo/i), { target: { value: 'regional' } })
+    fireEvent.change(within(dialog).getByLabelText(/regional \*/i), { target: { value: REGIONAL_ID } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar evento/i }))
+
+    await waitFor(() => {
+      expect(onEventoCriado).toHaveBeenCalledWith(novoEvento.id)
+    })
+  })
+
+  it('deve criar Local e Espaço sem sair do formulário e selecioná-los', async () => {
+    const novoLocalId = '99999999-9999-4999-8999-999999999999'
+    const novoEspacoId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    vi.mocked(apiClient.postWithAuth).mockImplementation(async (url) => {
+      if (url === '/locais') return { id: novoLocalId, nome: 'Local Rápido' }
+      if (url === '/espacos-locais') return { id: novoEspacoId, localId: novoLocalId, nome: 'Sala Rápida', ativo: true }
+      return {}
+    })
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+
+    const eventoDialog = await screen.findByRole('dialog', { name: /novo evento/i })
+    fireEvent.click(within(eventoDialog).getByRole('button', { name: /criar local sem sair/i }))
+
+    const localDialog = await screen.findByRole('dialog', { name: /criar local/i })
+    fireEvent.change(within(localDialog).getByLabelText('Nome do novo local'), { target: { value: 'Local Rápido' } })
+    fireEvent.change(within(localDialog).getByLabelText('Endereço do novo local'), { target: { value: 'Rua Teste' } })
+    fireEvent.change(within(localDialog).getByLabelText('Número do novo local'), { target: { value: '10' } })
+    fireEvent.click(within(localDialog).getByRole('button', { name: /criar e selecionar/i }))
+
+    await waitFor(() => {
+      expect(within(eventoDialog).getByLabelText(/local \*/i)).toHaveValue(novoLocalId)
+    })
+
+    fireEvent.click(within(eventoDialog).getByRole('button', { name: /criar espaço sem sair/i }))
+    const espacoDialog = await screen.findByRole('dialog', { name: /criar espaço/i })
+    fireEvent.change(within(espacoDialog).getByLabelText('Nome do novo espaço'), { target: { value: 'Sala Rápida' } })
+    fireEvent.click(within(espacoDialog).getByRole('button', { name: /criar e selecionar/i }))
+
+    await waitFor(() => {
+      expect(within(eventoDialog).getByLabelText(/espaço/i)).toHaveValue(novoEspacoId)
+    })
+  })
+
   it('deve exibir empty state quando não houver eventos', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/eventos') return []
