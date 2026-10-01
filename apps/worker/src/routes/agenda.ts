@@ -27,6 +27,7 @@ type RegistroAgenda = {
     titulo: string
     inicioEm: string
     fimEm: string
+    agendaRevisao: string
   }
   convocacao: any
   local: any
@@ -83,6 +84,7 @@ function assinaturaConflito(record: RegistroAgenda) {
     record.evento.id,
     record.evento.inicioEm,
     record.evento.fimEm,
+    record.evento.agendaRevisao,
   ].join('@')
 }
 
