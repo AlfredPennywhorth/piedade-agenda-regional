@@ -34,6 +34,7 @@ function App() {
     : paramsPublicos.get('op')
 
   const [currentTab, setCurrentTab] = useState<'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes' | 'acessos'>('agenda')
+  const [fluxoEventoId, setFluxoEventoId] = useState<string | null>(null)
   const [capacidades, setCapacidades] = useState<CapacidadesFrontend>({})
   const [nomeUsuario, setNomeUsuario] = useState('')
   const [recuperacoesPinPendentes, setRecuperacoesPinPendentes] = useState(0)
@@ -183,9 +184,21 @@ function App() {
       recuperacoesPinPendentes={recuperacoesPinPendentes}
     >
       {currentTab === 'agenda' && <AgendaView />}
-      {currentTab === 'eventos' && capacidades.podeGerirAgenda === true && <EventosView />}
+      {currentTab === 'eventos' && capacidades.podeGerirAgenda === true && (
+        <EventosView
+          onEventoCriado={eventoId => {
+            setFluxoEventoId(eventoId)
+            setCurrentTab('convocacoes')
+          }}
+        />
+      )}
       {currentTab === 'series' && capacidades.podeGerirAgenda === true && <SeriesView />}
-      {currentTab === 'convocacoes' && capacidades.podeGerirAgenda === true && <ConvocacoesView />}
+      {currentTab === 'convocacoes' && capacidades.podeGerirAgenda === true && (
+        <ConvocacoesView
+          initialEventoId={fluxoEventoId}
+          onFluxoConcluido={() => setFluxoEventoId(null)}
+        />
+      )}
       {currentTab === 'calendario' && <CalendarioView />}
       {currentTab === 'portaria' &&
         (capacidades.podeOperarPortaria === true || capacidades.podeGerirAgenda === true) && (
