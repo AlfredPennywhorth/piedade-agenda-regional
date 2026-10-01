@@ -84,6 +84,14 @@ export function AgendaView() {
     }
 
     void carregarAgenda({ destinatarioId, rsvp }).catch((err: any) => {
+      const invalidarConflitos = (item: AgendaItem) => ({
+        ...item,
+        rsvp: item.destinatarioId === destinatarioId ? rsvp : item.rsvp,
+        conflito: null,
+      })
+
+      setItems(current => current.map(invalidarConflitos))
+      setSelectedItem(current => current ? invalidarConflitos(current) : current)
       setError(err.message || 'Não foi possível atualizar os conflitos da agenda.')
     })
   }
