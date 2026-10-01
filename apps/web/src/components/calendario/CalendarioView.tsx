@@ -24,6 +24,7 @@ export function CalendarioView() {
   const [selectedDayEvents, setSelectedDayEvents] = useState<AgendaItem[] | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<AgendaItem | null>(null)
+  const [erroAtualizacaoConflitos, setErroAtualizacaoConflitos] = useState<string | null>(null)
   const geracaoCargaAgenda = useRef(0)
   const selectedDateRef = useRef<Date | null>(null)
 
@@ -45,6 +46,7 @@ export function CalendarioView() {
         : item
     )
 
+    setErroAtualizacaoConflitos(null)
     setItems(atualizados)
     setSelectedDayEvents(current => {
       const dataSelecionada = selectedDateRef.current
@@ -84,6 +86,21 @@ export function CalendarioView() {
 
     void carregarAgenda({ destinatarioId, rsvp }).catch(err => {
       console.error(err)
+      const limparConflitoObsoleto = (item: AgendaItem) =>
+        item.destinatarioId === destinatarioId
+          ? { ...item, rsvp, conflito: null }
+          : item
+
+      setItems(current => current.map(limparConflitoObsoleto))
+      setSelectedDayEvents(current => current ? current.map(limparConflitoObsoleto) : current)
+      setSelectedEvent(current =>
+        current?.destinatarioId === destinatarioId
+          ? { ...current, rsvp, conflito: null }
+          : current
+      )
+      setErroAtualizacaoConflitos(
+        'A resposta foi salva, mas não foi possível atualizar os conflitos da agenda. Recarregue o calendário.'
+      )
     })
   }
 
@@ -121,6 +138,14 @@ export function CalendarioView() {
 
   return (
     <div className="p-4">
+      {erroAtualizacaoConflitos && (
+        <div
+          role="alert"
+          className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+        >
+          {erroAtualizacaoConflitos}
+        </div>
+      )}
       
       <div className="flex items-center justify-between mb-4 bg-white p-3 rounded-xl shadow-sm border border-slate-100">
         <button onClick={prevMonth} className="p-2 text-slate-500 hover:bg-slate-50 rounded-full">
