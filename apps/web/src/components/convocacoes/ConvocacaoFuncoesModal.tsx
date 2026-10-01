@@ -20,9 +20,10 @@ interface ConvocacaoFuncao {
 interface ConvocacaoFuncoesModalProps {
   convocacaoId: string
   onClose: () => void
+  returnFocusRef?: { current: HTMLElement | null }
 }
 
-export function ConvocacaoFuncoesModal({ convocacaoId, onClose }: ConvocacaoFuncoesModalProps) {
+export function ConvocacaoFuncoesModal({ convocacaoId, onClose, returnFocusRef }: ConvocacaoFuncoesModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const triggerRef = useRef<HTMLElement | null>(
@@ -62,8 +63,15 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose }: ConvocacaoFunc
 
   useEffect(() => {
     closeButtonRef.current?.focus()
-    return () => triggerRef.current?.focus()
-  }, [])
+    return () => {
+      const destino = returnFocusRef?.current
+      if (destino?.isConnected) {
+        destino.focus()
+        return
+      }
+      if (triggerRef.current?.isConnected) triggerRef.current.focus()
+    }
+  }, [returnFocusRef])
 
   const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Escape' && !salvando) {
