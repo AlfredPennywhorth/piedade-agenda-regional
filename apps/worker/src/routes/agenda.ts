@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, asc, inArray } from 'drizzle-orm'
+import { eq, and, asc, inArray, ne } from 'drizzle-orm'
 import {
   eventos,
   convocacoes,
@@ -296,26 +296,34 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
     conflitoChave,
   }))
 
-  await executeAtomic(db, tx => [
-    tx.delete(agendaPrioridadesConflito).where(
-      and(
-        eq(agendaPrioridadesConflito.membroId, membroId),
-        inArray(agendaPrioridadesConflito.conflitoParChave, conflitoParChaves)
-      )
-    ),
-    ...tentativasPersistidas.map(({ id, conflitoParChave, conflitoChave }) =>
-      tx.insert(agendaPrioridadesConflito).values({
-        id,
-        membroId,
-        eventoId,
-        conflitoParChave,
-        conflitoChave,
-        priorizadoEm: agora,
-        createdAt: agora,
-        updatedAt: agora,
-      })
-    ),
-  ])
+  await executeAtomic(db, tx =>
+    tentativasPersistidas.map(({ id, conflitoParChave, conflitoChave }) =>
+      tx.insert(agendaPrioridadesConflito)
+        .values({
+          id,
+          membroId,
+          eventoId,
+          conflitoParChave,
+          conflitoChave,
+          priorizadoEm: agora,
+          createdAt: agora,
+          updatedAt: agora,
+        })
+        .onConflictDoUpdate({
+          target: [
+            agendaPrioridadesConflito.membroId,
+            agendaPrioridadesConflito.conflitoChave,
+          ],
+          set: {
+            id,
+            eventoId,
+            conflitoParChave,
+            priorizadoEm: agora,
+            updatedAt: agora,
+          },
+        })
+    )
+  )
 
   // Revalida depois da escrita para fechar a corrida com alterações de RSVP.
   // Se o RSVP mudar antes da inserção, esta checagem remove a prioridade recém-gravada.
@@ -366,6 +374,18 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
       code: 'CONFLITO_ALTERADO',
     }, 409)
   }
+
+  await executeAtomic(db, tx =>
+    tentativasPersistidas.map(({ conflitoParChave, conflitoChave }) =>
+      tx.delete(agendaPrioridadesConflito).where(
+        and(
+          eq(agendaPrioridadesConflito.membroId, membroId),
+          eq(agendaPrioridadesConflito.conflitoParChave, conflitoParChave),
+          ne(agendaPrioridadesConflito.conflitoChave, conflitoChave)
+        )
+      )
+    )
+  )
 
   return c.json({
     message: 'Compromisso priorizado',
