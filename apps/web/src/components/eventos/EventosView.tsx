@@ -151,11 +151,12 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
   const [espacoRapidoNome, setEspacoRapidoNome] = useState('')
   const localRapidoDialogRef = useRef<HTMLDivElement | null>(null)
   const espacoRapidoDialogRef = useRef<HTMLDivElement | null>(null)
+  const localRapidoTriggerRef = useRef<HTMLElement | null>(null)
+  const espacoRapidoTriggerRef = useRef<HTMLElement | null>(null)
   const eventoFormConsultaSeq = useRef(0)
 
   useEffect(() => {
     if (!localRapidoOpen) return
-    const anterior = document.activeElement as HTMLElement | null
     const dialog = localRapidoDialogRef.current
     const focaveis = dialog?.querySelectorAll<HTMLElement>(
       'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -182,13 +183,12 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     document.addEventListener('keydown', aoTeclar)
     return () => {
       document.removeEventListener('keydown', aoTeclar)
-      anterior?.focus()
+      if (localRapidoTriggerRef.current?.isConnected) localRapidoTriggerRef.current.focus()
     }
   }, [localRapidoOpen])
 
   useEffect(() => {
     if (!espacoRapidoOpen) return
-    const anterior = document.activeElement as HTMLElement | null
     const dialog = espacoRapidoDialogRef.current
     const focaveis = dialog?.querySelectorAll<HTMLElement>(
       'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -215,7 +215,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     document.addEventListener('keydown', aoTeclar)
     return () => {
       document.removeEventListener('keydown', aoTeclar)
-      anterior?.focus()
+      if (espacoRapidoTriggerRef.current?.isConnected) espacoRapidoTriggerRef.current.focus()
     }
   }, [espacoRapidoOpen])
 
@@ -956,7 +956,8 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                           {!eventoEditandoId && (
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={event => {
+                                localRapidoTriggerRef.current = event.currentTarget
                                 setLocalRapidoErro(null)
                                 setLocalRapidoOpen(true)
                               }}
@@ -988,7 +989,8 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                           {!eventoEditandoId && (
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={event => {
+                                espacoRapidoTriggerRef.current = event.currentTarget
                                 setEspacoRapidoErro(null)
                                 setEspacoRapidoNome('')
                                 setEspacoRapidoOpen(true)
