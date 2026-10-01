@@ -273,6 +273,39 @@ describe('ConvocacoesView', () => {
     expect(screen.getByText('Nenhuma convocação corresponde aos filtros selecionados.')).toBeInTheDocument()
   })
 
+  it('deve abrir convocação pré-selecionada e seguir direto para Gerenciar Funções', async () => {
+    const novaConvocacaoId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    vi.mocked(apiClient.postWithAuth).mockImplementation(async (url) => {
+      if (url === '/convocacoes') {
+        return {
+          id: novaConvocacaoId,
+          eventoId: EVENTO_DISPONIVEL_ID,
+          status: 'RASCUNHO',
+          observacoes: '',
+          ativo: true,
+          createdAt: '2026-10-01T12:00:00.000Z',
+          updatedAt: '2026-10-01T12:00:00.000Z',
+        }
+      }
+      return {}
+    })
+
+    render(<ConvocacoesView initialEventoId={EVENTO_DISPONIVEL_ID} />)
+
+    const dialog = await screen.findByRole('dialog', { name: /nova convocação/i })
+    expect(within(dialog).getByLabelText('Evento da convocação')).toHaveValue(EVENTO_DISPONIVEL_ID)
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar/i }))
+
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith('/convocacoes', {
+        eventoId: EVENTO_DISPONIVEL_ID,
+        observacoes: '',
+      })
+      expect(screen.getByRole('dialog', { name: /gerenciar funções do rascunho/i })).toBeInTheDocument()
+    })
+  })
+
   it('deve permitir criar um rascunho', async () => {
     render(<ConvocacoesView />)
 
