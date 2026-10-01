@@ -82,8 +82,20 @@ function montarMapaConflitos(records: RegistroAgenda[]) {
 
       const aId = ativos[i].evento.id
       const bId = ativos[j].evento.id
-      mapa.set(aId, [...(mapa.get(aId) ?? []), { eventoId: bId, tipo }])
-      mapa.set(bId, [...(mapa.get(bId) ?? []), { eventoId: aId, tipo }])
+
+      let conflitosA = mapa.get(aId)
+      if (!conflitosA) {
+        conflitosA = []
+        mapa.set(aId, conflitosA)
+      }
+      conflitosA.push({ eventoId: bId, tipo })
+
+      let conflitosB = mapa.get(bId)
+      if (!conflitosB) {
+        conflitosB = []
+        mapa.set(bId, conflitosB)
+      }
+      conflitosB.push({ eventoId: aId, tipo })
     }
   }
 
