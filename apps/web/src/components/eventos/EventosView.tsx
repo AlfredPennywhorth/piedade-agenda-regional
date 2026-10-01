@@ -488,6 +488,28 @@ export function EventosView() {
     }
   }
 
+  const handleCancelarEvento = async (item: Evento) => {
+    const confirmou = window.confirm(
+      `Cancelar o evento "${item.titulo}"? Se houver convocação em rascunho, as funções serão removidas e a convocação também será cancelada.`
+    )
+    if (!confirmou) return
+
+    setErro(null)
+    try {
+      await postWithAuth(`/eventos/${item.id}/cancelar`, {})
+      setEventos(atuais => atuais.filter(evento => evento.id !== item.id))
+      if (eventoDetalhe?.id === item.id) setEventoDetalhe(null)
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.body?.error) {
+        setErro(typeof err.body.error === 'string' ? err.body.error : 'Não foi possível cancelar o evento.')
+      } else if (err instanceof Error) {
+        setErro(err.message || 'Não foi possível cancelar o evento.')
+      } else {
+        setErro('Não foi possível cancelar o evento.')
+      }
+    }
+  }
+
   const confirmarEditarThis = async () => {
     if (!eventoEditandoId || !eventoEditandoSerieId || !confirmacaoThisAberto) return
     setSalvando(true)
@@ -673,6 +695,15 @@ export function EventosView() {
                         >
                           Editar
                         </button>
+                        {item.ativo && (
+                          <button
+                            type="button"
+                            onClick={() => void handleCancelarEvento(item)}
+                            className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-red-700 hover:bg-red-50 hover:text-red-900 font-medium"
+                          >
+                            Cancelar Evento
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
