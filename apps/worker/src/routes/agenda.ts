@@ -280,7 +280,21 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
     }
   })
   const conflitoParChaves = conflitosPersistidos.map(item => item.conflitoParChave)
+  const prioridadesAnteriores = await db.select()
+    .from(agendaPrioridadesConflito)
+    .where(
+      and(
+        eq(agendaPrioridadesConflito.membroId, membroId),
+        inArray(agendaPrioridadesConflito.conflitoParChave, conflitoParChaves)
+      )
+    )
+    .all()
   const agora = new Date().toISOString()
+  const tentativasPersistidas = conflitosPersistidos.map(({ conflitoParChave, conflitoChave }) => ({
+    id: crypto.randomUUID(),
+    conflitoParChave,
+    conflitoChave,
+  }))
 
   await executeAtomic(db, tx => [
     tx.delete(agendaPrioridadesConflito).where(
@@ -289,9 +303,9 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
         inArray(agendaPrioridadesConflito.conflitoParChave, conflitoParChaves)
       )
     ),
-    ...conflitosPersistidos.map(({ conflitoParChave, conflitoChave }) =>
+    ...tentativasPersistidas.map(({ id, conflitoParChave, conflitoChave }) =>
       tx.insert(agendaPrioridadesConflito).values({
-        id: crypto.randomUUID(),
+        id,
         membroId,
         eventoId,
         conflitoParChave,
@@ -328,12 +342,22 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
     [...chavesAntes].some(chave => !chavesDepois.has(chave))
 
   if (conflitoMudou) {
+    const idsTentativa = tentativasPersistidas.map(item => item.id)
+    const prioridadesRestauraveis = prioridadesAnteriores.filter(
+      prioridade => chavesDepois.has(prioridade.conflitoChave)
+    )
+
     await executeAtomic(db, tx => [
       tx.delete(agendaPrioridadesConflito).where(
         and(
           eq(agendaPrioridadesConflito.membroId, membroId),
-          inArray(agendaPrioridadesConflito.conflitoParChave, conflitoParChaves)
+          inArray(agendaPrioridadesConflito.id, idsTentativa)
         )
+      ),
+      ...prioridadesRestauraveis.map(prioridade =>
+        tx.insert(agendaPrioridadesConflito)
+          .values(prioridade)
+          .onConflictDoNothing()
       ),
     ])
 
