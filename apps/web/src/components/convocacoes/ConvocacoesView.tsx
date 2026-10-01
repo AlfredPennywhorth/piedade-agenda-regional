@@ -57,6 +57,7 @@ export function ConvocacoesView({
   const [salvando, setSalvando] = useState(false)
   const [gerenciandoFuncoesId, setGerenciandoFuncoesId] = useState<string | null>(null)
   const [fluxoConvocacaoId, setFluxoConvocacaoId] = useState<string | null>(null)
+  const [fluxoEventoIdAtivo, setFluxoEventoIdAtivo] = useState<string | null>(null)
   const [acompanhamentoConvocacaoId, setAcompanhamentoConvocacaoId] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<ConvocacaoCreatePayload>({
@@ -142,6 +143,7 @@ export function ConvocacoesView({
 
   useEffect(() => {
     if (!initialEventoId) return
+    setFluxoEventoIdAtivo(initialEventoId)
     setEditandoId(null)
     setFormData({ eventoId: initialEventoId, observacoes: '' })
     setErrosForm({})
@@ -171,11 +173,12 @@ export function ConvocacoesView({
 
   const handleCloseForm = () => {
     if (!salvando) {
-      const cancelandoFluxoGuiado = !!initialEventoId && !editandoId
+      const cancelandoFluxoGuiado = !!fluxoEventoIdAtivo && !editandoId
       setFormOpen(false)
       setEditandoId(null)
       if (cancelandoFluxoGuiado) {
         setFluxoConvocacaoId(null)
+        setFluxoEventoIdAtivo(null)
         onFluxoConcluido?.()
       }
     }
@@ -217,9 +220,10 @@ export function ConvocacoesView({
     try {
       const resultado = await requisicao
       setFormOpen(false)
-      if (!editandoId && initialEventoId && resultado && typeof resultado === 'object' && 'id' in resultado) {
+      if (!editandoId && fluxoEventoIdAtivo && resultado && typeof resultado === 'object' && 'id' in resultado) {
         const criada = resultado as Convocacao
         setFluxoConvocacaoId(criada.id)
+        setFluxoEventoIdAtivo(null)
         setGerenciandoFuncoesId(criada.id)
         onFluxoConcluido?.()
       }
