@@ -307,13 +307,25 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
   // Se o RSVP mudar antes da inserção, esta checagem remove a prioridade recém-gravada.
   // Se mudar depois, o próprio PUT de RSVP remove as prioridades do evento atomicamente.
   const recordsDepois = await buscarRegistrosAgenda(db, membroId)
+  const selecionadoDepois = recordsDepois.find(record => record.evento.id === eventoId)
   const mapaDepois = montarMapaConflitos(recordsDepois)
-  const conflitosAtuais = new Set(
-    (mapaDepois.get(eventoId) ?? []).map(conflito =>
-      chaveParEstavel(eventoId, conflito.eventoId)
-    )
-  )
-  const conflitoMudou = conflitoParChaves.some(chave => !conflitosAtuais.has(chave))
+  const porIdDepois = new Map(recordsDepois.map(record => [record.evento.id, record]))
+  const conflitosDepois = selecionadoDepois
+    ? (mapaDepois.get(eventoId) ?? []).map(conflito => {
+        const outro = porIdDepois.get(conflito.eventoId)
+        if (!outro) throw new Error('Conflito aponta para evento ausente da agenda')
+        return {
+          conflitoParChave: chaveParEstavel(eventoId, conflito.eventoId),
+          conflitoChave: chaveConflitoPar(selecionadoDepois, outro, conflito.tipo),
+        }
+      })
+    : []
+
+  const chavesAntes = new Set(conflitosPersistidos.map(item => item.conflitoChave))
+  const chavesDepois = new Set(conflitosDepois.map(item => item.conflitoChave))
+  const conflitoMudou =
+    chavesAntes.size !== chavesDepois.size ||
+    [...chavesAntes].some(chave => !chavesDepois.has(chave))
 
   if (conflitoMudou) {
     await executeAtomic(db, tx => [
