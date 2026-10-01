@@ -204,7 +204,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     render(<App />)
 
     expect(await screen.findByText('Conflito de horário')).toBeInTheDocument()
-    expect(screen.getByText('Também há: Encontro Online.')).toBeInTheDocument()
+    expect(screen.getByText('Também há: Encontro Online (conflito de horário).')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Priorizar este compromisso' }))
 
