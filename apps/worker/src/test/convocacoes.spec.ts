@@ -832,6 +832,11 @@ describe('S06 - Convocações', () => {
     expect(body.data[0].respostaRsvp).toBe('SEM_RESPOSTA')
     expect(body.data[0]).not.toHaveProperty('justificativa')
     expect(body.data[0].evidencias.length).toBeGreaterThan(0)
+    expect(body.data[0].vinculo).toMatchObject({
+      funcaoId: ctx.f1Id,
+      vinculoFuncionalId: expect.any(String),
+    })
+    expect(body.data[0].vinculo.funcaoNome).toEqual(expect.any(String))
 
     const reqFiltroSemResp = await app.request(`/api/v1/convocacoes/${conv.id}/acompanhamento-rsvp?statusRsvp=SEM_RESPOSTA`)
     expect((await reqFiltroSemResp.json()).data.length).toBe(body.data.length)
