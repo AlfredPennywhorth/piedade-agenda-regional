@@ -313,6 +313,9 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
 
       const mergedEvent = { ...existingEvent, ...parsed.changes }
       EventoCreate.parse(mergedEvent) // Valida regras S04
+      const horarioAlterado =
+        (parsed.changes.inicioEm !== undefined && parsed.changes.inicioEm !== existingEvent.inicioEm) ||
+        (parsed.changes.fimEm !== undefined && parsed.changes.fimEm !== existingEvent.fimEm)
       const espacoFoiAlterado = parsed.changes.espacoId !== undefined && parsed.changes.espacoId !== existingEvent.espacoId
       const espacoValido = espacoFoiAlterado
         ? await espacoAtivoPertenceAoLocal(db, mergedEvent.localId, mergedEvent.espacoId)
@@ -337,6 +340,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
               recorrenciaOrigemInicioEm:
                 existingEvent.recorrenciaOrigemInicioEm ?? existingEvent.inicioEm,
               recorrenciaExcecao: true,
+              agendaRevisao: horarioAlterado ? nowIso : existingEvent.agendaRevisao,
               updatedAt: nowIso,
             })
             .where(eq(eventos.id, parsed.fromEventId))
