@@ -390,4 +390,69 @@ describe('S07 - Minha Agenda', () => {
     expect(versoesDoPar.total).toBe(1)
   })
 
+
+  it('4. Não restaura prioridade após horário sair e voltar ao valor original', async () => {
+    sqlite.exec(`
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, agenda_revisao, regional_id, ativo)
+      VALUES
+        ('ev-round-a', 'Evento Round A', 'PRESENCIAL', '2026-01-05T10:00:00Z', '2026-01-05T11:00:00Z', 'rev-a-1', 'reg-1', 1),
+        ('ev-round-b', 'Evento Round B', 'PRESENCIAL', '2026-01-05T10:30:00Z', '2026-01-05T11:30:00Z', 'rev-b-1', 'reg-1', 1);
+
+      INSERT INTO convocacoes (id, evento_id, status, ativo)
+      VALUES
+        ('conv-round-a', 'ev-round-a', 'PUBLICADA', 1),
+        ('conv-round-b', 'ev-round-b', 'PUBLICADA', 1);
+
+      INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id)
+      VALUES
+        ('dest-round-a', 'conv-round-a', '${membroId}'),
+        ('dest-round-b', 'conv-round-b', '${membroId}');
+    `)
+
+    const priorizar = await req('/api/v1/minha-agenda/prioridade/ev-round-a', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    })
+    expect(priorizar.status).toBe(200)
+
+    sqlite.exec(`
+      UPDATE eventos
+      SET inicio_em = '2026-01-05T13:00:00Z',
+          fim_em = '2026-01-05T14:00:00Z',
+          agenda_revisao = 'rev-b-2'
+      WHERE id = 'ev-round-b';
+    `)
+
+    const semConflito = await req('/api/v1/minha-agenda', {
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    })
+    const agendaSemConflito = await semConflito.json() as any[]
+    expect(agendaSemConflito.find(item => item.evento.id === 'ev-round-a').conflito).toBeNull()
+
+    sqlite.exec(`
+      UPDATE eventos
+      SET inicio_em = '2026-01-05T10:30:00Z',
+          fim_em = '2026-01-05T11:30:00Z',
+          agenda_revisao = 'rev-b-3'
+      WHERE id = 'ev-round-b';
+    `)
+
+    const restaurado = await req('/api/v1/minha-agenda', {
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    })
+    const agendaRestaurada = await restaurado.json() as any[]
+    const eventoA = agendaRestaurada.find(item => item.evento.id === 'ev-round-a')
+    const eventoB = agendaRestaurada.find(item => item.evento.id === 'ev-round-b')
+
+    expect(eventoA.conflito.priorizado).toBe(false)
+    expect(eventoA.conflito.atenuado).toBe(false)
+    expect(eventoB.conflito.priorizado).toBe(false)
+    expect(eventoB.conflito.atenuado).toBe(false)
+  })
+
 })
