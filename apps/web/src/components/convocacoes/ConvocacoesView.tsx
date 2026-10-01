@@ -171,8 +171,13 @@ export function ConvocacoesView({
 
   const handleCloseForm = () => {
     if (!salvando) {
+      const cancelandoFluxoGuiado = !!initialEventoId && !editandoId
       setFormOpen(false)
       setEditandoId(null)
+      if (cancelandoFluxoGuiado) {
+        setFluxoConvocacaoId(null)
+        onFluxoConcluido?.()
+      }
     }
   }
 
@@ -216,6 +221,7 @@ export function ConvocacoesView({
         const criada = resultado as Convocacao
         setFluxoConvocacaoId(criada.id)
         setGerenciandoFuncoesId(criada.id)
+        onFluxoConcluido?.()
       }
       carregarDados()
     } catch (err: unknown) {
@@ -744,7 +750,6 @@ export function ConvocacoesView({
             setGerenciandoFuncoesId(null)
             if (concluindoFluxo) {
               setFluxoConvocacaoId(null)
-              onFluxoConcluido?.()
             }
           }}
         />
