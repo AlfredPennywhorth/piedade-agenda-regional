@@ -567,4 +567,62 @@ describe('S07 - Minha Agenda', () => {
     sqlite.exec('DROP TRIGGER trg_test_race_rsvp;')
   })
 
+
+  it('7. Rejeita prioridade se a configuração do conflito mudar durante a gravação', async () => {
+    sqlite.exec(`
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, agenda_revisao, regional_id, ativo)
+      VALUES
+        ('ev-version-a', 'Evento Version A', 'PRESENCIAL', '2027-01-08T10:00:00Z', '2027-01-08T11:00:00Z', 'rev-version-a', 'reg-1', 1),
+        ('ev-version-b', 'Evento Version B', 'PRESENCIAL', '2027-01-08T10:30:00Z', '2027-01-08T11:30:00Z', 'rev-version-b-1', 'reg-1', 1);
+
+      INSERT INTO convocacoes (id, evento_id, status, ativo)
+      VALUES
+        ('conv-version-a', 'ev-version-a', 'PUBLICADA', 1),
+        ('conv-version-b', 'ev-version-b', 'PUBLICADA', 1);
+
+      INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id)
+      VALUES
+        ('dest-version-a', 'conv-version-a', '${membroId}'),
+        ('dest-version-b', 'conv-version-b', '${membroId}');
+
+      CREATE TRIGGER trg_test_version_conflict
+      AFTER INSERT ON agenda_prioridades_conflito
+      WHEN NEW.conflito_par_chave = 'ev-version-a|ev-version-b'
+      BEGIN
+        UPDATE eventos
+        SET inicio_em = '2027-01-08T10:45:00Z',
+            fim_em = '2027-01-08T11:45:00Z',
+            agenda_revisao = 'rev-version-b-2'
+        WHERE id = 'ev-version-b';
+      END;
+    `)
+
+    const priorizar = await req('/api/v1/minha-agenda/prioridade/ev-version-a', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    })
+
+    expect(priorizar.status).toBe(409)
+    expect(await priorizar.json()).toEqual(expect.objectContaining({
+      code: 'CONFLITO_ALTERADO',
+    }))
+
+    const linha = sqlite
+      .prepare(`
+        SELECT COUNT(*) AS total
+        FROM agenda_prioridades_conflito
+        WHERE membro_id = ?
+          AND conflito_par_chave = ?
+      `)
+      .get(membroId, 'ev-version-a|ev-version-b') as { total: number }
+
+    expect(linha.total).toBe(0)
+    sqlite.exec('DROP TRIGGER trg_test_version_conflict;')
+  })
+
 })
