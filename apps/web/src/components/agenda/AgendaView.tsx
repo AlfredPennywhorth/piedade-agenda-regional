@@ -142,7 +142,7 @@ export function AgendaView() {
               role="status"
             >
               <p className="font-semibold">
-                {item.conflito.priorizado && item.conflito.atenuado
+                {item.conflito.priorizado && (!item.conflito.conflitosResolvidos || item.conflito.atenuado)
                   ? 'Prioridade parcial'
                   : item.conflito.priorizado
                     ? 'Compromisso priorizado'
@@ -151,7 +151,7 @@ export function AgendaView() {
               <p className="mt-1 text-xs">
                 {detalhesConflitos(item)}
               </p>
-              {(!item.conflito.priorizado || item.conflito.atenuado) && (
+              {(!item.conflito.conflitosResolvidos || item.conflito.atenuado) && (
                 <button
                   type="button"
                   disabled={priorizandoEventoId !== null}
