@@ -82,8 +82,8 @@ function montarMapaConflitos(records: RegistroAgenda[]) {
 function assinaturaConflito(record: RegistroAgenda) {
   return [
     record.evento.id,
-    record.evento.inicioEm,
-    record.evento.fimEm,
+    String(new Date(record.evento.inicioEm).getTime()),
+    String(new Date(record.evento.fimEm).getTime()),
     record.evento.agendaRevisao,
   ].join('@')
 }
