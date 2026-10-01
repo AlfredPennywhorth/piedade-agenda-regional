@@ -11,8 +11,6 @@ import {
   checkins,
   agendaPrioridadesConflito,
   convocacaoDestinatarioEvidencias,
-  vinculosFuncionais,
-  funcoes,
 } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { executeAtomic } from '../db/batch'
@@ -34,31 +32,22 @@ function particionar<T>(itens: T[], tamanho = MAX_IDS_POR_CONSULTA): T[][] {
   return partes
 }
 
-function hierarquiaVinculo(vinculo: {
-  regionalId?: string | null
-  administracaoId?: string | null
-  setorId?: string | null
-  casaId?: string | null
-  grupoTrabalhoId?: string | null
-}) {
-  if (vinculo.regionalId || vinculo.grupoTrabalhoId) return 4
-  if (vinculo.administracaoId) return 3
-  if (vinculo.setorId) return 2
-  if (vinculo.casaId) return 1
+function hierarquiaVinculo(escopoTipo: string | null) {
+  if (escopoTipo === 'REGIONAL' || escopoTipo === 'GRUPO_TRABALHO') return 4
+  if (escopoTipo === 'ADMINISTRACAO') return 3
+  if (escopoTipo === 'SETOR') return 2
+  if (escopoTipo === 'CASA') return 1
   return 0
 }
 
 function escolherMaiorVinculo<T extends {
-  funcaoNome: string
-  regionalId?: string | null
-  administracaoId?: string | null
-  setorId?: string | null
-  casaId?: string | null
-  grupoTrabalhoId?: string | null
+  funcaoNome: string | null
+  escopoTipo: string | null
 }>(vinculos: T[]): T | null {
   return [...vinculos].sort((a, b) => {
-    const nivel = hierarquiaVinculo(b) - hierarquiaVinculo(a)
-    return nivel !== 0 ? nivel : a.funcaoNome.localeCompare(b.funcaoNome, 'pt-BR')
+    const nivel = hierarquiaVinculo(b.escopoTipo) - hierarquiaVinculo(a.escopoTipo)
+    if (nivel !== 0) return nivel
+    return (a.funcaoNome ?? '').localeCompare(b.funcaoNome ?? '', 'pt-BR')
   })[0] ?? null
 }
 
@@ -222,12 +211,9 @@ agendaRouter.get('/', async (c) => {
       convocacaoDestinatarioId: string
       vinculoFuncionalId: string
       funcaoId: string
-      funcaoNome: string
-      regionalId: string | null
-      administracaoId: string | null
-      setorId: string | null
-      casaId: string | null
-      grupoTrabalhoId: string | null
+      funcaoNome: string | null
+      escopoTipo: string | null
+      escopoId: string | null
     }> = []
 
     if (eventoIds.length > 0) {
@@ -264,17 +250,12 @@ agendaRouter.get('/', async (c) => {
             db.select({
               convocacaoDestinatarioId: convocacaoDestinatarioEvidencias.convocacaoDestinatarioId,
               vinculoFuncionalId: convocacaoDestinatarioEvidencias.vinculoFuncionalId,
-              funcaoId: funcoes.id,
-              funcaoNome: funcoes.nome,
-              regionalId: vinculosFuncionais.regionalId,
-              administracaoId: vinculosFuncionais.administracaoId,
-              setorId: vinculosFuncionais.setorId,
-              casaId: vinculosFuncionais.casaId,
-              grupoTrabalhoId: vinculosFuncionais.grupoTrabalhoId,
+              funcaoId: convocacaoDestinatarioEvidencias.funcaoId,
+              funcaoNome: convocacaoDestinatarioEvidencias.funcaoNomeSnapshot,
+              escopoTipo: convocacaoDestinatarioEvidencias.escopoTipoSnapshot,
+              escopoId: convocacaoDestinatarioEvidencias.escopoIdSnapshot,
             })
               .from(convocacaoDestinatarioEvidencias)
-              .innerJoin(funcoes, eq(funcoes.id, convocacaoDestinatarioEvidencias.funcaoId))
-              .innerJoin(vinculosFuncionais, eq(vinculosFuncionais.id, convocacaoDestinatarioEvidencias.vinculoFuncionalId))
               .where(inArray(convocacaoDestinatarioEvidencias.convocacaoDestinatarioId, ids))
               .all()
           )
@@ -327,11 +308,14 @@ agendaRouter.get('/', async (c) => {
         local: record.local,
         espaco: record.espaco,
         destinatarioId: record.destinatario.id,
-        vinculo: escolherMaiorVinculo(
-          evidenciasVinculo.filter(
-            evidencia => evidencia.convocacaoDestinatarioId === record.destinatario.id
+        vinculo: (() => {
+          const vinculo = escolherMaiorVinculo(
+            evidenciasVinculo.filter(
+              evidencia => evidencia.convocacaoDestinatarioId === record.destinatario.id
+            )
           )
-        ),
+          return vinculo?.funcaoNome ? vinculo : null
+        })(),
         rsvp: record.rsvp ? {
           resposta: record.rsvp.resposta,
           justificativa: record.rsvp.justificativa,
