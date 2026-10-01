@@ -296,6 +296,8 @@ eventosRouter.patch('/:id', async (c) => {
     const horarioAlterado =
       (parsed.inicioEm !== undefined && !mesmoInstante(parsed.inicioEm, existing.inicioEm)) ||
       (parsed.fimEm !== undefined && !mesmoInstante(parsed.fimEm, existing.fimEm))
+    const ativacaoAlterada =
+      parsed.ativo !== undefined && parsed.ativo !== existing.ativo
 
     const atorMembroId = c.get('membroId') || null
 
@@ -320,7 +322,7 @@ eventosRouter.patch('/:id', async (c) => {
           .set({
             ...parsed,
             recorrenciaExcecao: isExcecao,
-            agendaRevisao: horarioAlterado ? nowIso : existing.agendaRevisao,
+            agendaRevisao: horarioAlterado || ativacaoAlterada ? nowIso : existing.agendaRevisao,
             updatedAt: nowIso,
           })
           .where(eq(eventos.id, id))
