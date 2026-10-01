@@ -455,4 +455,53 @@ describe('S07 - Minha Agenda', () => {
     expect(eventoB.conflito.atenuado).toBe(false)
   })
 
+
+  it('5. Preserva prioridade quando muda apenas a formatação ISO do horário', async () => {
+    sqlite.exec(`
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, agenda_revisao, regional_id, ativo)
+      VALUES
+        ('ev-iso-a', 'Evento ISO A', 'PRESENCIAL', '2026-01-06T10:00:00Z', '2026-01-06T11:00:00Z', 'rev-iso-a', 'reg-1', 1),
+        ('ev-iso-b', 'Evento ISO B', 'PRESENCIAL', '2026-01-06T10:30:00Z', '2026-01-06T11:30:00Z', 'rev-iso-b', 'reg-1', 1);
+
+      INSERT INTO convocacoes (id, evento_id, status, ativo)
+      VALUES
+        ('conv-iso-a', 'ev-iso-a', 'PUBLICADA', 1),
+        ('conv-iso-b', 'ev-iso-b', 'PUBLICADA', 1);
+
+      INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id)
+      VALUES
+        ('dest-iso-a', 'conv-iso-a', '${membroId}'),
+        ('dest-iso-b', 'conv-iso-b', '${membroId}');
+    `)
+
+    const priorizar = await req('/api/v1/minha-agenda/prioridade/ev-iso-a', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    })
+    expect(priorizar.status).toBe(200)
+
+    sqlite.exec(`
+      UPDATE eventos
+      SET inicio_em = '2026-01-06T10:30:00.000Z',
+          fim_em = '2026-01-06T11:30:00.000Z'
+      WHERE id = 'ev-iso-b';
+    `)
+
+    const res = await req('/api/v1/minha-agenda', {
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    })
+    const agenda = await res.json() as any[]
+    const eventoA = agenda.find(item => item.evento.id === 'ev-iso-a')
+    const eventoB = agenda.find(item => item.evento.id === 'ev-iso-b')
+
+    expect(eventoA.conflito.priorizado).toBe(true)
+    expect(eventoA.conflito.atenuado).toBe(false)
+    expect(eventoB.conflito.atenuado).toBe(true)
+  })
+
 })
