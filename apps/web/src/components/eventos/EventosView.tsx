@@ -149,7 +149,75 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
   const [salvandoEspacoRapido, setSalvandoEspacoRapido] = useState(false)
   const [espacoRapidoErro, setEspacoRapidoErro] = useState<string | null>(null)
   const [espacoRapidoNome, setEspacoRapidoNome] = useState('')
+  const localRapidoDialogRef = useRef<HTMLDivElement | null>(null)
+  const espacoRapidoDialogRef = useRef<HTMLDivElement | null>(null)
   const eventoFormConsultaSeq = useRef(0)
+
+  useEffect(() => {
+    if (!localRapidoOpen) return
+    const anterior = document.activeElement as HTMLElement | null
+    const dialog = localRapidoDialogRef.current
+    const focaveis = dialog?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    focaveis?.[0]?.focus()
+
+    const aoTeclar = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !dialog) return
+      const itens = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ))
+      if (itens.length === 0) return
+      const primeiro = itens[0]
+      const ultimo = itens[itens.length - 1]
+      if (event.shiftKey && document.activeElement === primeiro) {
+        event.preventDefault()
+        ultimo.focus()
+      } else if (!event.shiftKey && document.activeElement === ultimo) {
+        event.preventDefault()
+        primeiro.focus()
+      }
+    }
+
+    document.addEventListener('keydown', aoTeclar)
+    return () => {
+      document.removeEventListener('keydown', aoTeclar)
+      anterior?.focus()
+    }
+  }, [localRapidoOpen])
+
+  useEffect(() => {
+    if (!espacoRapidoOpen) return
+    const anterior = document.activeElement as HTMLElement | null
+    const dialog = espacoRapidoDialogRef.current
+    const focaveis = dialog?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    focaveis?.[0]?.focus()
+
+    const aoTeclar = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !dialog) return
+      const itens = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ))
+      if (itens.length === 0) return
+      const primeiro = itens[0]
+      const ultimo = itens[itens.length - 1]
+      if (event.shiftKey && document.activeElement === primeiro) {
+        event.preventDefault()
+        ultimo.focus()
+      } else if (!event.shiftKey && document.activeElement === ultimo) {
+        event.preventDefault()
+        primeiro.focus()
+      }
+    }
+
+    document.addEventListener('keydown', aoTeclar)
+    return () => {
+      document.removeEventListener('keydown', aoTeclar)
+      anterior?.focus()
+    }
+  }, [espacoRapidoOpen])
 
   const carregarDados = async () => {
     setLoading(true)
@@ -1153,14 +1221,14 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
 
       {localRapidoOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
-          <div role="dialog" aria-modal="true" aria-labelledby="local-rapido-title" className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+          <div ref={localRapidoDialogRef} role="dialog" aria-modal="true" aria-labelledby="local-rapido-title" className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
             <div className="border-b border-slate-200 px-5 py-4">
               <h3 id="local-rapido-title" className="font-semibold text-slate-900">Criar Local</h3>
               <p className="mt-1 text-xs text-slate-500">O novo local será selecionado automaticamente no evento.</p>
             </div>
             <form onSubmit={salvarLocalRapido} className="space-y-3 p-5">
               {localRapidoErro && <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{localRapidoErro}</p>}
-              <input aria-label="Nome do novo local" placeholder="Nome *" value={localRapido.nome} onChange={e => setLocalRapido({ ...localRapido, nome: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+              <input autoFocus aria-label="Nome do novo local" placeholder="Nome *" value={localRapido.nome} onChange={e => setLocalRapido({ ...localRapido, nome: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
               <div className="grid grid-cols-[1fr_110px] gap-3">
                 <input aria-label="Endereço do novo local" placeholder="Endereço *" value={localRapido.endereco} onChange={e => setLocalRapido({ ...localRapido, endereco: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
                 <input aria-label="Número do novo local" placeholder="Número *" value={localRapido.numero} onChange={e => setLocalRapido({ ...localRapido, numero: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
@@ -1182,7 +1250,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
 
       {espacoRapidoOpen && formData.localId && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
-          <div role="dialog" aria-modal="true" aria-labelledby="espaco-rapido-title" className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+          <div ref={espacoRapidoDialogRef} role="dialog" aria-modal="true" aria-labelledby="espaco-rapido-title" className="w-full max-w-md rounded-2xl bg-white shadow-xl">
             <div className="border-b border-slate-200 px-5 py-4">
               <h3 id="espaco-rapido-title" className="font-semibold text-slate-900">Criar Espaço</h3>
               <p className="mt-1 text-xs text-slate-500">O novo espaço será selecionado automaticamente.</p>
