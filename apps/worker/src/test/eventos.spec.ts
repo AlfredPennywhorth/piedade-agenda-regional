@@ -717,7 +717,40 @@ describe('Eventos API (S04)', () => {
     expect(logs.some((item: any) => item.acao === 'EVENTO_CANCELADO' && item.recursoId === eventoCriado.id)).toBe(true)
   })
 
-  it('22. não cancela evento enquanto a convocação estiver publicada', async () => {
+  it('22. cancelar evento sem convocação inativa somente o evento', async () => {
+    const regionalId = await createRegional()
+    const createRes = await req('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Evento sem convocação',
+        modalidade: 'ONLINE',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        urlOnline: 'https://meet.google.com/abc',
+        regionalId
+      })
+    })
+    expect(createRes.status).toBe(201)
+    const eventoCriado = await createRes.json()
+
+    const cancelar = await req(`/api/v1/eventos/${eventoCriado.id}/cancelar`, { method: 'POST' })
+    expect(cancelar.status).toBe(200)
+    expect(await cancelar.json()).toMatchObject({
+      success: true,
+      eventoId: eventoCriado.id,
+      convocacaoId: null,
+      convocacaoCancelada: false
+    })
+
+    const eventoPersistido = await db.select().from(eventos).where(eq(eventos.id, eventoCriado.id)).get()
+    const logs = await db.select().from(auditoriaLogs).where(eq(auditoriaLogs.recursoId, eventoCriado.id)).all()
+
+    expect(eventoPersistido?.ativo).toBe(false)
+    expect(logs.some((item: any) => item.acao === 'EVENTO_CANCELADO')).toBe(true)
+  })
+
+  it('23. não cancela evento enquanto a convocação estiver publicada', async () => {
     const regionalId = await createRegional()
     const createRes = await req('/api/v1/eventos', {
       method: 'POST',
