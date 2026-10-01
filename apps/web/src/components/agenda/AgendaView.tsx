@@ -4,6 +4,28 @@ import { AgendaItem } from './types'
 import { EventoDetalhe } from './EventoDetalhe'
 import { EventCard } from './EventCard'
 
+function resumoConflitos(item: AgendaItem) {
+  const conflitos = item.conflito?.eventos ?? []
+  const temSobreposicao = conflitos.some(conflito => conflito.tipo === 'SOBREPOSICAO')
+  const temProximidade = conflitos.some(conflito => conflito.tipo === 'PROXIMIDADE')
+
+  if (temSobreposicao && temProximidade) return 'Conflito de horário e compromissos próximos'
+  if (temSobreposicao) return 'Conflito de horário'
+  return 'Compromissos muito próximos'
+}
+
+function detalhesConflitos(item: AgendaItem) {
+  if (!item.conflito) return ''
+
+  const detalhes = item.conflito.eventos.map(conflito =>
+    conflito.tipo === 'SOBREPOSICAO'
+      ? `${conflito.titulo} (conflito de horário)`
+      : `${conflito.titulo} (próximo, até ${item.conflito!.janelaTransicaoMinutos} min de transição)`
+  )
+
+  return `Também há: ${detalhes.join('; ')}.`
+}
+
 export function AgendaView() {
   const [items, setItems] = useState<AgendaItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -124,17 +146,10 @@ export function AgendaView() {
                   ? 'Prioridade parcial'
                   : item.conflito.priorizado
                     ? 'Compromisso priorizado'
-                    : item.conflito.tipo === 'SOBREPOSICAO'
-                      ? 'Conflito de horário'
-                      : 'Compromissos muito próximos'}
+                    : resumoConflitos(item)}
               </p>
               <p className="mt-1 text-xs">
-                {item.conflito.eventos.length === 1
-                  ? `Também há: ${item.conflito.eventos[0].titulo}.`
-                  : `Há conflito com ${item.conflito.eventos.length} outros compromissos.`}
-                {item.conflito.tipo === 'PROXIMIDADE'
-                  ? ` A janela de transição considerada é de ${item.conflito.janelaTransicaoMinutos} minutos.`
-                  : ''}
+                {detalhesConflitos(item)}
               </p>
               {(!item.conflito.priorizado || item.conflito.atenuado) && (
                 <button
