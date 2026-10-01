@@ -75,7 +75,7 @@ export interface Evento {
   recorrenciaExcecao?: boolean
 }
 
-export function EventosView() {
+export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: string) => void }) {
   const [eventos, setEventos] = useState<Evento[]>([])
   
   // Lookups
@@ -472,7 +472,12 @@ export function EventosView() {
         }
         await patchWithAuth(`/eventos/${eventoEditandoId}`, updatePayload)
       } else {
-        await postWithAuth('/eventos', parsed.data)
+        const criado = await postWithAuth<Evento>('/eventos', parsed.data)
+        fecharFormularioEvento()
+        if (onEventoCriado) {
+          onEventoCriado(criado.id)
+          return
+        }
       }
 
       fecharFormularioEvento()
