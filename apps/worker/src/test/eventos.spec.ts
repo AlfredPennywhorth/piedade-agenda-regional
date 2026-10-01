@@ -4,7 +4,7 @@ import { setupDb } from './setup'
 import { createApp } from '../index'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import BetterSqlite3 from 'better-sqlite3'
-import { regionais, locais, eventos, administracoes, setores, casas, gruposTrabalho, membros, sessoes, auditoriaLogs } from '../db/schema'
+import { regionais, locais, eventos, administracoes, setores, casas, gruposTrabalho, membros, sessoes, auditoriaLogs, convocacoes, convocacaoFuncoes, funcoes } from '../db/schema'
 import { hashToken } from '../security/tokens'
 import { eq } from 'drizzle-orm'
 
@@ -663,4 +663,128 @@ describe('Eventos API (S04)', () => {
     })
     expect(res.status).toBe(201)
   })
+
+  it('21. cancelar evento com convocação em rascunho desfaz funções, convocação e evento', async () => {
+    const regionalId = await createRegional()
+    const createRes = await req('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Evento criado por engano',
+        modalidade: 'ONLINE',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        urlOnline: 'https://meet.google.com/abc',
+        regionalId
+      })
+    })
+    expect(createRes.status).toBe(201)
+    const eventoCriado = await createRes.json()
+
+    const convocacaoId = crypto.randomUUID()
+    const funcaoId = crypto.randomUUID()
+    await db.insert(convocacoes).values({
+      id: convocacaoId,
+      eventoId: eventoCriado.id,
+      status: 'RASCUNHO',
+      ativo: true
+    })
+    await db.insert(funcoes).values({ id: funcaoId, nome: 'Função Teste', ativo: true })
+    await db.insert(convocacaoFuncoes).values({
+      id: crypto.randomUUID(),
+      convocacaoId,
+      funcaoId
+    })
+
+    const cancelar = await req(`/api/v1/eventos/${eventoCriado.id}/cancelar`, { method: 'POST' })
+    expect(cancelar.status).toBe(200)
+    expect(await cancelar.json()).toMatchObject({
+      success: true,
+      eventoId: eventoCriado.id,
+      convocacaoId,
+      convocacaoCancelada: true
+    })
+
+    const eventoPersistido = await db.select().from(eventos).where(eq(eventos.id, eventoCriado.id)).get()
+    const convocacaoPersistida = await db.select().from(convocacoes).where(eq(convocacoes.id, convocacaoId)).get()
+    const funcoesPersistidas = await db.select().from(convocacaoFuncoes).where(eq(convocacaoFuncoes.convocacaoId, convocacaoId)).all()
+    const logs = await db.select().from(auditoriaLogs).all()
+
+    expect(eventoPersistido?.ativo).toBe(false)
+    expect(convocacaoPersistida).toMatchObject({ status: 'CANCELADA', ativo: false })
+    expect(funcoesPersistidas).toHaveLength(0)
+    expect(logs.some((item: any) => item.acao === 'CONVOCACAO_CANCELADA' && item.recursoId === convocacaoId)).toBe(true)
+    expect(logs.some((item: any) => item.acao === 'EVENTO_CANCELADO' && item.recursoId === eventoCriado.id)).toBe(true)
+  })
+
+  it('22. cancelar evento sem convocação inativa somente o evento', async () => {
+    const regionalId = await createRegional()
+    const createRes = await req('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Evento sem convocação',
+        modalidade: 'ONLINE',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        urlOnline: 'https://meet.google.com/abc',
+        regionalId
+      })
+    })
+    expect(createRes.status).toBe(201)
+    const eventoCriado = await createRes.json()
+
+    const cancelar = await req(`/api/v1/eventos/${eventoCriado.id}/cancelar`, { method: 'POST' })
+    expect(cancelar.status).toBe(200)
+    expect(await cancelar.json()).toMatchObject({
+      success: true,
+      eventoId: eventoCriado.id,
+      convocacaoId: null,
+      convocacaoCancelada: false
+    })
+
+    const eventoPersistido = await db.select().from(eventos).where(eq(eventos.id, eventoCriado.id)).get()
+    const logs = await db.select().from(auditoriaLogs).where(eq(auditoriaLogs.recursoId, eventoCriado.id)).all()
+
+    expect(eventoPersistido?.ativo).toBe(false)
+    expect(logs.some((item: any) => item.acao === 'EVENTO_CANCELADO')).toBe(true)
+  })
+
+  it('23. não cancela evento enquanto a convocação estiver publicada', async () => {
+    const regionalId = await createRegional()
+    const createRes = await req('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Evento publicado',
+        modalidade: 'ONLINE',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        urlOnline: 'https://meet.google.com/abc',
+        regionalId
+      })
+    })
+    expect(createRes.status).toBe(201)
+    const eventoCriado = await createRes.json()
+
+    const convocacaoId = crypto.randomUUID()
+    await db.insert(convocacoes).values({
+      id: convocacaoId,
+      eventoId: eventoCriado.id,
+      status: 'PUBLICADA',
+      ativo: true,
+      publicadaEm: new Date().toISOString()
+    })
+
+    const cancelar = await req(`/api/v1/eventos/${eventoCriado.id}/cancelar`, { method: 'POST' })
+    expect(cancelar.status).toBe(409)
+    expect(await cancelar.json()).toMatchObject({ code: 'EVENTO_COM_CONVOCACAO_PUBLICADA' })
+
+    const eventoPersistido = await db.select().from(eventos).where(eq(eventos.id, eventoCriado.id)).get()
+    const convocacaoPersistida = await db.select().from(convocacoes).where(eq(convocacoes.id, convocacaoId)).get()
+
+    expect(eventoPersistido?.ativo).toBe(true)
+    expect(convocacaoPersistida).toMatchObject({ status: 'PUBLICADA', ativo: true })
+  })
+
 })

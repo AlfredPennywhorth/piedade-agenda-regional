@@ -71,6 +71,29 @@ describe('EventosView', () => {
     })
   })
 
+  it('deve cancelar evento e removê-lo da lista operacional', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.mocked(apiClient.postWithAuth).mockResolvedValueOnce({
+      success: true,
+      eventoId: EVENTO_ID,
+      convocacaoId: null,
+      convocacaoCancelada: false,
+    })
+
+    render(<EventosView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Presencial')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /cancelar evento/i }))
+
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/eventos/${EVENTO_ID}/cancelar`, {})
+      expect(screen.queryByText('Reunião Presencial')).not.toBeInTheDocument()
+    })
+  })
+
   it('deve exibir empty state quando não houver eventos', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/eventos') return []
