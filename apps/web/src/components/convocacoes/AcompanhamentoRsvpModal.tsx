@@ -143,6 +143,9 @@ export function AcompanhamentoRsvpModal({ convocacaoId, onClose }: Props) {
                       Nome do Membro
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Vínculo
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                       Resposta RSVP
                     </th>
                   </tr>
@@ -152,6 +155,9 @@ export function AcompanhamentoRsvpModal({ convocacaoId, onClose }: Props) {
                     <tr key={item.destinatarioId}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
                         {item.membroNome}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-700">
+                        {item.vinculo?.funcaoNome || '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${mapStatusRsvpColor[item.respostaRsvp] || mapStatusRsvpColor.SEM_RESPOSTA}`}>
