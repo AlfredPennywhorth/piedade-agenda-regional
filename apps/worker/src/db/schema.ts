@@ -722,6 +722,9 @@ export const convocacaoDestinatarioEvidencias = sqliteTable(
     vinculoFuncionalId: text('vinculo_funcional_id')
       .notNull()
       .references(() => vinculosFuncionais.id),
+    funcaoNomeSnapshot: text('funcao_nome_snapshot'),
+    escopoTipoSnapshot: text('escopo_tipo_snapshot'),
+    escopoIdSnapshot: text('escopo_id_snapshot'),
     createdAt: text('created_at')
       .notNull()
       .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
