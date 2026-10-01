@@ -584,6 +584,9 @@ export const eventos = sqliteTable(
     modalidade: text('modalidade').notNull(), // PRESENCIAL, ONLINE, HIBRIDO
     inicioEm: text('inicio_em').notNull(), // ISO 8601 UTC
     fimEm: text('fim_em').notNull(), // ISO 8601 UTC
+    agendaRevisao: text('agenda_revisao')
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
     localId: text('local_id').references(() => locais.id),
     espacoId: text('espaco_id').references(() => espacosLocal.id),
     urlOnline: text('url_online'),
