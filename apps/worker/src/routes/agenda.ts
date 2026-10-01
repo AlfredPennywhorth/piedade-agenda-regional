@@ -303,6 +303,34 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
     ),
   ])
 
+  // Revalida depois da escrita para fechar a corrida com alterações de RSVP.
+  // Se o RSVP mudar antes da inserção, esta checagem remove a prioridade recém-gravada.
+  // Se mudar depois, o próprio PUT de RSVP remove as prioridades do evento atomicamente.
+  const recordsDepois = await buscarRegistrosAgenda(db, membroId)
+  const mapaDepois = montarMapaConflitos(recordsDepois)
+  const conflitosAtuais = new Set(
+    (mapaDepois.get(eventoId) ?? []).map(conflito =>
+      chaveParEstavel(eventoId, conflito.eventoId)
+    )
+  )
+  const conflitoMudou = conflitoParChaves.some(chave => !conflitosAtuais.has(chave))
+
+  if (conflitoMudou) {
+    await executeAtomic(db, tx => [
+      tx.delete(agendaPrioridadesConflito).where(
+        and(
+          eq(agendaPrioridadesConflito.membroId, membroId),
+          inArray(agendaPrioridadesConflito.conflitoParChave, conflitoParChaves)
+        )
+      ),
+    ])
+
+    return c.json({
+      error: 'O conflito mudou enquanto a prioridade era salva. Atualize a agenda e tente novamente.',
+      code: 'CONFLITO_ALTERADO',
+    }, 409)
+  }
+
   return c.json({
     message: 'Compromisso priorizado',
     eventoId,
