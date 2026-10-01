@@ -504,4 +504,67 @@ describe('S07 - Minha Agenda', () => {
     expect(eventoB.conflito.atenuado).toBe(true)
   })
 
+
+  it('6. Remove prioridade se o RSVP mudar durante a priorização', async () => {
+    sqlite.exec(`
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, agenda_revisao, regional_id, ativo)
+      VALUES
+        ('ev-race-a', 'Evento Race A', 'PRESENCIAL', '2027-01-07T10:00:00Z', '2027-01-07T11:00:00Z', 'rev-race-a', 'reg-1', 1),
+        ('ev-race-b', 'Evento Race B', 'PRESENCIAL', '2027-01-07T10:30:00Z', '2027-01-07T11:30:00Z', 'rev-race-b', 'reg-1', 1);
+
+      INSERT INTO convocacoes (id, evento_id, status, ativo)
+      VALUES
+        ('conv-race-a', 'ev-race-a', 'PUBLICADA', 1),
+        ('conv-race-b', 'ev-race-b', 'PUBLICADA', 1);
+
+      INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id)
+      VALUES
+        ('dest-race-a', 'conv-race-a', '${membroId}'),
+        ('dest-race-b', 'conv-race-b', '${membroId}');
+
+      INSERT INTO rsvp
+        (id, convocacao_destinatario_id, resposta, respondido_em, atualizado_em)
+      VALUES
+        ('rsvp-race-b', 'dest-race-b', 'PARTICIPAREI', '2026-10-01T00:00:00Z', '2026-10-01T00:00:00Z');
+
+      CREATE TRIGGER trg_test_race_rsvp
+      AFTER INSERT ON agenda_prioridades_conflito
+      WHEN NEW.conflito_par_chave = 'ev-race-a|ev-race-b'
+      BEGIN
+        UPDATE rsvp
+        SET resposta = 'NAO_PARTICIPAREI',
+            atualizado_em = '2026-10-01T00:00:01Z',
+            updated_at = '2026-10-01T00:00:01Z'
+        WHERE convocacao_destinatario_id = 'dest-race-b';
+      END;
+    `)
+
+    const priorizar = await req('/api/v1/minha-agenda/prioridade/ev-race-a', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    })
+
+    expect(priorizar.status).toBe(409)
+    expect(await priorizar.json()).toEqual(expect.objectContaining({
+      code: 'CONFLITO_ALTERADO',
+    }))
+
+    const linha = sqlite
+      .prepare(`
+        SELECT COUNT(*) AS total
+        FROM agenda_prioridades_conflito
+        WHERE membro_id = ?
+          AND conflito_par_chave = ?
+      `)
+      .get(membroId, 'ev-race-a|ev-race-b') as { total: number }
+
+    expect(linha.total).toBe(0)
+    sqlite.exec('DROP TRIGGER trg_test_race_rsvp;')
+  })
+
 })
