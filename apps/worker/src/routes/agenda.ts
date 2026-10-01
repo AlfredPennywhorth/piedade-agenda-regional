@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, asc, inArray, ne } from 'drizzle-orm'
+import { eq, and, asc, inArray } from 'drizzle-orm'
 import {
   eventos,
   convocacoes,
@@ -375,17 +375,25 @@ agendaRouter.post('/prioridade/:eventoId', async c => {
     }, 409)
   }
 
-  await executeAtomic(db, tx =>
-    tentativasPersistidas.map(({ conflitoParChave, conflitoChave }) =>
+  const chaveAtualPorPar = new Map(
+    tentativasPersistidas.map(item => [item.conflitoParChave, item.conflitoChave])
+  )
+  const idsPrioridadesAntigas = prioridadesAnteriores
+    .filter(prioridade =>
+      chaveAtualPorPar.get(prioridade.conflitoParChave) !== prioridade.conflitoChave
+    )
+    .map(prioridade => prioridade.id)
+
+  if (idsPrioridadesAntigas.length > 0) {
+    await executeAtomic(db, tx => [
       tx.delete(agendaPrioridadesConflito).where(
         and(
           eq(agendaPrioridadesConflito.membroId, membroId),
-          eq(agendaPrioridadesConflito.conflitoParChave, conflitoParChave),
-          ne(agendaPrioridadesConflito.conflitoChave, conflitoChave)
+          inArray(agendaPrioridadesConflito.id, idsPrioridadesAntigas)
         )
-      )
-    )
-  )
+      ),
+    ])
+  }
 
   return c.json({
     message: 'Compromisso priorizado',
