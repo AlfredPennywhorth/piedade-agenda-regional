@@ -306,6 +306,44 @@ describe('ConvocacoesView', () => {
     })
   })
 
+  it('deve devolver o foco à tela de Convocações ao fechar Gerenciar Funções no fluxo guiado', async () => {
+    const novaConvocacaoId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    vi.mocked(apiClient.postWithAuth).mockImplementation(async (url) => {
+      if (url === '/convocacoes') {
+        return {
+          id: novaConvocacaoId,
+          eventoId: EVENTO_DISPONIVEL_ID,
+          status: 'RASCUNHO',
+          observacoes: '',
+          ativo: true,
+          createdAt: '2026-10-01T12:00:00.000Z',
+          updatedAt: '2026-10-01T12:00:00.000Z',
+        }
+      }
+      return {}
+    })
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === '/convocacoes') return mockConvocacoes
+      if (url === '/funcoes') return []
+      if (url === `/convocacoes/${novaConvocacaoId}/funcoes`) return []
+      return []
+    })
+
+    render(<ConvocacoesView initialEventoId={EVENTO_DISPONIVEL_ID} />)
+
+    const dialog = await screen.findByRole('dialog', { name: /nova convocação/i })
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar/i }))
+
+    const funcoesDialog = await screen.findByRole('dialog', { name: /gerenciar funções do rascunho/i })
+    fireEvent.click(within(funcoesDialog).getByRole('button', { name: /fechar/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /gerenciar funções do rascunho/i })).not.toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Convocações' })).toHaveFocus()
+    })
+  })
+
   it('deve consumir o fluxo guiado ao dispensar o formulário', async () => {
     const onFluxoConcluido = vi.fn()
 
