@@ -461,6 +461,9 @@ export function setupDb(sqlite: any) {
       convocacao_destinatario_id text NOT NULL,
       funcao_id text NOT NULL,
       vinculo_funcional_id text NOT NULL,
+      funcao_nome_snapshot text,
+      escopo_tipo_snapshot text,
+      escopo_id_snapshot text,
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       FOREIGN KEY (convocacao_destinatario_id) REFERENCES convocacao_destinatarios(id),
       FOREIGN KEY (funcao_id) REFERENCES funcoes(id),
@@ -468,6 +471,51 @@ export function setupDb(sqlite: any) {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_convocacao_evidencia_unica ON convocacao_destinatario_evidencias (convocacao_destinatario_id, funcao_id, vinculo_funcional_id);
     CREATE INDEX IF NOT EXISTS idx_convocacao_evidencias_dest_id ON convocacao_destinatario_evidencias (convocacao_destinatario_id);
+
+    CREATE TRIGGER IF NOT EXISTS trg_convocacao_evidencia_snapshot_ai
+    AFTER INSERT ON convocacao_destinatario_evidencias
+    FOR EACH ROW
+    WHEN NEW.funcao_nome_snapshot IS NULL
+      OR NEW.escopo_tipo_snapshot IS NULL
+      OR NEW.escopo_id_snapshot IS NULL
+    BEGIN
+      UPDATE convocacao_destinatario_evidencias
+      SET
+        funcao_nome_snapshot = COALESCE(
+          NEW.funcao_nome_snapshot,
+          (SELECT f.nome FROM funcoes f WHERE f.id = NEW.funcao_id)
+        ),
+        escopo_tipo_snapshot = COALESCE(
+          NEW.escopo_tipo_snapshot,
+          (
+            SELECT CASE
+              WHEN vf.regional_id IS NOT NULL THEN 'REGIONAL'
+              WHEN vf.grupo_trabalho_id IS NOT NULL THEN 'GRUPO_TRABALHO'
+              WHEN vf.administracao_id IS NOT NULL THEN 'ADMINISTRACAO'
+              WHEN vf.setor_id IS NOT NULL THEN 'SETOR'
+              WHEN vf.casa_id IS NOT NULL THEN 'CASA'
+              ELSE NULL
+            END
+            FROM vinculos_funcionais vf
+            WHERE vf.id = NEW.vinculo_funcional_id
+          )
+        ),
+        escopo_id_snapshot = COALESCE(
+          NEW.escopo_id_snapshot,
+          (
+            SELECT COALESCE(
+              vf.regional_id,
+              vf.grupo_trabalho_id,
+              vf.administracao_id,
+              vf.setor_id,
+              vf.casa_id
+            )
+            FROM vinculos_funcionais vf
+            WHERE vf.id = NEW.vinculo_funcional_id
+          )
+        )
+      WHERE id = NEW.id;
+    END;
 
     CREATE TABLE IF NOT EXISTS agenda_prioridades_conflito (
       id text PRIMARY KEY NOT NULL,
