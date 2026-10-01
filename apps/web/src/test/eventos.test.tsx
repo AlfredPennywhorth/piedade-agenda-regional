@@ -165,6 +165,29 @@ describe('EventosView', () => {
     })
   })
 
+  it('deve conter o foco no modal rápido de Local e restaurá-lo ao fechar', async () => {
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+
+    const eventoDialog = await screen.findByRole('dialog', { name: /novo evento/i })
+    const abrir = within(eventoDialog).getByRole('button', { name: /criar local sem sair/i })
+    abrir.focus()
+    fireEvent.click(abrir)
+
+    const localDialog = await screen.findByRole('dialog', { name: /criar local/i })
+    const primeiro = within(localDialog).getByLabelText('Nome do novo local')
+    await waitFor(() => expect(primeiro).toHaveFocus())
+
+    const ultimo = within(localDialog).getByRole('button', { name: /criar e selecionar/i })
+    ultimo.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(primeiro).toHaveFocus()
+
+    fireEvent.click(within(localDialog).getByRole('button', { name: /voltar ao evento/i }))
+    await waitFor(() => expect(abrir).toHaveFocus())
+  })
+
   it('deve exibir empty state quando não houver eventos', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/eventos') return []
