@@ -38,6 +38,11 @@ const mockEventos = [
     local: { nome: 'Sede Regional', endereco: 'Rua X' },
     espaco: { id: 'esp-1', nome: 'Sala A' },
     destinatarioId: 'dest-1',
+    vinculo: {
+      funcaoId: 'funcao-dco',
+      funcaoNome: 'Diácono da Casa de Oração',
+      vinculoFuncionalId: 'vinculo-dco',
+    },
     rsvp: null
   },
   {
@@ -569,6 +574,19 @@ describe('S07 - Minha Agenda e Calendário', () => {
 
     const cardAtualizado = screen.getByRole('button', { name: /Reunião de Setor/i })
     expect(within(cardAtualizado).getByText('Confirmado')).toBeInTheDocument()
+  })
+
+  it('9c. Exibe o vínculo que originou a convocação na agenda', async () => {
+    mockAgenda(mockEventos)
+    render(<App />)
+
+    expect((await mobileNav()).getByText('Minha Agenda')).toBeInTheDocument()
+    expect(await screen.findByText('Diácono da Casa de Oração')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Reunião de Setor'))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Vínculo da convocação')).toBeInTheDocument()
+    expect(within(dialog).getByText('Diácono da Casa de Oração')).toBeInTheDocument()
   })
 
   it('10. Exibe seção de RSVP no detalhe', async () => {

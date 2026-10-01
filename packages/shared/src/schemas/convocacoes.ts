@@ -130,6 +130,11 @@ export const AcompanhamentoRsvpResponseSchema = z.object({
     membroId: z.string().uuid(),
     membroNome: z.string(),
     respostaRsvp: StatusRsvpFiltro,
+    vinculo: z.object({
+      funcaoId: z.string().uuid(),
+      funcaoNome: z.string(),
+      vinculoFuncionalId: z.string().uuid()
+    }).nullable(),
     evidencias: z.array(z.object({
       funcaoId: z.string().uuid(),
       vinculoFuncionalId: z.string().uuid()

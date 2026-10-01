@@ -38,6 +38,27 @@ function emLotes<T>(itens: T[], tamanho: number): T[][] {
 
 convocacoesRouter.use('*', authMiddleware)
 
+function hierarquiaVinculo(escopoTipo: string | null) {
+  if (escopoTipo === 'REGIONAL' || escopoTipo === 'GRUPO_TRABALHO') return 4
+  if (escopoTipo === 'ADMINISTRACAO') return 3
+  if (escopoTipo === 'SETOR') return 2
+  if (escopoTipo === 'CASA') return 1
+  return 0
+}
+
+function escolherMaiorVinculo<T extends {
+  funcaoNome: string | null
+  escopoTipo: string | null
+  [key: string]: unknown
+}>(vinculos: T[]): T | null {
+  return [...vinculos].sort((a, b) => {
+    const nivel = hierarquiaVinculo(b.escopoTipo) - hierarquiaVinculo(a.escopoTipo)
+    if (nivel !== 0) return nivel
+    return (a.funcaoNome ?? '').localeCompare(b.funcaoNome ?? '', 'pt-BR')
+  })[0] ?? null
+}
+
+
 function eventoVisivelNoEscopo(evento: any, escopos: any): boolean {
   if (escopos.tudo) return true
   if (evento.regionalId && escopos.regionaisIds.has(evento.regionalId)) return true
@@ -730,6 +751,9 @@ convocacoesRouter.get('/:id/acompanhamento-rsvp', async c => {
     convocacaoDestinatarioId: string
     funcaoId: string
     vinculoFuncionalId: string
+    funcaoNome: string | null
+    escopoTipo: string | null
+    escopoId: string | null
   }
 
   const destIds = destinatariosPage.map((d: DestinatarioPage) => d.destinatarioId)
@@ -737,24 +761,36 @@ convocacoesRouter.get('/:id/acompanhamento-rsvp', async c => {
     .select({
       convocacaoDestinatarioId: convocacaoDestinatarioEvidencias.convocacaoDestinatarioId,
       funcaoId: convocacaoDestinatarioEvidencias.funcaoId,
-      vinculoFuncionalId: convocacaoDestinatarioEvidencias.vinculoFuncionalId
+      vinculoFuncionalId: convocacaoDestinatarioEvidencias.vinculoFuncionalId,
+      funcaoNome: convocacaoDestinatarioEvidencias.funcaoNomeSnapshot,
+      escopoTipo: convocacaoDestinatarioEvidencias.escopoTipoSnapshot,
+      escopoId: convocacaoDestinatarioEvidencias.escopoIdSnapshot
     })
     .from(convocacaoDestinatarioEvidencias)
     .where(inArray(convocacaoDestinatarioEvidencias.convocacaoDestinatarioId, destIds))
     .all()
 
-  const data = destinatariosPage.map((d: DestinatarioPage) => ({
-    destinatarioId: d.destinatarioId,
-    membroId: d.membroId,
-    membroNome: d.membroNome,
-    respostaRsvp: d.respostaRsvp,
-    evidencias: evidencias
+  const data = destinatariosPage.map((d: DestinatarioPage) => {
+    const evidenciasDestinatario = evidencias
       .filter((e: EvidenciaItem) => e.convocacaoDestinatarioId === d.destinatarioId)
-      .map((e: EvidenciaItem) => ({
+    const vinculo = escolherMaiorVinculo(evidenciasDestinatario)
+
+    return {
+      destinatarioId: d.destinatarioId,
+      membroId: d.membroId,
+      membroNome: d.membroNome,
+      respostaRsvp: d.respostaRsvp,
+      vinculo: vinculo?.funcaoNome ? {
+        funcaoId: vinculo.funcaoId,
+        funcaoNome: vinculo.funcaoNome,
+        vinculoFuncionalId: vinculo.vinculoFuncionalId,
+      } : null,
+      evidencias: evidenciasDestinatario.map((e: EvidenciaItem) => ({
         funcaoId: e.funcaoId,
         vinculoFuncionalId: e.vinculoFuncionalId
       }))
-  }))
+    }
+  })
 
   return c.json({
     data,

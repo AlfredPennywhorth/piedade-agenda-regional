@@ -609,7 +609,7 @@ describe('ConvocacoesView', () => {
         if (url.includes('/acompanhamento-rsvp')) {
           return {
             data: [
-              { destinatarioId: '1', membroNome: 'João', respostaRsvp: 'PARTICIPAREI' },
+              { destinatarioId: '1', membroNome: 'João', respostaRsvp: 'PARTICIPAREI', vinculo: { funcaoId: 'f1', funcaoNome: 'Diácono da Casa de Oração', vinculoFuncionalId: 'v1' } },
               { destinatarioId: '2', membroNome: 'Maria', respostaRsvp: 'NAO_PARTICIPAREI' },
               { destinatarioId: '3', membroNome: 'Pedro', respostaRsvp: 'NAO_SEI' },
               { destinatarioId: '4', membroNome: 'Ana', respostaRsvp: 'SEM_RESPOSTA' },
@@ -639,6 +639,7 @@ describe('ConvocacoesView', () => {
       await waitFor(() => {
         expect(screen.getByText('Total de destinatários: 4')).toBeInTheDocument()
         expect(screen.getByText('João')).toBeInTheDocument()
+        expect(screen.getByText('Diácono da Casa de Oração')).toBeInTheDocument()
         expect(screen.getByText('Maria')).toBeInTheDocument()
         expect(screen.getByText('Pedro')).toBeInTheDocument()
         expect(screen.getByText('Ana')).toBeInTheDocument()

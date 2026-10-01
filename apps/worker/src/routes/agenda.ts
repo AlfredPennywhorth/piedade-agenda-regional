@@ -10,6 +10,7 @@ import {
   eventoRefeicoes,
   checkins,
   agendaPrioridadesConflito,
+  convocacaoDestinatarioEvidencias,
 } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { executeAtomic } from '../db/batch'
@@ -29,6 +30,26 @@ function particionar<T>(itens: T[], tamanho = MAX_IDS_POR_CONSULTA): T[][] {
     partes.push(itens.slice(i, i + tamanho))
   }
   return partes
+}
+
+function hierarquiaVinculo(escopoTipo: string | null) {
+  if (escopoTipo === 'REGIONAL' || escopoTipo === 'GRUPO_TRABALHO') return 4
+  if (escopoTipo === 'ADMINISTRACAO') return 3
+  if (escopoTipo === 'SETOR') return 2
+  if (escopoTipo === 'CASA') return 1
+  return 0
+}
+
+function escolherMaiorVinculo<T extends {
+  funcaoNome: string | null
+  escopoTipo: string | null
+  [key: string]: unknown
+}>(vinculos: T[]): T | null {
+  return [...vinculos].sort((a, b) => {
+    const nivel = hierarquiaVinculo(b.escopoTipo) - hierarquiaVinculo(a.escopoTipo)
+    if (nivel !== 0) return nivel
+    return (a.funcaoNome ?? '').localeCompare(b.funcaoNome ?? '', 'pt-BR')
+  })[0] ?? null
 }
 
 type AgendaPrioridadePersistida = {
@@ -182,14 +203,24 @@ agendaRouter.get('/', async (c) => {
   try {
     const records = await buscarRegistrosAgenda(db, membroId)
     const eventoIds = records.map(record => record.evento.id)
+    const destinatarioIds = records.map(record => record.destinatario.id)
     const mapaConflitos = montarMapaConflitos(records)
 
     let refOferecidas: any[] = []
     let prioridades: Array<{ eventoId: string; conflitoParChave: string; conflitoChave: string }> = []
+    let evidenciasVinculo: Array<{
+      convocacaoDestinatarioId: string
+      vinculoFuncionalId: string
+      funcaoId: string
+      funcaoNome: string | null
+      escopoTipo: string | null
+      escopoId: string | null
+    }> = []
 
     if (eventoIds.length > 0) {
       const lotes = particionar(eventoIds)
-      const [refLotes, prioridadeLotes] = await Promise.all([
+      const lotesDestinatarios = particionar(destinatarioIds)
+      const [refLotes, prioridadeLotes, evidenciaLotes] = await Promise.all([
         Promise.all(
           lotes.map(ids =>
             db.select()
@@ -215,10 +246,26 @@ agendaRouter.get('/', async (c) => {
               .all()
           )
         ),
+        Promise.all(
+          lotesDestinatarios.map(ids =>
+            db.select({
+              convocacaoDestinatarioId: convocacaoDestinatarioEvidencias.convocacaoDestinatarioId,
+              vinculoFuncionalId: convocacaoDestinatarioEvidencias.vinculoFuncionalId,
+              funcaoId: convocacaoDestinatarioEvidencias.funcaoId,
+              funcaoNome: convocacaoDestinatarioEvidencias.funcaoNomeSnapshot,
+              escopoTipo: convocacaoDestinatarioEvidencias.escopoTipoSnapshot,
+              escopoId: convocacaoDestinatarioEvidencias.escopoIdSnapshot,
+            })
+              .from(convocacaoDestinatarioEvidencias)
+              .where(inArray(convocacaoDestinatarioEvidencias.convocacaoDestinatarioId, ids))
+              .all()
+          )
+        ),
       ])
 
       refOferecidas = refLotes.flat()
       prioridades = prioridadeLotes.flat()
+      evidenciasVinculo = evidenciaLotes.flat()
     }
 
     const porId = new Map(records.map(record => [record.evento.id, record]))
@@ -262,6 +309,14 @@ agendaRouter.get('/', async (c) => {
         local: record.local,
         espaco: record.espaco,
         destinatarioId: record.destinatario.id,
+        vinculo: (() => {
+          const vinculo = escolherMaiorVinculo(
+            evidenciasVinculo.filter(
+              evidencia => evidencia.convocacaoDestinatarioId === record.destinatario.id
+            )
+          )
+          return vinculo?.funcaoNome ? vinculo : null
+        })(),
         rsvp: record.rsvp ? {
           resposta: record.rsvp.resposta,
           justificativa: record.rsvp.justificativa,

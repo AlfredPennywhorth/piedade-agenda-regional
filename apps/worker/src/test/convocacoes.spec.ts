@@ -808,6 +808,50 @@ describe('S06 - Convocações', () => {
     expect(await reqRascunho.json()).toMatchObject({ error: 'Acompanhamento disponível apenas para convocações PUBLICADAS' })
   })
 
+  it('Acompanhamento RSVP - preserva snapshot histórico após editar função e vínculo', async () => {
+    const ctx = await setupBaseData()
+
+    const cRes = await app.request('/api/v1/convocacoes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId: ctx.evSetorId }),
+    })
+    const conv = await cRes.json()
+
+    await app.request(`/api/v1/convocacoes/${conv.id}/funcoes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ funcaoId: ctx.f1Id }),
+    })
+    await app.request(`/api/v1/convocacoes/${conv.id}/publicar`, { method: 'POST' })
+
+    const antes = await app.request(`/api/v1/convocacoes/${conv.id}/acompanhamento-rsvp`)
+    const bodyAntes = await antes.json()
+    expect(bodyAntes.data[0].vinculo).toMatchObject({
+      funcaoNome: 'F1',
+      vinculoFuncionalId: ctx.v1Id,
+    })
+
+    await db.update(funcoes)
+      .set({ nome: 'F1 renomeada' })
+      .where(eq(funcoes.id, ctx.f1Id))
+    await db.update(vinculosFuncionais)
+      .set({
+        setorId: null,
+        regionalId: ctx.regId,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(vinculosFuncionais.id, ctx.v1Id))
+
+    const depois = await app.request(`/api/v1/convocacoes/${conv.id}/acompanhamento-rsvp`)
+    const bodyDepois = await depois.json()
+
+    expect(bodyDepois.data[0].vinculo).toMatchObject({
+      funcaoNome: 'F1',
+      vinculoFuncionalId: ctx.v1Id,
+    })
+  })
+
   it('Acompanhamento RSVP - organizador obtém dados com SEM_RESPOSTA, paginação, filtro e sem justificativa', async () => {
     const ctx = await setupBaseData()
     
@@ -832,6 +876,11 @@ describe('S06 - Convocações', () => {
     expect(body.data[0].respostaRsvp).toBe('SEM_RESPOSTA')
     expect(body.data[0]).not.toHaveProperty('justificativa')
     expect(body.data[0].evidencias.length).toBeGreaterThan(0)
+    expect(body.data[0].vinculo).toMatchObject({
+      funcaoId: ctx.f1Id,
+      vinculoFuncionalId: expect.any(String),
+    })
+    expect(body.data[0].vinculo.funcaoNome).toEqual(expect.any(String))
 
     const reqFiltroSemResp = await app.request(`/api/v1/convocacoes/${conv.id}/acompanhamento-rsvp?statusRsvp=SEM_RESPOSTA`)
     expect((await reqFiltroSemResp.json()).data.length).toBe(body.data.length)
