@@ -306,6 +306,31 @@ describe('ConvocacoesView', () => {
     })
   })
 
+  it('deve consumir o fluxo guiado ao dispensar o formulário', async () => {
+    const onFluxoConcluido = vi.fn()
+
+    render(
+      <ConvocacoesView
+        initialEventoId={EVENTO_DISPONIVEL_ID}
+        onFluxoConcluido={onFluxoConcluido}
+      />
+    )
+
+    const dialog = await screen.findByRole('dialog', { name: /nova convocação/i })
+    expect(within(dialog).getByLabelText('Evento da convocação')).toHaveValue(EVENTO_DISPONIVEL_ID)
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /cancelar/i }))
+
+    await waitFor(() => {
+      expect(onFluxoConcluido).toHaveBeenCalledTimes(1)
+      expect(screen.queryByRole('dialog', { name: /nova convocação/i })).not.toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /novo rascunho/i }))
+    const manual = await screen.findByRole('dialog', { name: /nova convocação/i })
+    expect(within(manual).getByLabelText('Evento da convocação')).toHaveValue('')
+  })
+
   it('deve permitir criar um rascunho', async () => {
     render(<ConvocacoesView />)
 
