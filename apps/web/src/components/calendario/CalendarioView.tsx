@@ -86,18 +86,15 @@ export function CalendarioView() {
 
     void carregarAgenda({ destinatarioId, rsvp }).catch(err => {
       console.error(err)
-      const limparConflitoObsoleto = (item: AgendaItem) =>
-        item.destinatarioId === destinatarioId
-          ? { ...item, rsvp, conflito: null }
-          : item
+      const invalidarConflitos = (item: AgendaItem) => ({
+        ...item,
+        rsvp: item.destinatarioId === destinatarioId ? rsvp : item.rsvp,
+        conflito: null,
+      })
 
-      setItems(current => current.map(limparConflitoObsoleto))
-      setSelectedDayEvents(current => current ? current.map(limparConflitoObsoleto) : current)
-      setSelectedEvent(current =>
-        current?.destinatarioId === destinatarioId
-          ? { ...current, rsvp, conflito: null }
-          : current
-      )
+      setItems(current => current.map(invalidarConflitos))
+      setSelectedDayEvents(current => current ? current.map(invalidarConflitos) : current)
+      setSelectedEvent(current => current ? invalidarConflitos(current) : current)
       setErroAtualizacaoConflitos(
         'A resposta foi salva, mas não foi possível atualizar os conflitos da agenda. Recarregue o calendário.'
       )
