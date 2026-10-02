@@ -809,18 +809,17 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     setSalvando(true)
     setErro(null)
     try {
-      const {
-        titulo, descricao, pauta, modalidade, frequencia, dataInicio,
-        dataFim, horarioInicio, horarioFim, diaSemana, diaMes,
-        posicaoSemanaMes, localId, espacoId, urlOnline, organizadorMembroId, regionalId,
-        administracaoId, setorId, casaId, grupoTrabalhoId, observacoes, ativo
-      } = confirmacaoFutureAberto
+      const normalizar = (valor: unknown) => valor === '' || valor === undefined ? null : valor
+      const changes = Object.fromEntries(
+        Object.entries(confirmacaoFutureAberto).filter(([campo, valor]) =>
+          normalizar(valor) !== normalizar(serieInitialData[campo as keyof SerieCreateInput])
+        )
+      ) as Partial<SerieCreateInput>
 
-      const changes = {
-        titulo, descricao, pauta, modalidade, frequencia, intervalo: 1, dataInicio,
-        dataFim, horarioInicio, horarioFim, diaSemana, diaMes,
-        posicaoSemanaMes, localId, espacoId, urlOnline, organizadorMembroId, regionalId,
-        administracaoId, setorId, casaId, grupoTrabalhoId, observacoes, ativo
+      if (Object.keys(changes).length === 0) {
+        setConfirmacaoFutureAberto(null)
+        setSerieFormOpen(false)
+        return
       }
 
       const updatePayload = {
@@ -1539,7 +1538,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
             </div>
             <div className="p-6">
               <p className="text-slate-700 mb-6">
-                Tem certeza que deseja alterar este e os próximos eventos a partir daqui? Isso atualizará a série e recriará os eventos futuros.
+                Tem certeza que deseja alterar este e os próximos eventos a partir daqui? Alterações apenas de Local, Espaço, Modalidade ou acesso online preservarão os eventos e convocações existentes; mudanças estruturais podem exigir regeneração.
               </p>
               <div className="flex justify-end gap-3">
                 <button
