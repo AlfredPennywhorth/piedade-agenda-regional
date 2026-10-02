@@ -86,7 +86,7 @@ export function SeriesView() {
     pauta: '',
     modalidade: 'PRESENCIAL',
     frequencia: 'SEMANAL',
-    intervalo: 1,
+    intervalo: serie.intervalo || 1,
     dataInicio: '',
     dataFim: '',
     horarioInicio: '',
@@ -194,7 +194,7 @@ export function SeriesView() {
       pauta: '',
       modalidade: 'PRESENCIAL',
       frequencia: 'SEMANAL',
-      intervalo: 1,
+      intervalo: serie.intervalo || 1,
       dataInicio: '',
       dataFim: '',
       horarioInicio: '',
@@ -255,7 +255,7 @@ export function SeriesView() {
       pauta: serie.pauta || '',
       modalidade: serie.modalidade,
       frequencia: serie.frequencia,
-      intervalo: 1,
+      intervalo: serie.intervalo || 1,
       dataInicio: serie.dataInicio,
       dataFim: serie.dataFim,
       horarioInicio: serie.horarioInicio,
@@ -447,7 +447,25 @@ export function SeriesView() {
         externalError={formOpen ? (erro ?? lookupAviso) : null}
         onSubmit={async (data) => {
           if (serieEditandoId) {
-            setConfirmacaoEditar(data)
+            const original = series.find(item => item.id === serieEditandoId)
+            if (!original) {
+              setErro('Série original não encontrada para calcular as alterações.')
+              return
+            }
+
+            const normalizar = (valor: unknown) => valor === '' ? null : valor
+            const changes = Object.fromEntries(
+              Object.entries(data).filter(([campo, valor]) =>
+                normalizar(valor) !== normalizar((original as Record<string, unknown>)[campo])
+              )
+            ) as Partial<SerieCreateInput>
+
+            if (Object.keys(changes).length === 0) {
+              fecharFormulario()
+              return
+            }
+
+            setConfirmacaoEditar(changes)
           } else {
             setSalvando(true)
             try {
@@ -520,12 +538,27 @@ export function SeriesView() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-confirm-edit-title" className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden p-6 space-y-4">
             <h3 id="modal-confirm-edit-title" className="text-lg font-semibold text-slate-900">Confirmar Edição de Série</h3>
-            <p className="text-sm text-slate-600">
-              Atenção: Ao confirmar esta edição, todas as ocorrências futuras não excepcionais desta série serão <strong>reconstruídas</strong> com base nestas novas regras.
-            </p>
-            <p className="text-sm text-slate-600">
-              Ocorrências passadas e exceções individuais não serão afetadas.
-            </p>
+            {Object.keys(confirmacaoEditar).every(campo =>
+              ['modalidade', 'localId', 'espacoId', 'urlOnline'].includes(campo)
+            ) ? (
+              <>
+                <p className="text-sm text-slate-600">
+                  Esta alteração atualizará as ocorrências futuras sem recriá-las. Convocações publicadas serão preservadas e participantes que já responderam precisarão reconfirmar a presença.
+                </p>
+                <p className="text-sm text-slate-600">
+                  Ocorrências passadas e exceções individuais não serão afetadas.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-slate-600">
+                  Atenção: esta alteração modifica regras da recorrência e pode reconstruir ocorrências futuras não excepcionais.
+                </p>
+                <p className="text-sm text-slate-600">
+                  Ocorrências com convocação vinculada permanecem protegidas contra regeneração.
+                </p>
+              </>
+            )}
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
@@ -541,7 +574,7 @@ export function SeriesView() {
                 disabled={salvando}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
-                {salvando ? 'Salvando...' : 'Confirmar e Reconstruir'}
+                {salvando ? 'Salvando...' : 'Confirmar alterações'}
               </button>
             </div>
           </div>
