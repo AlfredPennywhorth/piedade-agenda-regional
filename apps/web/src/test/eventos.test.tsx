@@ -161,7 +161,7 @@ describe('EventosView', () => {
     fireEvent.click(within(espacoDialog).getByRole('button', { name: /criar e selecionar/i }))
 
     await waitFor(() => {
-      expect(seletorEspaco).toHaveValue(novoEspacoId)
+      expect(within(eventoDialog).getByLabelText(/espaço/i)).toHaveValue(novoEspacoId)
     })
   })
 
