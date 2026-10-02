@@ -71,7 +71,7 @@ describe('SeriesView', () => {
   })
 
   afterEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
     vi.unstubAllGlobals()
   })
 
