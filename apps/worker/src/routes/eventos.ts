@@ -462,9 +462,6 @@ eventosRouter.patch('/:id', async (c) => {
     // PMO Rule: Ao alterar uma ocorrência individual, preservar serie_recorrencia_id e marcar recorrencia_excecao = true.
     const isExcecao = existing.serieRecorrenciaId !== null ? true : existing.recorrenciaExcecao
     const nowIso = new Date().toISOString()
-    const horarioAlterado =
-      (parsed.inicioEm !== undefined && !mesmoInstante(parsed.inicioEm, existing.inicioEm)) ||
-      (parsed.fimEm !== undefined && !mesmoInstante(parsed.fimEm, existing.fimEm))
     const ativacaoAlterada =
       parsed.ativo !== undefined && parsed.ativo !== existing.ativo
     const alteracaoMaterial = houveAlteracaoMaterial(existing, merged)
