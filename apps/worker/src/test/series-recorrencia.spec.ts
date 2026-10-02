@@ -67,14 +67,36 @@ describe('Series Recorrencia API (S05)', () => {
     return id
   }
 
+  function adicionarDias(data: Date, quantidade: number) {
+    const resultado = new Date(data)
+    resultado.setUTCDate(resultado.getUTCDate() + quantidade)
+    return resultado
+  }
+
+  function formatarData(data: Date) {
+    return data.toISOString().slice(0, 10)
+  }
+
+  const dataInicioSerie = adicionarDias(new Date(), 30)
+  const dataFimSerie = adicionarDias(dataInicioSerie, 4)
+  const dataInicioSemanal = new Date(dataInicioSerie)
+  dataInicioSemanal.setUTCDate(
+    dataInicioSemanal.getUTCDate() + ((2 - dataInicioSemanal.getUTCDay() + 7) % 7)
+  )
+  const dataFimSemanal = adicionarDias(dataInicioSemanal, 28)
+  const dataInicioMensal = new Date(dataInicioSerie)
+  dataInicioMensal.setUTCDate(1)
+  const dataFimMensal = new Date(dataInicioMensal)
+  dataFimMensal.setUTCMonth(dataFimMensal.getUTCMonth() + 3, 0)
+
   const basePayload = {
     titulo: 'Reunião Diária',
     modalidade: 'ONLINE',
     urlOnline: 'https://meet.google.com/abc',
     horarioInicio: '09:00',
     horarioFim: '10:00',
-    dataInicio: '2026-09-01',
-    dataFim: '2026-09-05',
+    dataInicio: formatarData(dataInicioSerie),
+    dataFim: formatarData(dataFimSerie),
     frequencia: 'DIARIA',
     intervalo: 1
   }
@@ -110,8 +132,9 @@ describe('Series Recorrencia API (S05)', () => {
       body: JSON.stringify({
         ...basePayload,
         frequencia: 'SEMANAL',
-        diaSemana: 2, // Terça-feira (2026-09-01 é Terça)
-        dataFim: '2026-09-30',
+        dataInicio: formatarData(dataInicioSemanal),
+        diaSemana: 2,
+        dataFim: formatarData(dataFimSemanal),
         regionalId
       })
     })
@@ -129,7 +152,8 @@ describe('Series Recorrencia API (S05)', () => {
         ...basePayload,
         frequencia: 'QUINZENAL',
         diaSemana: 2,
-        dataFim: '2026-09-30',
+        dataInicio: formatarData(dataInicioSemanal),
+        dataFim: formatarData(dataFimSemanal),
         regionalId
       })
     })
@@ -147,7 +171,8 @@ describe('Series Recorrencia API (S05)', () => {
         ...basePayload,
         frequencia: 'MENSAL_DIA_FIXO',
         diaMes: 15,
-        dataFim: '2026-11-30',
+        dataInicio: formatarData(dataInicioMensal),
+        dataFim: formatarData(dataFimMensal),
         regionalId
       })
     })
@@ -166,7 +191,8 @@ describe('Series Recorrencia API (S05)', () => {
         frequencia: 'MENSAL_POSICAO_SEMANA',
         diaSemana: 0, // Domingo
         posicaoSemanaMes: 1, // Primeiro
-        dataFim: '2026-11-30',
+        dataInicio: formatarData(dataInicioMensal),
+        dataFim: formatarData(dataFimMensal),
         regionalId
       })
     })
@@ -231,8 +257,8 @@ describe('Series Recorrencia API (S05)', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...basePayload,
-        dataInicio: '2026-09-10',
-        dataFim: '2026-09-01',
+        dataInicio: formatarData(dataInicioSerie),
+        dataFim: formatarData(adicionarDias(dataInicioSerie, -1)),
         regionalId
       })
     })
@@ -244,7 +270,7 @@ describe('Series Recorrencia API (S05)', () => {
     const res = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...basePayload, regionalId, dataFim: '2026-09-10' }) // 1 to 10
+      body: JSON.stringify({ ...basePayload, regionalId, dataFim: formatarData(adicionarDias(dataInicioSerie, 9)) }) // 1 to 10
     })
     const json = await res.json()
     expect(json.generatedOccurrences).toBe(10)
@@ -404,12 +430,12 @@ describe('Series Recorrencia API (S05)', () => {
     const postRes = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2026-09-01', dataFim: '2026-09-10' })
+      body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2099-09-01', dataFim: '2099-09-10' })
     })
     const serieId = (await postRes.json()).serie.id
     
     const evs = db.select().from(eventos).all()
-    const evTarget = evs.find((e: any) => e.inicioEm.includes('2026-09-06')) // Ocorrência do dia 06
+    const evTarget = evs.find((e: any) => e.inicioEm.includes('2099-09-06')) // Ocorrência do dia 06
     
     const patchRes = await req(`/api/v1/series-recorrencia/${serieId}`, {
       method: 'PATCH',
@@ -442,6 +468,44 @@ describe('Series Recorrencia API (S05)', () => {
     expect(velhasInativas.length).toBe(5) // não apagou fisicamente
   })
 
+  it('19.1 THIS_AND_FUTURE rejeita ocorrência pivô já encerrada', async () => {
+    const regionalId = await createRegional()
+    const postRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        regionalId,
+        dataInicio: '2020-09-01',
+        dataFim: '2020-09-03',
+      })
+    })
+    const { serie } = await postRes.json()
+    const ocorrencias = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    const pivot = ocorrencias[1]
+
+    const res = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'THIS_AND_FUTURE',
+        fromEventId: pivot.id,
+        changes: { titulo: 'Não deve reescrever histórico' }
+      })
+    })
+
+    expect(res.status).toBe(409)
+    expect(await res.json()).toMatchObject({ code: 'EVENTO_PASSADO_IMUTAVEL' })
+
+    const persistidas = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    expect(persistidas.every((item: any) => item.ativo)).toBe(true)
+    expect(db.select().from(seriesRecorrencia).all()).toHaveLength(1)
+  })
+
   describe('Regressivos THIS (via /api/v1/series-recorrencia)', () => {
     let regionalId: string
     let serieId: string
@@ -452,7 +516,7 @@ describe('Series Recorrencia API (S05)', () => {
       const postRes = await req('/api/v1/series-recorrencia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2026-09-01', dataFim: '2026-09-01' })
+        body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2099-09-01', dataFim: '2099-09-01' })
       })
       const json = await postRes.json()
       serieId = json.serie.id
@@ -473,7 +537,7 @@ describe('Series Recorrencia API (S05)', () => {
       const res = await req(`/api/v1/series-recorrencia/${serieId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { fimEm: '2026-09-01T08:00:00Z' } })
+        body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { fimEm: '2099-09-01T08:00:00Z' } })
       })
       expect(res.status).toBe(400)
     })
@@ -488,6 +552,34 @@ describe('Series Recorrencia API (S05)', () => {
         body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { administracaoId: adminId } })
       })
       expect(res.status).toBe(400) // Regra do Zod do EventoCreate veta dois escopos
+    })
+
+    it('22.1 THIS: ocorrência encerrada é imutável', async () => {
+      const passadoId = crypto.randomUUID()
+      await db.insert(eventos).values({
+        id: passadoId,
+        titulo: 'Ocorrência histórica',
+        modalidade: 'ONLINE',
+        inicioEm: '2020-01-01T10:00:00.000Z',
+        fimEm: '2020-01-01T11:00:00.000Z',
+        urlOnline: 'https://meet.google.com/historico',
+        regionalId,
+        serieRecorrenciaId: serieId,
+        ativo: true,
+      })
+
+      const res = await req(`/api/v1/series-recorrencia/${serieId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          updateMode: 'THIS',
+          fromEventId: passadoId,
+          changes: { titulo: 'Não deve alterar' },
+        }),
+      })
+
+      expect(res.status).toBe(409)
+      expect(await res.json()).toMatchObject({ code: 'EVENTO_PASSADO_IMUTAVEL' })
     })
 
     it('23. THIS: ONLINE com local falha', async () => {
