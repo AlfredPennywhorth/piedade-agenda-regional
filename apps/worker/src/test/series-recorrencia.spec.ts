@@ -1002,6 +1002,9 @@ describe('Series Recorrencia API (S05)', () => {
       .all()
     const pivot = antes[1]
     const idsAntes = antes.map((item: any) => item.id).sort()
+    const revisoesAntes = Object.fromEntries(
+      antes.map((item: any) => [item.id, item.agendaRevisao])
+    )
 
     const atualizar = await req(`/api/v1/series-recorrencia/${serie.id}`, {
       method: 'PATCH',
@@ -1024,7 +1027,9 @@ describe('Series Recorrencia API (S05)', () => {
       .where(eq(eventos.serieRecorrenciaId, serie.id))
       .all()
     expect(depois.map((item: any) => item.id).sort()).toEqual(idsAntes)
-    expect(depois.every((item: any) => item.agendaRevisao == null)).toBe(true)
+    expect(
+      Object.fromEntries(depois.map((item: any) => [item.id, item.agendaRevisao]))
+    ).toEqual(revisoesAntes)
   })
 
   it('24.5.1 impede criar convocação ativa para ocorrência inativada', async () => {
