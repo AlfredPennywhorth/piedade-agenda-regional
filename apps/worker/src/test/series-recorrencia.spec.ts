@@ -452,7 +452,7 @@ describe('Series Recorrencia API (S05)', () => {
       const postRes = await req('/api/v1/series-recorrencia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2026-09-01', dataFim: '2026-09-01' })
+        body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2099-09-01', dataFim: '2099-09-01' })
       })
       const json = await postRes.json()
       serieId = json.serie.id
@@ -473,7 +473,7 @@ describe('Series Recorrencia API (S05)', () => {
       const res = await req(`/api/v1/series-recorrencia/${serieId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { fimEm: '2026-09-01T08:00:00Z' } })
+        body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { fimEm: '2099-09-01T08:00:00Z' } })
       })
       expect(res.status).toBe(400)
     })
@@ -488,6 +488,34 @@ describe('Series Recorrencia API (S05)', () => {
         body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { administracaoId: adminId } })
       })
       expect(res.status).toBe(400) // Regra do Zod do EventoCreate veta dois escopos
+    })
+
+    it('22.1 THIS: ocorrência encerrada é imutável', async () => {
+      const passadoId = crypto.randomUUID()
+      await db.insert(eventos).values({
+        id: passadoId,
+        titulo: 'Ocorrência histórica',
+        modalidade: 'ONLINE',
+        inicioEm: '2020-01-01T10:00:00.000Z',
+        fimEm: '2020-01-01T11:00:00.000Z',
+        urlOnline: 'https://meet.google.com/historico',
+        regionalId,
+        serieRecorrenciaId: serieId,
+        ativo: true,
+      })
+
+      const res = await req(`/api/v1/series-recorrencia/${serieId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          updateMode: 'THIS',
+          fromEventId: passadoId,
+          changes: { titulo: 'Não deve alterar' },
+        }),
+      })
+
+      expect(res.status).toBe(409)
+      expect(await res.json()).toMatchObject({ code: 'EVENTO_PASSADO_IMUTAVEL' })
     })
 
     it('23. THIS: ONLINE com local falha', async () => {
