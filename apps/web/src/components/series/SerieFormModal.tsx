@@ -395,7 +395,7 @@ export function SerieFormModal({
       diaSemana: formData.diaSemana !== null && formData.diaSemana !== undefined ? formData.diaSemana : null,
       diaMes: formData.diaMes !== null && formData.diaMes !== undefined ? formData.diaMes : null,
       posicaoSemanaMes: formData.posicaoSemanaMes !== null && formData.posicaoSemanaMes !== undefined ? formData.posicaoSemanaMes : null,
-      intervalo: 1
+      intervalo: formData.intervalo ?? 1
     }
 
     try {
