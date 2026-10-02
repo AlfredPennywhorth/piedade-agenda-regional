@@ -250,15 +250,16 @@ describe('SeriesView', () => {
 
     // Confirmar
     vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({})
-    fireEvent.click(screen.getByText('Confirmar e Reconstruir'))
+    fireEvent.click(screen.getByText('Confirmar alterações'))
 
     await waitFor(() => {
-      expect(apiClient.patchWithAuth).toHaveBeenCalledWith('/series-recorrencia/f47ac10b-58cc-4372-a567-0e02b2c3d479', expect.objectContaining({
-        updateMode: 'ALL',
-        changes: expect.objectContaining({
-          titulo: 'Reunião Semanal Editada'
-        })
-      }))
+      expect(apiClient.patchWithAuth).toHaveBeenCalledWith(
+        '/series-recorrencia/f47ac10b-58cc-4372-a567-0e02b2c3d479',
+        {
+          updateMode: 'ALL',
+          changes: { titulo: 'Reunião Semanal Editada' }
+        }
+      )
     })
   })
 
@@ -759,11 +760,14 @@ describe('SeriesView', () => {
     fireEvent.click(screen.getByText('Editar'))
     await screen.findByRole('dialog', { name: 'Editar Série de Recorrência' })
 
+    fireEvent.change(screen.getByLabelText(/Título \*/i), {
+      target: { value: 'Reunião com erro no PATCH' }
+    })
     fireEvent.click(screen.getByText('Salvar Série'))
     await screen.findByRole('dialog', { name: 'Confirmar Edição de Série' })
 
     vi.mocked(apiClient.patchWithAuth).mockRejectedValueOnce(new apiClient.ApiError(400, 'Erro teste', { error: 'Mensagem de erro de API' }))
-    fireEvent.click(screen.getByText('Confirmar e Reconstruir'))
+    fireEvent.click(screen.getByText('Confirmar alterações'))
 
     // Dialog fecha e mostra erro na tela principal ou volta pro form
     await waitFor(() => {
