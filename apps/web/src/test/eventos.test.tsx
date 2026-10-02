@@ -348,13 +348,9 @@ describe('EventosView', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
 
     const eventoDialog = await screen.findByRole('dialog', { name: /editar evento/i })
-    const seletorLocal = eventoDialog.querySelector<HTMLSelectElement>('#localId')
-    const seletorEspaco = eventoDialog.querySelector<HTMLSelectElement>('#espacoId')
-    expect(seletorLocal).not.toBeNull()
-    expect(seletorEspaco).not.toBeNull()
 
     await waitFor(() => {
-      expect(seletorLocal).toHaveValue(LOCAL_ID)
+      expect(eventoDialog.querySelector<HTMLSelectElement>('#localId')).toHaveValue(LOCAL_ID)
     })
 
     fireEvent.click(within(eventoDialog).getByRole('button', { name: /criar local sem sair/i }))
@@ -365,8 +361,9 @@ describe('EventosView', () => {
     fireEvent.click(within(localDialog).getByRole('button', { name: /criar e selecionar/i }))
 
     await waitFor(() => {
-      expect(seletorLocal).toHaveValue(novoLocalId)
-      expect(seletorEspaco).toHaveValue('')
+      expect(screen.queryByRole('dialog', { name: /criar local/i })).not.toBeInTheDocument()
+      expect(eventoDialog.querySelector<HTMLSelectElement>('#localId')).toHaveValue(novoLocalId)
+      expect(eventoDialog.querySelector<HTMLSelectElement>('#espacoId')).toHaveValue('')
     })
 
     fireEvent.click(within(eventoDialog).getByRole('button', { name: /criar espaço sem sair/i }))
