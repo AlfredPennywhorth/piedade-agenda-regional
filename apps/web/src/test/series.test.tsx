@@ -261,6 +261,51 @@ describe('SeriesView', () => {
     })
   })
 
+  it('deve oferecer cadastro rápido de Local e Espaço ao editar série presencial', async () => {
+    const localId = MOCK_LOOKUPS.locais[0].id
+    const seriePresencial = {
+      ...MOCK_SERIES[0],
+      modalidade: 'PRESENCIAL',
+      localId,
+      espacoId: null,
+      urlOnline: null,
+    }
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/series-recorrencia') return [seriePresencial]
+      if (url === '/locais') return MOCK_LOOKUPS.locais
+      if (url === '/espacos-locais?ativo=true') return []
+      if (url === '/membros') return MOCK_LOOKUPS.membros
+      if (url === '/regionais') return MOCK_LOOKUPS.regionais
+      if (url === '/administracoes') return MOCK_LOOKUPS.administracoes
+      if (url === '/setores') return MOCK_LOOKUPS.setores
+      if (url === '/casas') return MOCK_LOOKUPS.casas
+      if (url === '/grupos-trabalho') return MOCK_LOOKUPS.gruposTrabalho
+      return []
+    })
+
+    render(<SeriesView />)
+    await screen.findByText('Reunião Semanal')
+    fireEvent.click(screen.getByText('Editar'))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Editar Série de Recorrência' })
+    await waitFor(() => {
+      expect(within(dialog).getByLabelText(/Local \*/i)).toHaveValue(localId)
+    })
+
+    const criarLocal = within(dialog).getByRole('button', { name: /criar local sem sair/i })
+    const criarEspaco = within(dialog).getByRole('button', { name: /criar espaço sem sair/i })
+    expect(criarLocal).toBeInTheDocument()
+    expect(criarEspaco).toBeInTheDocument()
+
+    fireEvent.click(criarLocal)
+    expect(await screen.findByRole('dialog', { name: /criar local/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /voltar à série/i }))
+
+    fireEvent.click(criarEspaco)
+    expect(await screen.findByRole('dialog', { name: /criar espaço/i })).toBeInTheDocument()
+  })
+
   it('deve mostrar espaço histórico inativo e exigir substituição antes de editar a série', async () => {
     const localId = MOCK_LOOKUPS.locais[0].id
     const espacoInativoId = '11111111-1111-4111-8111-111111111111'
