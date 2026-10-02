@@ -23,6 +23,8 @@ const MOCK_SERIES = [
   {
     id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
     titulo: 'Reunião Semanal',
+    descricao: null,
+    pauta: null,
     modalidade: 'ONLINE',
     frequencia: 'SEMANAL',
     intervalo: 1,
@@ -34,7 +36,9 @@ const MOCK_SERIES = [
     diaMes: null,
     posicaoSemanaMes: null,
     localId: null,
+    espacoId: null,
     urlOnline: 'https://meet.google.com/abc',
+    observacoes: null,
     organizadorMembroId: '2b4c13a0-7f2e-4b9d-a8e5-3d5f9c8b7a6d',
     regionalId: 'd290f1ee-6c54-4b01-90e6-d701748f0851',
     administracaoId: null,

@@ -74,9 +74,14 @@ describe('Eventos API (S04)', () => {
     return id
   }
 
-  const validDate1 = '2026-09-10T10:00:00Z'
-  const validDate2 = '2026-09-10T12:00:00Z'
-  const validDateNextDay = '2026-09-11T10:00:00Z'
+  const dataTeste = new Date()
+  dataTeste.setUTCDate(dataTeste.getUTCDate() + 30)
+  const dataTesteIso = dataTeste.toISOString().slice(0, 10)
+  const dataTesteSeguinte = new Date(`${dataTesteIso}T00:00:00.000Z`)
+  dataTesteSeguinte.setUTCDate(dataTesteSeguinte.getUTCDate() + 1)
+  const validDate1 = `${dataTesteIso}T10:00:00Z`
+  const validDate2 = `${dataTesteIso}T12:00:00Z`
+  const validDateNextDay = `${dataTesteSeguinte.toISOString().slice(0, 10)}T10:00:00Z`
 
   it('6. criar PRESENCIAL com local', async () => {
     const regionalId = await createRegional()
@@ -456,7 +461,7 @@ describe('Eventos API (S04)', () => {
         titulo: 'Patch Test',
         modalidade: 'ONLINE',
         inicioEm: validDate2,
-        fimEm: '2026-09-10T14:00:00Z',
+        fimEm: `${dataTesteIso}T14:00:00Z`,
         urlOnline: 'https://meet.google.com/abc',
         regionalId
       })

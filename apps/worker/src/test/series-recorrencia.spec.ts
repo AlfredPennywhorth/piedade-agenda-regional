@@ -67,14 +67,36 @@ describe('Series Recorrencia API (S05)', () => {
     return id
   }
 
+  function adicionarDias(data: Date, quantidade: number) {
+    const resultado = new Date(data)
+    resultado.setUTCDate(resultado.getUTCDate() + quantidade)
+    return resultado
+  }
+
+  function formatarData(data: Date) {
+    return data.toISOString().slice(0, 10)
+  }
+
+  const dataInicioSerie = adicionarDias(new Date(), 30)
+  const dataFimSerie = adicionarDias(dataInicioSerie, 4)
+  const dataInicioSemanal = new Date(dataInicioSerie)
+  dataInicioSemanal.setUTCDate(
+    dataInicioSemanal.getUTCDate() + ((2 - dataInicioSemanal.getUTCDay() + 7) % 7)
+  )
+  const dataFimSemanal = adicionarDias(dataInicioSemanal, 28)
+  const dataInicioMensal = new Date(dataInicioSerie)
+  dataInicioMensal.setUTCDate(1)
+  const dataFimMensal = new Date(dataInicioMensal)
+  dataFimMensal.setUTCMonth(dataFimMensal.getUTCMonth() + 3, 0)
+
   const basePayload = {
     titulo: 'Reunião Diária',
     modalidade: 'ONLINE',
     urlOnline: 'https://meet.google.com/abc',
     horarioInicio: '09:00',
     horarioFim: '10:00',
-    dataInicio: '2026-09-01',
-    dataFim: '2026-09-05',
+    dataInicio: formatarData(dataInicioSerie),
+    dataFim: formatarData(dataFimSerie),
     frequencia: 'DIARIA',
     intervalo: 1
   }
@@ -110,8 +132,9 @@ describe('Series Recorrencia API (S05)', () => {
       body: JSON.stringify({
         ...basePayload,
         frequencia: 'SEMANAL',
-        diaSemana: 2, // Terça-feira (2026-09-01 é Terça)
-        dataFim: '2026-09-30',
+        dataInicio: formatarData(dataInicioSemanal),
+        diaSemana: 2,
+        dataFim: formatarData(dataFimSemanal),
         regionalId
       })
     })
@@ -129,7 +152,8 @@ describe('Series Recorrencia API (S05)', () => {
         ...basePayload,
         frequencia: 'QUINZENAL',
         diaSemana: 2,
-        dataFim: '2026-09-30',
+        dataInicio: formatarData(dataInicioSemanal),
+        dataFim: formatarData(dataFimSemanal),
         regionalId
       })
     })
@@ -147,7 +171,8 @@ describe('Series Recorrencia API (S05)', () => {
         ...basePayload,
         frequencia: 'MENSAL_DIA_FIXO',
         diaMes: 15,
-        dataFim: '2026-11-30',
+        dataInicio: formatarData(dataInicioMensal),
+        dataFim: formatarData(dataFimMensal),
         regionalId
       })
     })
@@ -166,7 +191,8 @@ describe('Series Recorrencia API (S05)', () => {
         frequencia: 'MENSAL_POSICAO_SEMANA',
         diaSemana: 0, // Domingo
         posicaoSemanaMes: 1, // Primeiro
-        dataFim: '2026-11-30',
+        dataInicio: formatarData(dataInicioMensal),
+        dataFim: formatarData(dataFimMensal),
         regionalId
       })
     })
@@ -231,8 +257,8 @@ describe('Series Recorrencia API (S05)', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...basePayload,
-        dataInicio: '2026-09-10',
-        dataFim: '2026-09-01',
+        dataInicio: formatarData(dataInicioSerie),
+        dataFim: formatarData(adicionarDias(dataInicioSerie, -1)),
         regionalId
       })
     })
@@ -244,7 +270,7 @@ describe('Series Recorrencia API (S05)', () => {
     const res = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...basePayload, regionalId, dataFim: '2026-09-10' }) // 1 to 10
+      body: JSON.stringify({ ...basePayload, regionalId, dataFim: formatarData(adicionarDias(dataInicioSerie, 9)) }) // 1 to 10
     })
     const json = await res.json()
     expect(json.generatedOccurrences).toBe(10)

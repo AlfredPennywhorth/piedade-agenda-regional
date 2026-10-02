@@ -100,6 +100,10 @@ describe('Espaços de Local', () => {
   })
 
   it('permite editar evento existente que mantém referência histórica a espaço inativo', async () => {
+    const dataEvento = new Date()
+    dataEvento.setUTCDate(dataEvento.getUTCDate() + 30)
+    const dataEventoIso = dataEvento.toISOString().slice(0, 10)
+
     sqlite.exec(`
       INSERT INTO espacos_local (id, local_id, nome, ativo)
       VALUES ('66666666-6666-4666-8666-666666666666', '11111111-1111-4111-8111-111111111111', 'Sala histórica', 0);
@@ -111,8 +115,8 @@ describe('Espaços de Local', () => {
         '77777777-7777-4777-8777-777777777777',
         'Evento histórico',
         'PRESENCIAL',
-        '2026-09-01T20:00:00.000Z',
-        '2026-09-01T21:00:00.000Z',
+        '${dataEventoIso}T20:00:00.000Z',
+        '${dataEventoIso}T21:00:00.000Z',
         '11111111-1111-4111-8111-111111111111',
         '66666666-6666-4666-8666-666666666666',
         '44444444-4444-4444-8444-444444444444',
