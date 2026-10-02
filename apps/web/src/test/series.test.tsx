@@ -57,6 +57,18 @@ const MOCK_LOOKUPS = {
 
 describe('SeriesView', () => {
   beforeEach(() => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        cep: '03127-001',
+        logradouro: 'Rua Ibitirama',
+        bairro: 'Vila Prudente',
+        localidade: 'São Paulo',
+        uf: 'SP',
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/series-recorrencia') return MOCK_SERIES
       if (url === '/locais') return MOCK_LOOKUPS.locais
@@ -72,6 +84,7 @@ describe('SeriesView', () => {
 
   afterEach(() => {
     vi.clearAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('deve listar as séries e permitir visualizar os detalhes num diálogo acessível', async () => {
@@ -299,8 +312,23 @@ describe('SeriesView', () => {
     expect(criarEspaco).toBeInTheDocument()
 
     fireEvent.click(criarLocal)
-    expect(await screen.findByRole('dialog', { name: /criar local/i })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /voltar à série/i }))
+    const localRapido = await screen.findByRole('dialog', { name: /criar local/i })
+    fireEvent.change(within(localRapido).getByLabelText('CEP do novo local'), {
+      target: { value: '03127001' },
+    })
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://viacep.com.br/ws/03127001/json/',
+        expect.objectContaining({ signal: expect.anything() })
+      )
+      expect(within(localRapido).getByLabelText('Endereço do novo local')).toHaveValue('Rua Ibitirama')
+      expect(within(localRapido).getByLabelText('Bairro do novo local')).toHaveValue('Vila Prudente')
+      expect(within(localRapido).getByLabelText('Cidade do novo local')).toHaveValue('São Paulo')
+      expect(within(localRapido).getByLabelText('UF do novo local')).toHaveValue('SP')
+    })
+
+    fireEvent.click(within(localRapido).getByRole('button', { name: /voltar à série/i }))
 
     fireEvent.click(criarEspaco)
     expect(await screen.findByRole('dialog', { name: /criar espaço/i })).toBeInTheDocument()
