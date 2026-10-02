@@ -1335,7 +1335,23 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
             </div>
             <form onSubmit={salvarLocalRapido} className="space-y-3 p-5">
               {localRapidoErro && <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{localRapidoErro}</p>}
-              <input autoFocus aria-label="Nome do novo local" placeholder="Nome *" value={localRapido.nome} onChange={e => setLocalRapido({ ...localRapido, nome: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+              <div>
+                <input autoFocus aria-label="CEP do novo local" placeholder="CEP" value={localRapido.cep} onChange={e => handleCepRapidoChange(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                <p className="mt-1 text-xs text-slate-500">Informe o CEP primeiro para preencher o endereço automaticamente.</p>
+              </div>
+              {(consultandoCepRapido || cepRapidoMensagem) && (
+                <div className="flex items-center justify-between gap-3">
+                  <p role={cepRapidoErro ? 'alert' : undefined} className={`text-xs ${cepRapidoErro ? 'text-red-700' : 'text-slate-500'}`}>
+                    {consultandoCepRapido ? 'Consultando CEP...' : cepRapidoMensagem}
+                  </p>
+                  {consultandoCepRapido && (
+                    <button type="button" onClick={cancelarConsultaCepRapido} className="text-xs font-semibold text-brand-700 hover:text-brand-900">
+                      Usar endereço manualmente
+                    </button>
+                  )}
+                </div>
+              )}
+              <input aria-label="Nome do novo local" placeholder="Nome *" value={localRapido.nome} onChange={e => setLocalRapido({ ...localRapido, nome: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
               <div className="grid grid-cols-[1fr_110px] gap-3">
                 <input aria-label="Endereço do novo local" placeholder="Endereço *" value={localRapido.endereco} onChange={e => {
                   if (consultandoCepRapido) cancelarConsultaCepRapido()
@@ -1357,19 +1373,6 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                   setLocalRapido({ ...localRapido, uf: e.target.value.toUpperCase() })
                 }} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm uppercase" />
               </div>
-              <input aria-label="CEP do novo local" placeholder="CEP" value={localRapido.cep} onChange={e => handleCepRapidoChange(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
-              {(consultandoCepRapido || cepRapidoMensagem) && (
-                <div className="flex items-center justify-between gap-3">
-                  <p role={cepRapidoErro ? 'alert' : undefined} className={`text-xs ${cepRapidoErro ? 'text-red-700' : 'text-slate-500'}`}>
-                    {consultandoCepRapido ? 'Consultando CEP...' : cepRapidoMensagem}
-                  </p>
-                  {consultandoCepRapido && (
-                    <button type="button" onClick={cancelarConsultaCepRapido} className="text-xs font-semibold text-brand-700 hover:text-brand-900">
-                      Usar endereço manualmente
-                    </button>
-                  )}
-                </div>
-              )}
               <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
                 <button type="button" disabled={salvandoLocalRapido} onClick={fecharLocalRapido} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Voltar ao evento</button>
                 <button type="submit" disabled={salvandoLocalRapido || consultandoCepRapido} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{salvandoLocalRapido ? 'Criando...' : consultandoCepRapido ? 'Consultando CEP...' : 'Criar e selecionar'}</button>

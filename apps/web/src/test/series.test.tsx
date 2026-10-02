@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
 import { SeriesView } from '../components/series/SeriesView'
 import * as apiClient from '../api/apiClient'
 
@@ -354,6 +354,73 @@ describe('SeriesView', () => {
     expect(await screen.findByRole('dialog', { name: 'Confirmar Edição de Série' })).toBeInTheDocument()
   })
 
+  it('deve cancelar ViaCEP e preservar endereço manual no cadastro rápido da série', async () => {
+    let resolver: ((value: any) => void) | undefined
+    const pendente = new Promise<any>(resolve => {
+      resolver = resolve
+    })
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(pendente))
+
+    const localId = MOCK_LOOKUPS.locais[0].id
+    const seriePresencial = {
+      ...MOCK_SERIES[0],
+      modalidade: 'PRESENCIAL',
+      localId,
+      espacoId: null,
+      urlOnline: null,
+    }
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/series-recorrencia') return [seriePresencial]
+      if (url === '/locais') return MOCK_LOOKUPS.locais
+      if (url === '/espacos-locais?ativo=true') return []
+      if (url === '/membros') return MOCK_LOOKUPS.membros
+      if (url === '/regionais') return MOCK_LOOKUPS.regionais
+      if (url === '/administracoes') return MOCK_LOOKUPS.administracoes
+      if (url === '/setores') return MOCK_LOOKUPS.setores
+      if (url === '/casas') return MOCK_LOOKUPS.casas
+      if (url === '/grupos-trabalho') return MOCK_LOOKUPS.gruposTrabalho
+      return []
+    })
+
+    render(<SeriesView />)
+    await screen.findByText('Reunião Semanal')
+    fireEvent.click(screen.getByText('Editar'))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Editar Série de Recorrência' })
+    await waitFor(() => expect(within(dialog).getByLabelText(/Local \*/i)).toHaveValue(localId))
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /criar local sem sair/i }))
+    const localRapido = await screen.findByRole('dialog', { name: /criar local/i })
+
+    fireEvent.change(within(localRapido).getByLabelText('CEP do novo local'), {
+      target: { value: '03127001' },
+    })
+
+    const usarManual = await within(localRapido).findByRole('button', { name: /usar endereço manualmente/i })
+    fireEvent.click(usarManual)
+
+    const endereco = within(localRapido).getByLabelText('Endereço do novo local')
+    fireEvent.change(endereco, { target: { value: 'Rua Digitada Manualmente' } })
+    expect(endereco).toHaveValue('Rua Digitada Manualmente')
+
+    await act(async () => {
+      resolver?.({
+        ok: true,
+        json: async () => ({
+          cep: '03127-001',
+          logradouro: 'Rua ViaCEP',
+          bairro: 'Vila Prudente',
+          localidade: 'São Paulo',
+          uf: 'SP',
+        }),
+      })
+      await pendente
+    })
+
+    expect(endereco).toHaveValue('Rua Digitada Manualmente')
+  })
+
   it('deve conter e restaurar foco nos diálogos rápidos da série', async () => {
     const localId = MOCK_LOOKUPS.locais[0].id
     const seriePresencial = {
@@ -389,7 +456,7 @@ describe('SeriesView', () => {
     fireEvent.click(abrirLocal)
 
     const localRapido = await screen.findByRole('dialog', { name: /criar local/i })
-    const primeiroLocal = within(localRapido).getByLabelText('Nome do novo local')
+    const primeiroLocal = within(localRapido).getByLabelText('CEP do novo local')
     await waitFor(() => expect(primeiroLocal).toHaveFocus())
 
     const ultimoLocal = within(localRapido).getByRole('button', { name: /criar e selecionar/i })
