@@ -268,6 +268,15 @@ export function SerieFormModal({
     }
   }
 
+  const cancelarConsultaCepRapido = () => {
+    cepRapidoAbortControllerRef.current?.abort()
+    cepRapidoAbortControllerRef.current = null
+    cepRapidoConsultaSeq.current += 1
+    setConsultandoCepRapido(false)
+    setCepRapidoMensagem('Consulta de CEP cancelada. Preencha o endereço manualmente.')
+    setCepRapidoErro(false)
+  }
+
   const fecharLocalRapido = () => {
     cepRapidoAbortControllerRef.current?.abort()
     cepRapidoAbortControllerRef.current = null
@@ -901,22 +910,41 @@ export function SerieFormModal({
                   <p className="mt-1 text-xs text-slate-500">Informe o CEP primeiro para preencher o endereço automaticamente.</p>
                 </div>
                 {(consultandoCepRapido || cepRapidoMensagem) && (
-                  <p role={cepRapidoErro ? 'alert' : undefined} className={`text-xs ${cepRapidoErro ? 'text-red-700' : 'text-slate-500'}`}>
-                    {consultandoCepRapido ? 'Consultando CEP...' : cepRapidoMensagem}
-                  </p>
+                  <div className="flex items-center justify-between gap-3">
+                    <p role={cepRapidoErro ? 'alert' : undefined} className={`text-xs ${cepRapidoErro ? 'text-red-700' : 'text-slate-500'}`}>
+                      {consultandoCepRapido ? 'Consultando CEP...' : cepRapidoMensagem}
+                    </p>
+                    {consultandoCepRapido && (
+                      <button type="button" onClick={cancelarConsultaCepRapido} className="text-xs font-semibold text-brand-700 hover:text-brand-900">
+                        Usar endereço manualmente
+                      </button>
+                    )}
+                  </div>
                 )}
                 <input aria-label="Nome do novo local" placeholder="Nome *" value={localRapido.nome} onChange={e => setLocalRapido({ ...localRapido, nome: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
                 <div className="grid grid-cols-[1fr_110px] gap-3">
-                  <input aria-label="Endereço do novo local" placeholder="Endereço *" value={localRapido.endereco} onChange={e => setLocalRapido({ ...localRapido, endereco: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                  <input aria-label="Endereço do novo local" placeholder="Endereço *" value={localRapido.endereco} onChange={e => {
+                    if (consultandoCepRapido) cancelarConsultaCepRapido()
+                    setLocalRapido({ ...localRapido, endereco: e.target.value })
+                  }} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
                   <input aria-label="Número do novo local" placeholder="Número *" value={localRapido.numero} onChange={e => setLocalRapido({ ...localRapido, numero: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
                 </div>
-                <input aria-label="Bairro do novo local" placeholder="Bairro" value={localRapido.bairro} onChange={e => setLocalRapido({ ...localRapido, bairro: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                <input aria-label="Bairro do novo local" placeholder="Bairro" value={localRapido.bairro} onChange={e => {
+                  if (consultandoCepRapido) cancelarConsultaCepRapido()
+                  setLocalRapido({ ...localRapido, bairro: e.target.value })
+                }} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
                 <div className="grid grid-cols-[1fr_80px] gap-3">
-                  <input aria-label="Cidade do novo local" placeholder="Cidade *" value={localRapido.cidade} onChange={e => setLocalRapido({ ...localRapido, cidade: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
-                  <input aria-label="UF do novo local" placeholder="UF *" maxLength={2} value={localRapido.uf} onChange={e => setLocalRapido({ ...localRapido, uf: e.target.value.toUpperCase() })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm uppercase" />
+                  <input aria-label="Cidade do novo local" placeholder="Cidade *" value={localRapido.cidade} onChange={e => {
+                    if (consultandoCepRapido) cancelarConsultaCepRapido()
+                    setLocalRapido({ ...localRapido, cidade: e.target.value })
+                  }} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                  <input aria-label="UF do novo local" placeholder="UF *" maxLength={2} value={localRapido.uf} onChange={e => {
+                    if (consultandoCepRapido) cancelarConsultaCepRapido()
+                    setLocalRapido({ ...localRapido, uf: e.target.value.toUpperCase() })
+                  }} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm uppercase" />
                 </div>
                 <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
-                  <button type="button" disabled={salvandoLocalRapido || consultandoCepRapido} onClick={() => {
+                  <button type="button" disabled={salvandoLocalRapido} onClick={() => {
                     fecharLocalRapido()
                     if (localRapidoTriggerRef.current?.isConnected) localRapidoTriggerRef.current.focus()
                   }} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Voltar à série</button>
