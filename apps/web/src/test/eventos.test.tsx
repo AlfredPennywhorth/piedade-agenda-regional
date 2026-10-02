@@ -323,6 +323,29 @@ describe('EventosView', () => {
     })
   })
 
+  it('deve disponibilizar criação rápida de Local e Espaço durante a edição do evento', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === `/eventos/${EVENTO_ID}`) return mockEventos[0]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
+
+    const eventoDialog = await screen.findByRole('dialog', { name: /editar evento/i })
+
+    await waitFor(() => {
+      expect(eventoDialog.querySelector<HTMLSelectElement>('#localId')).toHaveValue(LOCAL_ID)
+    })
+
+    expect(within(eventoDialog).getByRole('button', { name: /criar local sem sair/i })).toBeInTheDocument()
+    expect(within(eventoDialog).getByRole('button', { name: /criar espaço sem sair/i })).toBeInTheDocument()
+  })
+
   it('deve preservar espaço inativo já vinculado ao editar sem oferecê-lo em novo evento', async () => {
     const eventoComEspacoInativo = {
       ...mockEventos[0],

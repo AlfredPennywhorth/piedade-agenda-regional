@@ -953,8 +953,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                       <div>
                         <div className="mb-1 flex items-center justify-between gap-3">
                           <label htmlFor="localId" className="block text-sm font-medium text-slate-700">Local *</label>
-                          {!eventoEditandoId && (
-                            <button
+                          <button
                               type="button"
                               onClick={event => {
                                 localRapidoTriggerRef.current = event.currentTarget
@@ -965,7 +964,6 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                             >
                               + Criar local sem sair
                             </button>
-                          )}
                         </div>
                         <select
                           id="localId"
@@ -986,8 +984,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                       <div>
                         <div className="mb-1 flex items-center justify-between gap-3">
                           <label htmlFor="espacoId" className="block text-sm font-medium text-slate-700">Espaço</label>
-                          {!eventoEditandoId && (
-                            <button
+                          <button
                               type="button"
                               onClick={event => {
                                 espacoRapidoTriggerRef.current = event.currentTarget
@@ -999,7 +996,6 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                             >
                               + Criar espaço sem sair
                             </button>
-                          )}
                         </div>
                         <select
                           id="espacoId"

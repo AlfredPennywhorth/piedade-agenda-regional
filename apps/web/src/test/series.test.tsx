@@ -300,6 +300,11 @@ describe('SeriesView', () => {
     fireEvent.click(screen.getByText('Editar'))
 
     const dialog = await screen.findByRole('dialog', { name: 'Editar Série de Recorrência' })
+
+    await waitFor(() => {
+      expect(within(dialog).getByLabelText(/Local \*/i)).toHaveValue(localId)
+    })
+
     const seletorEspaco = within(dialog).getByLabelText('Espaço')
 
     await waitFor(() => {
