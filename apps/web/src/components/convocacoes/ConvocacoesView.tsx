@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ConvocacaoCreate, ConvocacaoUpdate, ConvocacaoCreatePayload, ConvocacaoUpdatePayload, Convocacao } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import { ConvocacaoFuncoesModal } from './ConvocacaoFuncoesModal'
@@ -29,7 +29,13 @@ interface GrupoTrabalhoLookup {
 }
 type FiltroStatus = 'ATIVAS' | 'RASCUNHO' | 'PUBLICADA' | 'CANCELADA' | 'TODAS'
 
-export function ConvocacoesView() {
+export function ConvocacoesView({
+  initialEventoId,
+  onFluxoConcluido,
+}: {
+  initialEventoId?: string | null
+  onFluxoConcluido?: () => void
+}) {
   const [convocacoes, setConvocacoes] = useState<Convocacao[]>([])
   const [eventosLookup, setEventosLookup] = useState<EventoLookup[]>([])
   const [regionais, setRegionais] = useState<RegionalLookup[]>([])
@@ -50,6 +56,8 @@ export function ConvocacoesView() {
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [gerenciandoFuncoesId, setGerenciandoFuncoesId] = useState<string | null>(null)
+  const [fluxoConvocacaoId, setFluxoConvocacaoId] = useState<string | null>(null)
+  const [fluxoEventoIdAtivo, setFluxoEventoIdAtivo] = useState<string | null>(null)
   const [acompanhamentoConvocacaoId, setAcompanhamentoConvocacaoId] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<ConvocacaoCreatePayload>({
@@ -61,6 +69,7 @@ export function ConvocacoesView() {
   const [actionConfirm, setActionConfirm] = useState<{ type: 'PUBLICAR' | 'CANCELAR', convocacao: Convocacao } | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const fluxoRetornoFocoRef = useRef<HTMLHeadingElement | null>(null)
 
   const handleActionConfirm = async () => {
     if (!actionConfirm) return
@@ -133,6 +142,15 @@ export function ConvocacoesView() {
     carregarDados()
   }, [])
 
+  useEffect(() => {
+    if (!initialEventoId) return
+    setFluxoEventoIdAtivo(initialEventoId)
+    setEditandoId(null)
+    setFormData({ eventoId: initialEventoId, observacoes: '' })
+    setErrosForm({})
+    setFormOpen(true)
+  }, [initialEventoId])
+
   const abrirFormCriar = () => {
     setEditandoId(null)
     setFormData({ eventoId: '', observacoes: '' })
@@ -156,8 +174,14 @@ export function ConvocacoesView() {
 
   const handleCloseForm = () => {
     if (!salvando) {
+      const cancelandoFluxoGuiado = !!fluxoEventoIdAtivo && !editandoId
       setFormOpen(false)
       setEditandoId(null)
+      if (cancelandoFluxoGuiado) {
+        setFluxoConvocacaoId(null)
+        setFluxoEventoIdAtivo(null)
+        onFluxoConcluido?.()
+      }
     }
   }
 
@@ -190,13 +214,20 @@ export function ConvocacoesView() {
         setErrosForm(novosErros)
         return
       }
-      requisicao = postWithAuth('/convocacoes', payload)
+      requisicao = postWithAuth<Convocacao>('/convocacoes', payload)
     }
 
     setSalvando(true)
     try {
-      await requisicao
+      const resultado = await requisicao
       setFormOpen(false)
+      if (!editandoId && fluxoEventoIdAtivo && resultado && typeof resultado === 'object' && 'id' in resultado) {
+        const criada = resultado as Convocacao
+        setFluxoConvocacaoId(criada.id)
+        setFluxoEventoIdAtivo(null)
+        setGerenciandoFuncoesId(criada.id)
+        onFluxoConcluido?.()
+      }
       carregarDados()
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -346,7 +377,13 @@ export function ConvocacoesView() {
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Convocações</h2>
+          <h2
+            ref={fluxoRetornoFocoRef}
+            tabIndex={-1}
+            className="text-2xl font-bold text-slate-900"
+          >
+            Convocações
+          </h2>
           <p className="text-slate-600">Gerencie os rascunhos de convocações</p>
         </div>
         <button
@@ -719,7 +756,14 @@ export function ConvocacoesView() {
       {gerenciandoFuncoesId && (
         <ConvocacaoFuncoesModal
           convocacaoId={gerenciandoFuncoesId}
-          onClose={() => setGerenciandoFuncoesId(null)}
+          returnFocusRef={gerenciandoFuncoesId === fluxoConvocacaoId ? fluxoRetornoFocoRef : undefined}
+          onClose={() => {
+            const concluindoFluxo = gerenciandoFuncoesId === fluxoConvocacaoId
+            setGerenciandoFuncoesId(null)
+            if (concluindoFluxo) {
+              setFluxoConvocacaoId(null)
+            }
+          }}
         />
       )}
 

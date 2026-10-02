@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput, SerieCreateInput, createUtcDateFromSaoPaulo } from '@piedade/shared'
+import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput, SerieCreateInput, LocalCreate, EspacoLocalCreate, createUtcDateFromSaoPaulo } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import { SerieFormModal, TipoEscopo } from '../series/SerieFormModal'
 import { generateQrMatrix } from '../agenda/qrGenerator'
@@ -75,7 +75,7 @@ export interface Evento {
   recorrenciaExcecao?: boolean
 }
 
-export function EventosView() {
+export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: string) => void }) {
   const [eventos, setEventos] = useState<Evento[]>([])
   
   // Lookups
@@ -133,7 +133,91 @@ export function EventosView() {
   const [tipoEscopo, setTipoEscopo] = useState<'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | ''>('')
   
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
+  const [localRapidoOpen, setLocalRapidoOpen] = useState(false)
+  const [salvandoLocalRapido, setSalvandoLocalRapido] = useState(false)
+  const [localRapidoErro, setLocalRapidoErro] = useState<string | null>(null)
+  const [localRapido, setLocalRapido] = useState({
+    nome: '',
+    endereco: '',
+    numero: '',
+    bairro: '',
+    cidade: 'São Paulo',
+    uf: 'SP',
+    cep: '',
+  })
+  const [espacoRapidoOpen, setEspacoRapidoOpen] = useState(false)
+  const [salvandoEspacoRapido, setSalvandoEspacoRapido] = useState(false)
+  const [espacoRapidoErro, setEspacoRapidoErro] = useState<string | null>(null)
+  const [espacoRapidoNome, setEspacoRapidoNome] = useState('')
+  const localRapidoDialogRef = useRef<HTMLDivElement | null>(null)
+  const espacoRapidoDialogRef = useRef<HTMLDivElement | null>(null)
+  const localRapidoTriggerRef = useRef<HTMLElement | null>(null)
+  const espacoRapidoTriggerRef = useRef<HTMLElement | null>(null)
   const eventoFormConsultaSeq = useRef(0)
+
+  useEffect(() => {
+    if (!localRapidoOpen) return
+    const dialog = localRapidoDialogRef.current
+    const focaveis = dialog?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    focaveis?.[0]?.focus()
+
+    const aoTeclar = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !dialog) return
+      const itens = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ))
+      if (itens.length === 0) return
+      const primeiro = itens[0]
+      const ultimo = itens[itens.length - 1]
+      if (event.shiftKey && document.activeElement === primeiro) {
+        event.preventDefault()
+        ultimo.focus()
+      } else if (!event.shiftKey && document.activeElement === ultimo) {
+        event.preventDefault()
+        primeiro.focus()
+      }
+    }
+
+    document.addEventListener('keydown', aoTeclar)
+    return () => {
+      document.removeEventListener('keydown', aoTeclar)
+      if (localRapidoTriggerRef.current?.isConnected) localRapidoTriggerRef.current.focus()
+    }
+  }, [localRapidoOpen])
+
+  useEffect(() => {
+    if (!espacoRapidoOpen) return
+    const dialog = espacoRapidoDialogRef.current
+    const focaveis = dialog?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    focaveis?.[0]?.focus()
+
+    const aoTeclar = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !dialog) return
+      const itens = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ))
+      if (itens.length === 0) return
+      const primeiro = itens[0]
+      const ultimo = itens[itens.length - 1]
+      if (event.shiftKey && document.activeElement === primeiro) {
+        event.preventDefault()
+        ultimo.focus()
+      } else if (!event.shiftKey && document.activeElement === ultimo) {
+        event.preventDefault()
+        primeiro.focus()
+      }
+    }
+
+    document.addEventListener('keydown', aoTeclar)
+    return () => {
+      document.removeEventListener('keydown', aoTeclar)
+      if (espacoRapidoTriggerRef.current?.isConnected) espacoRapidoTriggerRef.current.focus()
+    }
+  }, [espacoRapidoOpen])
 
   const carregarDados = async () => {
     setLoading(true)
@@ -472,7 +556,12 @@ export function EventosView() {
         }
         await patchWithAuth(`/eventos/${eventoEditandoId}`, updatePayload)
       } else {
-        await postWithAuth('/eventos', parsed.data)
+        const criado = await postWithAuth<Evento>('/eventos', parsed.data)
+        fecharFormularioEvento()
+        if (onEventoCriado) {
+          onEventoCriado(criado.id)
+          return
+        }
       }
 
       fecharFormularioEvento()
@@ -485,6 +574,76 @@ export function EventosView() {
       }
     } finally {
       setSalvando(false)
+    }
+  }
+
+  const salvarLocalRapido = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const parsed = LocalCreate.safeParse({
+      nome: localRapido.nome,
+      endereco: localRapido.endereco,
+      numero: localRapido.numero,
+      bairro: localRapido.bairro || null,
+      cidade: localRapido.cidade,
+      uf: localRapido.uf,
+      cep: localRapido.cep || null,
+      complemento: null,
+      referencia: null,
+      latitude: null,
+      longitude: null,
+      urlMaps: null,
+      urlWaze: null,
+      ativo: true,
+    })
+    if (!parsed.success) {
+      setLocalRapidoErro(parsed.error.issues[0]?.message || 'Dados inválidos')
+      return
+    }
+
+    setSalvandoLocalRapido(true)
+    setLocalRapidoErro(null)
+    try {
+      const criado = await postWithAuth<Local>('/locais', parsed.data)
+      setLocais(atuais => [...atuais.filter(item => item.id !== criado.id), criado]
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
+      setFormData(atual => ({ ...atual, localId: criado.id, espacoId: '' }))
+      setLocalRapidoOpen(false)
+      setLocalRapido({ nome: '', endereco: '', numero: '', bairro: '', cidade: 'São Paulo', uf: 'SP', cep: '' })
+    } catch (err: unknown) {
+      setLocalRapidoErro(err instanceof Error ? err.message : 'Erro ao criar local')
+    } finally {
+      setSalvandoLocalRapido(false)
+    }
+  }
+
+  const salvarEspacoRapido = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.localId) return
+    const parsed = EspacoLocalCreate.safeParse({
+      localId: formData.localId,
+      nome: espacoRapidoNome,
+      descricao: null,
+      capacidade: null,
+      ativo: true,
+    })
+    if (!parsed.success) {
+      setEspacoRapidoErro(parsed.error.issues[0]?.message || 'Dados inválidos')
+      return
+    }
+
+    setSalvandoEspacoRapido(true)
+    setEspacoRapidoErro(null)
+    try {
+      const criado = await postWithAuth<EspacoLocal>('/espacos-locais', parsed.data)
+      setEspacos(atuais => [...atuais.filter(item => item.id !== criado.id), criado]
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
+      setFormData(atual => ({ ...atual, espacoId: criado.id }))
+      setEspacoRapidoOpen(false)
+      setEspacoRapidoNome('')
+    } catch (err: unknown) {
+      setEspacoRapidoErro(err instanceof Error ? err.message : 'Erro ao criar espaço')
+    } finally {
+      setSalvandoEspacoRapido(false)
     }
   }
 
@@ -792,7 +951,22 @@ export function EventosView() {
 
                     {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && (
                       <div>
-                        <label htmlFor="localId" className="block text-sm font-medium text-slate-700 mb-1">Local *</label>
+                        <div className="mb-1 flex items-center justify-between gap-3">
+                          <label htmlFor="localId" className="block text-sm font-medium text-slate-700">Local *</label>
+                          {!eventoEditandoId && (
+                            <button
+                              type="button"
+                              onClick={event => {
+                                localRapidoTriggerRef.current = event.currentTarget
+                                setLocalRapidoErro(null)
+                                setLocalRapidoOpen(true)
+                              }}
+                              className="text-xs font-semibold text-brand-700 hover:text-brand-900"
+                            >
+                              + Criar local sem sair
+                            </button>
+                          )}
+                        </div>
                         <select
                           id="localId"
                           value={formData.localId || ''}
@@ -810,7 +984,23 @@ export function EventosView() {
 
                     {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.localId && (
                       <div>
-                        <label htmlFor="espacoId" className="block text-sm font-medium text-slate-700 mb-1">Espaço</label>
+                        <div className="mb-1 flex items-center justify-between gap-3">
+                          <label htmlFor="espacoId" className="block text-sm font-medium text-slate-700">Espaço</label>
+                          {!eventoEditandoId && (
+                            <button
+                              type="button"
+                              onClick={event => {
+                                espacoRapidoTriggerRef.current = event.currentTarget
+                                setEspacoRapidoErro(null)
+                                setEspacoRapidoNome('')
+                                setEspacoRapidoOpen(true)
+                              }}
+                              className="text-xs font-semibold text-brand-700 hover:text-brand-900"
+                            >
+                              + Criar espaço sem sair
+                            </button>
+                          )}
+                        </div>
                         <select
                           id="espacoId"
                           value={formData.espacoId || ''}
@@ -1026,6 +1216,54 @@ export function EventosView() {
                   </div>
                 </>
               )}
+            </form>
+          </div>
+        </div>
+      )}
+
+      {localRapidoOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
+          <div ref={localRapidoDialogRef} role="dialog" aria-modal="true" aria-labelledby="local-rapido-title" className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <h3 id="local-rapido-title" className="font-semibold text-slate-900">Criar Local</h3>
+              <p className="mt-1 text-xs text-slate-500">O novo local será selecionado automaticamente no evento.</p>
+            </div>
+            <form onSubmit={salvarLocalRapido} className="space-y-3 p-5">
+              {localRapidoErro && <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{localRapidoErro}</p>}
+              <input autoFocus aria-label="Nome do novo local" placeholder="Nome *" value={localRapido.nome} onChange={e => setLocalRapido({ ...localRapido, nome: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+              <div className="grid grid-cols-[1fr_110px] gap-3">
+                <input aria-label="Endereço do novo local" placeholder="Endereço *" value={localRapido.endereco} onChange={e => setLocalRapido({ ...localRapido, endereco: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                <input aria-label="Número do novo local" placeholder="Número *" value={localRapido.numero} onChange={e => setLocalRapido({ ...localRapido, numero: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+              </div>
+              <input aria-label="Bairro do novo local" placeholder="Bairro" value={localRapido.bairro} onChange={e => setLocalRapido({ ...localRapido, bairro: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+              <div className="grid grid-cols-[1fr_80px] gap-3">
+                <input aria-label="Cidade do novo local" placeholder="Cidade *" value={localRapido.cidade} onChange={e => setLocalRapido({ ...localRapido, cidade: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                <input aria-label="UF do novo local" placeholder="UF *" maxLength={2} value={localRapido.uf} onChange={e => setLocalRapido({ ...localRapido, uf: e.target.value.toUpperCase() })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm uppercase" />
+              </div>
+              <input aria-label="CEP do novo local" placeholder="CEP" value={localRapido.cep} onChange={e => setLocalRapido({ ...localRapido, cep: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+              <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+                <button type="button" disabled={salvandoLocalRapido} onClick={() => setLocalRapidoOpen(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Voltar ao evento</button>
+                <button type="submit" disabled={salvandoLocalRapido} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{salvandoLocalRapido ? 'Criando...' : 'Criar e selecionar'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {espacoRapidoOpen && formData.localId && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
+          <div ref={espacoRapidoDialogRef} role="dialog" aria-modal="true" aria-labelledby="espaco-rapido-title" className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <h3 id="espaco-rapido-title" className="font-semibold text-slate-900">Criar Espaço</h3>
+              <p className="mt-1 text-xs text-slate-500">O novo espaço será selecionado automaticamente.</p>
+            </div>
+            <form onSubmit={salvarEspacoRapido} className="space-y-3 p-5">
+              {espacoRapidoErro && <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{espacoRapidoErro}</p>}
+              <input autoFocus aria-label="Nome do novo espaço" placeholder="Nome do espaço *" value={espacoRapidoNome} onChange={e => setEspacoRapidoNome(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+              <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+                <button type="button" disabled={salvandoEspacoRapido} onClick={() => setEspacoRapidoOpen(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Voltar ao evento</button>
+                <button type="submit" disabled={salvandoEspacoRapido} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{salvandoEspacoRapido ? 'Criando...' : 'Criar e selecionar'}</button>
+              </div>
             </form>
           </div>
         </div>
