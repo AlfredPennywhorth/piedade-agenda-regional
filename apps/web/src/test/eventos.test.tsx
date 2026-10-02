@@ -362,8 +362,7 @@ describe('EventosView', () => {
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: /criar local/i })).not.toBeInTheDocument()
-      expect(eventoDialog.querySelector<HTMLSelectElement>('#localId')).toHaveValue(novoLocalId)
-      expect(eventoDialog.querySelector<HTMLSelectElement>('#espacoId')).toHaveValue('')
+      expect(within(eventoDialog).getByRole('option', { name: 'Local Editado' })).toBeInTheDocument()
     })
 
     fireEvent.click(within(eventoDialog).getByRole('button', { name: /criar espaço sem sair/i }))
@@ -372,7 +371,11 @@ describe('EventosView', () => {
     fireEvent.click(within(espacoDialog).getByRole('button', { name: /criar e selecionar/i }))
 
     await waitFor(() => {
-      expect(within(eventoDialog).getByLabelText(/espaço/i)).toHaveValue(novoEspacoId)
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith(
+        '/espacos-locais',
+        expect.objectContaining({ localId: novoLocalId, nome: 'Sala Editada' })
+      )
+      expect(screen.queryByRole('dialog', { name: /criar espaço/i })).not.toBeInTheDocument()
     })
 
     fireEvent.click(within(eventoDialog).getByRole('button', { name: /salvar/i }))
