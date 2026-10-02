@@ -710,6 +710,15 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       }
             if (apenasAlteracaoOperacionalSerie(parsed.changes as Record<string, unknown>)) {
         const agendaAviso = await criarAvisoAlteracaoOperacionalSerie(db, existingSerie, serieBData)
+
+        if (!agendaAviso) {
+          return c.json({
+            message: 'Nenhuma alteração operacional efetiva foi detectada',
+            novaSerieId: null,
+            reconfirmacaoSolicitada: false,
+          })
+        }
+
         const splitNaPrimeiraOcorrencia = newStartDateStr <= existingSerie.dataInicio
         const pivotDate = new Date(`${newStartDateStr}T12:00:00Z`)
         pivotDate.setTime(pivotDate.getTime() - (1000 * 60 * 60 * 24))
