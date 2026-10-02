@@ -64,6 +64,8 @@ export function SerieFormModal({
   const [salvandoEspacoRapido, setSalvandoEspacoRapido] = useState(false)
   const [espacoRapidoErro, setEspacoRapidoErro] = useState<string | null>(null)
   const [espacoRapidoNome, setEspacoRapidoNome] = useState('')
+  const localRapidoDialogRef = useRef<HTMLDivElement | null>(null)
+  const espacoRapidoDialogRef = useRef<HTMLDivElement | null>(null)
   const localRapidoTriggerRef = useRef<HTMLElement | null>(null)
   const espacoRapidoTriggerRef = useRef<HTMLElement | null>(null)
 
@@ -88,6 +90,70 @@ export function SerieFormModal({
       setEspacoRapidoNome('')
     }
   }, [isOpen, initialData, initialTipoEscopo])
+
+  useEffect(() => {
+    if (!localRapidoOpen) return
+    const dialog = localRapidoDialogRef.current
+    const focaveis = dialog?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    focaveis?.[0]?.focus()
+
+    const aoTeclar = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !dialog) return
+      const itens = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ))
+      if (itens.length === 0) return
+      const primeiro = itens[0]
+      const ultimo = itens[itens.length - 1]
+      if (event.shiftKey && document.activeElement === primeiro) {
+        event.preventDefault()
+        ultimo.focus()
+      } else if (!event.shiftKey && document.activeElement === ultimo) {
+        event.preventDefault()
+        primeiro.focus()
+      }
+    }
+
+    document.addEventListener('keydown', aoTeclar)
+    return () => {
+      document.removeEventListener('keydown', aoTeclar)
+      if (localRapidoTriggerRef.current?.isConnected) localRapidoTriggerRef.current.focus()
+    }
+  }, [localRapidoOpen])
+
+  useEffect(() => {
+    if (!espacoRapidoOpen) return
+    const dialog = espacoRapidoDialogRef.current
+    const focaveis = dialog?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    focaveis?.[0]?.focus()
+
+    const aoTeclar = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !dialog) return
+      const itens = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ))
+      if (itens.length === 0) return
+      const primeiro = itens[0]
+      const ultimo = itens[itens.length - 1]
+      if (event.shiftKey && document.activeElement === primeiro) {
+        event.preventDefault()
+        ultimo.focus()
+      } else if (!event.shiftKey && document.activeElement === ultimo) {
+        event.preventDefault()
+        primeiro.focus()
+      }
+    }
+
+    document.addEventListener('keydown', aoTeclar)
+    return () => {
+      document.removeEventListener('keydown', aoTeclar)
+      if (espacoRapidoTriggerRef.current?.isConnected) espacoRapidoTriggerRef.current.focus()
+    }
+  }, [espacoRapidoOpen])
 
   if (!isOpen) return null
 
@@ -291,7 +357,7 @@ export function SerieFormModal({
     setErro(null)
     
     if (formData.espacoId) {
-      const espacoSelecionado = espacos.find(espaco => espaco.id === formData.espacoId)
+      const espacoSelecionado = espacosDisponiveis.find(espaco => espaco.id === formData.espacoId)
       if (!espacoSelecionado || !espacoSelecionado.ativo) {
         setErrosForm({
           espacoId: espacoSelecionado
@@ -823,7 +889,7 @@ export function SerieFormModal({
 
         {localRapidoOpen && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
-            <div role="dialog" aria-modal="true" aria-labelledby="serie-local-rapido-title" className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+            <div ref={localRapidoDialogRef} role="dialog" aria-modal="true" aria-labelledby="serie-local-rapido-title" className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
               <div className="border-b border-slate-200 px-5 py-4">
                 <h3 id="serie-local-rapido-title" className="font-semibold text-slate-900">Criar Local</h3>
                 <p className="mt-1 text-xs text-slate-500">O novo local será selecionado automaticamente na série.</p>
@@ -860,7 +926,7 @@ export function SerieFormModal({
 
         {espacoRapidoOpen && formData.localId && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
-            <div role="dialog" aria-modal="true" aria-labelledby="serie-espaco-rapido-title" className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <div ref={espacoRapidoDialogRef} role="dialog" aria-modal="true" aria-labelledby="serie-espaco-rapido-title" className="w-full max-w-md rounded-2xl bg-white shadow-xl">
               <div className="border-b border-slate-200 px-5 py-4">
                 <h3 id="serie-espaco-rapido-title" className="font-semibold text-slate-900">Criar Espaço</h3>
                 <p className="mt-1 text-xs text-slate-500">O novo espaço será selecionado automaticamente na série.</p>
