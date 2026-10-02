@@ -453,7 +453,7 @@ export function SeriesView() {
               return
             }
 
-            const normalizar = (valor: unknown) => valor === '' ? null : valor
+            const normalizar = (valor: unknown) => valor === '' || valor === undefined ? null : valor
             const changes = Object.fromEntries(
               Object.entries(data).filter(([campo, valor]) =>
                 normalizar(valor) !== normalizar(original[campo as keyof SerieRecorrencia])
