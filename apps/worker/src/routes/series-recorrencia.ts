@@ -708,7 +708,118 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       if (!(await podeGerenciarEntidade(c, serieBData))) {
         return c.json({ error: 'Acesso não autorizado para mover a série para este escopo', code: 'FORBIDDEN' }, 403)
       }
-      
+            if (apenasAlteracaoOperacionalSerie(parsed.changes as Record<string, unknown>)) {
+        const agendaAviso = await criarAvisoAlteracaoOperacionalSerie(db, existingSerie, serieBData)
+        const splitNaPrimeiraOcorrencia = newStartDateStr <= existingSerie.dataInicio
+        const pivotDate = new Date(`${newStartDateStr}T12:00:00Z`)
+        pivotDate.setTime(pivotDate.getTime() - (1000 * 60 * 60 * 24))
+        const oldEndDateStr = pivotDate.toISOString().split('T')[0]
+
+        await executeAtomic(db, (qdb) => {
+          const queries = []
+
+          queries.push(
+            qdb.update(seriesRecorrencia)
+              .set(
+                splitNaPrimeiraOcorrencia
+                  ? { ativo: false, updatedAt: nowIso }
+                  : { dataFim: oldEndDateStr, updatedAt: nowIso }
+              )
+              .where(eq(seriesRecorrencia.id, serieId))
+          )
+
+          queries.push(
+            qdb.insert(seriesRecorrencia).values({
+              id: newSerieId,
+              ...serieBData,
+              createdAt: nowIso,
+              updatedAt: nowIso,
+            })
+          )
+
+          // Exceções futuras continuam como exceções e são apenas movidas para a nova fatia.
+          queries.push(
+            qdb.update(eventos)
+              .set({ serieRecorrenciaId: newSerieId, updatedAt: nowIso })
+              .where(and(
+                eq(eventos.serieRecorrenciaId, serieId),
+                gte(
+                  sql`COALESCE(${eventos.recorrenciaOrigemInicioEm}, ${eventos.inicioEm})`,
+                  pivotDateIso
+                ),
+                eq(eventos.recorrenciaExcecao, true)
+              ))
+          )
+
+          // Ocorrências normais são atualizadas no lugar: IDs e convocações permanecem.
+          queries.push(
+            qdb.update(eventos)
+              .set({
+                modalidade: serieBData.modalidade,
+                localId: serieBData.localId,
+                espacoId: serieBData.espacoId,
+                urlOnline: serieBData.urlOnline,
+                serieRecorrenciaId: newSerieId,
+                agendaRevisao: nowIso,
+                agendaAviso,
+                updatedAt: nowIso,
+              })
+              .where(and(
+                eq(eventos.serieRecorrenciaId, serieId),
+                gte(
+                  sql`COALESCE(${eventos.recorrenciaOrigemInicioEm}, ${eventos.inicioEm})`,
+                  pivotDateIso
+                ),
+                eq(eventos.recorrenciaExcecao, false),
+                eq(eventos.ativo, true)
+              ))
+          )
+
+          // Se o pivô for exceção, aplicar a mudança material também nele.
+          if (existingEvent.recorrenciaExcecao) {
+            queries.push(
+              qdb.update(eventos)
+                .set({
+                  modalidade: serieBData.modalidade,
+                  localId: serieBData.localId,
+                  espacoId: serieBData.espacoId,
+                  urlOnline: serieBData.urlOnline,
+                  agendaRevisao: nowIso,
+                  agendaAviso,
+                  updatedAt: nowIso,
+                })
+                .where(eq(eventos.id, existingEvent.id))
+            )
+          }
+
+          const escopo = extrairEscopoDoEvento(existingSerie)
+          queries.push(criarAuditQuery(qdb, {
+            acao: 'SERIE_RECORRENCIA_DIVIDIDA',
+            atorMembroId: c.get('membroId') || null,
+            recursoTipo: 'SERIE_RECORRENCIA',
+            recursoId: serieId,
+            escopoTipo: escopo.escopoTipo,
+            escopoId: escopo.escopoId,
+            contexto: {
+              updateMode: 'THIS_AND_FUTURE',
+              novaSerieId: newSerieId,
+              fromEventId: parsed.fromEventId,
+              semRegeneracao: true,
+              reconfirmacaoSolicitada: Boolean(agendaAviso),
+              agendaAviso,
+            },
+          }))
+          return queries
+        })
+
+        return c.json({
+          message: 'Este e os próximos eventos atualizados sem regeneração',
+          novaSerieId: newSerieId,
+          reconfirmacaoSolicitada: Boolean(agendaAviso),
+        })
+      }
+
+
       // Série A (Antiga) termina no dia anterior a novaStartDateStr
       // Para saber isso facilmente no mesmo timezone de SP: 
       // Em Javascript local é perigoso por causa de fusos da máquina.
