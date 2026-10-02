@@ -688,10 +688,7 @@ describe('EventosView', () => {
       expect(apiClient.patchWithAuth).toHaveBeenCalledWith(`/series-recorrencia/${SERIE_ID}`, expect.objectContaining({
         updateMode: 'THIS_AND_FUTURE',
         fromEventId: mockEventoRecorrente.id,
-        changes: expect.objectContaining({
-          titulo: 'Série Editada',
-          frequencia: 'DIARIA'
-        })
+        changes: { titulo: 'Série Editada' }
       }))
     })
   })
