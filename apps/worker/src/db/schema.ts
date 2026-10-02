@@ -587,6 +587,7 @@ export const eventos = sqliteTable(
     agendaRevisao: text('agenda_revisao')
       .notNull()
       .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+    agendaAviso: text('agenda_aviso'),
     localId: text('local_id').references(() => locais.id),
     espacoId: text('espaco_id').references(() => espacosLocal.id),
     urlOnline: text('url_online'),
