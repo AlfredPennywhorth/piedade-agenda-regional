@@ -389,7 +389,7 @@ describe('SeriesView', () => {
     fireEvent.click(abrirLocal)
 
     const localRapido = await screen.findByRole('dialog', { name: /criar local/i })
-    const primeiroLocal = within(localRapido).getByLabelText('Nome do novo local')
+    const primeiroLocal = within(localRapido).getByLabelText('CEP do novo local')
     await waitFor(() => expect(primeiroLocal).toHaveFocus())
 
     const ultimoLocal = within(localRapido).getByRole('button', { name: /criar e selecionar/i })
