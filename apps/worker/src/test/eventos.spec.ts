@@ -787,4 +787,32 @@ describe('Eventos API (S04)', () => {
     expect(convocacaoPersistida).toMatchObject({ status: 'PUBLICADA', ativo: true })
   })
 
+  it('24. não permite alterar evento já encerrado', async () => {
+    const regionalId = await createRegional()
+    const eventoId = crypto.randomUUID()
+
+    await db.insert(eventos).values({
+      id: eventoId,
+      titulo: 'Evento histórico',
+      modalidade: 'ONLINE',
+      inicioEm: '2020-01-01T10:00:00.000Z',
+      fimEm: '2020-01-01T11:00:00.000Z',
+      urlOnline: 'https://meet.google.com/historico',
+      regionalId,
+      ativo: true,
+    })
+
+    const res = await req(`/api/v1/eventos/${eventoId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ titulo: 'Evento histórico alterado' }),
+    })
+
+    expect(res.status).toBe(409)
+    expect(await res.json()).toMatchObject({ code: 'EVENTO_PASSADO_IMUTAVEL' })
+
+    const persistido = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
+    expect(persistido?.titulo).toBe('Evento histórico')
+  })
+
 })
