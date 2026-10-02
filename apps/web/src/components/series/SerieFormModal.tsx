@@ -896,7 +896,16 @@ export function SerieFormModal({
               </div>
               <form onSubmit={salvarLocalRapido} className="space-y-3 p-5">
                 {localRapidoErro && <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{localRapidoErro}</p>}
-                <input autoFocus aria-label="Nome do novo local" placeholder="Nome *" value={localRapido.nome} onChange={e => setLocalRapido({ ...localRapido, nome: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                <div>
+                  <input autoFocus aria-label="CEP do novo local" placeholder="CEP" value={localRapido.cep} onChange={e => handleCepRapidoChange(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                  <p className="mt-1 text-xs text-slate-500">Informe o CEP primeiro para preencher o endereço automaticamente.</p>
+                </div>
+                {(consultandoCepRapido || cepRapidoMensagem) && (
+                  <p role={cepRapidoErro ? 'alert' : undefined} className={`text-xs ${cepRapidoErro ? 'text-red-700' : 'text-slate-500'}`}>
+                    {consultandoCepRapido ? 'Consultando CEP...' : cepRapidoMensagem}
+                  </p>
+                )}
+                <input aria-label="Nome do novo local" placeholder="Nome *" value={localRapido.nome} onChange={e => setLocalRapido({ ...localRapido, nome: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
                 <div className="grid grid-cols-[1fr_110px] gap-3">
                   <input aria-label="Endereço do novo local" placeholder="Endereço *" value={localRapido.endereco} onChange={e => setLocalRapido({ ...localRapido, endereco: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
                   <input aria-label="Número do novo local" placeholder="Número *" value={localRapido.numero} onChange={e => setLocalRapido({ ...localRapido, numero: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
@@ -906,12 +915,6 @@ export function SerieFormModal({
                   <input aria-label="Cidade do novo local" placeholder="Cidade *" value={localRapido.cidade} onChange={e => setLocalRapido({ ...localRapido, cidade: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
                   <input aria-label="UF do novo local" placeholder="UF *" maxLength={2} value={localRapido.uf} onChange={e => setLocalRapido({ ...localRapido, uf: e.target.value.toUpperCase() })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm uppercase" />
                 </div>
-                <input aria-label="CEP do novo local" placeholder="CEP" value={localRapido.cep} onChange={e => handleCepRapidoChange(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
-                {(consultandoCepRapido || cepRapidoMensagem) && (
-                  <p role={cepRapidoErro ? 'alert' : undefined} className={`text-xs ${cepRapidoErro ? 'text-red-700' : 'text-slate-500'}`}>
-                    {consultandoCepRapido ? 'Consultando CEP...' : cepRapidoMensagem}
-                  </p>
-                )}
                 <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
                   <button type="button" disabled={salvandoLocalRapido || consultandoCepRapido} onClick={() => {
                     fecharLocalRapido()
