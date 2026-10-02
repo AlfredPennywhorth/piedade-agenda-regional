@@ -57,6 +57,13 @@ const MOCK_LOOKUPS = {
 
 describe('SeriesView', () => {
   beforeEach(() => {
+    vi.mocked(apiClient.postWithAuth).mockImplementation(async (url) => {
+      if (url === '/espacos-locais') {
+        return { id: novoEspacoId, localId, nome: 'Sala Nova', ativo: true }
+      }
+      return {}
+    })
+
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/series-recorrencia') return MOCK_SERIES
       if (url === '/locais') return MOCK_LOOKUPS.locais
@@ -276,6 +283,7 @@ describe('SeriesView', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const localId = MOCK_LOOKUPS.locais[0].id
+    const novoEspacoId = '33333333-3333-4333-8333-333333333333'
     const seriePresencial = {
       ...MOCK_SERIES[0],
       modalidade: 'PRESENCIAL',
@@ -331,7 +339,82 @@ describe('SeriesView', () => {
     fireEvent.click(within(localRapido).getByRole('button', { name: /voltar à série/i }))
 
     fireEvent.click(criarEspaco)
-    expect(await screen.findByRole('dialog', { name: /criar espaço/i })).toBeInTheDocument()
+    const espacoRapido = await screen.findByRole('dialog', { name: /criar espaço/i })
+    fireEvent.change(within(espacoRapido).getByLabelText('Nome do novo espaço'), {
+      target: { value: 'Sala Nova' },
+    })
+    fireEvent.click(within(espacoRapido).getByRole('button', { name: /criar e selecionar/i }))
+
+    await waitFor(() => {
+      expect(within(dialog).getByLabelText('Espaço')).toHaveValue(novoEspacoId)
+    })
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar série/i }))
+
+    expect(await screen.findByRole('dialog', { name: 'Confirmar Edição de Série' })).toBeInTheDocument()
+  })
+
+  it('deve conter e restaurar foco nos diálogos rápidos da série', async () => {
+    const localId = MOCK_LOOKUPS.locais[0].id
+    const seriePresencial = {
+      ...MOCK_SERIES[0],
+      modalidade: 'PRESENCIAL',
+      localId,
+      espacoId: null,
+      urlOnline: null,
+    }
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/series-recorrencia') return [seriePresencial]
+      if (url === '/locais') return MOCK_LOOKUPS.locais
+      if (url === '/espacos-locais?ativo=true') return []
+      if (url === '/membros') return MOCK_LOOKUPS.membros
+      if (url === '/regionais') return MOCK_LOOKUPS.regionais
+      if (url === '/administracoes') return MOCK_LOOKUPS.administracoes
+      if (url === '/setores') return MOCK_LOOKUPS.setores
+      if (url === '/casas') return MOCK_LOOKUPS.casas
+      if (url === '/grupos-trabalho') return MOCK_LOOKUPS.gruposTrabalho
+      return []
+    })
+
+    render(<SeriesView />)
+    await screen.findByText('Reunião Semanal')
+    fireEvent.click(screen.getByText('Editar'))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Editar Série de Recorrência' })
+    await waitFor(() => expect(within(dialog).getByLabelText(/Local \*/i)).toHaveValue(localId))
+
+    const abrirLocal = within(dialog).getByRole('button', { name: /criar local sem sair/i })
+    abrirLocal.focus()
+    fireEvent.click(abrirLocal)
+
+    const localRapido = await screen.findByRole('dialog', { name: /criar local/i })
+    const primeiroLocal = within(localRapido).getByLabelText('Nome do novo local')
+    await waitFor(() => expect(primeiroLocal).toHaveFocus())
+
+    const ultimoLocal = within(localRapido).getByRole('button', { name: /criar e selecionar/i })
+    ultimoLocal.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(primeiroLocal).toHaveFocus()
+
+    fireEvent.click(within(localRapido).getByRole('button', { name: /voltar à série/i }))
+    await waitFor(() => expect(abrirLocal).toHaveFocus())
+
+    const abrirEspaco = within(dialog).getByRole('button', { name: /criar espaço sem sair/i })
+    abrirEspaco.focus()
+    fireEvent.click(abrirEspaco)
+
+    const espacoRapido = await screen.findByRole('dialog', { name: /criar espaço/i })
+    const primeiroEspaco = within(espacoRapido).getByLabelText('Nome do novo espaço')
+    await waitFor(() => expect(primeiroEspaco).toHaveFocus())
+
+    const ultimoEspaco = within(espacoRapido).getByRole('button', { name: /criar e selecionar/i })
+    ultimoEspaco.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(primeiroEspaco).toHaveFocus()
+
+    fireEvent.click(within(espacoRapido).getByRole('button', { name: /voltar à série/i }))
+    await waitFor(() => expect(abrirEspaco).toHaveFocus())
   })
 
   it('deve mostrar espaço histórico inativo e exigir substituição antes de editar a série', async () => {
