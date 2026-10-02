@@ -430,12 +430,12 @@ describe('Series Recorrencia API (S05)', () => {
     const postRes = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2026-09-01', dataFim: '2026-09-10' })
+      body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2099-09-01', dataFim: '2099-09-10' })
     })
     const serieId = (await postRes.json()).serie.id
     
     const evs = db.select().from(eventos).all()
-    const evTarget = evs.find((e: any) => e.inicioEm.includes('2026-09-06')) // Ocorrência do dia 06
+    const evTarget = evs.find((e: any) => e.inicioEm.includes('2099-09-06')) // Ocorrência do dia 06
     
     const patchRes = await req(`/api/v1/series-recorrencia/${serieId}`, {
       method: 'PATCH',
@@ -466,6 +466,44 @@ describe('Series Recorrencia API (S05)', () => {
     expect(novasAtivas[0].titulo).toBe('Novo Título Futuro')
     const velhasInativas = oldEvs.filter((e:any) => !e.ativo)
     expect(velhasInativas.length).toBe(5) // não apagou fisicamente
+  })
+
+  it('19.1 THIS_AND_FUTURE rejeita ocorrência pivô já encerrada', async () => {
+    const regionalId = await createRegional()
+    const postRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        regionalId,
+        dataInicio: '2020-09-01',
+        dataFim: '2020-09-03',
+      })
+    })
+    const { serie } = await postRes.json()
+    const ocorrencias = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    const pivot = ocorrencias[1]
+
+    const res = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'THIS_AND_FUTURE',
+        fromEventId: pivot.id,
+        changes: { titulo: 'Não deve reescrever histórico' }
+      })
+    })
+
+    expect(res.status).toBe(409)
+    expect(await res.json()).toMatchObject({ code: 'EVENTO_PASSADO_IMUTAVEL' })
+
+    const persistidas = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    expect(persistidas.every((item: any) => item.ativo)).toBe(true)
+    expect(db.select().from(seriesRecorrencia).all()).toHaveLength(1)
   })
 
   describe('Regressivos THIS (via /api/v1/series-recorrencia)', () => {
