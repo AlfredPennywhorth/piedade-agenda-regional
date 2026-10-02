@@ -161,8 +161,7 @@ describe('EventosView', () => {
     fireEvent.click(within(espacoDialog).getByRole('button', { name: /criar e selecionar/i }))
 
     await waitFor(() => {
-      const dialogAtual = screen.getByRole('dialog', { name: /editar evento/i })
-      expect(dialogAtual.querySelector<HTMLSelectElement>('#espacoId')).toHaveValue(novoEspacoId)
+      expect(within(eventoDialog).getByLabelText(/espaço/i)).toHaveValue(novoEspacoId)
     })
   })
 
@@ -363,7 +362,10 @@ describe('EventosView', () => {
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: /criar local/i })).not.toBeInTheDocument()
-      expect(within(eventoDialog).getByRole('option', { name: 'Local Editado' })).toBeInTheDocument()
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith(
+        '/locais',
+        expect.objectContaining({ nome: 'Local Editado' })
+      )
     })
 
     fireEvent.click(within(eventoDialog).getByRole('button', { name: /criar espaço sem sair/i }))
