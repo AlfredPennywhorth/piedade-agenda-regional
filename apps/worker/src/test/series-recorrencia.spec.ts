@@ -702,6 +702,90 @@ describe('Series Recorrencia API (S05)', () => {
     expect(persistido.titulo).toBe(original.titulo)
   })
 
+  it('24.5a ALL altera Local sem regenerar ocorrência com convocação PUBLICADA', async () => {
+    const regionalId = await createRegional()
+    const localAnteriorId = crypto.randomUUID()
+    const localNovoId = crypto.randomUUID()
+
+    await db.insert(locais).values({
+      id: localAnteriorId,
+      nome: 'Local Anterior',
+      endereco: 'Rua A',
+      numero: '10',
+      cidade: 'São Paulo',
+      uf: 'SP',
+      ativo: true,
+    }).run()
+    await db.insert(locais).values({
+      id: localNovoId,
+      nome: 'Local Novo',
+      endereco: 'Rua B',
+      numero: '20',
+      cidade: 'São Paulo',
+      uf: 'SP',
+      ativo: true,
+    }).run()
+
+    const createRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        titulo: 'Série operacional',
+        modalidade: 'PRESENCIAL',
+        urlOnline: null,
+        localId: localAnteriorId,
+        regionalId,
+        dataInicio: '2099-12-01',
+        dataFim: '2099-12-03',
+      }),
+    })
+    expect(createRes.status).toBe(201)
+    const { serie } = await createRes.json()
+
+    const antes = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    const idsAntes = antes.map((item: any) => item.id).sort()
+    const original = antes[0]
+
+    await db.insert(convocacoes).values({
+      id: crypto.randomUUID(),
+      eventoId: original.id,
+      status: 'PUBLICADA',
+      publicadaEm: new Date().toISOString(),
+      ativo: true,
+    })
+
+    const atualizar = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'ALL',
+        changes: { localId: localNovoId },
+      }),
+    })
+
+    expect(atualizar.status).toBe(200)
+    expect(await atualizar.json()).toMatchObject({ reconfirmacaoSolicitada: true })
+
+    const depois = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    expect(depois.map((item: any) => item.id).sort()).toEqual(idsAntes)
+    expect(depois.filter((item: any) => item.ativo)).toHaveLength(3)
+
+    const persistido = depois.find((item: any) => item.id === original.id)
+    expect(persistido.localId).toBe(localNovoId)
+    expect(persistido.agendaAviso).toContain('Local Anterior')
+    expect(persistido.agendaAviso).toContain('Local Novo')
+
+    const convocacaoPersistida = db.select().from(convocacoes)
+      .where(eq(convocacoes.eventoId, original.id))
+      .get()
+    expect(convocacaoPersistida.status).toBe('PUBLICADA')
+  })
+
   it('24.5.1 impede criar convocação ativa para ocorrência inativada', async () => {
     const regionalId = await createRegional()
     const createRes = await req('/api/v1/series-recorrencia', {
