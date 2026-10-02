@@ -57,13 +57,6 @@ const MOCK_LOOKUPS = {
 
 describe('SeriesView', () => {
   beforeEach(() => {
-    vi.mocked(apiClient.postWithAuth).mockImplementation(async (url) => {
-      if (url === '/espacos-locais') {
-        return { id: novoEspacoId, localId, nome: 'Sala Nova', ativo: true }
-      }
-      return {}
-    })
-
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/series-recorrencia') return MOCK_SERIES
       if (url === '/locais') return MOCK_LOOKUPS.locais
@@ -291,6 +284,13 @@ describe('SeriesView', () => {
       espacoId: null,
       urlOnline: null,
     }
+
+    vi.mocked(apiClient.postWithAuth).mockImplementation(async (url) => {
+      if (url === '/espacos-locais') {
+        return { id: novoEspacoId, localId, nome: 'Sala Nova', ativo: true }
+      }
+      return {}
+    })
 
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/series-recorrencia') return [seriePresencial]
