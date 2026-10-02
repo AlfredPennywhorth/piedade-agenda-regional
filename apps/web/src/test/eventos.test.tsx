@@ -688,10 +688,7 @@ describe('EventosView', () => {
       expect(apiClient.patchWithAuth).toHaveBeenCalledWith(`/series-recorrencia/${SERIE_ID}`, expect.objectContaining({
         updateMode: 'THIS_AND_FUTURE',
         fromEventId: mockEventoRecorrente.id,
-        changes: expect.objectContaining({
-          titulo: 'Série Editada',
-          frequencia: 'DIARIA'
-        })
+        changes: { titulo: 'Série Editada' }
       }))
     })
   })
@@ -725,6 +722,9 @@ describe('EventosView', () => {
       expect(within(formDialog).getByLabelText(/título/i)).toHaveValue('Reunião Recorrente')
     })
 
+    fireEvent.change(within(formDialog).getByLabelText(/título/i), {
+      target: { value: 'Reunião Recorrente com erro' }
+    })
     fireEvent.click(getByRole('button', { name: /salvar série/i }))
 
     const confirmDialog = await screen.findByRole('dialog', { name: /confirmar edição/i })
