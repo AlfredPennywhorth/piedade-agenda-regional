@@ -57,18 +57,6 @@ const MOCK_LOOKUPS = {
 
 describe('SeriesView', () => {
   beforeEach(() => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        cep: '03127-001',
-        logradouro: 'Rua Ibitirama',
-        bairro: 'Vila Prudente',
-        localidade: 'São Paulo',
-        uf: 'SP',
-      }),
-    })
-    vi.stubGlobal('fetch', fetchMock)
-
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/series-recorrencia') return MOCK_SERIES
       if (url === '/locais') return MOCK_LOOKUPS.locais
@@ -275,6 +263,18 @@ describe('SeriesView', () => {
   })
 
   it('deve oferecer cadastro rápido de Local e Espaço ao editar série presencial', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        cep: '03127-001',
+        logradouro: 'Rua Ibitirama',
+        bairro: 'Vila Prudente',
+        localidade: 'São Paulo',
+        uf: 'SP',
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
     const localId = MOCK_LOOKUPS.locais[0].id
     const seriePresencial = {
       ...MOCK_SERIES[0],
