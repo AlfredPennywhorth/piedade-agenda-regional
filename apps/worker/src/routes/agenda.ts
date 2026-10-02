@@ -321,6 +321,8 @@ agendaRouter.get('/', async (c) => {
           resposta: record.rsvp.resposta,
           justificativa: record.rsvp.justificativa,
           periodosParticipacao: record.rsvp.periodosParticipacao,
+          reconfirmacaoPendente:
+            new Date(record.rsvp.atualizadoEm).getTime() < new Date(record.evento.agendaRevisao).getTime(),
         } : null,
         checkin: record.checkin ? {
           id: record.checkin.id,
