@@ -12,6 +12,7 @@ export interface AgendaItem {
     possuiTarde?: boolean
     possuiNoite?: boolean
     refeicoesOferecidas?: string[]
+    agendaAviso?: string | null
   }
   convocacao: {
     id: string
@@ -37,6 +38,7 @@ export interface AgendaItem {
     resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI'
     justificativa?: string | null
     periodosParticipacao?: string[] | null
+    reconfirmacaoPendente?: boolean
   } | null
   conflito?: {
     tipo: 'SOBREPOSICAO' | 'PROXIMIDADE'
