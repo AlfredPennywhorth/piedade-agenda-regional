@@ -165,6 +165,97 @@ describe('EventosView', () => {
     })
   })
 
+  it('deve consultar CEP no cadastro rápido de Local do evento', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        cep: '03127-001',
+        logradouro: 'Rua Ibitirama',
+        bairro: 'Vila Prudente',
+        localidade: 'São Paulo',
+        uf: 'SP',
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    try {
+      render(<EventosView />)
+      await screen.findByText('Reunião Presencial')
+      fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+
+      const eventoDialog = await screen.findByRole('dialog', { name: /novo evento/i })
+      fireEvent.click(within(eventoDialog).getByRole('button', { name: /criar local sem sair/i }))
+
+      const localDialog = await screen.findByRole('dialog', { name: /criar local/i })
+      fireEvent.change(within(localDialog).getByLabelText('CEP do novo local'), {
+        target: { value: '03127001' },
+      })
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith(
+          'https://viacep.com.br/ws/03127001/json/',
+          expect.objectContaining({ signal: expect.anything() })
+        )
+        expect(within(localDialog).getByLabelText('Endereço do novo local')).toHaveValue('Rua Ibitirama')
+        expect(within(localDialog).getByLabelText('Bairro do novo local')).toHaveValue('Vila Prudente')
+        expect(within(localDialog).getByLabelText('Cidade do novo local')).toHaveValue('São Paulo')
+        expect(within(localDialog).getByLabelText('UF do novo local')).toHaveValue('SP')
+      })
+
+      expect(within(localDialog).getByText('Endereço preenchido automaticamente pelo CEP.')).toBeInTheDocument()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('deve permitir cancelar consulta de CEP e preservar preenchimento manual', async () => {
+    let resolver: ((value: any) => void) | undefined
+    const pendente = new Promise<any>(resolve => {
+      resolver = resolve
+    })
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(pendente))
+
+    try {
+      render(<EventosView />)
+      await screen.findByText('Reunião Presencial')
+      fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+
+      const eventoDialog = await screen.findByRole('dialog', { name: /novo evento/i })
+      fireEvent.click(within(eventoDialog).getByRole('button', { name: /criar local sem sair/i }))
+
+      const localDialog = await screen.findByRole('dialog', { name: /criar local/i })
+      fireEvent.change(within(localDialog).getByLabelText('CEP do novo local'), {
+        target: { value: '03127001' },
+      })
+
+      const usarManual = await within(localDialog).findByRole('button', { name: /usar endereço manualmente/i })
+      fireEvent.click(usarManual)
+
+      const endereco = within(localDialog).getByLabelText('Endereço do novo local')
+      fireEvent.change(endereco, { target: { value: 'Rua Digitada Manualmente' } })
+      expect(endereco).toHaveValue('Rua Digitada Manualmente')
+      expect(within(localDialog).getByText('Consulta de CEP cancelada. Preencha o endereço manualmente.')).toBeInTheDocument()
+
+      await act(async () => {
+        resolver?.({
+          ok: true,
+          json: async () => ({
+            cep: '03127-001',
+            logradouro: 'Rua ViaCEP',
+            bairro: 'Vila Prudente',
+            localidade: 'São Paulo',
+            uf: 'SP',
+          }),
+        })
+        await pendente
+      })
+
+      expect(endereco).toHaveValue('Rua Digitada Manualmente')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('deve conter o foco no modal rápido de Local e restaurá-lo ao fechar', async () => {
     render(<EventosView />)
     await screen.findByText('Reunião Presencial')

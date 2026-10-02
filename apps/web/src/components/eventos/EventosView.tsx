@@ -136,6 +136,11 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
   const [localRapidoOpen, setLocalRapidoOpen] = useState(false)
   const [salvandoLocalRapido, setSalvandoLocalRapido] = useState(false)
   const [localRapidoErro, setLocalRapidoErro] = useState<string | null>(null)
+  const [consultandoCepRapido, setConsultandoCepRapido] = useState(false)
+  const [cepRapidoMensagem, setCepRapidoMensagem] = useState<string | null>(null)
+  const [cepRapidoErro, setCepRapidoErro] = useState(false)
+  const cepRapidoConsultaSeq = useRef(0)
+  const cepRapidoAbortControllerRef = useRef<AbortController | null>(null)
   const [localRapido, setLocalRapido] = useState({
     nome: '',
     endereco: '',
@@ -577,8 +582,110 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     }
   }
 
+  const formatarCepRapido = (valor: string) => {
+    const digitos = valor.replace(/\D/g, '').slice(0, 8)
+    return digitos.length > 5 ? `${digitos.slice(0, 5)}-${digitos.slice(5)}` : digitos
+  }
+
+  const buscarCepRapido = async (cepInformado: string) => {
+    const cep = cepInformado.replace(/\D/g, '')
+    if (cep.length !== 8) return
+
+    cepRapidoAbortControllerRef.current?.abort()
+    const controller = new AbortController()
+    cepRapidoAbortControllerRef.current = controller
+    const seq = ++cepRapidoConsultaSeq.current
+    const timeout = window.setTimeout(() => controller.abort(), 8000)
+
+    setConsultandoCepRapido(true)
+    setCepRapidoMensagem(null)
+    setCepRapidoErro(false)
+
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, { signal: controller.signal })
+      if (!response.ok) throw new Error('Falha ao consultar CEP')
+
+      const data = await response.json() as {
+        cep?: string
+        logradouro?: string
+        bairro?: string
+        localidade?: string
+        uf?: string
+        erro?: boolean
+      }
+      if (seq !== cepRapidoConsultaSeq.current) return
+
+      if (data.erro) {
+        setCepRapidoMensagem('CEP não encontrado. Preencha o endereço manualmente.')
+        setCepRapidoErro(true)
+        return
+      }
+
+      setLocalRapido(atual => ({
+        ...atual,
+        cep: data.cep || formatarCepRapido(cep),
+        endereco: data.logradouro || atual.endereco,
+        bairro: data.bairro || atual.bairro,
+        cidade: data.localidade || atual.cidade,
+        uf: (data.uf || atual.uf).toUpperCase(),
+      }))
+      setCepRapidoMensagem('Endereço preenchido automaticamente pelo CEP.')
+    } catch {
+      if (seq !== cepRapidoConsultaSeq.current) return
+      setCepRapidoMensagem('Consulta de CEP encerrada. Você pode preencher o endereço manualmente.')
+      setCepRapidoErro(false)
+    } finally {
+      window.clearTimeout(timeout)
+      if (cepRapidoAbortControllerRef.current === controller) {
+        cepRapidoAbortControllerRef.current = null
+      }
+      if (seq === cepRapidoConsultaSeq.current) {
+        setConsultandoCepRapido(false)
+      }
+    }
+  }
+
+  const handleCepRapidoChange = (valor: string) => {
+    const cepFormatado = formatarCepRapido(valor)
+    setLocalRapido(atual => ({ ...atual, cep: cepFormatado }))
+    setCepRapidoMensagem(null)
+    setCepRapidoErro(false)
+
+    if (cepFormatado.replace(/\D/g, '').length === 8) {
+      void buscarCepRapido(cepFormatado)
+    } else {
+      cepRapidoAbortControllerRef.current?.abort()
+      cepRapidoAbortControllerRef.current = null
+      cepRapidoConsultaSeq.current += 1
+      setConsultandoCepRapido(false)
+    }
+  }
+
+  const cancelarConsultaCepRapido = () => {
+    cepRapidoAbortControllerRef.current?.abort()
+    cepRapidoAbortControllerRef.current = null
+    cepRapidoConsultaSeq.current += 1
+    setConsultandoCepRapido(false)
+    setCepRapidoMensagem('Consulta de CEP cancelada. Preencha o endereço manualmente.')
+    setCepRapidoErro(false)
+  }
+
+  const fecharLocalRapido = () => {
+    cepRapidoAbortControllerRef.current?.abort()
+    cepRapidoAbortControllerRef.current = null
+    cepRapidoConsultaSeq.current += 1
+    setConsultandoCepRapido(false)
+    setCepRapidoMensagem(null)
+    setCepRapidoErro(false)
+    setLocalRapidoOpen(false)
+  }
+
   const salvarLocalRapido = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (consultandoCepRapido) {
+      setCepRapidoMensagem('Aguarde a consulta do CEP terminar antes de criar o local.')
+      return
+    }
     const parsed = LocalCreate.safeParse({
       nome: localRapido.nome,
       endereco: localRapido.endereco,
@@ -607,7 +714,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       setLocais(atuais => [...atuais.filter(item => item.id !== criado.id), criado]
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
       setFormData(atual => ({ ...atual, localId: criado.id, espacoId: '' }))
-      setLocalRapidoOpen(false)
+      fecharLocalRapido()
       setLocalRapido({ nome: '', endereco: '', numero: '', bairro: '', cidade: 'São Paulo', uf: 'SP', cep: '' })
     } catch (err: unknown) {
       setLocalRapidoErro(err instanceof Error ? err.message : 'Erro ao criar local')
@@ -958,6 +1065,8 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                               onClick={event => {
                                 localRapidoTriggerRef.current = event.currentTarget
                                 setLocalRapidoErro(null)
+                                setCepRapidoMensagem(null)
+                                setCepRapidoErro(false)
                                 setLocalRapidoOpen(true)
                               }}
                               className="text-xs font-semibold text-brand-700 hover:text-brand-900"
@@ -1228,18 +1337,42 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
               {localRapidoErro && <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{localRapidoErro}</p>}
               <input autoFocus aria-label="Nome do novo local" placeholder="Nome *" value={localRapido.nome} onChange={e => setLocalRapido({ ...localRapido, nome: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
               <div className="grid grid-cols-[1fr_110px] gap-3">
-                <input aria-label="Endereço do novo local" placeholder="Endereço *" value={localRapido.endereco} onChange={e => setLocalRapido({ ...localRapido, endereco: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                <input aria-label="Endereço do novo local" placeholder="Endereço *" value={localRapido.endereco} onChange={e => {
+                  if (consultandoCepRapido) cancelarConsultaCepRapido()
+                  setLocalRapido({ ...localRapido, endereco: e.target.value })
+                }} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
                 <input aria-label="Número do novo local" placeholder="Número *" value={localRapido.numero} onChange={e => setLocalRapido({ ...localRapido, numero: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
               </div>
-              <input aria-label="Bairro do novo local" placeholder="Bairro" value={localRapido.bairro} onChange={e => setLocalRapido({ ...localRapido, bairro: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+              <input aria-label="Bairro do novo local" placeholder="Bairro" value={localRapido.bairro} onChange={e => {
+                if (consultandoCepRapido) cancelarConsultaCepRapido()
+                setLocalRapido({ ...localRapido, bairro: e.target.value })
+              }} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
               <div className="grid grid-cols-[1fr_80px] gap-3">
-                <input aria-label="Cidade do novo local" placeholder="Cidade *" value={localRapido.cidade} onChange={e => setLocalRapido({ ...localRapido, cidade: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
-                <input aria-label="UF do novo local" placeholder="UF *" maxLength={2} value={localRapido.uf} onChange={e => setLocalRapido({ ...localRapido, uf: e.target.value.toUpperCase() })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm uppercase" />
+                <input aria-label="Cidade do novo local" placeholder="Cidade *" value={localRapido.cidade} onChange={e => {
+                  if (consultandoCepRapido) cancelarConsultaCepRapido()
+                  setLocalRapido({ ...localRapido, cidade: e.target.value })
+                }} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                <input aria-label="UF do novo local" placeholder="UF *" maxLength={2} value={localRapido.uf} onChange={e => {
+                  if (consultandoCepRapido) cancelarConsultaCepRapido()
+                  setLocalRapido({ ...localRapido, uf: e.target.value.toUpperCase() })
+                }} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm uppercase" />
               </div>
-              <input aria-label="CEP do novo local" placeholder="CEP" value={localRapido.cep} onChange={e => setLocalRapido({ ...localRapido, cep: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+              <input aria-label="CEP do novo local" placeholder="CEP" value={localRapido.cep} onChange={e => handleCepRapidoChange(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+              {(consultandoCepRapido || cepRapidoMensagem) && (
+                <div className="flex items-center justify-between gap-3">
+                  <p role={cepRapidoErro ? 'alert' : undefined} className={`text-xs ${cepRapidoErro ? 'text-red-700' : 'text-slate-500'}`}>
+                    {consultandoCepRapido ? 'Consultando CEP...' : cepRapidoMensagem}
+                  </p>
+                  {consultandoCepRapido && (
+                    <button type="button" onClick={cancelarConsultaCepRapido} className="text-xs font-semibold text-brand-700 hover:text-brand-900">
+                      Usar endereço manualmente
+                    </button>
+                  )}
+                </div>
+              )}
               <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
-                <button type="button" disabled={salvandoLocalRapido} onClick={() => setLocalRapidoOpen(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Voltar ao evento</button>
-                <button type="submit" disabled={salvandoLocalRapido} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{salvandoLocalRapido ? 'Criando...' : 'Criar e selecionar'}</button>
+                <button type="button" disabled={salvandoLocalRapido} onClick={fecharLocalRapido} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Voltar ao evento</button>
+                <button type="submit" disabled={salvandoLocalRapido || consultandoCepRapido} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{salvandoLocalRapido ? 'Criando...' : consultandoCepRapido ? 'Consultando CEP...' : 'Criar e selecionar'}</button>
               </div>
             </form>
           </div>
