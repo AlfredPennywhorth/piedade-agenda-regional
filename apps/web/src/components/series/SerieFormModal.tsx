@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { SerieCreate, SerieCreateInput } from '@piedade/shared'
-import { ApiError } from '../../api/apiClient'
+import { useState, useEffect, useRef } from 'react'
+import { SerieCreate, SerieCreateInput, LocalCreate, EspacoLocalCreate } from '@piedade/shared'
+import { ApiError, postWithAuth } from '../../api/apiClient'
 
 export interface Lookups {
   locais: { id: string; nome: string }[]
@@ -41,8 +41,30 @@ export function SerieFormModal({
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState<boolean>(false)
+  const [locaisRapidos, setLocaisRapidos] = useState<{ id: string; nome: string }[]>([])
+  const [espacosRapidos, setEspacosRapidos] = useState<{ id: string; localId: string; nome: string; ativo: boolean }[]>([])
+  const [localRapidoOpen, setLocalRapidoOpen] = useState(false)
+  const [salvandoLocalRapido, setSalvandoLocalRapido] = useState(false)
+  const [localRapidoErro, setLocalRapidoErro] = useState<string | null>(null)
+  const [localRapido, setLocalRapido] = useState({
+    nome: '',
+    endereco: '',
+    numero: '',
+    bairro: '',
+    cidade: 'São Paulo',
+    uf: 'SP',
+    cep: '',
+  })
+  const [espacoRapidoOpen, setEspacoRapidoOpen] = useState(false)
+  const [salvandoEspacoRapido, setSalvandoEspacoRapido] = useState(false)
+  const [espacoRapidoErro, setEspacoRapidoErro] = useState<string | null>(null)
+  const [espacoRapidoNome, setEspacoRapidoNome] = useState('')
+  const localRapidoTriggerRef = useRef<HTMLElement | null>(null)
+  const espacoRapidoTriggerRef = useRef<HTMLElement | null>(null)
 
   const { locais, espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho } = lookups
+  const locaisDisponiveis = [...locais, ...locaisRapidos.filter(item => !locais.some(local => local.id === item.id))]
+  const espacosDisponiveis = [...espacos, ...espacosRapidos.filter(item => !espacos.some(espaco => espaco.id === item.id))]
 
   useEffect(() => {
     if (isOpen) {
@@ -51,6 +73,14 @@ export function SerieFormModal({
       setErrosForm({})
       setErro(null)
       setSalvando(false)
+      setLocaisRapidos([])
+      setEspacosRapidos([])
+      setLocalRapidoOpen(false)
+      setEspacoRapidoOpen(false)
+      setLocalRapidoErro(null)
+      setEspacoRapidoErro(null)
+      setLocalRapido({ nome: '', endereco: '', numero: '', bairro: '', cidade: 'São Paulo', uf: 'SP', cep: '' })
+      setEspacoRapidoNome('')
     }
   }, [isOpen, initialData, initialTipoEscopo])
 
@@ -86,6 +116,75 @@ export function SerieFormModal({
       diaMes: freq === 'MENSAL_DIA_FIXO' ? (prev.diaMes ?? 1) : null,
       posicaoSemanaMes: freq === 'MENSAL_POSICAO_SEMANA' ? (prev.posicaoSemanaMes ?? 1) : null
     }))
+  }
+
+  const salvarLocalRapido = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const parsed = LocalCreate.safeParse({
+      nome: localRapido.nome,
+      endereco: localRapido.endereco,
+      numero: localRapido.numero,
+      bairro: localRapido.bairro || null,
+      cidade: localRapido.cidade,
+      uf: localRapido.uf,
+      cep: localRapido.cep || null,
+      complemento: null,
+      referencia: null,
+      latitude: null,
+      longitude: null,
+      urlMaps: null,
+      urlWaze: null,
+      ativo: true,
+    })
+    if (!parsed.success) {
+      setLocalRapidoErro(parsed.error.issues[0]?.message || 'Dados inválidos')
+      return
+    }
+
+    setSalvandoLocalRapido(true)
+    setLocalRapidoErro(null)
+    try {
+      const criado = await postWithAuth<{ id: string; nome: string }>('/locais', parsed.data)
+      setLocaisRapidos(atuais => [...atuais.filter(item => item.id !== criado.id), criado])
+      setFormData(atual => ({ ...atual, localId: criado.id, espacoId: '' }))
+      setLocalRapidoOpen(false)
+      setLocalRapido({ nome: '', endereco: '', numero: '', bairro: '', cidade: 'São Paulo', uf: 'SP', cep: '' })
+    } catch (err: unknown) {
+      setLocalRapidoErro(err instanceof Error ? err.message : 'Erro ao criar local')
+    } finally {
+      setSalvandoLocalRapido(false)
+    }
+  }
+
+  const salvarEspacoRapido = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.localId) return
+
+    const parsed = EspacoLocalCreate.safeParse({
+      localId: formData.localId,
+      nome: espacoRapidoNome,
+      descricao: null,
+      capacidade: null,
+      ativo: true,
+    })
+    if (!parsed.success) {
+      setEspacoRapidoErro(parsed.error.issues[0]?.message || 'Dados inválidos')
+      return
+    }
+
+    setSalvandoEspacoRapido(true)
+    setEspacoRapidoErro(null)
+    try {
+      const criado = await postWithAuth<{ id: string; localId: string; nome: string; ativo: boolean }>('/espacos-locais', parsed.data)
+      setEspacosRapidos(atuais => [...atuais.filter(item => item.id !== criado.id), criado])
+      setFormData(atual => ({ ...atual, espacoId: criado.id }))
+      setEspacoRapidoOpen(false)
+      setEspacoRapidoNome('')
+    } catch (err: unknown) {
+      setEspacoRapidoErro(err instanceof Error ? err.message : 'Erro ao criar espaço')
+    } finally {
+      setSalvandoEspacoRapido(false)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -156,6 +255,7 @@ export function SerieFormModal({
   }
 
   return (
+    <>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in overflow-y-auto">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-form-title" className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden my-8">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
@@ -356,7 +456,20 @@ export function SerieFormModal({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                     {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO' || !formData.modalidade) && (
                       <div>
-                        <label htmlFor="localId" className="block text-sm font-medium text-slate-700 mb-1">Local *</label>
+                        <div className="mb-1 flex items-center justify-between gap-3">
+                          <label htmlFor="localId" className="block text-sm font-medium text-slate-700">Local *</label>
+                          <button
+                            type="button"
+                            onClick={event => {
+                              localRapidoTriggerRef.current = event.currentTarget
+                              setLocalRapidoErro(null)
+                              setLocalRapidoOpen(true)
+                            }}
+                            className="text-xs font-semibold text-brand-700 hover:text-brand-900"
+                          >
+                            + Criar local sem sair
+                          </button>
+                        </div>
                         <select
                           id="localId"
                           value={formData.localId || ''}
@@ -364,7 +477,7 @@ export function SerieFormModal({
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         >
                           <option value="">Selecione...</option>
-                          {locais.map((l) => (
+                          {locaisDisponiveis.map((l) => (
                             <option key={l.id} value={l.id}>{l.nome}</option>
                           ))}
                         </select>
@@ -374,7 +487,21 @@ export function SerieFormModal({
 
                     {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.localId && (
                       <div>
-                        <label htmlFor="espacoId" className="block text-sm font-medium text-slate-700 mb-1">Espaço</label>
+                        <div className="mb-1 flex items-center justify-between gap-3">
+                          <label htmlFor="espacoId" className="block text-sm font-medium text-slate-700">Espaço</label>
+                          <button
+                            type="button"
+                            onClick={event => {
+                              espacoRapidoTriggerRef.current = event.currentTarget
+                              setEspacoRapidoErro(null)
+                              setEspacoRapidoNome('')
+                              setEspacoRapidoOpen(true)
+                            }}
+                            className="text-xs font-semibold text-brand-700 hover:text-brand-900"
+                          >
+                            + Criar espaço sem sair
+                          </button>
+                        </div>
                         <select
                           id="espacoId"
                           value={formData.espacoId || ''}
@@ -382,7 +509,7 @@ export function SerieFormModal({
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         >
                           <option value="">Local inteiro / não especificado</option>
-                          {espacos
+                          {espacosDisponiveis
                             .filter(espaco =>
                               espaco.localId === formData.localId &&
                               (espaco.ativo || espaco.id === formData.espacoId)
@@ -593,5 +720,60 @@ export function SerieFormModal({
             </form>
           </div>
         </div>
+
+        {localRapidoOpen && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
+            <div role="dialog" aria-modal="true" aria-labelledby="serie-local-rapido-title" className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+              <div className="border-b border-slate-200 px-5 py-4">
+                <h3 id="serie-local-rapido-title" className="font-semibold text-slate-900">Criar Local</h3>
+                <p className="mt-1 text-xs text-slate-500">O novo local será selecionado automaticamente na série.</p>
+              </div>
+              <form onSubmit={salvarLocalRapido} className="space-y-3 p-5">
+                {localRapidoErro && <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{localRapidoErro}</p>}
+                <input autoFocus aria-label="Nome do novo local" placeholder="Nome *" value={localRapido.nome} onChange={e => setLocalRapido({ ...localRapido, nome: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                <div className="grid grid-cols-[1fr_110px] gap-3">
+                  <input aria-label="Endereço do novo local" placeholder="Endereço *" value={localRapido.endereco} onChange={e => setLocalRapido({ ...localRapido, endereco: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                  <input aria-label="Número do novo local" placeholder="Número *" value={localRapido.numero} onChange={e => setLocalRapido({ ...localRapido, numero: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                </div>
+                <input aria-label="Bairro do novo local" placeholder="Bairro" value={localRapido.bairro} onChange={e => setLocalRapido({ ...localRapido, bairro: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                <div className="grid grid-cols-[1fr_80px] gap-3">
+                  <input aria-label="Cidade do novo local" placeholder="Cidade *" value={localRapido.cidade} onChange={e => setLocalRapido({ ...localRapido, cidade: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                  <input aria-label="UF do novo local" placeholder="UF *" maxLength={2} value={localRapido.uf} onChange={e => setLocalRapido({ ...localRapido, uf: e.target.value.toUpperCase() })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm uppercase" />
+                </div>
+                <input aria-label="CEP do novo local" placeholder="CEP" value={localRapido.cep} onChange={e => setLocalRapido({ ...localRapido, cep: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+                  <button type="button" disabled={salvandoLocalRapido} onClick={() => {
+                    setLocalRapidoOpen(false)
+                    if (localRapidoTriggerRef.current?.isConnected) localRapidoTriggerRef.current.focus()
+                  }} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Voltar à série</button>
+                  <button type="submit" disabled={salvandoLocalRapido} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{salvandoLocalRapido ? 'Criando...' : 'Criar e selecionar'}</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {espacoRapidoOpen && formData.localId && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
+            <div role="dialog" aria-modal="true" aria-labelledby="serie-espaco-rapido-title" className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+              <div className="border-b border-slate-200 px-5 py-4">
+                <h3 id="serie-espaco-rapido-title" className="font-semibold text-slate-900">Criar Espaço</h3>
+                <p className="mt-1 text-xs text-slate-500">O novo espaço será selecionado automaticamente na série.</p>
+              </div>
+              <form onSubmit={salvarEspacoRapido} className="space-y-3 p-5">
+                {espacoRapidoErro && <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{espacoRapidoErro}</p>}
+                <input autoFocus aria-label="Nome do novo espaço" placeholder="Nome do espaço *" value={espacoRapidoNome} onChange={e => setEspacoRapidoNome(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+                  <button type="button" disabled={salvandoEspacoRapido} onClick={() => {
+                    setEspacoRapidoOpen(false)
+                    if (espacoRapidoTriggerRef.current?.isConnected) espacoRapidoTriggerRef.current.focus()
+                  }} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Voltar à série</button>
+                  <button type="submit" disabled={salvandoEspacoRapido} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{salvandoEspacoRapido ? 'Criando...' : 'Criar e selecionar'}</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+    </>
   )
 }
