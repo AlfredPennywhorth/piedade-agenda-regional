@@ -86,7 +86,7 @@ export function SeriesView() {
     pauta: '',
     modalidade: 'PRESENCIAL',
     frequencia: 'SEMANAL',
-    intervalo: serie.intervalo || 1,
+    intervalo: 1,
     dataInicio: '',
     dataFim: '',
     horarioInicio: '',
@@ -194,7 +194,7 @@ export function SeriesView() {
       pauta: '',
       modalidade: 'PRESENCIAL',
       frequencia: 'SEMANAL',
-      intervalo: serie.intervalo || 1,
+      intervalo: 1,
       dataInicio: '',
       dataFim: '',
       horarioInicio: '',
@@ -255,7 +255,7 @@ export function SeriesView() {
       pauta: serie.pauta || '',
       modalidade: serie.modalidade,
       frequencia: serie.frequencia,
-      intervalo: serie.intervalo || 1,
+      intervalo: 1,
       dataInicio: serie.dataInicio,
       dataFim: serie.dataFim,
       horarioInicio: serie.horarioInicio,
@@ -456,7 +456,7 @@ export function SeriesView() {
             const normalizar = (valor: unknown) => valor === '' ? null : valor
             const changes = Object.fromEntries(
               Object.entries(data).filter(([campo, valor]) =>
-                normalizar(valor) !== normalizar((original as Record<string, unknown>)[campo])
+                normalizar(valor) !== normalizar(original[campo as keyof SerieRecorrencia])
               )
             ) as Partial<SerieCreateInput>
 
