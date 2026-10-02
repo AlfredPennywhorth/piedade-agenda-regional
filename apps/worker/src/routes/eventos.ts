@@ -28,7 +28,9 @@ async function criarAvisoAlteracaoMaterial(db: any, anterior: any, atual: any) {
   const partes: string[] = []
 
   if (!mesmoInstante(anterior.inicioEm, atual.inicioEm) || !mesmoInstante(anterior.fimEm, atual.fimEm)) {
-    partes.push(`Horário: ${formatarDataHoraAgenda(anterior.inicioEm)} → ${formatarDataHoraAgenda(atual.inicioEm)}`)
+    partes.push(
+      `Horário: ${formatarDataHoraAgenda(anterior.inicioEm)}–${formatarDataHoraAgenda(anterior.fimEm)} → ${formatarDataHoraAgenda(atual.inicioEm)}–${formatarDataHoraAgenda(atual.fimEm)}`
+    )
   }
 
   if (anterior.modalidade !== atual.modalidade) {
