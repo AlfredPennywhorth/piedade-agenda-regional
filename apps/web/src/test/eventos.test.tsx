@@ -267,7 +267,7 @@ describe('EventosView', () => {
     fireEvent.click(abrir)
 
     const localDialog = await screen.findByRole('dialog', { name: /criar local/i })
-    const primeiro = within(localDialog).getByLabelText('Nome do novo local')
+    const primeiro = within(localDialog).getByLabelText('CEP do novo local')
     await waitFor(() => expect(primeiro).toHaveFocus())
 
     const ultimo = within(localDialog).getByRole('button', { name: /criar e selecionar/i })
