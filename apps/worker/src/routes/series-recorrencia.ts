@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and, gte, sql, inArray } from 'drizzle-orm'
-import { administracoes, casas, eventos, gruposTrabalho, membros, seriesRecorrencia, setores } from '../db/schema'
+import { administracoes, casas, eventos, gruposTrabalho, membros, seriesRecorrencia, setores, locais, espacosLocal } from '../db/schema'
 import { SerieCreate, SerieUpdatePayload, generateOccurrences, getLocalDateFromUtc } from '@piedade/shared'
 import { EventoCreate } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
@@ -13,6 +13,103 @@ export const seriesRecorrenciaRouter = new Hono<any>()
 
 function mesmoInstante(a: string, b: string) {
   return new Date(a).getTime() === new Date(b).getTime()
+}
+
+const CAMPOS_OPERACIONAIS_SERIE = new Set(['modalidade', 'localId', 'espacoId', 'urlOnline'])
+
+function apenasAlteracaoOperacionalSerie(changes: Record<string, unknown>) {
+  const chaves = Object.keys(changes)
+  return chaves.length > 0 && chaves.every(chave => CAMPOS_OPERACIONAIS_SERIE.has(chave))
+}
+
+async function criarAvisoAlteracaoOperacionalSerie(db: any, anterior: any, atual: any) {
+  const partes: string[] = []
+
+  if (anterior.modalidade !== atual.modalidade) {
+    partes.push(`Modalidade: ${anterior.modalidade} → ${atual.modalidade}`)
+  }
+
+  if (anterior.localId !== atual.localId) {
+    const [localAnterior, localAtual] = await Promise.all([
+      anterior.localId ? db.select({ nome: locais.nome }).from(locais).where(eq(locais.id, anterior.localId)).get() : null,
+      atual.localId ? db.select({ nome: locais.nome }).from(locais).where(eq(locais.id, atual.localId)).get() : null,
+    ])
+    partes.push(`Local: ${localAnterior?.nome ?? 'sem local'} → ${localAtual?.nome ?? 'sem local'}`)
+  }
+
+  if (anterior.espacoId !== atual.espacoId) {
+    const [espacoAnterior, espacoAtual] = await Promise.all([
+      anterior.espacoId ? db.select({ nome: espacosLocal.nome }).from(espacosLocal).where(eq(espacosLocal.id, anterior.espacoId)).get() : null,
+      atual.espacoId ? db.select({ nome: espacosLocal.nome }).from(espacosLocal).where(eq(espacosLocal.id, atual.espacoId)).get() : null,
+    ])
+    partes.push(`Espaço: ${espacoAnterior?.nome ?? 'sem espaço'} → ${espacoAtual?.nome ?? 'sem espaço'}`)
+  }
+
+  if (anterior.urlOnline !== atual.urlOnline) {
+    partes.push(`Acesso online: ${anterior.urlOnline ? 'link anterior' : 'sem link'} → ${atual.urlOnline ? 'novo link disponível' : 'removido'}`)
+  }
+
+  if (partes.length === 0) return null
+  return `Atenção! O evento "${anterior.titulo}" foi alterado. ${partes.join('; ')}. Favor reconfirmar sua presença.`
+}
+
+function formatarDataHoraAgenda(valor: string) {
+  return new Date(valor).toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function houveAlteracaoMaterialOcorrencia(anterior: any, atual: any) {
+  return (
+    !mesmoInstante(anterior.inicioEm, atual.inicioEm) ||
+    !mesmoInstante(anterior.fimEm, atual.fimEm) ||
+    anterior.modalidade !== atual.modalidade ||
+    anterior.localId !== atual.localId ||
+    anterior.espacoId !== atual.espacoId ||
+    anterior.urlOnline !== atual.urlOnline
+  )
+}
+
+async function criarAvisoAlteracaoOcorrencia(db: any, anterior: any, atual: any) {
+  const partes: string[] = []
+
+  if (!mesmoInstante(anterior.inicioEm, atual.inicioEm) || !mesmoInstante(anterior.fimEm, atual.fimEm)) {
+    partes.push(
+      `Horário: ${formatarDataHoraAgenda(anterior.inicioEm)}–${formatarDataHoraAgenda(anterior.fimEm)} → ${formatarDataHoraAgenda(atual.inicioEm)}–${formatarDataHoraAgenda(atual.fimEm)}`
+    )
+  }
+
+  if (anterior.modalidade !== atual.modalidade) {
+    partes.push(`Modalidade: ${anterior.modalidade} → ${atual.modalidade}`)
+  }
+
+  if (anterior.localId !== atual.localId) {
+    const [localAnterior, localAtual] = await Promise.all([
+      anterior.localId ? db.select({ nome: locais.nome }).from(locais).where(eq(locais.id, anterior.localId)).get() : null,
+      atual.localId ? db.select({ nome: locais.nome }).from(locais).where(eq(locais.id, atual.localId)).get() : null,
+    ])
+    partes.push(`Local: ${localAnterior?.nome ?? 'sem local'} → ${localAtual?.nome ?? 'sem local'}`)
+  }
+
+  if (anterior.espacoId !== atual.espacoId) {
+    const [espacoAnterior, espacoAtual] = await Promise.all([
+      anterior.espacoId ? db.select({ nome: espacosLocal.nome }).from(espacosLocal).where(eq(espacosLocal.id, anterior.espacoId)).get() : null,
+      atual.espacoId ? db.select({ nome: espacosLocal.nome }).from(espacosLocal).where(eq(espacosLocal.id, atual.espacoId)).get() : null,
+    ])
+    partes.push(`Espaço: ${espacoAnterior?.nome ?? 'sem espaço'} → ${espacoAtual?.nome ?? 'sem espaço'}`)
+  }
+
+  if (anterior.urlOnline !== atual.urlOnline) {
+    partes.push(`Acesso online: ${anterior.urlOnline ? 'link anterior' : 'sem link'} → ${atual.urlOnline ? 'novo link disponível' : 'removido'}`)
+  }
+
+  if (partes.length === 0) return null
+  return `Atenção! O evento "${anterior.titulo}" foi alterado. ${partes.join('; ')}. Favor reconfirmar sua presença.`
 }
 
 seriesRecorrenciaRouter.use('*', authMiddleware)
@@ -317,9 +414,10 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
 
       const mergedEvent = { ...existingEvent, ...parsed.changes }
       EventoCreate.parse(mergedEvent) // Valida regras S04
-      const horarioAlterado =
-        (parsed.changes.inicioEm !== undefined && !mesmoInstante(parsed.changes.inicioEm, existingEvent.inicioEm)) ||
-        (parsed.changes.fimEm !== undefined && !mesmoInstante(parsed.changes.fimEm, existingEvent.fimEm))
+      const alteracaoMaterial = houveAlteracaoMaterialOcorrencia(existingEvent, mergedEvent)
+      const agendaAviso = alteracaoMaterial
+        ? await criarAvisoAlteracaoOcorrencia(db, existingEvent, mergedEvent)
+        : existingEvent.agendaAviso
       const espacoFoiAlterado = parsed.changes.espacoId !== undefined && parsed.changes.espacoId !== existingEvent.espacoId
       const espacoValido = espacoFoiAlterado
         ? await espacoAtivoPertenceAoLocal(db, mergedEvent.localId, mergedEvent.espacoId)
@@ -344,7 +442,8 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
               recorrenciaOrigemInicioEm:
                 existingEvent.recorrenciaOrigemInicioEm ?? existingEvent.inicioEm,
               recorrenciaExcecao: true,
-              agendaRevisao: horarioAlterado ? nowIso : existingEvent.agendaRevisao,
+              agendaRevisao: alteracaoMaterial ? nowIso : existingEvent.agendaRevisao,
+              agendaAviso,
               updatedAt: nowIso,
             })
             .where(eq(eventos.id, parsed.fromEventId))
@@ -356,7 +455,13 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
           recursoId: parsed.fromEventId,
           escopoTipo: escopo.escopoTipo,
           escopoId: escopo.escopoId,
-          contexto: { serieRecorrenciaId: serieId, camposAlterados: Object.keys(parsed.changes) },
+          contexto: {
+            serieRecorrenciaId: serieId,
+            camposAlterados: Object.keys(parsed.changes),
+            alteracaoMaterial,
+            reconfirmacaoSolicitada: alteracaoMaterial,
+            agendaAviso: alteracaoMaterial ? agendaAviso : null,
+          },
         }
       )
       const updatedEvent = await db.select().from(eventos).where(eq(eventos.id, parsed.fromEventId)).get()
@@ -380,6 +485,63 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         if (!(await podeGerenciarEntidade(c, mergedSerieData))) {
           return c.json({ error: 'Acesso não autorizado para mover a série para este escopo', code: 'FORBIDDEN' }, 403)
         }
+      }
+
+      if (
+        !apenasDesativacao &&
+        apenasAlteracaoOperacionalSerie(parsed.changes as Record<string, unknown>)
+      ) {
+        const agendaAviso = await criarAvisoAlteracaoOperacionalSerie(db, existingSerie, mergedSerieData)
+        const alteracoesEvento: Record<string, unknown> = {}
+        for (const campo of CAMPOS_OPERACIONAIS_SERIE) {
+          if (Object.prototype.hasOwnProperty.call(parsed.changes, campo)) {
+            alteracoesEvento[campo] = (parsed.changes as any)[campo]
+          }
+        }
+
+        await executeAtomic(db, (qdb) => {
+          const escopo = extrairEscopoDoEvento(existingSerie)
+          return [
+            qdb.update(seriesRecorrencia)
+              .set({ ...parsed.changes, updatedAt: nowIso })
+              .where(eq(seriesRecorrencia.id, serieId)),
+            qdb.update(eventos)
+              .set({
+                ...alteracoesEvento,
+                agendaRevisao: agendaAviso ? nowIso : eventos.agendaRevisao,
+                agendaAviso: agendaAviso ?? eventos.agendaAviso,
+                updatedAt: nowIso,
+              })
+              .where(and(
+                eq(eventos.serieRecorrenciaId, serieId),
+                gte(eventos.inicioEm, nowIso),
+                eq(eventos.recorrenciaExcecao, false),
+                eq(eventos.ativo, true)
+              )),
+            criarAuditQuery(qdb, {
+              acao: 'SERIE_RECORRENCIA_ATUALIZADA',
+              atorMembroId: c.get('membroId') || null,
+              recursoTipo: 'SERIE_RECORRENCIA',
+              recursoId: serieId,
+              escopoTipo: escopo.escopoTipo,
+              escopoId: escopo.escopoId,
+              contexto: {
+                updateMode: 'ALL',
+                camposAlterados: Object.keys(parsed.changes),
+                semRegeneracao: true,
+                reconfirmacaoSolicitada: Boolean(agendaAviso),
+                agendaAviso,
+              },
+            })
+          ]
+        })
+
+        return c.json({
+          message: agendaAviso
+            ? 'Série atualizada sem regenerar ocorrências; reconfirmação solicitada.'
+            : 'Série atualizada sem regenerar ocorrências.',
+          reconfirmacaoSolicitada: Boolean(agendaAviso),
+        })
       }
 
       if (parsed.changes.ativo === false) {

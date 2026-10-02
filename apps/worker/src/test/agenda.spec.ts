@@ -682,4 +682,52 @@ describe('S07 - Minha Agenda', () => {
     sqlite.exec('DROP TRIGGER trg_cleanup_concorrente;')
   })
 
+
+  it('8. Marca reconfirmação pendente e limpa após novo RSVP', async () => {
+    const revisao = new Date(Date.now() - 1000).toISOString()
+    const respostaAnterior = new Date(Date.now() - 60_000).toISOString()
+
+    sqlite.exec(`
+      UPDATE eventos
+      SET inicio_em = '2099-12-20T10:00:00Z',
+          fim_em = '2099-12-20T11:00:00Z',
+          agenda_revisao = '${revisao}',
+          agenda_aviso = 'Atenção! O evento foi alterado. Favor reconfirmar sua presença.'
+      WHERE id = 'ev-1';
+
+      INSERT OR REPLACE INTO rsvp
+        (id, convocacao_destinatario_id, resposta, justificativa, respondido_em, atualizado_em, created_at, updated_at)
+      VALUES
+        ('rsvp-reconfirmacao', 'dest-1', 'PARTICIPAREI', NULL,
+         '${respostaAnterior}', '${respostaAnterior}',
+         '${respostaAnterior}', '${respostaAnterior}');
+    `)
+
+    const antes = await req('/api/v1/minha-agenda', {
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    })
+    expect(antes.status).toBe(200)
+    const agendaAntes = await antes.json() as any[]
+    const itemAntes = agendaAntes.find(item => item.evento.id === 'ev-1')
+    expect(itemAntes.evento.agendaAviso).toContain('reconfirmar')
+    expect(itemAntes.rsvp.resposta).toBe('PARTICIPAREI')
+    expect(itemAntes.rsvp.reconfirmacaoPendente).toBe(true)
+
+    const responder = await req('/api/v1/minha-agenda/rsvp/dest-1', {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI' }),
+    })
+    expect(responder.status).toBe(200)
+
+    const depois = await req('/api/v1/minha-agenda', {
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    })
+    const agendaDepois = await depois.json() as any[]
+    const itemDepois = agendaDepois.find(item => item.evento.id === 'ev-1')
+    expect(itemDepois.rsvp.reconfirmacaoPendente).toBe(false)
+  })
 })

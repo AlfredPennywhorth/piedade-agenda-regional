@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
-import { eventos, funcoes, vinculosFuncionais, convocacoes, convocacaoFuncoes } from '../db/schema'
+import { eventos, funcoes, vinculosFuncionais, convocacoes, convocacaoFuncoes, locais, espacosLocal } from '../db/schema'
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, executarOperacaoComAudits, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
@@ -11,6 +11,65 @@ export const eventosRouter = new Hono<any>()
 
 function mesmoInstante(a: string, b: string) {
   return new Date(a).getTime() === new Date(b).getTime()
+}
+
+function formatarDataHoraAgenda(valor: string) {
+  return new Date(valor).toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+async function criarAvisoAlteracaoMaterial(db: any, anterior: any, atual: any) {
+  const partes: string[] = []
+
+  if (!mesmoInstante(anterior.inicioEm, atual.inicioEm) || !mesmoInstante(anterior.fimEm, atual.fimEm)) {
+    partes.push(
+      `Horário: ${formatarDataHoraAgenda(anterior.inicioEm)}–${formatarDataHoraAgenda(anterior.fimEm)} → ${formatarDataHoraAgenda(atual.inicioEm)}–${formatarDataHoraAgenda(atual.fimEm)}`
+    )
+  }
+
+  if (anterior.modalidade !== atual.modalidade) {
+    partes.push(`Modalidade: ${anterior.modalidade} → ${atual.modalidade}`)
+  }
+
+  if (anterior.localId !== atual.localId) {
+    const [localAnterior, localAtual] = await Promise.all([
+      anterior.localId ? db.select({ nome: locais.nome }).from(locais).where(eq(locais.id, anterior.localId)).get() : null,
+      atual.localId ? db.select({ nome: locais.nome }).from(locais).where(eq(locais.id, atual.localId)).get() : null,
+    ])
+    partes.push(`Local: ${localAnterior?.nome ?? 'sem local'} → ${localAtual?.nome ?? 'sem local'}`)
+  }
+
+  if (anterior.espacoId !== atual.espacoId) {
+    const [espacoAnterior, espacoAtual] = await Promise.all([
+      anterior.espacoId ? db.select({ nome: espacosLocal.nome }).from(espacosLocal).where(eq(espacosLocal.id, anterior.espacoId)).get() : null,
+      atual.espacoId ? db.select({ nome: espacosLocal.nome }).from(espacosLocal).where(eq(espacosLocal.id, atual.espacoId)).get() : null,
+    ])
+    partes.push(`Espaço: ${espacoAnterior?.nome ?? 'sem espaço'} → ${espacoAtual?.nome ?? 'sem espaço'}`)
+  }
+
+  if (anterior.urlOnline !== atual.urlOnline) {
+    partes.push(`Acesso online: ${anterior.urlOnline ? 'link anterior' : 'sem link'} → ${atual.urlOnline ? 'novo link disponível' : 'removido'}`)
+  }
+
+  if (partes.length === 0) return null
+  return `Atenção! O evento "${anterior.titulo}" foi alterado. ${partes.join('; ')}. Favor reconfirmar sua presença.`
+}
+
+function houveAlteracaoMaterial(anterior: any, atual: any) {
+  return (
+    !mesmoInstante(anterior.inicioEm, atual.inicioEm) ||
+    !mesmoInstante(anterior.fimEm, atual.fimEm) ||
+    anterior.modalidade !== atual.modalidade ||
+    anterior.localId !== atual.localId ||
+    anterior.espacoId !== atual.espacoId ||
+    anterior.urlOnline !== atual.urlOnline
+  )
 }
 
 function eventoVisivelNoEscopo(evento: any, escopos: any): boolean {
@@ -405,11 +464,12 @@ eventosRouter.patch('/:id', async (c) => {
     // PMO Rule: Ao alterar uma ocorrência individual, preservar serie_recorrencia_id e marcar recorrencia_excecao = true.
     const isExcecao = existing.serieRecorrenciaId !== null ? true : existing.recorrenciaExcecao
     const nowIso = new Date().toISOString()
-    const horarioAlterado =
-      (parsed.inicioEm !== undefined && !mesmoInstante(parsed.inicioEm, existing.inicioEm)) ||
-      (parsed.fimEm !== undefined && !mesmoInstante(parsed.fimEm, existing.fimEm))
     const ativacaoAlterada =
       parsed.ativo !== undefined && parsed.ativo !== existing.ativo
+    const alteracaoMaterial = houveAlteracaoMaterial(existing, merged)
+    const agendaAviso = alteracaoMaterial
+      ? await criarAvisoAlteracaoMaterial(db, existing, merged)
+      : existing.agendaAviso
 
     const atorMembroId = c.get('membroId') || null
 
@@ -424,6 +484,8 @@ eventosRouter.patch('/:id', async (c) => {
         titulo: existing.titulo,
         modalidade: existing.modalidade,
         camposAlterados: Object.keys(parsed),
+        alteracaoMaterial,
+        agendaAviso: alteracaoMaterial ? agendaAviso : null,
       },
     }
 
@@ -434,7 +496,8 @@ eventosRouter.patch('/:id', async (c) => {
           .set({
             ...parsed,
             recorrenciaExcecao: isExcecao,
-            agendaRevisao: horarioAlterado || ativacaoAlterada ? nowIso : existing.agendaRevisao,
+            agendaRevisao: alteracaoMaterial || ativacaoAlterada ? nowIso : existing.agendaRevisao,
+            agendaAviso,
             updatedAt: nowIso,
           })
           .where(eq(eventos.id, id))

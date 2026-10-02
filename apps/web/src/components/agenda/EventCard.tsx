@@ -6,6 +6,10 @@ interface EventCardProps {
 }
 
 function statusParticipacao(item: AgendaItem) {
+  if (item.rsvp?.reconfirmacaoPendente) {
+    return { label: 'Reconfirmar presença', className: 'bg-amber-50 text-amber-800 border-amber-300' }
+  }
+
   switch (item.rsvp?.resposta) {
     case 'PARTICIPAREI':
       return { label: 'Confirmado', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
@@ -88,6 +92,13 @@ export function EventCard({ item, onClick }: EventCardProps) {
               </p>
             )}
           </div>
+
+          {item.rsvp?.reconfirmacaoPendente && item.evento.agendaAviso && (
+            <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+              <p className="font-semibold">Evento alterado — reconfirme sua presença</p>
+              <p className="mt-1">{item.evento.agendaAviso}</p>
+            </div>
+          )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">

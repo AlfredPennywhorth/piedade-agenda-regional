@@ -723,7 +723,8 @@ convocacoesRouter.get('/:id/acompanhamento-rsvp', async c => {
       destinatarioId: convocacaoDestinatarios.id,
       membroId: membros.id,
       membroNome: membros.nome,
-      respostaRsvp: sql`COALESCE(${rsvp.resposta}, 'SEM_RESPOSTA')`.as('respostaRsvp')
+      respostaRsvp: sql`COALESCE(${rsvp.resposta}, 'SEM_RESPOSTA')`.as('respostaRsvp'),
+      rsvpAtualizadoEm: rsvp.atualizadoEm
     })
     .from(convocacaoDestinatarios)
     .innerJoin(membros, eq(membros.id, convocacaoDestinatarios.membroId))
@@ -746,6 +747,7 @@ convocacoesRouter.get('/:id/acompanhamento-rsvp', async c => {
     membroId: string
     membroNome: string
     respostaRsvp: string
+    rsvpAtualizadoEm: string | null
   }
   type EvidenciaItem = {
     convocacaoDestinatarioId: string
@@ -780,6 +782,9 @@ convocacoesRouter.get('/:id/acompanhamento-rsvp', async c => {
       membroId: d.membroId,
       membroNome: d.membroNome,
       respostaRsvp: d.respostaRsvp,
+      reconfirmacaoPendente:
+        Boolean(d.rsvpAtualizadoEm) &&
+        new Date(d.rsvpAtualizadoEm!).getTime() < new Date(evento.agendaRevisao).getTime(),
       vinculo: vinculo?.funcaoNome ? {
         funcaoId: vinculo.funcaoId,
         funcaoNome: vinculo.funcaoNome,
