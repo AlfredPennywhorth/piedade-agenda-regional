@@ -414,6 +414,13 @@ eventosRouter.patch('/:id', async (c) => {
     const existing = await db.select().from(eventos).where(eq(eventos.id, id)).get()
     if (!existing) return c.json({ error: 'Evento não encontrado' }, 404)
 
+    if (new Date(existing.fimEm).getTime() <= Date.now()) {
+      return c.json({
+        error: 'Eventos já encerrados não podem ser alterados. O registro deve preservar o que efetivamente ocorreu.',
+        code: 'EVENTO_PASSADO_IMUTAVEL'
+      }, 409)
+    }
+
     // Validar estado final mesclado (existente + patch) com EventoCreate
     const merged = { ...existing, ...parsed }
     EventoCreate.parse(merged)
