@@ -966,6 +966,67 @@ describe('Series Recorrencia API (S05)', () => {
     expect(convocacaoPersistida).toMatchObject({ status: 'PUBLICADA', ativo: true })
   })
 
+  it('24.5c THIS_AND_FUTURE no-op operacional não divide série nem força reconfirmação', async () => {
+    const regionalId = await createRegional()
+    const localId = crypto.randomUUID()
+
+    await db.insert(locais).values({
+      id: localId,
+      nome: 'Local sem mudança',
+      endereco: 'Rua A',
+      numero: '10',
+      cidade: 'São Paulo',
+      uf: 'SP',
+      ativo: true,
+    }).run()
+
+    const createRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        titulo: 'Série no-op',
+        modalidade: 'PRESENCIAL',
+        urlOnline: null,
+        localId,
+        regionalId,
+        dataInicio: '2099-12-20',
+        dataFim: '2099-12-22',
+      }),
+    })
+    expect(createRes.status).toBe(201)
+    const { serie } = await createRes.json()
+
+    const antes = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    const pivot = antes[1]
+    const idsAntes = antes.map((item: any) => item.id).sort()
+
+    const atualizar = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'THIS_AND_FUTURE',
+        fromEventId: pivot.id,
+        changes: { localId },
+      }),
+    })
+
+    expect(atualizar.status).toBe(200)
+    expect(await atualizar.json()).toMatchObject({
+      novaSerieId: null,
+      reconfirmacaoSolicitada: false,
+    })
+
+    expect(db.select().from(seriesRecorrencia).all()).toHaveLength(1)
+    const depois = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    expect(depois.map((item: any) => item.id).sort()).toEqual(idsAntes)
+    expect(depois.every((item: any) => item.agendaRevisao == null)).toBe(true)
+  })
+
   it('24.5.1 impede criar convocação ativa para ocorrência inativada', async () => {
     const regionalId = await createRegional()
     const createRes = await req('/api/v1/series-recorrencia', {
