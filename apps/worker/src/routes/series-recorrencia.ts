@@ -675,6 +675,13 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       if (!existingEvent || existingEvent.serieRecorrenciaId !== serieId) {
          return c.json({ error: 'Evento origem não encontrado ou não pertence a esta série' }, 400)
       }
+
+      if (new Date(existingEvent.fimEm).getTime() <= Date.now()) {
+        return c.json({
+          error: 'Ocorrências já encerradas não podem servir de início para alterar esta e as futuras.',
+          code: 'EVENTO_PASSADO_IMUTAVEL'
+        }, 409)
+      }
       
       if (!(await podeGerenciarEntidade(c, existingEvent))) {
         return c.json({ error: 'Acesso não autorizado para gerir este evento', code: 'FORBIDDEN' }, 403)
