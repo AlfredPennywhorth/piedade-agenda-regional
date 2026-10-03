@@ -58,23 +58,36 @@ A navegacao principal definida no projeto e:
 - Avisos
 - Meu Cadastro
 
-A navegacao condicional conforme capability e:
+A navegacao condicional conforme capability inclui:
 
 - Portaria
 - Relatorios
 - Auditoria
+- Eventos e Series
+- Convocacoes
+- Membros
+- Contas e Acessos
+- Regionais
+- Administracoes
+- Setores
+- Casas
+- Grupos de Trabalho
+- Funcoes
+- Vinculos
+- Locais e Espacos
 
-O Stitch deve preservar esses nomes e essa organizacao. Nao devem ser inventados novos menus, agrupamentos ou perfis de acesso.
+O Stitch deve preservar esses nomes, seus agrupamentos atuais e a separacao entre navegacao principal e ferramentas administrativas. Nao devem ser inventados novos perfis de acesso. Novos agrupamentos visuais so podem ser propostos como alternativa de UX e devem ser explicitamente aprovados pelo PO antes de implementacao.
 
 ## 5. Perfis e capabilities relevantes
 
-O frontend consulta as capabilities retornadas por `auth/me` e usa somente estas regras de exibicao:
+O frontend consulta as capabilities retornadas por `auth/me` para controlar tanto ferramentas operacionais quanto superficies administrativas. Entre as regras visiveis estao:
 
-- `podeOperarPortaria`: exibe Portaria.
-- `podeVisualizarRelatorios`: exibe Relatorios.
-- `podeVisualizarAuditoria`: exibe Auditoria.
+- `podeOperarPortaria`: exibe Portaria;
+- `podeVisualizarRelatorios`: exibe Relatorios;
+- `podeVisualizarAuditoria`: exibe Auditoria;
+- capabilities proprias para administracao de Eventos/Series, Convocacoes, Membros, Contas e Acessos, Regionais, Administracoes, Setores, Casas, Grupos de Trabalho, Funcoes, Vinculos, Locais e Espacos.
 
-Minha Agenda, Calendario, Avisos e Meu Cadastro formam a navegacao principal. A proposta visual deve manter a diferenca entre navegacao principal e ferramentas condicionais, sem criar novas capabilities ou presumir permissoes nao definidas.
+Minha Agenda, Calendario, Avisos e Meu Cadastro formam a navegacao principal do usuario comum. A proposta visual deve manter a diferenca entre navegacao principal e ferramentas condicionais/administrativas, sem criar novas capabilities nem presumir permissoes nao definidas. O inventario visual deve refletir as superficies realmente expostas pela aplicacao atual.
 
 ## 6. Requisitos UX para o handoff
 
@@ -82,8 +95,9 @@ A proposta deve considerar:
 
 - classificar cada fluxo como `MOBILE_FIRST`, `DESKTOP_FIRST` ou `RESPONSIVO_DUAL`;
 - `MOBILE_FIRST`: priorizar o usuario comum em Minha Agenda, Calendario, RSVP, QR Code, notificacoes e acoes rapidas;
-- `DESKTOP_FIRST`: priorizar Master e administracao em gestao de eventos/series, convocacoes, membros, contas e acessos, locais/espacos, relatorios densos e configuracoes;
+- `DESKTOP_FIRST`: priorizar Master e administracao em gestao de eventos/series, convocacoes, membros, contas e acessos, Regionais, Administracoes, Setores, Casas, Grupos de Trabalho, Funcoes, Vinculos, locais/espacos, relatorios densos e configuracoes;
 - `RESPONSIVO_DUAL`: preservar experiencia equivalente em login, Meu Cadastro, consultas simples e fluxos compartilhados;
+- cada superficie deve possuir uma classificacao primaria unica; quando um fluxo atender mais de um contexto, a classificacao primaria define o prefixo do identificador e a composicao de referencia, e as adaptacoes secundarias devem ser descritas sem criar um segundo codigo para a mesma superficie;
 - nao tratar desktop como mero estiramento da tela mobile nem mobile como simples reducao da tela desktop;
 - em desktop, aproveitar largura para tabelas, filtros persistentes, paineis laterais, multiplas colunas e contexto simultaneo;
 - em mobile/PWA, preferir cards, etapas sequenciais, navegacao compacta e acoes focadas;
@@ -106,20 +120,20 @@ A aplicacao continuara sendo unica e responsiva, com os mesmos contratos, permis
 
 | Contexto | Prioridade | Superficies principais | Diretriz |
 | --- | --- | --- | --- |
-| Usuario comum em PWA/celular | MOBILE_FIRST | Minha Agenda, Calendario, RSVP, QR Code, notificacoes, Meu Cadastro | Navegacao simples, cards, acoes rapidas, poucos passos e alvos de toque grandes. |
-| Master e administradores em computador | DESKTOP_FIRST | Eventos, Series, Convocacoes, Membros, Contas e Acessos, Locais/Espacos, Relatorios, Auditoria | Tabelas e formularios amplos, filtros persistentes, contexto simultaneo, paineis laterais e uso eficiente da largura. |
+| Usuario comum em PWA/celular | MOBILE_FIRST | Minha Agenda, Calendario, RSVP, QR Code, notificacoes | Navegacao simples, cards, acoes rapidas, poucos passos e alvos de toque grandes. |
+| Master e administradores em computador | DESKTOP_FIRST | Eventos, Series, Convocacoes, Membros, Contas e Acessos, Regionais, Administracoes, Setores, Casas, Grupos de Trabalho, Funcoes, Vinculos, Locais/Espacos, Relatorios, Auditoria | Tabelas e formularios amplos, filtros persistentes, contexto simultaneo, paineis laterais e uso eficiente da largura. |
 | Fluxos compartilhados | RESPONSIVO_DUAL | Login, Meu Cadastro, consultas simples, relatorios leves | Manter equivalencia funcional, com composicao adequada a cada breakpoint. |
 
 A proposta deve considerar que configuracao e manutencao administrativa serao realizadas preferencialmente em computador. A experiencia mobile dessas telas administrativas pode permanecer funcional, mas nao deve limitar o desenho desktop.
 
 ## 8. Convencao de identificacao de telas
 
-Toda tela ou superficie desenhada deve possuir um codigo unico, estavel e visivel ao usuario, para permitir identificacao objetiva em suporte, homologacao, manutencao e relatos de erro.
+Toda tela ou superficie desenhada deve possuir um codigo unico e estavel no inventario de UX/QA, para permitir identificacao objetiva em suporte, homologacao, manutencao e relatos de erro. A exibicao desse codigo na interface do produto e opcional e depende de aprovacao explicita do PO.
 
 Regras:
 
-- o codigo deve aparecer discretamente na propria interface, preferencialmente no rodape, canto inferior ou area de metadados da tela;
-- o codigo nao deve competir visualmente com o conteudo principal;
+- o codigo deve existir obrigatoriamente no inventario de telas e artefatos de QA;
+- quando o PO aprovar sua exibicao na interface, deve aparecer discretamente, preferencialmente no rodape, canto inferior ou area de metadados, sem competir visualmente com o conteudo principal;
 - o identificador deve permanecer estavel mesmo que o layout evolua;
 - modal, dialogo ou subfluxo relevante pode receber codigo proprio quando for tratado como superficie independente;
 - relatos de suporte e QA devem poder referenciar diretamente o codigo da tela;
@@ -143,7 +157,7 @@ Essas dividas nao sao pre-condicao para iniciar o trabalho com o Stitch; elas fa
 1. Minha Agenda e detalhe do evento, incluindo RSVP, periodos, justificativa e QR Code.
 2. Calendario, com selecao de dia e visualizacao dos eventos.
 3. Avisos, evoluindo o controle de notificacoes para uma tela compreensivel de preferencias.
-4. Meu Cadastro, substituindo o placeholder por um fluxo de consulta e manutencao definido pelo PO.
+4. Meu Cadastro, classificado como RESPONSIVO_DUAL, substituindo o placeholder por um fluxo de consulta e manutencao definido pelo PO.
 5. Login e ativacao/redefinicao de PIN, ausentes no frontend atual e necessarios para completar a entrada do usuario.
 6. Portaria, Relatorios e Auditoria, preservando os acessos condicionais e priorizando fluxos operacionais.
 
@@ -192,7 +206,7 @@ A proposta visual sera considerada pronta para aprovacao quando:
 
 - cobrir a navegacao principal e as telas condicionais sem criar menus novos;
 - representar desktop e mobile conforme a classificacao de cada fluxo: mobile-first para usuario comum, desktop-first para Master/administracao e responsivo dual quando aplicavel;
-- atribuir codigo unico e visivel a cada tela/superficie aprovada e manter inventario de rastreabilidade;
+- atribuir codigo unico a cada tela/superficie aprovada e manter inventario de rastreabilidade; a exibicao do codigo na interface depende de aprovacao explicita do PO;
 - mostrar os fluxos prioritarios e seus estados especiais;
 - deixar claras as acoes principais e seus resultados;
 - manter linguagem, hierarquia, contraste e alvos de toque adequados ao publico;
