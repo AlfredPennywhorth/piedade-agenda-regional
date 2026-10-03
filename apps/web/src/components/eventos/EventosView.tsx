@@ -372,6 +372,24 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     }
   }
 
+  const abrirDetalheEvento = async (item: Evento) => {
+    setEventoDetalhe(item)
+
+    if (!item.espacoId || !item.localId || espacos.some(espaco => espaco.id === item.espacoId)) {
+      return
+    }
+
+    try {
+      const espacosDoLocal = await fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${item.localId}`)
+      const espacoAtual = (espacosDoLocal || []).find(espaco => espaco.id === item.espacoId)
+      if (espacoAtual) {
+        setEspacos(prev => prev.some(espaco => espaco.id === espacoAtual.id) ? prev : [...prev, espacoAtual])
+      }
+    } catch {
+      // O detalhe continua disponível mesmo se o lookup histórico falhar.
+    }
+  }
+
   const abrirFormEditar = async (id: string, serieId: string | null) => {
     const consultaAtual = ++eventoFormConsultaSeq.current
     setEventoEditandoId(id)
@@ -467,7 +485,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
         horarioInicio: serie.horarioInicio || '',
         horarioFim: serie.horarioFim || '',
         frequencia: serie.frequencia,
-        intervalo: serie.intervalo,
+        intervalo: 1,
         diaSemana: serie.diaSemana,
         diaMes: serie.diaMes,
         posicaoSemanaMes: serie.posicaoSemanaMes,
@@ -941,7 +959,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                       <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 min-w-[220px]">
                         <button
                           type="button"
-                          onClick={() => setEventoDetalhe(item)}
+                          onClick={() => void abrirDetalheEvento(item)}
                           className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-brand-700 hover:bg-brand-50 hover:text-brand-900 font-medium"
                         >
                           Ver
