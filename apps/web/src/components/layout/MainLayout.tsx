@@ -5,6 +5,7 @@ export interface CapacidadesFrontend {
   podeVisualizarAuditoria?: boolean
   podeOperarPortaria?: boolean
   podeAdministrarAcessos?: boolean
+  podeGerenciarSessoes?: boolean
   podeAdministrarRegionais?: boolean
   podeAdministrarEstrutura?: boolean
   podeAdministrarPessoas?: boolean
@@ -19,9 +20,10 @@ interface MainLayoutProps {
   capacidades?: CapacidadesFrontend
   nomeUsuario?: string
   onLogout?: () => void | Promise<void>
+  recuperacoesPinPendentes?: number
 }
 
-export function MainLayout({ children, currentTab, onTabChange, capacidades, nomeUsuario, onLogout }: MainLayoutProps) {
+export function MainLayout({ children, currentTab, onTabChange, capacidades, nomeUsuario, onLogout, recuperacoesPinPendentes = 0 }: MainLayoutProps) {
   const mostrarPortaria =
     capacidades?.podeOperarPortaria === true || capacidades?.podeGerirAgenda === true
   const mostrarRelatorios = capacidades?.podeVisualizarRelatorios === true
@@ -122,6 +124,25 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
         aria-label="Conteúdo principal"
         className="flex-1 w-full max-w-2xl mx-auto overflow-y-auto focus:outline-none"
       >
+        {mostrarAdministracaoAcessos && recuperacoesPinPendentes > 0 && currentTab !== 'acessos' && (
+          <div className="m-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-sm" role="status">
+            <p className="font-semibold">
+              {recuperacoesPinPendentes === 1
+                ? 'Há 1 solicitação de redefinição de PIN pendente.'
+                : `Há ${recuperacoesPinPendentes} solicitações de redefinição de PIN pendentes.`}
+            </p>
+            <p className="mt-1 text-sm text-amber-800">
+              Acesse Contas e acessos para tratar a solicitação.
+            </p>
+            <button
+              type="button"
+              onClick={() => navegar('acessos')}
+              className="mt-3 rounded-lg bg-amber-900 px-3 py-2 text-sm font-semibold text-white"
+            >
+              Ver solicitações
+            </button>
+          </div>
+        )}
         {children}
       </main>
 

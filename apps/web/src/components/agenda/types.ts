@@ -12,6 +12,7 @@ export interface AgendaItem {
     possuiTarde?: boolean
     possuiNoite?: boolean
     refeicoesOferecidas?: string[]
+    agendaAviso?: string | null
   }
   convocacao: {
     id: string
@@ -28,9 +29,29 @@ export interface AgendaItem {
     nome: string
   } | null
   destinatarioId: string
+  vinculo?: {
+    funcaoId: string
+    funcaoNome: string
+    vinculoFuncionalId: string
+  } | null
   rsvp: {
     resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI'
     justificativa?: string | null
     periodosParticipacao?: string[] | null
+    reconfirmacaoPendente?: boolean
+  } | null
+  conflito?: {
+    tipo: 'SOBREPOSICAO' | 'PROXIMIDADE'
+    janelaTransicaoMinutos: number
+    priorizado: boolean
+    conflitosResolvidos: boolean
+    atenuado: boolean
+    eventos: Array<{
+      eventoId: string
+      titulo: string
+      inicioEm: string
+      fimEm: string
+      tipo: 'SOBREPOSICAO' | 'PROXIMIDADE'
+    }>
   } | null
 }

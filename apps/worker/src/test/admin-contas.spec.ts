@@ -39,6 +39,7 @@ describe('Administração de contas — PR-ACC-05', () => {
         ('membro-comum', 'Usuário Comum', '11900000003', '2000-01-03', 'CART-COMUM', 'casa-1', 1),
         ('membro-sem-conta', 'Pessoa Sem Conta', '11900000004', '2000-01-04', 'CART-SEM-CONTA', 'casa-1', 1),
         ('membro-reset', 'Pessoa Reset', '11900000005', '2000-01-05', 'CART-RESET', 'casa-1', 1),
+        ('membro-sem-carteira', 'Pessoa Legada', '11900000008', '2000-01-08', NULL, 'casa-1', 1),
         ('membro-outra-regional', 'Pessoa Outra Regional', '11900000006', '2000-01-06', 'CART-OUTRA', 'casa-2', 1);
 
       INSERT INTO contas_acesso
@@ -48,6 +49,7 @@ describe('Administração de contas — PR-ACC-05', () => {
         ('conta-master', 'membro-master', 'ATIVA', 'hash-master', 'salt-master', CURRENT_TIMESTAMP),
         ('conta-comum', 'membro-comum', 'ATIVA', 'hash-comum', 'salt-comum', CURRENT_TIMESTAMP),
         ('conta-reset', 'membro-reset', 'ATIVA', 'hash-antigo', 'salt-antigo', CURRENT_TIMESTAMP),
+        ('conta-sem-carteira', 'membro-sem-carteira', 'ATIVA', 'hash-legado', 'salt-legado', CURRENT_TIMESTAMP),
         ('conta-outra', 'membro-outra-regional', 'ATIVA', 'hash-outra', 'salt-outra', CURRENT_TIMESTAMP);
 
       INSERT INTO acessos_conta
@@ -259,6 +261,75 @@ describe('Administração de contas — PR-ACC-05', () => {
     expect(links.total).toBe(0)
   })
 
+  it('não gera link de ativação quando a carteirinha ainda não está cadastrada', async () => {
+    const tokenAdmin = 'token-admin-sem-carteira-link'
+    await criarSessao('sessao-admin-sem-carteira-link', 'conta-admin', 'membro-admin', tokenAdmin)
+
+    sqlite.prepare(`UPDATE contas_acesso SET status = 'PENDENTE_ATIVACAO' WHERE id = 'conta-sem-carteira'`).run()
+
+    const response = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-sem-carteira/link-ativacao',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenAdmin}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }
+    )
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'CARTEIRINHA_OBRIGATORIA' })
+    const links = sqlite.prepare(
+      "SELECT COUNT(*) AS total FROM links_ativacao WHERE conta_acesso_id = 'conta-sem-carteira'"
+    ).get() as any
+    expect(links.total).toBe(0)
+
+    sqlite.prepare(`UPDATE contas_acesso SET status = 'ATIVA' WHERE id = 'conta-sem-carteira'`).run()
+  })
+
+  it('não redefine PIN sem carteirinha e preserva a conta e as sessões', async () => {
+    const tokenAdmin = 'token-admin-sem-carteira-reset'
+    const tokenLegado = 'token-legado-ativo'
+    await criarSessao('sessao-admin-sem-carteira-reset', 'conta-admin', 'membro-admin', tokenAdmin)
+    await criarSessao('sessao-legada', 'conta-sem-carteira', 'membro-sem-carteira', tokenLegado)
+
+    const response = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-sem-carteira/reset-pin',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenAdmin}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }
+    )
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'CARTEIRINHA_OBRIGATORIA' })
+
+    const conta = sqlite.prepare(
+      "SELECT status, pin_hash, pin_salt FROM contas_acesso WHERE id = 'conta-sem-carteira'"
+    ).get() as any
+    expect(conta).toMatchObject({
+      status: 'ATIVA',
+      pin_hash: 'hash-legado',
+      pin_salt: 'salt-legado',
+    })
+
+    const sessao = sqlite.prepare(
+      "SELECT revogado_em FROM sessoes WHERE id = 'sessao-legada'"
+    ).get() as any
+    expect(sessao.revogado_em).toBeNull()
+
+    const links = sqlite.prepare(
+      "SELECT COUNT(*) AS total FROM links_ativacao WHERE conta_acesso_id = 'conta-sem-carteira'"
+    ).get() as any
+    expect(links.total).toBe(0)
+  })
+
   it('redefine PIN, revoga sessões e links anteriores e registra auditoria', async () => {
     const tokenAdmin = 'token-admin-reset'
     const tokenAnterior = 'token-sessao-anterior'
@@ -449,9 +520,160 @@ describe('Administração de contas — PR-ACC-05', () => {
     expect((await response.json()) as any).toMatchObject({ code: 'AUTO_BLOQUEIO' })
   })
 
-  it('revoga sessões manualmente sem alterar o estado da conta', async () => {
-    const tokenAdmin = 'token-admin-revogacao'
-    await criarSessao('sessao-admin-revogacao', 'conta-admin', 'membro-admin', tokenAdmin)
+
+  it('impede Administrador regional de listar ou revogar sessões', async () => {
+    const tokenAdmin = 'token-admin-sem-gestao-sessoes'
+    await criarSessao('sessao-admin-sem-gestao-sessoes', 'conta-admin', 'membro-admin', tokenAdmin)
+    await criarSessao('sessao-alvo-protegida', 'conta-reset', 'membro-reset', 'token-alvo-protegida')
+
+    const listar = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-reset/sessoes',
+      { headers: { Authorization: `Bearer ${tokenAdmin}` } }
+    )
+    expect(listar.status).toBe(403)
+
+    const revogarUma = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-reset/sessoes/sessao-alvo-protegida/revogar',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenAdmin}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }
+    )
+    expect(revogarUma.status).toBe(403)
+
+    const revogarTodas = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-reset/revogar-sessoes',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenAdmin}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }
+    )
+    expect(revogarTodas.status).toBe(403)
+
+    const sessao = sqlite.prepare(
+      `SELECT revogado_em FROM sessoes WHERE id = 'sessao-alvo-protegida'`
+    ).get() as any
+    expect(sessao.revogado_em).toBeNull()
+  })
+
+  it('lista sessões ativas com identificação segura e permite ao Master revogar uma sessão específica', async () => {
+    const tokenMaster = 'token-master-sessoes-individuais'
+    await criarSessao('sessao-master-individual', 'conta-master', 'membro-master', tokenMaster)
+    await criarSessao('sessao-alvo-1', 'conta-reset', 'membro-reset', 'token-alvo-1')
+    await criarSessao('sessao-alvo-2', 'conta-reset', 'membro-reset', 'token-alvo-2')
+    await criarSessao('sessao-expirada-inatividade', 'conta-reset', 'membro-reset', 'token-expirada')
+
+    sqlite.prepare(
+      `UPDATE sessoes
+       SET user_agent = ?, ultimo_acesso_em = ?
+       WHERE id = ?`
+    ).run(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154.0.0.0 Safari/537.36',
+      new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+      'sessao-alvo-1'
+    )
+
+    sqlite.prepare(
+      `UPDATE sessoes
+       SET created_at = ?, ultimo_acesso_em = ?, expira_em = ?
+       WHERE id = ?`
+    ).run(
+      new Date(Date.now() - 13 * 60 * 60 * 1000).toISOString(),
+      new Date(Date.now() - 13 * 60 * 60 * 1000).toISOString(),
+      new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+      'sessao-expirada-inatividade'
+    )
+
+    const listar = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-reset/sessoes',
+      {
+        headers: { Authorization: `Bearer ${tokenMaster}` },
+      }
+    )
+
+    expect(listar.status).toBe(200)
+    const sessoes = (await listar.json()) as any[]
+    expect(sessoes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'sessao-alvo-1',
+          dispositivo: 'Chrome em Windows',
+        }),
+        expect.objectContaining({ id: 'sessao-alvo-2' }),
+      ])
+    )
+    expect(sessoes.some(sessao => sessao.id === 'sessao-expirada-inatividade')).toBe(false)
+
+    const revogar = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-reset/sessoes/sessao-alvo-1/revogar',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenMaster}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }
+    )
+
+    expect(revogar.status).toBe(200)
+
+    const revogada = sqlite.prepare(
+      `SELECT revogado_em FROM sessoes WHERE id = 'sessao-alvo-1'`
+    ).get() as any
+    const preservada = sqlite.prepare(
+      `SELECT revogado_em FROM sessoes WHERE id = 'sessao-alvo-2'`
+    ).get() as any
+
+    expect(revogada.revogado_em).toBeTruthy()
+    expect(preservada.revogado_em).toBeNull()
+
+    const auditoria = sqlite.prepare(
+      `SELECT acao, contexto FROM auditoria_logs
+       WHERE recurso_id = 'conta-reset' AND acao = 'SESSAO_REVOGADA'`
+    ).get() as any
+    expect(auditoria.acao).toBe('SESSAO_REVOGADA')
+    expect(JSON.parse(auditoria.contexto)).toMatchObject({
+      membroId: 'membro-reset',
+      sessaoId: 'sessao-alvo-1',
+    })
+  })
+
+  it('não permite ao Master revogar sessão de outra conta pelo membro alvo', async () => {
+    const tokenMaster = 'token-master-sessao-fora'
+    await criarSessao('sessao-master-fora', 'conta-master', 'membro-master', tokenMaster)
+    await criarSessao('sessao-outra-conta', 'conta-outra', 'membro-outra-regional', 'token-outra')
+
+    const response = await requisicao(
+      '/api/v1/admin/acessos/membros/membro-reset/sessoes/sessao-outra-conta/revogar',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenMaster}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      }
+    )
+
+    expect(response.status).toBe(404)
+    const sessao = sqlite.prepare(
+      `SELECT revogado_em FROM sessoes WHERE id = 'sessao-outra-conta'`
+    ).get() as any
+    expect(sessao.revogado_em).toBeNull()
+  })
+
+  it('permite ao Master revogar todas as sessões sem alterar o estado da conta', async () => {
+    const tokenMaster = 'token-master-revogacao'
+    await criarSessao('sessao-master-revogacao', 'conta-master', 'membro-master', tokenMaster)
     await criarSessao('sessao-alvo-revogacao', 'conta-reset', 'membro-reset', 'token-alvo-revogacao')
 
     const response = await requisicao(
@@ -459,7 +681,7 @@ describe('Administração de contas — PR-ACC-05', () => {
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${tokenAdmin}`,
+          Authorization: `Bearer ${tokenMaster}`,
           'Content-Type': 'application/json',
         },
         body: '{}',
@@ -483,7 +705,7 @@ describe('Administração de contas — PR-ACC-05', () => {
     ).get() as any
     expect(auditoria).toMatchObject({
       acao: 'SESSOES_REVOGADAS',
-      ator_conta_acesso_id: 'conta-admin',
+      ator_conta_acesso_id: 'conta-master',
     })
   })
 

@@ -18,7 +18,7 @@ ativacaoApp.post('/', async c => {
     return c.json({ error: 'Dados inválidos', details: result.error.flatten() }, 400)
   }
 
-  const { token, celular, pin } = result.data
+  const { token, codigoCarteirinha, celular, pin } = result.data
   const hashedToken = await hashToken(token)
   const db = c.get('db')
 
@@ -76,14 +76,14 @@ ativacaoApp.post('/', async c => {
     return c.json({ error: 'Link de ativação inválido ou expirado' }, 400)
   }
 
-  if (membro.celular !== celular) {
+  if (membro.celular !== celular || membro.codigoCarteirinha !== codigoCarteirinha) {
     await db.insert(schema.tentativasAcesso).values({
       id: crypto.randomUUID(),
       contaAcessoId: conta.id,
       membroId: membro.id,
       tipo: 'ATIVACAO',
       sucesso: false,
-      motivo: 'Celular não confere',
+      motivo: 'Dados cadastrais não conferem',
     })
     return c.json({ error: 'Dados informados não conferem com o cadastro' }, 400)
   }

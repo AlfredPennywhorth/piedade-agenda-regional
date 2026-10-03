@@ -11,14 +11,16 @@ const mapStatusRsvpLabel: Record<string, string> = {
   PARTICIPAREI: 'Participarei',
   NAO_PARTICIPAREI: 'Não Participarei',
   NAO_SEI: 'Não Sei',
-  SEM_RESPOSTA: 'Sem Resposta'
+  SEM_RESPOSTA: 'Sem Resposta',
+  RECONFIRMAR: 'Reconfirmar'
 }
 
 const mapStatusRsvpColor: Record<string, string> = {
   PARTICIPAREI: 'bg-green-100 text-green-800',
   NAO_PARTICIPAREI: 'bg-red-100 text-red-800',
   NAO_SEI: 'bg-yellow-100 text-yellow-800',
-  SEM_RESPOSTA: 'bg-slate-100 text-slate-800'
+  SEM_RESPOSTA: 'bg-slate-100 text-slate-800',
+  RECONFIRMAR: 'bg-amber-100 text-amber-800'
 }
 
 export function AcompanhamentoRsvpModal({ convocacaoId, onClose }: Props) {
@@ -143,6 +145,9 @@ export function AcompanhamentoRsvpModal({ convocacaoId, onClose }: Props) {
                       Nome do Membro
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                      Vínculo
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                       Resposta RSVP
                     </th>
                   </tr>
@@ -153,9 +158,12 @@ export function AcompanhamentoRsvpModal({ convocacaoId, onClose }: Props) {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
                         {item.membroNome}
                       </td>
+                      <td className="px-6 py-4 text-sm text-slate-700">
+                        {item.vinculo?.funcaoNome || '—'}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${mapStatusRsvpColor[item.respostaRsvp] || mapStatusRsvpColor.SEM_RESPOSTA}`}>
-                          {mapStatusRsvpLabel[item.respostaRsvp] || mapStatusRsvpLabel.SEM_RESPOSTA}
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.reconfirmacaoPendente ? mapStatusRsvpColor.RECONFIRMAR : (mapStatusRsvpColor[item.respostaRsvp] || mapStatusRsvpColor.SEM_RESPOSTA)}`}>
+                          {item.reconfirmacaoPendente ? mapStatusRsvpLabel.RECONFIRMAR : (mapStatusRsvpLabel[item.respostaRsvp] || mapStatusRsvpLabel.SEM_RESPOSTA)}
                         </span>
                       </td>
                     </tr>

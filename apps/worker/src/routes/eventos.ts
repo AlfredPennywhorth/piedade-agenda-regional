@@ -1,13 +1,76 @@
 import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
-import { eventos, funcoes, vinculosFuncionais } from '../db/schema'
+import { eventos, funcoes, vinculosFuncionais, convocacoes, convocacaoFuncoes, locais, espacosLocal } from '../db/schema'
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
-import { executarOperacaoComAudit, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
+import { executarOperacaoComAudit, executarOperacaoComAudits, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
 import { obterEscoposTerritoriaisVisiveis, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
 export const eventosRouter = new Hono<any>()
+
+function mesmoInstante(a: string, b: string) {
+  return new Date(a).getTime() === new Date(b).getTime()
+}
+
+function formatarDataHoraAgenda(valor: string) {
+  return new Date(valor).toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+async function criarAvisoAlteracaoMaterial(db: any, anterior: any, atual: any) {
+  const partes: string[] = []
+
+  if (!mesmoInstante(anterior.inicioEm, atual.inicioEm) || !mesmoInstante(anterior.fimEm, atual.fimEm)) {
+    partes.push(
+      `Horário: ${formatarDataHoraAgenda(anterior.inicioEm)}–${formatarDataHoraAgenda(anterior.fimEm)} → ${formatarDataHoraAgenda(atual.inicioEm)}–${formatarDataHoraAgenda(atual.fimEm)}`
+    )
+  }
+
+  if (anterior.modalidade !== atual.modalidade) {
+    partes.push(`Modalidade: ${anterior.modalidade} → ${atual.modalidade}`)
+  }
+
+  if (anterior.localId !== atual.localId) {
+    const [localAnterior, localAtual] = await Promise.all([
+      anterior.localId ? db.select({ nome: locais.nome }).from(locais).where(eq(locais.id, anterior.localId)).get() : null,
+      atual.localId ? db.select({ nome: locais.nome }).from(locais).where(eq(locais.id, atual.localId)).get() : null,
+    ])
+    partes.push(`Local: ${localAnterior?.nome ?? 'sem local'} → ${localAtual?.nome ?? 'sem local'}`)
+  }
+
+  if (anterior.espacoId !== atual.espacoId) {
+    const [espacoAnterior, espacoAtual] = await Promise.all([
+      anterior.espacoId ? db.select({ nome: espacosLocal.nome }).from(espacosLocal).where(eq(espacosLocal.id, anterior.espacoId)).get() : null,
+      atual.espacoId ? db.select({ nome: espacosLocal.nome }).from(espacosLocal).where(eq(espacosLocal.id, atual.espacoId)).get() : null,
+    ])
+    partes.push(`Espaço: ${espacoAnterior?.nome ?? 'sem espaço'} → ${espacoAtual?.nome ?? 'sem espaço'}`)
+  }
+
+  if (anterior.urlOnline !== atual.urlOnline) {
+    partes.push(`Acesso online: ${anterior.urlOnline ? 'link anterior' : 'sem link'} → ${atual.urlOnline ? 'novo link disponível' : 'removido'}`)
+  }
+
+  if (partes.length === 0) return null
+  return `Atenção! O evento "${anterior.titulo}" foi alterado. ${partes.join('; ')}. Favor reconfirmar sua presença.`
+}
+
+function houveAlteracaoMaterial(anterior: any, atual: any) {
+  return (
+    !mesmoInstante(anterior.inicioEm, atual.inicioEm) ||
+    !mesmoInstante(anterior.fimEm, atual.fimEm) ||
+    anterior.modalidade !== atual.modalidade ||
+    anterior.localId !== atual.localId ||
+    anterior.espacoId !== atual.espacoId ||
+    anterior.urlOnline !== atual.urlOnline
+  )
+}
 
 function eventoVisivelNoEscopo(evento: any, escopos: any): boolean {
   if (escopos.tudo) return true
@@ -229,6 +292,125 @@ eventosRouter.post('/', async (c) => {
   }
 })
 
+eventosRouter.post('/:id/cancelar', async (c) => {
+  const db = c.get('db')
+  const id = c.req.param('id')
+
+  const evento = await db.select().from(eventos).where(eq(eventos.id, id)).get()
+  if (!evento) return c.json({ error: 'Evento não encontrado' }, 404)
+  if (!evento.ativo) return c.json({ error: 'Evento já está cancelado', code: 'EVENTO_JA_CANCELADO' }, 409)
+
+  if (new Date(evento.fimEm).getTime() <= Date.now()) {
+    return c.json({
+      error: 'Eventos já encerrados não podem ser alterados. O registro deve preservar o que efetivamente ocorreu.',
+      code: 'EVENTO_PASSADO_IMUTAVEL'
+    }, 409)
+  }
+
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+  const atorMembroId = c.get('membroId') || null
+  if (!atorMembroId || !escopoTipo || !escopoId) {
+    return c.json({ error: 'Escopo da Agenda indisponível', code: 'FORBIDDEN' }, 403)
+  }
+
+  const autorizado = await podeGerenciarAgendaNoEscopo(
+    db,
+    atorMembroId,
+    escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+    escopoId
+  )
+  if (!autorizado) {
+    return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
+  }
+
+  const convocacao = await db
+    .select()
+    .from(convocacoes)
+    .where(eq(convocacoes.eventoId, id))
+    .get()
+
+  if (convocacao?.status === 'PUBLICADA') {
+    return c.json({
+      error: 'O evento possui convocação PUBLICADA. Cancele primeiro a convocação antes de cancelar o evento.',
+      code: 'EVENTO_COM_CONVOCACAO_PUBLICADA'
+    }, 409)
+  }
+
+  const agoraIso = new Date().toISOString()
+  const audits: AuditLogData[] = []
+
+  if (convocacao && convocacao.status === 'RASCUNHO') {
+    audits.push({
+      acao: 'CONVOCACAO_CANCELADA',
+      atorMembroId,
+      recursoTipo: 'CONVOCACAO',
+      recursoId: convocacao.id,
+      escopoTipo,
+      escopoId,
+      contexto: {
+        eventoId: id,
+        motivo: 'CANCELAMENTO_EVENTO'
+      }
+    })
+  }
+
+  audits.push({
+    acao: 'EVENTO_CANCELADO',
+    atorMembroId,
+    recursoTipo: 'EVENTO',
+    recursoId: id,
+    escopoTipo,
+    escopoId,
+    contexto: {
+      titulo: evento.titulo,
+      convocacaoId: convocacao?.id ?? null,
+      convocacaoStatusAnterior: convocacao?.status ?? null
+    }
+  })
+
+  await executarOperacaoComAudits(
+    db,
+    qdb => {
+      const queries: any[] = []
+
+      if (convocacao?.status === 'RASCUNHO') {
+        queries.push(
+          qdb.delete(convocacaoFuncoes).where(eq(convocacaoFuncoes.convocacaoId, convocacao.id)),
+          qdb.update(convocacoes)
+            .set({
+              status: 'CANCELADA',
+              ativo: false,
+              canceladaEm: agoraIso,
+              updatedAt: agoraIso
+            })
+            .where(eq(convocacoes.id, convocacao.id))
+        )
+      }
+
+      queries.push(
+        qdb.update(eventos)
+          .set({
+            ativo: false,
+            recorrenciaExcecao: evento.serieRecorrenciaId ? true : evento.recorrenciaExcecao,
+            agendaRevisao: agoraIso,
+            updatedAt: agoraIso
+          })
+          .where(eq(eventos.id, id))
+      )
+
+      return queries
+    },
+    audits
+  )
+
+  return c.json({
+    success: true,
+    eventoId: id,
+    convocacaoId: convocacao?.id ?? null,
+    convocacaoCancelada: convocacao?.status === 'RASCUNHO'
+  })
+})
+
 eventosRouter.patch('/:id', async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')
@@ -238,6 +420,13 @@ eventosRouter.patch('/:id', async (c) => {
     
     const existing = await db.select().from(eventos).where(eq(eventos.id, id)).get()
     if (!existing) return c.json({ error: 'Evento não encontrado' }, 404)
+
+    if (new Date(existing.fimEm).getTime() <= Date.now()) {
+      return c.json({
+        error: 'Eventos já encerrados não podem ser alterados. O registro deve preservar o que efetivamente ocorreu.',
+        code: 'EVENTO_PASSADO_IMUTAVEL'
+      }, 409)
+    }
 
     // Validar estado final mesclado (existente + patch) com EventoCreate
     const merged = { ...existing, ...parsed }
@@ -289,6 +478,12 @@ eventosRouter.patch('/:id', async (c) => {
     // PMO Rule: Ao alterar uma ocorrência individual, preservar serie_recorrencia_id e marcar recorrencia_excecao = true.
     const isExcecao = existing.serieRecorrenciaId !== null ? true : existing.recorrenciaExcecao
     const nowIso = new Date().toISOString()
+    const ativacaoAlterada =
+      parsed.ativo !== undefined && parsed.ativo !== existing.ativo
+    const alteracaoMaterial = houveAlteracaoMaterial(existing, merged)
+    const agendaAviso = alteracaoMaterial
+      ? await criarAvisoAlteracaoMaterial(db, existing, merged)
+      : existing.agendaAviso
 
     const atorMembroId = c.get('membroId') || null
 
@@ -303,6 +498,8 @@ eventosRouter.patch('/:id', async (c) => {
         titulo: existing.titulo,
         modalidade: existing.modalidade,
         camposAlterados: Object.keys(parsed),
+        alteracaoMaterial,
+        agendaAviso: alteracaoMaterial ? agendaAviso : null,
       },
     }
 
@@ -310,7 +507,13 @@ eventosRouter.patch('/:id', async (c) => {
       db,
       (qdb) => [
         qdb.update(eventos)
-          .set({ ...parsed, recorrenciaExcecao: isExcecao, updatedAt: nowIso })
+          .set({
+            ...parsed,
+            recorrenciaExcecao: isExcecao,
+            agendaRevisao: alteracaoMaterial || ativacaoAlterada ? nowIso : existing.agendaRevisao,
+            agendaAviso,
+            updatedAt: nowIso,
+          })
           .where(eq(eventos.id, id))
       ],
       auditData

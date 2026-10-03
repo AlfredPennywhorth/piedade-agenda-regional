@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { eq, and } from 'drizzle-orm'
-import { rsvp, convocacoes, convocacaoDestinatarios, eventos } from '../db/schema'
+import { eq, and, sql } from 'drizzle-orm'
+import { rsvp, convocacoes, convocacaoDestinatarios, eventos, agendaPrioridadesConflito } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { RsvpUpsert } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
@@ -158,6 +158,20 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
           }
         })
       txQueries.push(txRsvp)
+
+      if (parsed.resposta === 'NAO_PARTICIPAREI') {
+        txQueries.push(
+          tx.delete(agendaPrioridadesConflito).where(
+            and(
+              eq(agendaPrioridadesConflito.membroId, membroId),
+              sql`(
+                substr(${agendaPrioridadesConflito.conflitoParChave}, 1, instr(${agendaPrioridadesConflito.conflitoParChave}, '|') - 1) = ${record.eventoId}
+                OR substr(${agendaPrioridadesConflito.conflitoParChave}, instr(${agendaPrioridadesConflito.conflitoParChave}, '|') + 1) = ${record.eventoId}
+              )`
+            )
+          )
+        )
+      }
 
       const auditQuery = criarAuditQuery(tx, {
         acao: 'RSVP_REGISTRADO',

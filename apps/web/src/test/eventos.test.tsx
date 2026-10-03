@@ -71,6 +71,214 @@ describe('EventosView', () => {
     })
   })
 
+  it('deve cancelar evento e removê-lo da lista operacional', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.mocked(apiClient.postWithAuth).mockResolvedValueOnce({
+      success: true,
+      eventoId: EVENTO_ID,
+      convocacaoId: null,
+      convocacaoCancelada: false,
+    })
+
+    render(<EventosView />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Reunião Presencial')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /cancelar evento/i }))
+
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/eventos/${EVENTO_ID}/cancelar`, {})
+      expect(screen.queryByText('Reunião Presencial')).not.toBeInTheDocument()
+    })
+  })
+
+  it('deve continuar o fluxo para convocação após criar evento', async () => {
+    const onEventoCriado = vi.fn()
+    const novoEvento = {
+      ...mockEventos[0],
+      id: '88888888-8888-4888-8888-888888888888',
+      titulo: 'Evento do fluxo',
+      modalidade: 'ONLINE',
+      localId: null,
+      urlOnline: 'https://meet.google.com/fluxo',
+    }
+    vi.mocked(apiClient.postWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return novoEvento
+      return {}
+    })
+
+    render(<EventosView onEventoCriado={onEventoCriado} />)
+    await screen.findByText('Reunião Presencial')
+
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+
+    fireEvent.change(within(dialog).getByLabelText(/título/i), { target: { value: 'Evento do fluxo' } })
+    fireEvent.change(within(dialog).getByLabelText(/início/i), { target: { value: '2026-10-10T10:00' } })
+    fireEvent.change(within(dialog).getByLabelText(/fim/i), { target: { value: '2026-10-10T12:00' } })
+    fireEvent.change(within(dialog).getByLabelText(/modalidade/i), { target: { value: 'ONLINE' } })
+    fireEvent.change(within(dialog).getByLabelText(/url online/i), { target: { value: 'https://meet.google.com/fluxo' } })
+    fireEvent.change(within(dialog).getByLabelText(/tipo de escopo/i), { target: { value: 'regional' } })
+    fireEvent.change(within(dialog).getByLabelText(/regional \*/i), { target: { value: REGIONAL_ID } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar evento/i }))
+
+    await waitFor(() => {
+      expect(onEventoCriado).toHaveBeenCalledWith(novoEvento.id)
+    })
+  })
+
+  it('deve criar Local e Espaço sem sair do formulário e selecioná-los', async () => {
+    const novoLocalId = '99999999-9999-4999-8999-999999999999'
+    const novoEspacoId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    vi.mocked(apiClient.postWithAuth).mockImplementation(async (url) => {
+      if (url === '/locais') return { id: novoLocalId, nome: 'Local Rápido' }
+      if (url === '/espacos-locais') return { id: novoEspacoId, localId: novoLocalId, nome: 'Sala Rápida', ativo: true }
+      return {}
+    })
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+
+    const eventoDialog = await screen.findByRole('dialog', { name: /novo evento/i })
+    fireEvent.click(within(eventoDialog).getByRole('button', { name: /criar local sem sair/i }))
+
+    const localDialog = await screen.findByRole('dialog', { name: /criar local/i })
+    fireEvent.change(within(localDialog).getByLabelText('Nome do novo local'), { target: { value: 'Local Rápido' } })
+    fireEvent.change(within(localDialog).getByLabelText('Endereço do novo local'), { target: { value: 'Rua Teste' } })
+    fireEvent.change(within(localDialog).getByLabelText('Número do novo local'), { target: { value: '10' } })
+    fireEvent.click(within(localDialog).getByRole('button', { name: /criar e selecionar/i }))
+
+    await waitFor(() => {
+      expect(within(eventoDialog).getByLabelText(/local \*/i)).toHaveValue(novoLocalId)
+    })
+
+    fireEvent.click(within(eventoDialog).getByRole('button', { name: /criar espaço sem sair/i }))
+    const espacoDialog = await screen.findByRole('dialog', { name: /criar espaço/i })
+    fireEvent.change(within(espacoDialog).getByLabelText('Nome do novo espaço'), { target: { value: 'Sala Rápida' } })
+    fireEvent.click(within(espacoDialog).getByRole('button', { name: /criar e selecionar/i }))
+
+    await waitFor(() => {
+      expect(within(eventoDialog).getByLabelText(/espaço/i)).toHaveValue(novoEspacoId)
+    })
+  })
+
+  it('deve consultar CEP no cadastro rápido de Local do evento', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        cep: '03127-001',
+        logradouro: 'Rua Ibitirama',
+        bairro: 'Vila Prudente',
+        localidade: 'São Paulo',
+        uf: 'SP',
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    try {
+      render(<EventosView />)
+      await screen.findByText('Reunião Presencial')
+      fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+
+      const eventoDialog = await screen.findByRole('dialog', { name: /novo evento/i })
+      fireEvent.click(within(eventoDialog).getByRole('button', { name: /criar local sem sair/i }))
+
+      const localDialog = await screen.findByRole('dialog', { name: /criar local/i })
+      fireEvent.change(within(localDialog).getByLabelText('CEP do novo local'), {
+        target: { value: '03127001' },
+      })
+
+      await waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledWith(
+          'https://viacep.com.br/ws/03127001/json/',
+          expect.objectContaining({ signal: expect.anything() })
+        )
+        expect(within(localDialog).getByLabelText('Endereço do novo local')).toHaveValue('Rua Ibitirama')
+        expect(within(localDialog).getByLabelText('Bairro do novo local')).toHaveValue('Vila Prudente')
+        expect(within(localDialog).getByLabelText('Cidade do novo local')).toHaveValue('São Paulo')
+        expect(within(localDialog).getByLabelText('UF do novo local')).toHaveValue('SP')
+      })
+
+      expect(within(localDialog).getByText('Endereço preenchido automaticamente pelo CEP.')).toBeInTheDocument()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('deve permitir cancelar consulta de CEP e preservar preenchimento manual', async () => {
+    let resolver: ((value: any) => void) | undefined
+    const pendente = new Promise<any>(resolve => {
+      resolver = resolve
+    })
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(pendente))
+
+    try {
+      render(<EventosView />)
+      await screen.findByText('Reunião Presencial')
+      fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+
+      const eventoDialog = await screen.findByRole('dialog', { name: /novo evento/i })
+      fireEvent.click(within(eventoDialog).getByRole('button', { name: /criar local sem sair/i }))
+
+      const localDialog = await screen.findByRole('dialog', { name: /criar local/i })
+      fireEvent.change(within(localDialog).getByLabelText('CEP do novo local'), {
+        target: { value: '03127001' },
+      })
+
+      const usarManual = await within(localDialog).findByRole('button', { name: /usar endereço manualmente/i })
+      fireEvent.click(usarManual)
+
+      const endereco = within(localDialog).getByLabelText('Endereço do novo local')
+      fireEvent.change(endereco, { target: { value: 'Rua Digitada Manualmente' } })
+      expect(endereco).toHaveValue('Rua Digitada Manualmente')
+      expect(within(localDialog).getByText('Consulta de CEP cancelada. Preencha o endereço manualmente.')).toBeInTheDocument()
+
+      await act(async () => {
+        resolver?.({
+          ok: true,
+          json: async () => ({
+            cep: '03127-001',
+            logradouro: 'Rua ViaCEP',
+            bairro: 'Vila Prudente',
+            localidade: 'São Paulo',
+            uf: 'SP',
+          }),
+        })
+        await pendente
+      })
+
+      expect(endereco).toHaveValue('Rua Digitada Manualmente')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('deve conter o foco no modal rápido de Local e restaurá-lo ao fechar', async () => {
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+
+    const eventoDialog = await screen.findByRole('dialog', { name: /novo evento/i })
+    const abrir = within(eventoDialog).getByRole('button', { name: /criar local sem sair/i })
+    abrir.focus()
+    fireEvent.click(abrir)
+
+    const localDialog = await screen.findByRole('dialog', { name: /criar local/i })
+    const primeiro = within(localDialog).getByLabelText('CEP do novo local')
+    await waitFor(() => expect(primeiro).toHaveFocus())
+
+    const ultimo = within(localDialog).getByRole('button', { name: /criar e selecionar/i })
+    ultimo.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(primeiro).toHaveFocus()
+
+    fireEvent.click(within(localDialog).getByRole('button', { name: /voltar ao evento/i }))
+    await waitFor(() => expect(abrir).toHaveFocus())
+  })
+
   it('deve exibir empty state quando não houver eventos', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/eventos') return []
@@ -204,6 +412,29 @@ describe('EventosView', () => {
         administracaoId: null,
       }))
     })
+  })
+
+  it('deve disponibilizar criação rápida de Local e Espaço durante a edição do evento', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === `/eventos/${EVENTO_ID}`) return mockEventos[0]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
+
+    const eventoDialog = await screen.findByRole('dialog', { name: /editar evento/i })
+
+    await waitFor(() => {
+      expect(eventoDialog.querySelector<HTMLSelectElement>('#localId')).toHaveValue(LOCAL_ID)
+    })
+
+    expect(within(eventoDialog).getByRole('button', { name: /criar local sem sair/i })).toBeInTheDocument()
+    expect(within(eventoDialog).getByRole('button', { name: /criar espaço sem sair/i })).toBeInTheDocument()
   })
 
   it('deve preservar espaço inativo já vinculado ao editar sem oferecê-lo em novo evento', async () => {
@@ -457,10 +688,7 @@ describe('EventosView', () => {
       expect(apiClient.patchWithAuth).toHaveBeenCalledWith(`/series-recorrencia/${SERIE_ID}`, expect.objectContaining({
         updateMode: 'THIS_AND_FUTURE',
         fromEventId: mockEventoRecorrente.id,
-        changes: expect.objectContaining({
-          titulo: 'Série Editada',
-          frequencia: 'DIARIA'
-        })
+        changes: { titulo: 'Série Editada' }
       }))
     })
   })
@@ -494,6 +722,9 @@ describe('EventosView', () => {
       expect(within(formDialog).getByLabelText(/título/i)).toHaveValue('Reunião Recorrente')
     })
 
+    fireEvent.change(within(formDialog).getByLabelText(/título/i), {
+      target: { value: 'Reunião Recorrente com erro' }
+    })
     fireEvent.click(getByRole('button', { name: /salvar série/i }))
 
     const confirmDialog = await screen.findByRole('dialog', { name: /confirmar edição/i })

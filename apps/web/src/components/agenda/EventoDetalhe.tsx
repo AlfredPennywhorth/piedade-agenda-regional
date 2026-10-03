@@ -12,6 +12,7 @@ interface EventoDetalheProps {
       resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI'
       justificativa?: string | null
       periodosParticipacao?: string[] | null
+      reconfirmacaoPendente?: boolean
     }
   ) => void
 }
@@ -20,6 +21,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
   const dialogRef = useRef<HTMLDialogElement>(null)
   
   const [respostaLocal, setRespostaLocal] = useState<string | null>(item.rsvp?.resposta ?? null)
+  const reconfirmacaoPendente = item.rsvp?.reconfirmacaoPendente ?? false
   const [ausenciaSelecionada, setAusenciaSelecionada] = useState(false)
   const [isEditingParticipacao, setIsEditingParticipacao] = useState(false)
   const [showQrModal, setShowQrModal] = useState(false)
@@ -141,7 +143,8 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
       const rsvpAtualizado = {
         resposta,
         justificativa: resposta === 'NAO_PARTICIPAREI' ? justificativa : null,
-        periodosParticipacao: resposta === 'PARTICIPAREI' ? (periodosLocal.length > 0 ? periodosLocal : null) : null
+        periodosParticipacao: resposta === 'PARTICIPAREI' ? (periodosLocal.length > 0 ? periodosLocal : null) : null,
+        reconfirmacaoPendente: false
       }
       
       setRespostaLocal(resposta)
@@ -233,6 +236,17 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
       </div>
 
       <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto text-slate-800">
+        {reconfirmacaoPendente && item.evento.agendaAviso && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950" role="alert">
+            <p className="font-semibold">Atenção: este evento foi alterado</p>
+            <p className="mt-1">{item.evento.agendaAviso}</p>
+            {item.rsvp?.resposta && (
+              <p className="mt-2 text-xs font-medium">
+                Sua resposta anterior foi preservada, mas precisa ser reconfirmada.
+              </p>
+            )}
+          </div>
+        )}
         
         <div className="flex gap-4">
           <div className="flex-1">
@@ -287,6 +301,13 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
               Acessar Transmissão Online
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
             </a>
+          </div>
+        )}
+
+        {item.vinculo?.funcaoNome && (
+          <div className="border-t border-slate-100 pt-6">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Vínculo da convocação</h3>
+            <p className="font-medium text-slate-900">{item.vinculo.funcaoNome}</p>
           </div>
         )}
 
@@ -361,8 +382,11 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
         <div className="border-t border-slate-100 pt-6 pb-2">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Sua Participação</h3>
-            {respostaLocal === 'PARTICIPAREI' && <span className="text-xs font-bold px-2 py-1 bg-green-100 text-green-700 rounded uppercase">Confirmado</span>}
-            {respostaLocal === 'NAO_PARTICIPAREI' && <span className="text-xs font-bold px-2 py-1 bg-red-100 text-red-700 rounded uppercase">Ausente</span>}
+            {reconfirmacaoPendente && (
+              <span className="text-xs font-bold px-2 py-1 bg-amber-100 text-amber-800 rounded uppercase">Reconfirmar</span>
+            )}
+            {!reconfirmacaoPendente && respostaLocal === 'PARTICIPAREI' && <span className="text-xs font-bold px-2 py-1 bg-green-100 text-green-700 rounded uppercase">Confirmado</span>}
+            {!reconfirmacaoPendente && respostaLocal === 'NAO_PARTICIPAREI' && <span className="text-xs font-bold px-2 py-1 bg-red-100 text-red-700 rounded uppercase">Ausente</span>}
             {respostaLocal === 'NAO_SEI' && <span className="text-xs font-bold px-2 py-1 bg-slate-200 text-slate-700 rounded uppercase">Pendente</span>}
           </div>
 

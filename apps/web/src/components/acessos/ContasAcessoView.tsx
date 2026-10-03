@@ -28,27 +28,81 @@ interface LinkTemporario {
   membroId: string
 }
 
+interface SessaoAdministrada {
+  id: string
+  criadoEm: string
+  ultimoAcessoEm: string | null
+  expiraEm: string
+  dispositivo: string | null
+}
+
+interface FeedbackConta {
+  membroId: string
+  tipo: 'status' | 'alert'
+  mensagem: string
+}
+
+interface LinkTemporarioContextual {
+  membroId: string
+  url: string
+  expiraEm: string
+  tipo: 'ATIVACAO' | 'REDEFINICAO'
+}
+
 function montarLink(token: string) {
   const url = new URL(window.location.origin + window.location.pathname)
   url.searchParams.set('ativacao', token)
   return url.toString()
 }
 
-export function ContasAcessoView() {
+function normalizarCelularWhatsApp(celular: string) {
+  const digitos = celular.replace(/\D/g, '')
+  if (digitos.startsWith('55') && (digitos.length === 12 || digitos.length === 13)) return digitos
+  if (digitos.length === 10 || digitos.length === 11) return `55${digitos}`
+  return null
+}
+
+function formatarExpiracao(expiraEm: string) {
+  const data = new Date(expiraEm)
+  if (Number.isNaN(data.getTime())) return expiraEm
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'America/Sao_Paulo',
+  }).format(data)
+}
+
+const formatarDataHora = formatarExpiracao
+
+interface ContasAcessoViewProps {
+  onPendenciasAtualizadas?: (quantidade: number) => void
+  podeGerenciarSessoes?: boolean
+}
+
+export function ContasAcessoView({
+  onPendenciasAtualizadas,
+  podeGerenciarSessoes = false,
+}: ContasAcessoViewProps = {}) {
   const [contas, setContas] = useState<ContaAdministrada[]>([])
   const [carregando, setCarregando] = useState(true)
   const [processando, setProcessando] = useState<string | null>(null)
-  const [erro, setErro] = useState<string | null>(null)
-  const [mensagem, setMensagem] = useState<string | null>(null)
-  const [linkTemporario, setLinkTemporario] = useState<string | null>(null)
+  const [erroGlobal, setErroGlobal] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<FeedbackConta | null>(null)
+  const [linkTemporario, setLinkTemporario] = useState<LinkTemporarioContextual | null>(null)
   const [gerenciandoMembroId, setGerenciandoMembroId] = useState<string | null>(null)
+  const [sessoesAbertasMembroId, setSessoesAbertasMembroId] = useState<string | null>(null)
+  const [sessoesPorMembro, setSessoesPorMembro] = useState<Record<string, SessaoAdministrada[]>>({})
 
   const carregar = async () => {
-    setErro(null)
+    setErroGlobal(null)
     try {
-      setContas(await fetchWithAuth<ContaAdministrada[]>('/admin/acessos'))
+      const dados = await fetchWithAuth<ContaAdministrada[]>('/admin/acessos')
+      setContas(dados)
+      onPendenciasAtualizadas?.(
+        dados.filter(conta => conta.recuperacaoPinPendente === true).length
+      )
     } catch (error) {
-      setErro(error instanceof ApiError ? error.message : 'Não foi possível carregar as contas.')
+      setErroGlobal(error instanceof ApiError ? error.message : 'Não foi possível carregar as contas.')
     } finally {
       setCarregando(false)
     }
@@ -57,6 +111,14 @@ export function ContasAcessoView() {
   useEffect(() => {
     void carregar()
   }, [])
+
+  useEffect(() => {
+    const membroId = feedback?.membroId ?? linkTemporario?.membroId
+    if (!membroId) return
+    const elemento = document.getElementById(`feedback-conta-${membroId}`)
+    elemento?.scrollIntoView?.({ block: 'nearest' })
+    elemento?.focus()
+  }, [feedback, linkTemporario])
 
   const gerarLink = async (conta: ContaAdministrada, redefinicao: boolean) => {
     if (
@@ -69,17 +131,29 @@ export function ContasAcessoView() {
     }
 
     setProcessando(conta.membroId)
-    setErro(null)
-    setLinkTemporario(null)
+    setFeedback(null)
     try {
       const endpoint = redefinicao
         ? `/admin/acessos/membros/${conta.membroId}/reset-pin`
         : `/admin/acessos/membros/${conta.membroId}/link-ativacao`
       const resposta = await postWithAuth<LinkTemporario>(endpoint, {})
-      setLinkTemporario(montarLink(resposta.token))
+      if (redefinicao) {
+        setSessoesAbertasMembroId(null)
+        setSessoesPorMembro(atual => ({ ...atual, [conta.membroId]: [] }))
+      }
+      setLinkTemporario({
+        membroId: conta.membroId,
+        url: montarLink(resposta.token),
+        expiraEm: resposta.expiraEm,
+        tipo: redefinicao ? 'REDEFINICAO' : 'ATIVACAO',
+      })
       await carregar()
     } catch (error) {
-      setErro(error instanceof ApiError ? error.message : 'Não foi possível gerar o link.')
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'alert',
+        mensagem: error instanceof ApiError ? error.message : 'Não foi possível gerar o link.',
+      })
     } finally {
       setProcessando(null)
     }
@@ -90,14 +164,81 @@ export function ContasAcessoView() {
     if (!window.confirm(`Confirma ${verbo} a conta de ${conta.nome}?`)) return
 
     setProcessando(conta.membroId)
-    setErro(null)
-    setMensagem(null)
+    setFeedback(null)
     try {
       await patchWithAuth(`/admin/acessos/membros/${conta.membroId}/status`, { status })
-      setMensagem(status === 'BLOQUEADA' ? 'Conta bloqueada e sessões revogadas.' : 'Conta desbloqueada.')
+      if (status === 'BLOQUEADA') {
+        setSessoesAbertasMembroId(null)
+        setSessoesPorMembro(atual => ({ ...atual, [conta.membroId]: [] }))
+      }
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'status',
+        mensagem: status === 'BLOQUEADA' ? 'Conta bloqueada e sessões revogadas.' : 'Conta desbloqueada.',
+      })
       await carregar()
     } catch (error) {
-      setErro(error instanceof ApiError ? error.message : 'Não foi possível alterar a conta.')
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'alert',
+        mensagem: error instanceof ApiError ? error.message : 'Não foi possível alterar a conta.',
+      })
+    } finally {
+      setProcessando(null)
+    }
+  }
+
+
+  const carregarSessoes = async (conta: ContaAdministrada) => {
+    if (sessoesAbertasMembroId === conta.membroId) {
+      setSessoesAbertasMembroId(null)
+      return
+    }
+
+    setProcessando(conta.membroId)
+    setFeedback(null)
+    try {
+      const sessoes = await fetchWithAuth<SessaoAdministrada[]>(
+        `/admin/acessos/membros/${conta.membroId}/sessoes`
+      )
+      setSessoesPorMembro(atual => ({ ...atual, [conta.membroId]: sessoes }))
+      setSessoesAbertasMembroId(conta.membroId)
+    } catch (error) {
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'alert',
+        mensagem: error instanceof ApiError ? error.message : 'Não foi possível carregar as sessões.',
+      })
+    } finally {
+      setProcessando(null)
+    }
+  }
+
+  const revogarSessao = async (conta: ContaAdministrada, sessao: SessaoAdministrada) => {
+    if (!window.confirm(`Revogar esta sessão de ${conta.nome}?`)) return
+
+    setProcessando(conta.membroId)
+    setFeedback(null)
+    try {
+      await postWithAuth(
+        `/admin/acessos/membros/${conta.membroId}/sessoes/${sessao.id}/revogar`,
+        {}
+      )
+      setSessoesPorMembro(atual => ({
+        ...atual,
+        [conta.membroId]: (atual[conta.membroId] ?? []).filter(item => item.id !== sessao.id),
+      }))
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'status',
+        mensagem: 'Sessão revogada com sucesso.',
+      })
+    } catch (error) {
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'alert',
+        mensagem: error instanceof ApiError ? error.message : 'Não foi possível revogar a sessão.',
+      })
     } finally {
       setProcessando(null)
     }
@@ -107,25 +248,76 @@ export function ContasAcessoView() {
     if (!window.confirm(`Revogar todas as sessões de ${conta.nome}?`)) return
 
     setProcessando(conta.membroId)
-    setErro(null)
-    setMensagem(null)
+    setFeedback(null)
     try {
       await postWithAuth(`/admin/acessos/membros/${conta.membroId}/revogar-sessoes`, {})
-      setMensagem('Todas as sessões da conta foram revogadas.')
+      setSessoesPorMembro(atual => ({ ...atual, [conta.membroId]: [] }))
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'status',
+        mensagem: 'Todas as sessões da conta foram revogadas.',
+      })
     } catch (error) {
-      setErro(error instanceof ApiError ? error.message : 'Não foi possível revogar as sessões.')
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'alert',
+        mensagem: error instanceof ApiError ? error.message : 'Não foi possível revogar as sessões.',
+      })
     } finally {
       setProcessando(null)
     }
   }
 
-  const copiarLink = async () => {
-    if (!linkTemporario) return
+  const copiarLink = async (membroId: string, url: string) => {
     try {
-      await navigator.clipboard.writeText(linkTemporario)
+      await navigator.clipboard.writeText(url)
     } catch {
-      setErro('Não foi possível copiar automaticamente. Selecione o link e copie manualmente.')
+      setFeedback({
+        membroId,
+        tipo: 'alert',
+        mensagem: 'Não foi possível copiar automaticamente. Selecione o link e copie manualmente.',
+      })
     }
+  }
+
+  const abrirWhatsApp = (conta: ContaAdministrada, link: LinkTemporarioContextual) => {
+    if (!conta.celular) {
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'alert',
+        mensagem: 'Cadastre um celular antes de enviar o link pelo WhatsApp.',
+      })
+      return
+    }
+
+    const telefone = normalizarCelularWhatsApp(conta.celular)
+    if (!telefone) {
+      setFeedback({
+        membroId: conta.membroId,
+        tipo: 'alert',
+        mensagem: 'O celular informado não é válido para envio pelo WhatsApp.',
+      })
+      return
+    }
+
+    const orientacao =
+      link.tipo === 'ATIVACAO'
+        ? 'Foi gerado um link individual para ativação da sua conta na Agenda Regional São Paulo. Acesse-o para criar seu PIN.'
+        : 'Foi gerado um link individual para redefinição do seu PIN na Agenda Regional São Paulo.'
+
+    const mensagem = [
+      `Caro irmão ${conta.nome}.`,
+      'A paz de Deus!',
+      orientacao,
+      link.url,
+      `O link é válido até ${formatarExpiracao(link.expiraEm)} (horário de São Paulo).`,
+      'Use-o apenas para a sua conta e não compartilhe este link com outras pessoas.',
+    ].join('\n\n')
+
+    const whatsappUrl = new URL('https://web.whatsapp.com/send')
+    whatsappUrl.searchParams.set('phone', telefone)
+    whatsappUrl.searchParams.set('text', mensagem)
+    window.open(whatsappUrl.toString(), '_blank', 'noopener,noreferrer')
   }
 
   if (carregando) {
@@ -141,43 +333,16 @@ export function ContasAcessoView() {
         </p>
       </header>
 
-      {mensagem && (
-        <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-          {mensagem}
-        </div>
-      )}
-
-      {erro && (
+      {erroGlobal && (
         <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          {erro}
-        </div>
-      )}
-
-      {linkTemporario && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-3">
-          <p className="font-semibold text-amber-900">Link temporário gerado</p>
-          <p className="text-xs text-amber-800">
-            Copie agora e envie somente ao titular. O link é individual, temporário e de uso único.
-          </p>
-          <input
-            readOnly
-            value={linkTemporario}
-            aria-label="Link temporário"
-            className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs"
-          />
-          <div className="flex gap-2">
-            <button type="button" onClick={() => void copiarLink()} className="rounded-lg bg-brand-700 px-3 py-2 text-sm font-semibold text-white">
-              Copiar link
-            </button>
-            <button type="button" onClick={() => setLinkTemporario(null)} className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-white">
-              Ocultar
-            </button>
-          </div>
+          {erroGlobal}
         </div>
       )}
 
       <div className="space-y-3">
-        {contas.map(conta => (
+        {[...contas]
+          .sort((a, b) => Number(Boolean(b.recuperacaoPinPendente)) - Number(Boolean(a.recuperacaoPinPendente)))
+          .map(conta => (
           <article key={conta.membroId} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -225,14 +390,26 @@ export function ContasAcessoView() {
                 )}
                 {conta.contaAcessoId && conta.status === 'ATIVA' && (
                   <>
-                    <button
-                      type="button"
-                      disabled={processando === conta.membroId}
-                      onClick={() => void revogarSessoes(conta)}
-                      className="rounded-lg border border-slate-400 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
-                    >
-                      Revogar sessões
-                    </button>
+                    {podeGerenciarSessoes && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={processando === conta.membroId}
+                          onClick={() => void carregarSessoes(conta)}
+                          className="rounded-lg border border-slate-400 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                        >
+                          {sessoesAbertasMembroId === conta.membroId ? 'Ocultar sessões' : 'Sessões ativas'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={processando === conta.membroId}
+                          onClick={() => void revogarSessoes(conta)}
+                          className="rounded-lg border border-slate-400 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                        >
+                          Revogar todas
+                        </button>
+                      </>
+                    )}
                     <button
                       type="button"
                       disabled={processando === conta.membroId}
@@ -255,6 +432,115 @@ export function ContasAcessoView() {
                 )}
               </div>
             </div>
+            {podeGerenciarSessoes && conta.contaAcessoId && conta.status === 'ATIVA' && sessoesAbertasMembroId === conta.membroId && (
+              <section className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3" aria-label={`Sessões ativas de ${conta.nome}`}>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900">Sessões ativas</h4>
+                    <p className="text-xs text-slate-500">
+                      Dispositivo aproximado com base nas informações do navegador.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-white px-2 py-1 text-xs text-slate-600">
+                    {(sessoesPorMembro[conta.membroId] ?? []).length}
+                  </span>
+                </div>
+                {(sessoesPorMembro[conta.membroId] ?? []).length === 0 ? (
+                  <p className="text-sm text-slate-600">Nenhuma sessão ativa.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {(sessoesPorMembro[conta.membroId] ?? []).map(sessao => (
+                      <li key={sessao.id} className="rounded-lg border border-slate-200 bg-white p-3">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="text-xs text-slate-600">
+                            <p className="font-semibold text-slate-800">
+                              {sessao.dispositivo || 'Dispositivo não identificado'}
+                            </p>
+                            <p>Criada em: {formatarDataHora(sessao.criadoEm)}</p>
+                            <p>
+                              Último uso: {sessao.ultimoAcessoEm
+                                ? formatarDataHora(sessao.ultimoAcessoEm)
+                                : 'sem uso posterior ao login'}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={processando === conta.membroId}
+                            onClick={() => void revogarSessao(conta, sessao)}
+                            className="rounded-lg border border-red-300 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-50"
+                          >
+                            Revogar esta sessão
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )}
+            {(feedback?.membroId === conta.membroId || linkTemporario?.membroId === conta.membroId) && (
+              <div
+                id={`feedback-conta-${conta.membroId}`}
+                tabIndex={-1}
+                className="mt-3 space-y-3 outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                {feedback?.membroId === conta.membroId && (
+                  <div
+                    role={feedback.tipo === 'alert' ? 'alert' : 'status'}
+                    className={`rounded-lg border p-3 text-sm ${
+                      feedback.tipo === 'alert'
+                        ? 'border-red-200 bg-red-50 text-red-700'
+                        : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    }`}
+                  >
+                    {feedback.mensagem}
+                  </div>
+                )}
+
+                {linkTemporario?.membroId === conta.membroId && (
+                  <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                    <div className="space-y-3">
+                      <p className="font-semibold">Link temporário gerado</p>
+                      <p className="text-xs">
+                        Copie agora e envie somente ao titular. O link é individual, temporário e de uso único.
+                      </p>
+                      <input
+                        readOnly
+                        value={linkTemporario.url}
+                        aria-label={`Link temporário de ${conta.nome}`}
+                        className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs text-slate-900"
+                      />
+                      <p className="text-xs">
+                        Validade: {formatarExpiracao(linkTemporario.expiraEm)}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void copiarLink(conta.membroId, linkTemporario.url)}
+                          className="rounded-lg bg-brand-700 px-3 py-2 text-sm font-semibold text-white"
+                        >
+                          Copiar link
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => abrirWhatsApp(conta, linkTemporario)}
+                          className="rounded-lg border border-emerald-600 px-3 py-2 text-sm font-semibold text-emerald-700"
+                        >
+                          Enviar pelo WhatsApp
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLinkTemporario(null)}
+                          className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-white"
+                        >
+                          Ocultar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {conta.acessos.length > 0 && (
               <ul className="mt-3 flex flex-wrap gap-2" aria-label="Perfis ativos">
                 {conta.acessos.map(acesso => (

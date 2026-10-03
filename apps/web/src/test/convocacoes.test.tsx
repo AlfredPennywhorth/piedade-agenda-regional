@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ConvocacoesView } from '../components/convocacoes/ConvocacoesView'
 import * as apiClient from '../api/apiClient'
@@ -271,6 +271,102 @@ describe('ConvocacoesView', () => {
     })
 
     expect(screen.getByText('Nenhuma convocação corresponde aos filtros selecionados.')).toBeInTheDocument()
+  })
+
+  it('deve abrir convocação pré-selecionada e seguir direto para Gerenciar Funções', async () => {
+    const novaConvocacaoId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    vi.mocked(apiClient.postWithAuth).mockImplementation(async (url) => {
+      if (url === '/convocacoes') {
+        return {
+          id: novaConvocacaoId,
+          eventoId: EVENTO_DISPONIVEL_ID,
+          status: 'RASCUNHO',
+          observacoes: '',
+          ativo: true,
+          createdAt: '2026-10-01T12:00:00.000Z',
+          updatedAt: '2026-10-01T12:00:00.000Z',
+        }
+      }
+      return {}
+    })
+
+    render(<ConvocacoesView initialEventoId={EVENTO_DISPONIVEL_ID} />)
+
+    const dialog = await screen.findByRole('dialog', { name: /nova convocação/i })
+    expect(within(dialog).getByLabelText('Evento da convocação')).toHaveValue(EVENTO_DISPONIVEL_ID)
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar/i }))
+
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith('/convocacoes', {
+        eventoId: EVENTO_DISPONIVEL_ID,
+        observacoes: '',
+      })
+      expect(screen.getByRole('dialog', { name: /gerenciar funções do rascunho/i })).toBeInTheDocument()
+    })
+  })
+
+  it('deve devolver o foco à tela de Convocações ao fechar Gerenciar Funções no fluxo guiado', async () => {
+    const novaConvocacaoId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    vi.mocked(apiClient.postWithAuth).mockImplementation(async (url) => {
+      if (url === '/convocacoes') {
+        return {
+          id: novaConvocacaoId,
+          eventoId: EVENTO_DISPONIVEL_ID,
+          status: 'RASCUNHO',
+          observacoes: '',
+          ativo: true,
+          createdAt: '2026-10-01T12:00:00.000Z',
+          updatedAt: '2026-10-01T12:00:00.000Z',
+        }
+      }
+      return {}
+    })
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === '/convocacoes') return mockConvocacoes
+      if (url === '/funcoes') return []
+      if (url === `/convocacoes/${novaConvocacaoId}/funcoes`) return []
+      return []
+    })
+
+    render(<ConvocacoesView initialEventoId={EVENTO_DISPONIVEL_ID} />)
+
+    const dialog = await screen.findByRole('dialog', { name: /nova convocação/i })
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar/i }))
+
+    const funcoesDialog = await screen.findByRole('dialog', { name: /gerenciar funções do rascunho/i })
+    fireEvent.click(within(funcoesDialog).getByRole('button', { name: /fechar/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /gerenciar funções do rascunho/i })).not.toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Convocações' })).toHaveFocus()
+    })
+  })
+
+  it('deve consumir o fluxo guiado ao dispensar o formulário', async () => {
+    const onFluxoConcluido = vi.fn()
+
+    render(
+      <ConvocacoesView
+        initialEventoId={EVENTO_DISPONIVEL_ID}
+        onFluxoConcluido={onFluxoConcluido}
+      />
+    )
+
+    const dialog = await screen.findByRole('dialog', { name: /nova convocação/i })
+    expect(within(dialog).getByLabelText('Evento da convocação')).toHaveValue(EVENTO_DISPONIVEL_ID)
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /cancelar/i }))
+
+    await waitFor(() => {
+      expect(onFluxoConcluido).toHaveBeenCalledTimes(1)
+      expect(screen.queryByRole('dialog', { name: /nova convocação/i })).not.toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /novo rascunho/i }))
+    const manual = await screen.findByRole('dialog', { name: /nova convocação/i })
+    expect(within(manual).getByLabelText('Evento da convocação')).toHaveValue('')
   })
 
   it('deve permitir criar um rascunho', async () => {
@@ -609,7 +705,7 @@ describe('ConvocacoesView', () => {
         if (url.includes('/acompanhamento-rsvp')) {
           return {
             data: [
-              { destinatarioId: '1', membroNome: 'João', respostaRsvp: 'PARTICIPAREI' },
+              { destinatarioId: '1', membroNome: 'João', respostaRsvp: 'PARTICIPAREI', vinculo: { funcaoId: 'f1', funcaoNome: 'Diácono da Casa de Oração', vinculoFuncionalId: 'v1' } },
               { destinatarioId: '2', membroNome: 'Maria', respostaRsvp: 'NAO_PARTICIPAREI' },
               { destinatarioId: '3', membroNome: 'Pedro', respostaRsvp: 'NAO_SEI' },
               { destinatarioId: '4', membroNome: 'Ana', respostaRsvp: 'SEM_RESPOSTA' },
@@ -639,6 +735,7 @@ describe('ConvocacoesView', () => {
       await waitFor(() => {
         expect(screen.getByText('Total de destinatários: 4')).toBeInTheDocument()
         expect(screen.getByText('João')).toBeInTheDocument()
+        expect(screen.getByText('Diácono da Casa de Oração')).toBeInTheDocument()
         expect(screen.getByText('Maria')).toBeInTheDocument()
         expect(screen.getByText('Pedro')).toBeInTheDocument()
         expect(screen.getByText('Ana')).toBeInTheDocument()
