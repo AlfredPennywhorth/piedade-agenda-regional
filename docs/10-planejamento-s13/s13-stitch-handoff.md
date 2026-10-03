@@ -58,25 +58,36 @@ A navegacao principal definida no projeto e:
 - Avisos
 - Meu Cadastro
 
-A navegacao condicional conforme capability inclui:
+A navegacao atual esta organizada assim:
 
-- Portaria
-- Relatorios
-- Auditoria
-- Eventos e Series
-- Convocacoes
-- Membros
-- Contas e Acessos
-- Regionais
-- Administracoes
-- Setores
-- Casas
-- Grupos de Trabalho
-- Funcoes
-- Vinculos
-- Locais e Espacos
+- barra inferior principal:
+  - Minha Agenda;
+  - Eventos, quando `podeGerirAgenda`;
+  - Calendario;
+  - Convocacoes, quando `podeGerirAgenda`;
+  - Mais.
+- grupo `Agenda e gestao` dentro de Mais:
+  - Series;
+  - Relatorios;
+  - Avisos;
+  - Portaria;
+  - Auditoria.
+- grupo `Administracao` dentro de Mais:
+  - Regionais;
+  - Administracoes;
+  - Setores;
+  - Casas;
+  - Grupos de Trabalho;
+  - Locais.
+- grupo `Pessoas e acessos` dentro de Mais:
+  - Membros;
+  - Funcoes;
+  - Vinculos;
+  - Acessos.
+- grupo `Conta` dentro de Mais:
+  - Meu Cadastro.
 
-O Stitch deve preservar esses nomes, seus agrupamentos atuais e a separacao entre navegacao principal e ferramentas administrativas. Nao devem ser inventados novos perfis de acesso. Novos agrupamentos visuais so podem ser propostos como alternativa de UX e devem ser explicitamente aprovados pelo PO antes de implementacao.
+O Stitch deve preservar esses nomes, agrupamentos e a separacao entre navegacao principal e ferramentas administrativas. Nao devem ser inventados novos perfis de acesso. Novos agrupamentos visuais so podem ser propostos como alternativa de UX e devem ser explicitamente aprovados pelo PO antes de implementacao.
 
 ## 5. Perfis e capabilities relevantes
 
@@ -85,13 +96,15 @@ O frontend consulta as capabilities retornadas por `auth/me` para controlar tant
 - `podeOperarPortaria` ou `podeGerirAgenda`: permite Portaria;
 - `podeVisualizarRelatorios`: permite Relatorios;
 - `podeVisualizarAuditoria`: permite Auditoria;
-- `podeAdministrarAcessos`: permite Contas e Acessos;
+- `podeAdministrarAcessos`: permite a superficie Acessos;
 - `podeAdministrarEstrutura`: agrupa Regionais, Administracoes, Setores, Casas e Grupos de Trabalho;
 - `podeAdministrarPessoas`: agrupa Membros e Vinculos Funcionais;
 - `podeAdministrarFuncoes`: permite Funcoes;
-- `podeGerirAgenda`: agrupa Eventos, Series, Convocacoes e Locais/Espacos.
+- `podeGerirAgenda`: agrupa Eventos, Series, Convocacoes e Locais;
+- `podeAdministrarRegionais`: nao cria nova aba; dentro de Regionais, controla se acoes de criacao/edicao ficam disponiveis;
+- `podeGerenciarSessoes`: nao cria nova aba; dentro de Acessos, controla consulta e revogacao de sessoes.
 
-As capabilities podem ser compartilhadas por varias superficies. O Stitch deve preservar esses agrupamentos de autorizacao; a existencia de uma tela no inventario nao implica capability exclusiva para ela.
+As capabilities podem ser compartilhadas por varias superficies e tambem controlar acoes internas dentro de uma superficie já acessivel. O Stitch deve preservar esses agrupamentos de autorizacao; a existencia de uma tela no inventario nao implica capability exclusiva para ela.
 
 Minha Agenda, Calendario, Avisos e Meu Cadastro formam a navegacao principal do usuario comum. A proposta visual deve manter a diferenca entre navegacao principal e ferramentas condicionais/administrativas, sem criar novas capabilities nem presumir permissoes nao definidas. O inventario visual deve refletir as superficies realmente expostas pela aplicacao atual.
 
@@ -128,7 +141,7 @@ A aplicacao continuara sendo unica e responsiva, com os mesmos contratos, permis
 | --- | --- | --- | --- |
 | Usuario comum em PWA/celular | MOBILE_FIRST | Minha Agenda, Calendario, RSVP, QR Code, notificacoes, Portaria | Navegacao simples, cards, acoes rapidas, poucos passos, alvos de toque grandes e operacao de check-in adequada ao celular. |
 | Master e administradores em computador | DESKTOP_FIRST | Eventos, Series, Convocacoes, Membros, Contas e Acessos, Regionais, Administracoes, Setores, Casas, Grupos de Trabalho, Funcoes, Vinculos, Locais/Espacos, Relatorios, Auditoria | Tabelas e formularios amplos, filtros persistentes, contexto simultaneo, paineis laterais e uso eficiente da largura. |
-| Fluxos compartilhados | RESPONSIVO_DUAL | Login, Meu Cadastro, consultas simples, relatorios leves | Manter equivalencia funcional, com composicao adequada a cada breakpoint. |
+| Fluxos compartilhados | RESPONSIVO_DUAL | Login, Meu Cadastro, consultas simples | Manter equivalencia funcional, com composicao adequada a cada breakpoint. |
 
 A proposta deve considerar que configuracao e manutencao administrativa serao realizadas preferencialmente em computador. A experiencia mobile dessas telas administrativas pode permanecer funcional, mas nao deve limitar o desenho desktop.
 
@@ -165,7 +178,7 @@ Essas dividas nao sao pre-condicao para iniciar o trabalho com o Stitch; elas fa
 3. Avisos, evoluindo o controle de notificacoes para uma tela compreensivel de preferencias.
 4. Meu Cadastro, classificado como RESPONSIVO_DUAL, preservando consulta de dados institucionais, atualizacao de celular e alteracao de PIN.
 5. Login e ativacao/redefinicao de PIN, classificados como RESPONSIVO_DUAL, preservando os fluxos existentes de autenticacao, ativacao e solicitacao de redefinicao.
-6. Portaria, classificada como MOBILE_FIRST, e Relatorios/Auditoria, classificados como DESKTOP_FIRST, preservando os acessos condicionais e priorizando os respectivos contextos operacionais.
+6. Portaria, classificada como MOBILE_FIRST, e Relatorios/Auditoria, classificados integralmente como DESKTOP_FIRST, preservando os acessos condicionais e priorizando os respectivos contextos operacionais.
 
 ## 11. Estados especiais
 
