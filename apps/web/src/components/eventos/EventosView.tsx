@@ -805,9 +805,8 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     )
     if (!confirmou) return
 
-    const iniciadoNoDetalhe = eventoDetalheIdRef.current === item.id
     setErro(null)
-    if (iniciadoNoDetalhe) setErroDetalhe(null)
+    if (eventoDetalheIdRef.current === item.id) setErroDetalhe(null)
 
     try {
       await postWithAuth(`/eventos/${item.id}/cancelar`, {})
@@ -823,9 +822,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
             ? (err.message || 'Não foi possível cancelar o evento.')
             : 'Não foi possível cancelar o evento.'
       setErro(mensagem)
-      if (iniciadoNoDetalhe) {
-        setErroDetalhe({ eventoId: item.id, mensagem })
-      }
+      setErroDetalhe({ eventoId: item.id, mensagem })
     }
   }
 
