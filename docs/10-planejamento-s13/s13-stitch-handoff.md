@@ -18,7 +18,7 @@ O frontend atual usa React, Vite e Tailwind. O produto atende usuarios com difer
 - Portaria: selecao de evento, leitura de token QR, busca de participante, check-in manual e feedback de sucesso, aviso e erro.
 - Relatorios: relatorio por evento, lista nominal filtravel e relatorio agregado por escopo e periodo.
 - Auditoria: filtros, tabela paginada, atualizacao e modal de contexto JSON.
-- Meu Cadastro: rota de navegacao presente, mas somente com placeholder de modulo em desenvolvimento.
+- Meu Cadastro: consulta dados institucionais e permite atualizar celular e alterar PIN, com encerramento das sessoes apos troca de PIN.
 
 ### Componentes estruturais e reutilizaveis
 
@@ -38,12 +38,12 @@ Nao existe ainda um catalogo de componentes ou uma camada visual independente do
 | Minha Agenda                  | EXISTENTE     | Lista, loading, erro, estado vazio, detalhe e RSVP.                                            |
 | Calendario                    | EXISTENTE     | Grade mensal, navegacao, eventos por dia e estado vazio do dia.                                |
 | Avisos                        | PARCIAL       | Notificacoes push funcionais, mas modulo ainda marcado como em desenvolvimento.                |
-| Meu Cadastro                  | PARCIAL       | Navegacao existe; conteudo e placeholder.                                                      |
+| Meu Cadastro                  | EXISTENTE     | Consulta dados institucionais, atualiza celular e permite alterar PIN.                         |
 | Portaria                      | EXISTENTE     | Check-in QR/manual, busca, participantes e feedback operacional.                               |
 | Relatorios                    | EXISTENTE     | Relatorio por evento, agregado, filtros, loading e erros.                                      |
 | Auditoria                     | EXISTENTE     | Filtros, tabela, paginacao, loading, erro e detalhes.                                          |
-| Login                         | AUSENTE       | Nao ha tela de login no frontend atual.                                                        |
-| Ativacao / redefinicao de PIN | AUSENTE       | Nao ha tela ou fluxo visual correspondente.                                                    |
+| Login                         | EXISTENTE     | Autenticacao por celular e PIN implementada em `AuthView`.                                     |
+| Ativacao / redefinicao de PIN | EXISTENTE     | Ativacao por token/carteirinha e fluxo "Esqueci meu PIN" implementados em `AuthView`.        |
 | Estados de erro               | PARCIAL       | Existem mensagens por view; falta tratamento visual transversal e consistente.                 |
 | Estados vazios                | EXISTENTE     | Agenda, calendario, portaria e auditoria possuem estados vazios locais.                        |
 | Loading                       | EXISTENTE     | Ha spinners, textos e botoes desabilitados em varias views.                                    |
@@ -82,10 +82,16 @@ O Stitch deve preservar esses nomes, seus agrupamentos atuais e a separacao entr
 
 O frontend consulta as capabilities retornadas por `auth/me` para controlar tanto ferramentas operacionais quanto superficies administrativas. Entre as regras visiveis estao:
 
-- `podeOperarPortaria`: exibe Portaria;
-- `podeVisualizarRelatorios`: exibe Relatorios;
-- `podeVisualizarAuditoria`: exibe Auditoria;
-- capabilities proprias para administracao de Eventos/Series, Convocacoes, Membros, Contas e Acessos, Regionais, Administracoes, Setores, Casas, Grupos de Trabalho, Funcoes, Vinculos, Locais e Espacos.
+- `podeOperarPortaria` ou `podeGerirAgenda`: permite Portaria;
+- `podeVisualizarRelatorios`: permite Relatorios;
+- `podeVisualizarAuditoria`: permite Auditoria;
+- `podeAdministrarAcessos`: permite Contas e Acessos;
+- `podeAdministrarEstrutura`: agrupa Regionais, Administracoes, Setores, Casas e Grupos de Trabalho;
+- `podeAdministrarPessoas`: agrupa Membros e Vinculos Funcionais;
+- `podeAdministrarFuncoes`: permite Funcoes;
+- `podeGerirAgenda`: agrupa Eventos, Series, Convocacoes e Locais/Espacos.
+
+As capabilities podem ser compartilhadas por varias superficies. O Stitch deve preservar esses agrupamentos de autorizacao; a existencia de uma tela no inventario nao implica capability exclusiva para ela.
 
 Minha Agenda, Calendario, Avisos e Meu Cadastro formam a navegacao principal do usuario comum. A proposta visual deve manter a diferenca entre navegacao principal e ferramentas condicionais/administrativas, sem criar novas capabilities nem presumir permissoes nao definidas. O inventario visual deve refletir as superficies realmente expostas pela aplicacao atual.
 
@@ -120,7 +126,7 @@ A aplicacao continuara sendo unica e responsiva, com os mesmos contratos, permis
 
 | Contexto | Prioridade | Superficies principais | Diretriz |
 | --- | --- | --- | --- |
-| Usuario comum em PWA/celular | MOBILE_FIRST | Minha Agenda, Calendario, RSVP, QR Code, notificacoes | Navegacao simples, cards, acoes rapidas, poucos passos e alvos de toque grandes. |
+| Usuario comum em PWA/celular | MOBILE_FIRST | Minha Agenda, Calendario, RSVP, QR Code, notificacoes, Portaria | Navegacao simples, cards, acoes rapidas, poucos passos, alvos de toque grandes e operacao de check-in adequada ao celular. |
 | Master e administradores em computador | DESKTOP_FIRST | Eventos, Series, Convocacoes, Membros, Contas e Acessos, Regionais, Administracoes, Setores, Casas, Grupos de Trabalho, Funcoes, Vinculos, Locais/Espacos, Relatorios, Auditoria | Tabelas e formularios amplos, filtros persistentes, contexto simultaneo, paineis laterais e uso eficiente da largura. |
 | Fluxos compartilhados | RESPONSIVO_DUAL | Login, Meu Cadastro, consultas simples, relatorios leves | Manter equivalencia funcional, com composicao adequada a cada breakpoint. |
 
@@ -157,9 +163,9 @@ Essas dividas nao sao pre-condicao para iniciar o trabalho com o Stitch; elas fa
 1. Minha Agenda e detalhe do evento, incluindo RSVP, periodos, justificativa e QR Code.
 2. Calendario, com selecao de dia e visualizacao dos eventos.
 3. Avisos, evoluindo o controle de notificacoes para uma tela compreensivel de preferencias.
-4. Meu Cadastro, classificado como RESPONSIVO_DUAL, substituindo o placeholder por um fluxo de consulta e manutencao definido pelo PO.
-5. Login e ativacao/redefinicao de PIN, ausentes no frontend atual e necessarios para completar a entrada do usuario.
-6. Portaria, Relatorios e Auditoria, preservando os acessos condicionais e priorizando fluxos operacionais.
+4. Meu Cadastro, classificado como RESPONSIVO_DUAL, preservando consulta de dados institucionais, atualizacao de celular e alteracao de PIN.
+5. Login e ativacao/redefinicao de PIN, classificados como RESPONSIVO_DUAL, preservando os fluxos existentes de autenticacao, ativacao e solicitacao de redefinicao.
+6. Portaria, classificada como MOBILE_FIRST, e Relatorios/Auditoria, classificados como DESKTOP_FIRST, preservando os acessos condicionais e priorizando os respectivos contextos operacionais.
 
 ## 11. Estados especiais
 
