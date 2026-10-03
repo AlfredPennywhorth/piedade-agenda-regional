@@ -694,11 +694,24 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       // Cálculo correto com timezone
       const newStartDateStr = getLocalDateFromUtc(pivotDateIso)
       
-      const serieBData = SerieCreate.parse({
-        ...existingSerie,
-        ...parsed.changes,
-        dataInicio: newStartDateStr
-      })
+      const alteracaoApenasOperacional = apenasAlteracaoOperacionalSerie(parsed.changes as Record<string, unknown>)
+      const serieBData = alteracaoApenasOperacional
+        ? {
+            ...SerieCreate.parse({
+              ...existingSerie,
+              ...parsed.changes,
+              dataInicio: newStartDateStr,
+              // Valida o restante do contrato atual sem rejeitar série legada.
+              intervalo: 1,
+            }),
+            // Alteração operacional não muda a cadência histórica armazenada.
+            intervalo: existingSerie.intervalo,
+          }
+        : SerieCreate.parse({
+            ...existingSerie,
+            ...parsed.changes,
+            dataInicio: newStartDateStr
+          })
       if (!(await espacoAtivoPertenceAoLocal(db, serieBData.localId, serieBData.espacoId))) {
         if (await espacoPertenceAoLocal(db, serieBData.localId, serieBData.espacoId)) {
           return c.json({ error: 'O espaço selecionado está inativo', code: 'ESPACO_INATIVO' }, 409)
@@ -708,7 +721,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       if (!(await podeGerenciarEntidade(c, serieBData))) {
         return c.json({ error: 'Acesso não autorizado para mover a série para este escopo', code: 'FORBIDDEN' }, 403)
       }
-            if (apenasAlteracaoOperacionalSerie(parsed.changes as Record<string, unknown>)) {
+      if (alteracaoApenasOperacional) {
         const agendaAviso = await criarAvisoAlteracaoOperacionalSerie(db, existingSerie, serieBData)
 
         if (!agendaAviso) {
