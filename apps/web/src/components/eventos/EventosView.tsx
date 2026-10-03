@@ -796,7 +796,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     }
   }
 
-  const handleCancelarEvento = async (item: Evento) => {
+  const handleCancelarEvento = async (item: Evento, origem: 'lista' | 'detalhe' = 'lista') => {
     const confirmou = window.confirm(
       `Cancelar o evento "${item.titulo}"? Se houver convocação em rascunho, as funções serão removidas e a convocação também será cancelada.`
     )
@@ -817,7 +817,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
           : err instanceof Error
             ? (err.message || 'Não foi possível cancelar o evento.')
             : 'Não foi possível cancelar o evento.'
-      if (eventoDetalheIdRef.current === item.id) {
+      if (origem === 'detalhe' && eventoDetalheIdRef.current === item.id) {
         fecharDetalheEvento()
       }
       setErro(mensagem)
@@ -1530,7 +1530,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                 <div className="flex justify-end border-t border-slate-100 pt-4">
                   <button
                     type="button"
-                    onClick={() => void handleCancelarEvento(eventoDetalhe)}
+                    onClick={() => void handleCancelarEvento(eventoDetalhe, 'detalhe')}
                     className="inline-flex min-h-10 items-center rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
                   >
                     Cancelar Evento
