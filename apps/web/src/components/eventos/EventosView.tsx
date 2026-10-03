@@ -162,7 +162,6 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
   const eventoFormConsultaSeq = useRef(0)
   const eventoDetalheConsultaSeq = useRef(0)
   const eventoDetalheIdRef = useRef<string | null>(null)
-  const [erroDetalhe, setErroDetalhe] = useState<{ eventoId: string; mensagem: string } | null>(null)
 
   useEffect(() => {
     if (!localRapidoOpen) return
@@ -379,7 +378,6 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
   const abrirDetalheEvento = async (item: Evento) => {
     const consultaAtual = ++eventoDetalheConsultaSeq.current
     setErro(null)
-    setErroDetalhe(null)
     eventoDetalheIdRef.current = item.id
     setEventoDetalhe(item)
     let itemCompleto = item
@@ -413,7 +411,6 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     eventoDetalheConsultaSeq.current += 1
     eventoDetalheIdRef.current = null
     setEventoDetalhe(null)
-    setErroDetalhe(null)
   }
 
   const abrirFormEditar = async (id: string, serieId: string | null) => {
@@ -806,7 +803,6 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     if (!confirmou) return
 
     setErro(null)
-    if (eventoDetalheIdRef.current === item.id) setErroDetalhe(null)
 
     try {
       await postWithAuth(`/eventos/${item.id}/cancelar`, {})
@@ -821,8 +817,10 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
           : err instanceof Error
             ? (err.message || 'Não foi possível cancelar o evento.')
             : 'Não foi possível cancelar o evento.'
+      if (eventoDetalheIdRef.current === item.id) {
+        fecharDetalheEvento()
+      }
       setErro(mensagem)
-      setErroDetalhe({ eventoId: item.id, mensagem })
     }
   }
 
@@ -1465,11 +1463,6 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
               <button onClick={fecharDetalheEvento} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
             <div className="p-6 space-y-4">
-              {erroDetalhe?.eventoId === eventoDetalhe.id && (
-                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                  {erroDetalhe.mensagem}
-                </div>
-              )}
               <div>
                 <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Título</span>
                 <p className="text-slate-900 font-medium">{eventoDetalhe.titulo}</p>
