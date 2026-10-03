@@ -160,6 +160,8 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
   const localRapidoTriggerRef = useRef<HTMLElement | null>(null)
   const espacoRapidoTriggerRef = useRef<HTMLElement | null>(null)
   const eventoFormConsultaSeq = useRef(0)
+  const eventoDetalheConsultaSeq = useRef(0)
+  const [erroDetalhe, setErroDetalhe] = useState<string | null>(null)
 
   useEffect(() => {
     if (!localRapidoOpen) return
@@ -374,7 +376,10 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
   }
 
   const abrirDetalheEvento = async (item: Evento) => {
+    const consultaAtual = ++eventoDetalheConsultaSeq.current
     setErro(null)
+    setErroDetalhe(null)
+    setEventoDetalhe(item)
     let itemCompleto = item
 
     try {
@@ -383,6 +388,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       // Mantém o resumo da listagem disponível caso a consulta pontual falhe.
     }
 
+    if (consultaAtual !== eventoDetalheConsultaSeq.current) return
     setEventoDetalhe(itemCompleto)
 
     if (!itemCompleto.espacoId || !itemCompleto.localId || espacos.some(espaco => espaco.id === itemCompleto.espacoId)) {
@@ -391,6 +397,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
 
     try {
       const espacosDoLocal = await fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${itemCompleto.localId}`)
+      if (consultaAtual !== eventoDetalheConsultaSeq.current) return
       const espacoAtual = (espacosDoLocal || []).find(espaco => espaco.id === itemCompleto.espacoId)
       if (espacoAtual) {
         setEspacos(prev => prev.some(espaco => espaco.id === espacoAtual.id) ? prev : [...prev, espacoAtual])
@@ -398,6 +405,12 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     } catch {
       // O detalhe continua disponível mesmo se o lookup histórico falhar.
     }
+  }
+
+  const fecharDetalheEvento = () => {
+    eventoDetalheConsultaSeq.current += 1
+    setEventoDetalhe(null)
+    setErroDetalhe(null)
   }
 
   const abrirFormEditar = async (id: string, serieId: string | null) => {
@@ -795,13 +808,14 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       setEventos(atuais => atuais.filter(evento => evento.id !== item.id))
       if (eventoDetalhe?.id === item.id) setEventoDetalhe(null)
     } catch (err: unknown) {
-      if (err instanceof ApiError && err.body?.error) {
-        setErro(typeof err.body.error === 'string' ? err.body.error : 'Não foi possível cancelar o evento.')
-      } else if (err instanceof Error) {
-        setErro(err.message || 'Não foi possível cancelar o evento.')
-      } else {
-        setErro('Não foi possível cancelar o evento.')
-      }
+      const mensagem =
+        err instanceof ApiError && err.body?.error
+          ? (typeof err.body.error === 'string' ? err.body.error : 'Não foi possível cancelar o evento.')
+          : err instanceof Error
+            ? (err.message || 'Não foi possível cancelar o evento.')
+            : 'Não foi possível cancelar o evento.'
+      setErro(mensagem)
+      if (eventoDetalhe?.id === item.id) setErroDetalhe(mensagem)
     }
   }
 
@@ -1441,9 +1455,14 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
               <h3 id="modal-detalhe-title" className="text-lg font-semibold text-slate-900">
                 Detalhes do Evento
               </h3>
-              <button onClick={() => setEventoDetalhe(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+              <button onClick={fecharDetalheEvento} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
             <div className="p-6 space-y-4">
+              {erroDetalhe && (
+                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {erroDetalhe}
+                </div>
+              )}
               <div>
                 <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Título</span>
                 <p className="text-slate-900 font-medium">{eventoDetalhe.titulo}</p>
