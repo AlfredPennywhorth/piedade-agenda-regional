@@ -161,6 +161,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
   const espacoRapidoTriggerRef = useRef<HTMLElement | null>(null)
   const eventoFormConsultaSeq = useRef(0)
   const eventoDetalheConsultaSeq = useRef(0)
+  const eventoDetalheIdRef = useRef<string | null>(null)
   const [erroDetalhe, setErroDetalhe] = useState<string | null>(null)
 
   useEffect(() => {
@@ -379,6 +380,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     const consultaAtual = ++eventoDetalheConsultaSeq.current
     setErro(null)
     setErroDetalhe(null)
+    eventoDetalheIdRef.current = item.id
     setEventoDetalhe(item)
     let itemCompleto = item
 
@@ -409,6 +411,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
 
   const fecharDetalheEvento = () => {
     eventoDetalheConsultaSeq.current += 1
+    eventoDetalheIdRef.current = null
     setEventoDetalhe(null)
     setErroDetalhe(null)
   }
@@ -802,11 +805,16 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     )
     if (!confirmou) return
 
+    const iniciadoNoDetalhe = eventoDetalheIdRef.current === item.id
     setErro(null)
+    if (iniciadoNoDetalhe) setErroDetalhe(null)
+
     try {
       await postWithAuth(`/eventos/${item.id}/cancelar`, {})
       setEventos(atuais => atuais.filter(evento => evento.id !== item.id))
-      if (eventoDetalhe?.id === item.id) setEventoDetalhe(null)
+      if (eventoDetalheIdRef.current === item.id) {
+        fecharDetalheEvento()
+      }
     } catch (err: unknown) {
       const mensagem =
         err instanceof ApiError && err.body?.error
@@ -815,7 +823,9 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
             ? (err.message || 'Não foi possível cancelar o evento.')
             : 'Não foi possível cancelar o evento.'
       setErro(mensagem)
-      setErroDetalhe(mensagem)
+      if (iniciadoNoDetalhe && eventoDetalheIdRef.current === item.id) {
+        setErroDetalhe(mensagem)
+      }
     }
   }
 
