@@ -467,7 +467,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
         horarioInicio: serie.horarioInicio || '',
         horarioFim: serie.horarioFim || '',
         frequencia: serie.frequencia,
-        intervalo: 1,
+        intervalo: serie.intervalo,
         diaSemana: serie.diaSemana,
         diaMes: serie.diaMes,
         posicaoSemanaMes: serie.posicaoSemanaMes,
@@ -1435,6 +1435,39 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                   <p className="text-slate-900">{eventoDetalhe.ativo ? 'Ativo' : 'Inativo'}</p>
                 </div>
               </div>
+              {(eventoDetalhe.modalidade === 'PRESENCIAL' || eventoDetalhe.modalidade === 'HIBRIDO') && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Local</span>
+                    <p className="text-slate-900">
+                      {eventoDetalhe.localId
+                        ? (locais.find(local => local.id === eventoDetalhe.localId)?.nome || 'Local não encontrado')
+                        : 'Não informado'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Espaço</span>
+                    <p className="text-slate-900">
+                      {eventoDetalhe.espacoId
+                        ? (espacos.find(espaco => espaco.id === eventoDetalhe.espacoId)?.nome || 'Espaço não encontrado')
+                        : 'Local inteiro / não especificado'}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {(eventoDetalhe.modalidade === 'ONLINE' || eventoDetalhe.modalidade === 'HIBRIDO') && eventoDetalhe.urlOnline && (
+                <div>
+                  <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Acesso online</span>
+                  <a
+                    href={eventoDetalhe.urlOnline}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="break-all text-brand-700 underline"
+                  >
+                    {eventoDetalhe.urlOnline}
+                  </a>
+                </div>
+              )}
               {eventoDetalhe.descricao && (
                 <div>
                   <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Descrição</span>
