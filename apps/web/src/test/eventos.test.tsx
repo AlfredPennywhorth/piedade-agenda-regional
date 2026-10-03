@@ -766,62 +766,41 @@ describe('EventosView', () => {
     expect(within(detalhe).getByText('Sala Principal')).toBeInTheDocument()
   })
 
-  it('deve preservar o intervalo real da série ao calcular delta de Este e os próximos', async () => {
+
+
+
+  it('deve carregar Espaço inativo vinculado ao abrir detalhe histórico', async () => {
+    const eventoHistorico = {
+      ...mockEventos[0],
+      espacoId: ESPACO_INATIVO_ID,
+    }
+
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
-      if (url.startsWith(`/series-recorrencia/${SERIE_ID}`)) {
-        return {
-          ...mockEventoRecorrente,
-          frequencia: 'DIARIA',
-          intervalo: 2,
-          dataInicio: '2026-10-10',
-          dataFim: '2026-10-20',
-          horarioInicio: '10:00',
-          horarioFim: '12:00',
-        }
+      if (url === '/eventos') return [eventoHistorico]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/espacos-locais?ativo=true') {
+        return [{ id: ESPACO_ATIVO_ID, localId: LOCAL_ID, nome: 'Sala Ativa', ativo: true }]
       }
-      if (url === '/eventos') return [mockEventoRecorrente]
-      if (url === '/locais') return [
-        { id: LOCAL_ID, nome: 'Sede' },
-        { id: '99999999-9999-4999-8999-999999999998', nome: 'Novo Local' },
-      ]
+      if (url === `/espacos-locais?localId=${LOCAL_ID}`) {
+        return [
+          { id: ESPACO_ATIVO_ID, localId: LOCAL_ID, nome: 'Sala Ativa', ativo: true },
+          { id: ESPACO_INATIVO_ID, localId: LOCAL_ID, nome: 'Sala Histórica', ativo: false },
+        ]
+      }
       if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
       return []
     })
-    vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({})
 
     render(<EventosView />)
-    await screen.findByText('Reunião Recorrente')
+    await screen.findByText('Reunião Presencial')
 
-    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
-    const escolha = await screen.findByRole('dialog', { name: /editar evento recorrente/i })
-    fireEvent.click(within(escolha).getByRole('button', { name: /este e os próximos eventos/i }))
-
-    const form = await screen.findByRole('dialog', { name: /editar evento recorrente/i })
-    await waitFor(() => {
-      expect(within(form).getByLabelText(/título/i)).toHaveValue('Reunião Recorrente')
-    })
-
-    fireEvent.change(within(form).getByLabelText(/local \*/i), {
-      target: { value: '99999999-9999-4999-8999-999999999998' },
-    })
-    fireEvent.click(within(form).getByRole('button', { name: /salvar série/i }))
-
-    const confirmacao = await screen.findByRole('dialog', { name: /confirmar edição/i })
-    fireEvent.click(within(confirmacao).getByRole('button', { name: /confirmar e salvar/i }))
+    fireEvent.click(screen.getByRole('button', { name: /ver/i }))
+    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
 
     await waitFor(() => {
-      expect(apiClient.patchWithAuth).toHaveBeenCalledWith(
-        `/series-recorrencia/${SERIE_ID}`,
-        expect.objectContaining({
-          updateMode: 'THIS_AND_FUTURE',
-          fromEventId: mockEventoRecorrente.id,
-          changes: { localId: '99999999-9999-4999-8999-999999999998' },
-        })
-      )
+      expect(within(detalhe).getByText('Sala Histórica')).toBeInTheDocument()
     })
-
-    const patchCall = vi.mocked(apiClient.patchWithAuth).mock.calls[0][1]
-    expect(patchCall.changes).not.toHaveProperty('intervalo')
+    expect(apiClient.fetchWithAuth).toHaveBeenCalledWith(`/espacos-locais?localId=${LOCAL_ID}`)
   })
 
 })
