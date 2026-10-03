@@ -820,4 +820,31 @@ describe('Eventos API (S04)', () => {
     expect(persistido?.titulo).toBe('Evento histórico')
   })
 
+  it('25. não permite cancelar evento já encerrado', async () => {
+    const regionalId = await createRegional()
+    const eventoId = crypto.randomUUID()
+
+    await db.insert(eventos).values({
+      id: eventoId,
+      titulo: 'Evento histórico para cancelamento',
+      modalidade: 'ONLINE',
+      inicioEm: '2020-01-01T10:00:00.000Z',
+      fimEm: '2020-01-01T11:00:00.000Z',
+      urlOnline: 'https://meet.google.com/historico-cancelamento',
+      regionalId,
+      ativo: true,
+    })
+
+    const res = await req(`/api/v1/eventos/${eventoId}/cancelar`, { method: 'POST' })
+
+    expect(res.status).toBe(409)
+    expect(await res.json()).toMatchObject({ code: 'EVENTO_PASSADO_IMUTAVEL' })
+
+    const persistido = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
+    const logs = await db.select().from(auditoriaLogs).where(eq(auditoriaLogs.recursoId, eventoId)).all()
+
+    expect(persistido?.ativo).toBe(true)
+    expect(logs.some((item: any) => item.acao === 'EVENTO_CANCELADO')).toBe(false)
+  })
+
 })
