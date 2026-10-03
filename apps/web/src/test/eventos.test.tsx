@@ -72,7 +72,7 @@ describe('EventosView', () => {
   })
 
   it('deve cancelar evento e removê-lo da lista operacional', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.mocked(apiClient.postWithAuth).mockResolvedValueOnce({
       success: true,
       eventoId: EVENTO_ID,
@@ -807,7 +807,7 @@ describe('EventosView', () => {
 
 
   it('deve oferecer cancelamento também no detalhe do evento', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/eventos') return mockEventos
       if (url === `/eventos/${EVENTO_ID}`) return mockEventos[0]
@@ -891,7 +891,7 @@ describe('EventosView', () => {
 
 
   it('deve exibir erro de cancelamento dentro do detalhe', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/eventos') return mockEventos
       if (url === `/eventos/${EVENTO_ID}`) return mockEventos[0]
@@ -910,6 +910,9 @@ describe('EventosView', () => {
     const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
     fireEvent.click(within(detalhe).getByRole('button', { name: /cancelar evento/i }))
 
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/eventos/${EVENTO_ID}/cancelar`, {})
+    })
     expect(await within(detalhe).findByRole('alert')).toHaveTextContent(
       'Ocorrências já encerradas não podem ser canceladas.'
     )
