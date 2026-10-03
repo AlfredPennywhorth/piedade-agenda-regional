@@ -889,4 +889,30 @@ describe('EventosView', () => {
     expect(patchCall.changes).not.toHaveProperty('dataInicio')
   })
 
+
+  it('deve exibir erro de cancelamento dentro do detalhe', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true)
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === `/eventos/${EVENTO_ID}`) return mockEventos[0]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+    vi.mocked(apiClient.postWithAuth).mockRejectedValueOnce(
+      new apiClient.ApiError(409, 'Evento passado', { error: 'Ocorrências já encerradas não podem ser canceladas.' })
+    )
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+
+    fireEvent.click(screen.getByRole('button', { name: /ver/i }))
+    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    fireEvent.click(within(detalhe).getByRole('button', { name: /cancelar evento/i }))
+
+    expect(await within(detalhe).findByRole('alert')).toHaveTextContent(
+      'Ocorrências já encerradas não podem ser canceladas.'
+    )
+  })
+
 })
