@@ -78,7 +78,13 @@ Minha Agenda, Calendario, Avisos e Meu Cadastro formam a navegacao principal. A 
 
 A proposta deve considerar:
 
-- mobile-first, com boa operacao em telas pequenas;
+- classificar cada fluxo como `MOBILE_FIRST`, `DESKTOP_FIRST` ou `RESPONSIVO_DUAL`;
+- `MOBILE_FIRST`: priorizar o usuario comum em Minha Agenda, Calendario, RSVP, QR Code, notificacoes e acoes rapidas;
+- `DESKTOP_FIRST`: priorizar Master e administracao em gestao de eventos/series, convocacoes, membros, contas e acessos, locais/espacos, relatorios densos e configuracoes;
+- `RESPONSIVO_DUAL`: preservar experiencia equivalente em login, Meu Cadastro, consultas simples e fluxos compartilhados;
+- nao tratar desktop como mero estiramento da tela mobile nem mobile como simples reducao da tela desktop;
+- em desktop, aproveitar largura para tabelas, filtros persistentes, paineis laterais, multiplas colunas e contexto simultaneo;
+- em mobile/PWA, preferir cards, etapas sequenciais, navegacao compacta e acoes focadas;
 - usuarios com diferentes niveis de familiaridade tecnologica;
 - navegacao simples e previsivel;
 - textos legiveis e linguagem direta;
@@ -92,7 +98,30 @@ A proposta deve considerar:
 
 Este documento nao define detalhes tecnicos de WCAG. A implementacao de acessibilidade sera tratada nas sub-sprints apropriadas.
 
-## 7. Telas prioritarias
+## 7. Diretriz de composicao por dispositivo
+
+A aplicacao continuara sendo unica e responsiva, com os mesmos contratos, permissoes e regras de negocio, mas o Stitch deve propor composicoes distintas conforme o contexto de uso.
+
+| Contexto | Prioridade | Superficies principais | Diretriz |
+| --- | --- | --- | --- |
+| Usuario comum em PWA/celular | MOBILE_FIRST | Minha Agenda, Calendario, RSVP, QR Code, notificacoes, Meu Cadastro | Navegacao simples, cards, acoes rapidas, poucos passos e alvos de toque grandes. |
+| Master e administradores em computador | DESKTOP_FIRST | Eventos, Series, Convocacoes, Membros, Contas e Acessos, Locais/Espacos, Relatorios, Auditoria | Tabelas e formularios amplos, filtros persistentes, contexto simultaneo, paineis laterais e uso eficiente da largura. |
+| Fluxos compartilhados | RESPONSIVO_DUAL | Login, Meu Cadastro, consultas simples, relatorios leves | Manter equivalencia funcional, com composicao adequada a cada breakpoint. |
+
+A proposta deve considerar que configuracao e manutencao administrativa serao realizadas preferencialmente em computador. A experiencia mobile dessas telas administrativas pode permanecer funcional, mas nao deve limitar o desenho desktop.
+
+## 8. Dividas UX incorporadas ao redesenho
+
+As dividas abaixo devem ser tratadas como requisitos do Stitch, evitando implementacao isolada antes do redesenho:
+
+- #241: melhorar navegacao horizontal em telas largas do Master, preservando contexto de linha e reduzindo dependencia da barra de rolagem no fim da pagina;
+- #242: incluir filtro de Setor antes de Casa de Oracao e ordenar alfabeticamente Locais fisicos;
+- #226: adicionar busca e filtros em Contas e Acessos, incluindo nome, celular, carteirinha, escopo territorial, status e perfil;
+- #231/#232: incorporar no redesenho os filtros remanescentes de ativos/inativos/cancelados e refinamentos do fluxo Evento -> Convocacao -> Funcoes.
+
+Essas dividas nao sao pre-condicao para iniciar o trabalho com o Stitch; elas fazem parte do briefing do proprio redesenho.
+
+## 9. Telas prioritarias
 
 1. Minha Agenda e detalhe do evento, incluindo RSVP, periodos, justificativa e QR Code.
 2. Calendario, com selecao de dia e visualizacao dos eventos.
@@ -101,7 +130,7 @@ Este documento nao define detalhes tecnicos de WCAG. A implementacao de acessibi
 5. Login e ativacao/redefinicao de PIN, ausentes no frontend atual e necessarios para completar a entrada do usuario.
 6. Portaria, Relatorios e Auditoria, preservando os acessos condicionais e priorizando fluxos operacionais.
 
-## 8. Estados especiais
+## 10. Estados especiais
 
 A proposta deve apresentar estados visuais para:
 
@@ -118,7 +147,7 @@ A proposta deve apresentar estados visuais para:
 
 Os estados existentes devem ser preservados como comportamento funcional e harmonizados visualmente na proposta.
 
-## 9. Restricoes tecnicas
+## 11. Restricoes tecnicas
 
 - Preservar a arquitetura React/Vite/Tailwind existente.
 - Preservar a navegacao e os nomes canonicamente definidos.
@@ -128,7 +157,7 @@ Os estados existentes devem ser preservados como comportamento funcional e harmo
 - Considerar a base visual atual: Tailwind, paleta `brand` azul e tipografia Inter.
 - Nao introduzir backend, novas rotas de API ou novo modelo de permissao como parte do handoff.
 
-## 10. Itens fora de escopo
+## 12. Itens fora de escopo
 
 - Implementacao de qualquer tela ou componente nesta etapa.
 - Inicio da S13.03.
@@ -140,12 +169,12 @@ Os estados existentes devem ser preservados como comportamento funcional e harmo
 
 O Stitch fornecera uma proposta visual/UX. O codigo gerado nao sera incorporado cegamente. O Copilot adaptara posteriormente o design aprovado a arquitetura real, preservando React/Vite/Tailwind e as permissoes existentes.
 
-## 11. Criterios para aprovacao do PO
+## 13. Criterios para aprovacao do PO
 
 A proposta visual sera considerada pronta para aprovacao quando:
 
 - cobrir a navegacao principal e as telas condicionais sem criar menus novos;
-- representar desktop e mobile, com prioridade para mobile;
+- representar desktop e mobile conforme a classificacao de cada fluxo: mobile-first para usuario comum, desktop-first para Master/administracao e responsivo dual quando aplicavel;
 - mostrar os fluxos prioritarios e seus estados especiais;
 - deixar claras as acoes principais e seus resultados;
 - manter linguagem, hierarquia, contraste e alvos de toque adequados ao publico;
@@ -154,7 +183,7 @@ A proposta visual sera considerada pronta para aprovacao quando:
 - nao exigir mudanca de arquitetura ou de contratos para ser adaptada;
 - receber aprovacao explicita do PO antes de qualquer implementacao da S13.03.
 
-## 12. Relacao com S13.03 e S13.04
+## 14. Relacao com S13.03 e S13.04
 
 Este documento e um handoff de UX, nao uma implementacao. A S13.03 so deve comecar depois da aprovacao visual/UX do PO e da definicao das telas prioritarias. A S13.04 e as demais atividades de acessibilidade devem usar a proposta aprovada como referencia, sem antecipar neste documento detalhes tecnicos de WCAG.
 
