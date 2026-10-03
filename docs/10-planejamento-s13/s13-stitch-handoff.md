@@ -48,6 +48,8 @@ Cada superficie possui uma classificacao primaria unica de UX. Essa classificaca
 | Recuperacao de PIN | `AuthView` | Fluxo anonimo | sessao anonima | — | RESPONSIVO_DUAL | EXISTENTE |
 | Portaria temporaria | `PortariaOperadorTemporarioView` — `/o/` ou `/portaria-operador` | Fluxo publico por token | token de operador | — | MOBILE_FIRST | EXISTENTE |
 | Cadastro de convidado | `CadastroConvidadoView` — `/c` ou `/convidado` | Fluxo publico por token | token de portaria | — | MOBILE_FIRST | EXISTENTE |
+| Ciencia de responsabilidade regional | `ResponsabilidadeRegionalGate` | Gate obrigatorio antes da area autenticada quando houver ciencia pendente | usuario autenticado com responsabilidade pendente | confirmacao de ciencia desbloqueia a aplicacao e atualiza a identidade | RESPONSIVO_DUAL | EXISTENTE |
+| Alerta global de recuperacao de PIN | `MainLayout` + contagem carregada em `App.tsx` | Banner global fora da tela Acessos, quando ha solicitacoes pendentes | `podeAdministrarAcessos` | acao `Ver solicitacoes` direciona para Acessos; oculto dentro da propria tela Acessos | DESKTOP_FIRST | EXISTENTE |
 
 Os estados transversais — loading, erro, vazio, acesso negado, sessao expirada, sucesso e conflitos — pertencem a essas superficies e devem ser harmonizados visualmente, sem criar telas funcionais novas.
 
@@ -97,15 +99,17 @@ As capabilities retornadas por `auth/me` devem ser preservadas. Elas podem liber
 - `podeAdministrarFuncoes`: acesso a Funcoes;
 - `podeGerirAgenda`: acesso a Eventos, Series, Convocacoes e Locais;
 - `podeAdministrarRegionais`: dentro de Regionais, controla criacao/edicao;
-- `podeGerenciarSessoes`: dentro de Acessos, controla consulta/revogacao de sessoes.
+- `podeGerenciarSessoes`: dentro de Acessos, controla consulta/revogacao de sessoes;
+- `ResponsabilidadeRegionalGate`: quando existe ciencia pendente, substitui temporariamente toda a area autenticada ate o registro da ciencia;
+- recuperacoes de PIN pendentes: com `podeAdministrarAcessos`, `App.tsx` carrega a contagem e `MainLayout` exibe um alerta global com acesso direto a Acessos, exceto quando o usuario ja esta nessa tela.
 
 Uma superficie visivel nao implica permissao para todas as suas acoes. O redesenho deve preservar essas diferencas.
 
 ## 6. Diretrizes UX por classificacao
 
 - `MOBILE_FIRST`: Minha Agenda, Calendario, Avisos, Portaria autenticada, Portaria temporaria e Cadastro de convidado. Priorizar cards, fluxo sequencial, alvos de toque grandes, QR/check-in e poucos passos.
-- `DESKTOP_FIRST`: Eventos, Convocacoes, Series, Relatorios, Auditoria, Regionais, Administracoes, Setores, Casas, Grupos de Trabalho, Locais, Membros, Funcoes, Vinculos e Acessos. Priorizar tabelas, filtros persistentes, contexto simultaneo, formularios amplos e uso eficiente da largura.
-- `RESPONSIVO_DUAL`: Login, Ativacao de conta, Recuperacao de PIN e Meu Cadastro. Manter equivalencia funcional entre mobile e desktop, com composicao apropriada para cada breakpoint.
+- `DESKTOP_FIRST`: Eventos, Convocacoes, Series, Relatorios, Auditoria, Regionais, Administracoes, Setores, Casas, Grupos de Trabalho, Locais, Membros, Funcoes, Vinculos, Acessos e o alerta global de recuperacoes de PIN. Priorizar tabelas, filtros persistentes, contexto simultaneo, formularios amplos e uso eficiente da largura.
+- `RESPONSIVO_DUAL`: Login, Ativacao de conta, Recuperacao de PIN, Meu Cadastro e Ciencia de responsabilidade regional. Manter equivalencia funcional entre mobile e desktop, com composicao apropriada para cada breakpoint.
 
 Cada superficie tem uma unica classificacao primaria. Adaptacoes para outro dispositivo nao criam uma segunda classificacao nem outro identificador para a mesma superficie.
 
@@ -124,7 +128,7 @@ A proposta deve:
 - reduzir passos para consultar agenda, responder convocacao e apresentar QR Code;
 - harmonizar cards, formularios, tabelas, dialogs e mensagens;
 - explicitar sucesso, aviso, erro, carregamento, ausencia de dados e acesso negado;
-- preservar contratos, regras de negocio, rotas publicas, capabilities e controles internos;
+- preservar contratos, regras de negocio, rotas publicas, capabilities, gates bloqueantes e controles internos/transversais;
 - preparar base visual para acessibilidade nas sub-sprints seguintes sem antecipar definicoes tecnicas de WCAG.
 
 Este documento nao define detalhes tecnicos de WCAG. A implementacao de acessibilidade sera tratada nas sub-sprints apropriadas.
