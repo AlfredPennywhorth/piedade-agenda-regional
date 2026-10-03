@@ -162,7 +162,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
   const eventoFormConsultaSeq = useRef(0)
   const eventoDetalheConsultaSeq = useRef(0)
   const eventoDetalheIdRef = useRef<string | null>(null)
-  const [erroDetalhe, setErroDetalhe] = useState<string | null>(null)
+  const [erroDetalhe, setErroDetalhe] = useState<{ eventoId: string; mensagem: string } | null>(null)
 
   useEffect(() => {
     if (!localRapidoOpen) return
@@ -823,8 +823,8 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
             ? (err.message || 'Não foi possível cancelar o evento.')
             : 'Não foi possível cancelar o evento.'
       setErro(mensagem)
-      if (iniciadoNoDetalhe && eventoDetalheIdRef.current === item.id) {
-        setErroDetalhe(mensagem)
+      if (iniciadoNoDetalhe) {
+        setErroDetalhe({ eventoId: item.id, mensagem })
       }
     }
   }
@@ -1468,9 +1468,9 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
               <button onClick={fecharDetalheEvento} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
             <div className="p-6 space-y-4">
-              {erroDetalhe && (
+              {erroDetalhe?.eventoId === eventoDetalhe.id && (
                 <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                  {erroDetalhe}
+                  {erroDetalhe.mensagem}
                 </div>
               )}
               <div>
