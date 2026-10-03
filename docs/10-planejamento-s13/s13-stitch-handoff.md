@@ -48,7 +48,7 @@ Cada superficie possui uma classificacao primaria unica de UX. Essa classificaca
 | Recuperacao de PIN | `AuthView` | Fluxo anonimo | sessao anonima | — | RESPONSIVO_DUAL | EXISTENTE |
 | Portaria temporaria | `PortariaOperadorTemporarioView` — `/o/` ou `/portaria-operador` | Fluxo publico por token | token de operador | — | MOBILE_FIRST | EXISTENTE |
 | Cadastro de convidado | `CadastroConvidadoView` — `/c` ou `/convidado` | Fluxo publico por token | token de portaria | — | MOBILE_FIRST | EXISTENTE |
-| Ciencia de responsabilidade regional | `ResponsabilidadeRegionalGate` | Gate obrigatorio antes da area autenticada quando houver ciencia pendente | usuario autenticado com responsabilidade pendente | confirmacao de ciencia desbloqueia a aplicacao e atualiza a identidade | RESPONSIVO_DUAL | EXISTENTE |
+| Ciencia de responsabilidade regional | `ResponsabilidadeRegionalGate` | Gate obrigatorio antes da area autenticada quando houver ciencia pendente | usuario autenticado com responsabilidade pendente | confirma um acesso regional por vez; apos cada registro consulta novamente e repete o gate ate nao restar pendencia. Em falha de consulta diferente de 403, registra erro e libera a aplicacao, preservando o comportamento atual | RESPONSIVO_DUAL | EXISTENTE |
 | Alerta global de recuperacao de PIN | `MainLayout` + contagem carregada em `App.tsx` | Banner global fora da tela Acessos, quando ha solicitacoes pendentes | `podeAdministrarAcessos` | acao `Ver solicitacoes` direciona para Acessos; oculto dentro da propria tela Acessos | DESKTOP_FIRST | EXISTENTE |
 
 Os estados transversais — loading, erro, vazio, acesso negado, sessao expirada, sucesso e conflitos — pertencem a essas superficies e devem ser harmonizados visualmente, sem criar telas funcionais novas.
@@ -100,7 +100,7 @@ As capabilities retornadas por `auth/me` devem ser preservadas. Elas podem liber
 - `podeGerirAgenda`: acesso a Eventos, Series, Convocacoes e Locais;
 - `podeAdministrarRegionais`: dentro de Regionais, controla criacao/edicao;
 - `podeGerenciarSessoes`: dentro de Acessos, controla consulta/revogacao de sessoes;
-- `ResponsabilidadeRegionalGate`: quando existe ciencia pendente, substitui temporariamente toda a area autenticada ate o registro da ciencia;
+- `ResponsabilidadeRegionalGate`: quando existe ciencia pendente, substitui temporariamente toda a area autenticada; a confirmacao ocorre sequencialmente por acesso regional pendente, com nova consulta apos cada registro, e a aplicacao so e liberada quando nao restam pendencias. Se a verificacao falhar por erro diferente de 403, o componente registra a falha e libera a aplicacao, conforme o comportamento atual;
 - recuperacoes de PIN pendentes: com `podeAdministrarAcessos`, `App.tsx` carrega a contagem e `MainLayout` exibe um alerta global com acesso direto a Acessos, exceto quando o usuario ja esta nessa tela.
 
 Uma superficie visivel nao implica permissao para todas as suas acoes. O redesenho deve preservar essas diferencas.
