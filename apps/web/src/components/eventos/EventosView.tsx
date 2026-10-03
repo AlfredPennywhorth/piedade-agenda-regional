@@ -105,6 +105,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
   // Serie Form State
   const [serieFormOpen, setSerieFormOpen] = useState(false)
   const [serieInitialData, setSerieInitialData] = useState<Partial<SerieCreateInput>>({})
+  const [serieOriginal, setSerieOriginal] = useState<SerieResponse | null>(null)
   const [serieInitialTipoEscopo, setSerieInitialTipoEscopo] = useState<TipoEscopo>('')
 
   // Modal Details
@@ -373,15 +374,24 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
   }
 
   const abrirDetalheEvento = async (item: Evento) => {
-    setEventoDetalhe(item)
+    setErro(null)
+    let itemCompleto = item
 
-    if (!item.espacoId || !item.localId || espacos.some(espaco => espaco.id === item.espacoId)) {
+    try {
+      itemCompleto = await fetchWithAuth<Evento>(`/eventos/${item.id}`)
+    } catch {
+      // Mantém o resumo da listagem disponível caso a consulta pontual falhe.
+    }
+
+    setEventoDetalhe(itemCompleto)
+
+    if (!itemCompleto.espacoId || !itemCompleto.localId || espacos.some(espaco => espaco.id === itemCompleto.espacoId)) {
       return
     }
 
     try {
-      const espacosDoLocal = await fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${item.localId}`)
-      const espacoAtual = (espacosDoLocal || []).find(espaco => espaco.id === item.espacoId)
+      const espacosDoLocal = await fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${itemCompleto.localId}`)
+      const espacoAtual = (espacosDoLocal || []).find(espaco => espaco.id === itemCompleto.espacoId)
       if (espacoAtual) {
         setEspacos(prev => prev.some(espaco => espaco.id === espacoAtual.id) ? prev : [...prev, espacoAtual])
       }
@@ -466,6 +476,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     
     try {
       const serie = await fetchWithAuth<SerieResponse>(`/series-recorrencia/${evento.serieRecorrenciaId}`)
+      setSerieOriginal(serie)
       
       let tipo: TipoEscopo = ''
       if (serie.regionalId) tipo = 'regional'
@@ -828,10 +839,14 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     setErro(null)
     try {
       const normalizar = (valor: unknown) => valor === '' || valor === undefined ? null : valor
+      const baseline = serieOriginal ?? serieInitialData
       const changes = Object.fromEntries(
-        Object.entries(confirmacaoFutureAberto).filter(([campo, valor]) =>
-          normalizar(valor) !== normalizar(serieInitialData[campo as keyof SerieCreateInput])
-        )
+        Object.entries(confirmacaoFutureAberto).filter(([campo, valor]) => {
+          // O contrato atual não permite editar intervalo (SerieCreate usa literal 1).
+          // Em séries legadas, nunca transformar esse valor técnico em delta estrutural.
+          if (campo === 'intervalo') return false
+          return normalizar(valor) !== normalizar((baseline as Record<string, unknown>)[campo])
+        })
       ) as Partial<SerieCreateInput>
 
       if (Object.keys(changes).length === 0) {
@@ -1490,6 +1505,17 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                 <div>
                   <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Descrição</span>
                   <p className="text-slate-900">{eventoDetalhe.descricao}</p>
+                </div>
+              )}
+              {eventoDetalhe.ativo && (
+                <div className="flex justify-end border-t border-slate-100 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => void handleCancelarEvento(eventoDetalhe)}
+                    className="inline-flex min-h-10 items-center rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                  >
+                    Cancelar Evento
+                  </button>
                 </div>
               )}
             </div>
