@@ -739,4 +739,68 @@ describe('EventosView', () => {
     const alerts = await screen.findAllByRole('alert')
     expect(alerts.some(alert => alert.textContent === 'Erro na série futura')).toBe(true)
   })
+
+  it('deve exibir Local e Espaço no detalhe do evento presencial', async () => {
+    const eventoComEspaco = {
+      ...mockEventos[0],
+      espacoId: ESPACO_ATIVO_ID,
+    }
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return [eventoComEspaco]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/espacos-locais?ativo=true') {
+        return [{ id: ESPACO_ATIVO_ID, localId: LOCAL_ID, nome: 'Sala Principal', ativo: true }]
+      }
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+
+    fireEvent.click(screen.getByRole('button', { name: /ver/i }))
+    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+
+    expect(within(detalhe).getByText('Sede')).toBeInTheDocument()
+    expect(within(detalhe).getByText('Sala Principal')).toBeInTheDocument()
+  })
+
+
+
+
+  it('deve carregar Espaço inativo vinculado ao abrir detalhe histórico', async () => {
+    const eventoHistorico = {
+      ...mockEventos[0],
+      espacoId: ESPACO_INATIVO_ID,
+    }
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return [eventoHistorico]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/espacos-locais?ativo=true') {
+        return [{ id: ESPACO_ATIVO_ID, localId: LOCAL_ID, nome: 'Sala Ativa', ativo: true }]
+      }
+      if (url === `/espacos-locais?localId=${LOCAL_ID}`) {
+        return [
+          { id: ESPACO_ATIVO_ID, localId: LOCAL_ID, nome: 'Sala Ativa', ativo: true },
+          { id: ESPACO_INATIVO_ID, localId: LOCAL_ID, nome: 'Sala Histórica', ativo: false },
+        ]
+      }
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+
+    fireEvent.click(screen.getByRole('button', { name: /ver/i }))
+    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+
+    await waitFor(() => {
+      expect(within(detalhe).getByText('Sala Histórica')).toBeInTheDocument()
+    })
+    expect(apiClient.fetchWithAuth).toHaveBeenCalledWith(`/espacos-locais?localId=${LOCAL_ID}`)
+  })
+
 })

@@ -372,6 +372,24 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     }
   }
 
+  const abrirDetalheEvento = async (item: Evento) => {
+    setEventoDetalhe(item)
+
+    if (!item.espacoId || !item.localId || espacos.some(espaco => espaco.id === item.espacoId)) {
+      return
+    }
+
+    try {
+      const espacosDoLocal = await fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${item.localId}`)
+      const espacoAtual = (espacosDoLocal || []).find(espaco => espaco.id === item.espacoId)
+      if (espacoAtual) {
+        setEspacos(prev => prev.some(espaco => espaco.id === espacoAtual.id) ? prev : [...prev, espacoAtual])
+      }
+    } catch {
+      // O detalhe continua disponível mesmo se o lookup histórico falhar.
+    }
+  }
+
   const abrirFormEditar = async (id: string, serieId: string | null) => {
     const consultaAtual = ++eventoFormConsultaSeq.current
     setEventoEditandoId(id)
@@ -941,7 +959,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                       <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 min-w-[220px]">
                         <button
                           type="button"
-                          onClick={() => setEventoDetalhe(item)}
+                          onClick={() => void abrirDetalheEvento(item)}
                           className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-brand-700 hover:bg-brand-50 hover:text-brand-900 font-medium"
                         >
                           Ver
@@ -1435,6 +1453,39 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                   <p className="text-slate-900">{eventoDetalhe.ativo ? 'Ativo' : 'Inativo'}</p>
                 </div>
               </div>
+              {(eventoDetalhe.modalidade === 'PRESENCIAL' || eventoDetalhe.modalidade === 'HIBRIDO') && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Local</span>
+                    <p className="text-slate-900">
+                      {eventoDetalhe.localId
+                        ? (locais.find(local => local.id === eventoDetalhe.localId)?.nome || 'Local não encontrado')
+                        : 'Não informado'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Espaço</span>
+                    <p className="text-slate-900">
+                      {eventoDetalhe.espacoId
+                        ? (espacos.find(espaco => espaco.id === eventoDetalhe.espacoId)?.nome || 'Espaço não encontrado')
+                        : 'Local inteiro / não especificado'}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {(eventoDetalhe.modalidade === 'ONLINE' || eventoDetalhe.modalidade === 'HIBRIDO') && eventoDetalhe.urlOnline && (
+                <div>
+                  <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Acesso online</span>
+                  <a
+                    href={eventoDetalhe.urlOnline}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="break-all text-brand-700 underline"
+                  >
+                    {eventoDetalhe.urlOnline}
+                  </a>
+                </div>
+              )}
               {eventoDetalhe.descricao && (
                 <div>
                   <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Descrição</span>
