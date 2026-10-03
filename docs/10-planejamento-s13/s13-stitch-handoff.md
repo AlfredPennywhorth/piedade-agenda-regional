@@ -4,6 +4,8 @@
 
 Este documento fornece ao Google Stitch um inventario enxuto do frontend atual da Agenda Regional Sao Paulo e orienta uma proposta visual/UX para as superficies prioritarias. O objetivo e apoiar a aprovacao do PO sem alterar a arquitetura, as permissoes ou o codigo existente.
 
+A nova rodada de UX deve ser tratada como um redesenho do zero. Artefatos, mockups ou propostas anteriores do Stitch nao devem ser considerados como referencia visual obrigatoria. O ponto de partida e o produto funcional atual, seus fluxos consolidados, as regras de negocio existentes e as dividas UX registradas.
+
 O frontend atual usa React, Vite e Tailwind. O produto atende usuarios com diferentes niveis de familiaridade tecnologica, com foco em acesso por celular e em consultas e acoes recorrentes de agenda.
 
 ## 2. Estado atual do frontend
@@ -110,7 +112,22 @@ A aplicacao continuara sendo unica e responsiva, com os mesmos contratos, permis
 
 A proposta deve considerar que configuracao e manutencao administrativa serao realizadas preferencialmente em computador. A experiencia mobile dessas telas administrativas pode permanecer funcional, mas nao deve limitar o desenho desktop.
 
-## 8. Dividas UX incorporadas ao redesenho
+## 8. Convencao de identificacao de telas
+
+Toda tela ou superficie desenhada deve possuir um codigo unico, estavel e visivel ao usuario, para permitir identificacao objetiva em suporte, homologacao, manutencao e relatos de erro.
+
+Regras:
+
+- o codigo deve aparecer discretamente na propria interface, preferencialmente no rodape, canto inferior ou area de metadados da tela;
+- o codigo nao deve competir visualmente com o conteudo principal;
+- o identificador deve permanecer estavel mesmo que o layout evolua;
+- modal, dialogo ou subfluxo relevante pode receber codigo proprio quando for tratado como superficie independente;
+- relatos de suporte e QA devem poder referenciar diretamente o codigo da tela;
+- a convencao deve ser simples e legivel, por exemplo: `AGD-MOB-001`, `AGD-ADM-001`, `AGD-SHR-001`;
+- `MOB` identifica superficies mobile-first, `ADM` superficies administrativas/desktop-first e `SHR` fluxos responsivos compartilhados;
+- o inventario de telas deve manter a correspondencia entre codigo, nome funcional, perfil de uso e rota/componente quando houver.
+
+## 9. Dividas UX incorporadas ao redesenho
 
 As dividas abaixo devem ser tratadas como requisitos do Stitch, evitando implementacao isolada antes do redesenho:
 
@@ -121,7 +138,7 @@ As dividas abaixo devem ser tratadas como requisitos do Stitch, evitando impleme
 
 Essas dividas nao sao pre-condicao para iniciar o trabalho com o Stitch; elas fazem parte do briefing do proprio redesenho.
 
-## 9. Telas prioritarias
+## 10. Telas prioritarias
 
 1. Minha Agenda e detalhe do evento, incluindo RSVP, periodos, justificativa e QR Code.
 2. Calendario, com selecao de dia e visualizacao dos eventos.
@@ -130,7 +147,7 @@ Essas dividas nao sao pre-condicao para iniciar o trabalho com o Stitch; elas fa
 5. Login e ativacao/redefinicao de PIN, ausentes no frontend atual e necessarios para completar a entrada do usuario.
 6. Portaria, Relatorios e Auditoria, preservando os acessos condicionais e priorizando fluxos operacionais.
 
-## 10. Estados especiais
+## 11. Estados especiais
 
 A proposta deve apresentar estados visuais para:
 
@@ -147,7 +164,7 @@ A proposta deve apresentar estados visuais para:
 
 Os estados existentes devem ser preservados como comportamento funcional e harmonizados visualmente na proposta.
 
-## 11. Restricoes tecnicas
+## 12. Restricoes tecnicas
 
 - Preservar a arquitetura React/Vite/Tailwind existente.
 - Preservar a navegacao e os nomes canonicamente definidos.
@@ -157,7 +174,7 @@ Os estados existentes devem ser preservados como comportamento funcional e harmo
 - Considerar a base visual atual: Tailwind, paleta `brand` azul e tipografia Inter.
 - Nao introduzir backend, novas rotas de API ou novo modelo de permissao como parte do handoff.
 
-## 12. Itens fora de escopo
+## 13. Itens fora de escopo
 
 - Implementacao de qualquer tela ou componente nesta etapa.
 - Inicio da S13.03.
@@ -169,12 +186,13 @@ Os estados existentes devem ser preservados como comportamento funcional e harmo
 
 O Stitch fornecera uma proposta visual/UX. O codigo gerado nao sera incorporado cegamente. O Copilot adaptara posteriormente o design aprovado a arquitetura real, preservando React/Vite/Tailwind e as permissoes existentes.
 
-## 13. Criterios para aprovacao do PO
+## 14. Criterios para aprovacao do PO
 
 A proposta visual sera considerada pronta para aprovacao quando:
 
 - cobrir a navegacao principal e as telas condicionais sem criar menus novos;
 - representar desktop e mobile conforme a classificacao de cada fluxo: mobile-first para usuario comum, desktop-first para Master/administracao e responsivo dual quando aplicavel;
+- atribuir codigo unico e visivel a cada tela/superficie aprovada e manter inventario de rastreabilidade;
 - mostrar os fluxos prioritarios e seus estados especiais;
 - deixar claras as acoes principais e seus resultados;
 - manter linguagem, hierarquia, contraste e alvos de toque adequados ao publico;
@@ -183,7 +201,7 @@ A proposta visual sera considerada pronta para aprovacao quando:
 - nao exigir mudanca de arquitetura ou de contratos para ser adaptada;
 - receber aprovacao explicita do PO antes de qualquer implementacao da S13.03.
 
-## 14. Relacao com S13.03 e S13.04
+## 15. Relacao com S13.03 e S13.04
 
 Este documento e um handoff de UX, nao uma implementacao. A S13.03 so deve comecar depois da aprovacao visual/UX do PO e da definicao das telas prioritarias. A S13.04 e as demais atividades de acessibilidade devem usar a proposta aprovada como referencia, sem antecipar neste documento detalhes tecnicos de WCAG.
 
