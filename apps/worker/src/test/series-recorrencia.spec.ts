@@ -966,6 +966,92 @@ describe('Series Recorrencia API (S05)', () => {
     expect(convocacaoPersistida).toMatchObject({ status: 'PUBLICADA', ativo: true })
   })
 
+  it('24.5b.1 THIS_AND_FUTURE operacional preserva intervalo legado diferente de 1', async () => {
+    const regionalId = await createRegional()
+    const localAnteriorId = crypto.randomUUID()
+    const localNovoId = crypto.randomUUID()
+
+    await db.insert(locais).values({
+      id: localAnteriorId,
+      nome: 'Local Legado Anterior',
+      endereco: 'Rua A',
+      numero: '10',
+      cidade: 'São Paulo',
+      uf: 'SP',
+      ativo: true,
+    }).run()
+    await db.insert(locais).values({
+      id: localNovoId,
+      nome: 'Local Legado Novo',
+      endereco: 'Rua B',
+      numero: '20',
+      cidade: 'São Paulo',
+      uf: 'SP',
+      ativo: true,
+    }).run()
+
+    const createRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        titulo: 'Série legado operacional',
+        modalidade: 'PRESENCIAL',
+        urlOnline: null,
+        localId: localAnteriorId,
+        regionalId,
+        dataInicio: '2099-12-15',
+        dataFim: '2099-12-19',
+      }),
+    })
+    expect(createRes.status).toBe(201)
+    const { serie } = await createRes.json()
+
+    // Simula série histórica criada antes do contrato atual intervalo=1.
+    await db.update(seriesRecorrencia)
+      .set({ intervalo: 2 })
+      .where(eq(seriesRecorrencia.id, serie.id))
+      .run()
+
+    const antes = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    const pivot = antes[1]
+
+    await db.insert(convocacoes).values({
+      id: crypto.randomUUID(),
+      eventoId: pivot.id,
+      status: 'PUBLICADA',
+      publicadaEm: new Date().toISOString(),
+      ativo: true,
+    })
+
+    const atualizar = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'THIS_AND_FUTURE',
+        fromEventId: pivot.id,
+        changes: { localId: localNovoId },
+      }),
+    })
+
+    expect(atualizar.status).toBe(200)
+    const resposta = await atualizar.json()
+    expect(resposta).toMatchObject({ reconfirmacaoSolicitada: true })
+    expect(resposta.novaSerieId).toBeTruthy()
+
+    const novaSerie = db.select().from(seriesRecorrencia)
+      .where(eq(seriesRecorrencia.id, resposta.novaSerieId))
+      .get()
+    expect(novaSerie.intervalo).toBe(2)
+
+    const convocacaoPersistida = db.select().from(convocacoes)
+      .where(eq(convocacoes.eventoId, pivot.id))
+      .get()
+    expect(convocacaoPersistida).toMatchObject({ status: 'PUBLICADA', ativo: true })
+  })
+
   it('24.5c THIS_AND_FUTURE no-op operacional não divide série nem força reconfirmação', async () => {
     const regionalId = await createRegional()
     const localId = crypto.randomUUID()
