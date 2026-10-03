@@ -52,7 +52,10 @@ const mockEventoRecorrente = {
 
 describe('EventosView', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.restoreAllMocks()
+    vi.mocked(apiClient.fetchWithAuth).mockReset()
+    vi.mocked(apiClient.postWithAuth).mockReset()
+    vi.mocked(apiClient.patchWithAuth).mockReset()
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/eventos') return mockEventos
       if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
