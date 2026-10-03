@@ -890,7 +890,7 @@ describe('EventosView', () => {
   })
 
 
-  it('deve exibir erro de cancelamento dentro do detalhe', async () => {
+  it('deve fechar o detalhe e exibir erro global quando o cancelamento falhar', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/eventos') return mockEventos
@@ -913,9 +913,10 @@ describe('EventosView', () => {
     await waitFor(() => {
       expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/eventos/${EVENTO_ID}/cancelar`, {})
     })
-    expect(await within(detalhe).findByRole('alert')).toHaveTextContent(
-      'Ocorrências já encerradas não podem ser canceladas.'
-    )
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: /detalhes do evento/i })).not.toBeInTheDocument()
+    })
+    expect(await screen.findByText('Ocorrências já encerradas não podem ser canceladas.')).toBeInTheDocument()
   })
 
 })
