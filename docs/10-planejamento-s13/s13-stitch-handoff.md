@@ -100,7 +100,7 @@ As capabilities retornadas por `auth/me` devem ser preservadas. Elas podem liber
 - `podeGerirAgenda`: acesso a Eventos, Series, Convocacoes e Locais;
 - `podeAdministrarRegionais`: dentro de Regionais, controla criacao/edicao;
 - `podeGerenciarSessoes`: dentro de Acessos, controla consulta/revogacao de sessoes;
-- `ResponsabilidadeRegionalGate`: quando existe ciencia pendente, substitui temporariamente toda a area autenticada; a confirmacao ocorre sequencialmente por acesso regional pendente, com nova consulta apos cada registro, e a aplicacao so e liberada quando nao restam pendencias. Se a verificacao falhar por erro diferente de 403, o componente registra a falha e libera a aplicacao, conforme o comportamento atual;
+- `ResponsabilidadeRegionalGate`: quando existe ciencia pendente, substitui temporariamente toda a area autenticada; a confirmacao ocorre sequencialmente por acesso regional pendente, com nova consulta apos cada registro, e a aplicacao so e liberada quando nao restam pendencias. Em erro diferente de 403 na consulta inicial, o componente registra a falha e libera a aplicacao; em erro equivalente na reconsulta apos uma ciencia, preserva a responsabilidade anterior e mantem o gate exibido ate nova verificacao;
 - recuperacoes de PIN pendentes: com `podeAdministrarAcessos`, `App.tsx` carrega a contagem e `MainLayout` exibe um alerta global com acesso direto a Acessos, exceto quando o usuario ja esta nessa tela.
 
 Uma superficie visivel nao implica permissao para todas as suas acoes. O redesenho deve preservar essas diferencas.
