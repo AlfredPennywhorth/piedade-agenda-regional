@@ -815,7 +815,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
             ? (err.message || 'Não foi possível cancelar o evento.')
             : 'Não foi possível cancelar o evento.'
       setErro(mensagem)
-      if (eventoDetalhe?.id === item.id) setErroDetalhe(mensagem)
+      setErroDetalhe(mensagem)
     }
   }
 
