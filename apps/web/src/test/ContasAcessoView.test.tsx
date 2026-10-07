@@ -257,7 +257,7 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     fireEvent.change(screen.getByLabelText('Filtrar por Status'), {
       target: { value: 'SEM_CONTA' },
     })
-    fireEvent.click(screen.getByRole('button', { name: /Gerar link de ativação/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Gerar ativação/i }))
     expect(await screen.findByText(/ativacao=token-a/)).toBeDefined()
 
     fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
