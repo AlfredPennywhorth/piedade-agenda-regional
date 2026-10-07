@@ -2,11 +2,12 @@ import { Hono } from 'hono'
 import { eq, and } from 'drizzle-orm'
 import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento, convidadosEvento, credenciaisCadastroPortariaEvento, credenciaisOperadorPortariaEvento, presencasConvidadoEvento, portariaFechamentos, portariaFechamentoItens, portariaSolicitacoesFechamento, portariaReaberturas, portariaFechamentoLocks } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
-import { eMasterSistema, eOperadorPortariaAutorizado, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
+import { eMasterSistema, eOperadorPortariaAutorizado } from '../security/permissoes'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
 import { PortariaEventosQuerySchema, getSaoPauloDateString, getSaoPauloEndOfDayIso } from '@piedade/shared'
 import { gerarTokenAleatorio, hashToken } from '../security/tokens'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
+import { podeGerenciarEvento } from '../security/eventos'
 import { executeAtomic } from '../db/batch'
 
 export const portariaRouter = new Hono<{ Variables: Variables }>()
@@ -17,14 +18,7 @@ portariaRouter.use('*', authMiddleware)
 async function podeGerarCredencialOperador(db: any, membroId: string, contexto: any, evento: any) {
   if (evento.pessoal) return false
   if (eMasterSistema(contexto)) return true
-  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
-  if (!escopoTipo || !escopoId) return false
-  return podeGerenciarAgendaNoEscopo(
-    db,
-    membroId,
-    escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-    escopoId
-  )
+  return podeGerenciarEvento(db, membroId, evento)
 }
 
 // POST /api/v1/portaria/eventos/:eventoId/credenciais-operador

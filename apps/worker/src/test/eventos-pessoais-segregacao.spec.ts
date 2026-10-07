@@ -181,6 +181,27 @@ describe('Eventos pessoais e segregação', () => {
     for (const u of [autor, master])
       expect((await req(u, `/eventos/${id}`, 'PATCH', { titulo: 'Alterado' })).status).toBe(200)
   })
+  it('relatório agregado preserva privacidade de pessoais, inclusive totais', async () => {
+    const relator = await usuario(casa, 'GESTOR_RELATORIOS', 'CASA', casa)
+    const privado = await evento({ casaId: casa }, { pessoal: true, criadorMembroId: autor.id })
+    const proprio = await evento({ casaId: casa }, { pessoal: true, criadorMembroId: relator.id })
+    const publico = await evento({ casaId: casa })
+    for (const [u, ids] of [[relator, [proprio, publico]], [master, [privado, proprio, publico]]] as const) {
+      const res = await req(u, `/relatorios/agregado?escopoTipo=CASA&escopoId=${casa}`)
+      expect(res.status).toBe(200)
+      const body = await res.json() as any
+      expect(body.eventos.map((e: any) => e.id).sort()).toEqual([...ids].sort())
+      expect(body.totalEventos).toBe(ids.length)
+    }
+  })
+  it('credenciais de portaria exigem gestão do evento mesmo na própria Casa', async () => {
+    const id = await evento({ casaId: casa }, { organizadorMembroId: colega.id })
+    for (const method of ['GET', 'POST'])
+      expect((await req(autor, `/portaria/eventos/${id}/credenciais-operador`, method, method === 'POST' ? {} : undefined)).status).toBe(403)
+    const gestor = await usuario(casa, 'GESTOR_AGENDA', 'CASA', casa)
+    for (const u of [colega, gestor, master])
+      expect((await req(u, `/portaria/eventos/${id}/credenciais-operador`, 'POST', {})).status).toBe(201)
+  })
   it('usuário comum não vê eventos dos colegas nem rascunhos ancestrais', async () => {
     await evento({ casaId: casa })
     await evento({ regionalId: reg })

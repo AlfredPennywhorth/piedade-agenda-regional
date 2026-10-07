@@ -62,7 +62,7 @@ aprovação. Nenhum deploy é disparado por esta alteração.
 
 ## Evidências locais
 
-- Worker: 588 testes passando, incluindo 19 testes de segregação, eventos
+- Worker: 590 testes passando, incluindo 21 testes de segregação, eventos
   pessoais, conflitos, atalhos de convocação e migration.
 - Frontend: 281 testes passando, incluindo criação pessoal sem convocação,
   consulta sem ações de gestão e abertura pessoal na agenda/calendário sem RSVP/QR.
