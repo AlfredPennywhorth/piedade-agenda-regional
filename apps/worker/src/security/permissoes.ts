@@ -439,6 +439,22 @@ export function temPerfilNoEscopo(
   )
 }
 
+export async function podeGerenciarAgendaExterna(
+  db: any,
+  membroId: string
+): Promise<boolean> {
+  if (!db || !membroId) return false
+  const contexto = await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) return true
+
+  return contexto.acessosAtivos.some(
+    acesso =>
+      ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) &&
+      acesso.escopoTipo === 'REGIONAL' &&
+      acesso.escopoId !== null
+  )
+}
+
 export async function podeGerenciarAgendaNoEscopo(
   db: any,
   membroId: string,
