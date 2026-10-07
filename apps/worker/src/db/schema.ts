@@ -595,7 +595,12 @@ export const eventos = sqliteTable(
     urlOnline: text('url_online'),
     organizadorMembroId: text('organizador_membro_id').references(() => membros.id),
 
-    // Escopo Institucional (Exatamente UM preenchido)
+    abrangencia: text('abrangencia').notNull().default('TERRITORIAL'),
+    destinoUf: text('destino_uf'),
+    destinoPaisCodigo: text('destino_pais_codigo'),
+    destinoCidadeLocal: text('destino_cidade_local'),
+
+    // Escopo Institucional territorial
     regionalId: text('regional_id').references(() => regionais.id),
     administracaoId: text('administracao_id').references(() => administracoes.id),
     setorId: text('setor_id').references(() => setores.id),
@@ -621,13 +626,41 @@ export const eventos = sqliteTable(
   },
   table => ({
     checkEscopo: check(
-      'check_evento_escopo_unico',
+      'check_evento_abrangencia_destino',
       sql`
-      (CASE WHEN ${table.regionalId} IS NOT NULL THEN 1 ELSE 0 END) +
-      (CASE WHEN ${table.administracaoId} IS NOT NULL THEN 1 ELSE 0 END) +
-      (CASE WHEN ${table.setorId} IS NOT NULL THEN 1 ELSE 0 END) +
-      (CASE WHEN ${table.casaId} IS NOT NULL THEN 1 ELSE 0 END) +
-      (CASE WHEN ${table.grupoTrabalhoId} IS NOT NULL THEN 1 ELSE 0 END) = 1
+      (
+        ${table.abrangencia} = 'TERRITORIAL'
+        AND (
+          (CASE WHEN ${table.regionalId} IS NOT NULL THEN 1 ELSE 0 END) +
+          (CASE WHEN ${table.administracaoId} IS NOT NULL THEN 1 ELSE 0 END) +
+          (CASE WHEN ${table.setorId} IS NOT NULL THEN 1 ELSE 0 END) +
+          (CASE WHEN ${table.casaId} IS NOT NULL THEN 1 ELSE 0 END) +
+          (CASE WHEN ${table.grupoTrabalhoId} IS NOT NULL THEN 1 ELSE 0 END)
+        ) = 1
+        AND ${table.destinoUf} IS NULL
+        AND ${table.destinoPaisCodigo} IS NULL
+        AND ${table.destinoCidadeLocal} IS NULL
+      )
+      OR
+      (
+        ${table.abrangencia} = 'NACIONAL'
+        AND ${table.regionalId} IS NULL AND ${table.administracaoId} IS NULL
+        AND ${table.setorId} IS NULL AND ${table.casaId} IS NULL
+        AND ${table.grupoTrabalhoId} IS NULL
+        AND ${table.destinoUf} IS NOT NULL
+        AND ${table.destinoPaisCodigo} IS NULL
+        AND ${table.destinoCidadeLocal} IS NOT NULL
+      )
+      OR
+      (
+        ${table.abrangencia} = 'INTERNACIONAL'
+        AND ${table.regionalId} IS NULL AND ${table.administracaoId} IS NULL
+        AND ${table.setorId} IS NULL AND ${table.casaId} IS NULL
+        AND ${table.grupoTrabalhoId} IS NULL
+        AND ${table.destinoUf} IS NULL
+        AND ${table.destinoPaisCodigo} IS NOT NULL
+        AND ${table.destinoCidadeLocal} IS NOT NULL
+      )
     `
     ),
     idxCriadorPessoal: index('idx_eventos_criador_pessoal').on(table.criadorMembroId, table.pessoal, table.ativo),
