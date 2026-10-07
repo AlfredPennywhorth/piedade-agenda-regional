@@ -64,6 +64,84 @@ describe('EventosView', () => {
     })
   })
 
+  it('gestor filtra a Administração incluindo eventos de Casas subordinadas', async () => {
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos/filtros') return { master: false, filtrarEscopo: true, pessoas: [] }
+      if (url === '/administracoes') return [{ id: 'adm-1', nome: 'Administração SP', regionalId: REGIONAL_ID }]
+      if (url === '/setores') return [{ id: 'setor-1', nome: 'Setor', administracaoId: 'adm-1' }]
+      if (url === '/casas') return [{ id: 'casa-1', nome: 'Casa', setorId: 'setor-1' }]
+      if (url === '/eventos') return [mockEventos[0], { ...mockEventos[0], id: 'outro', titulo: 'Evento da Casa', regionalId: null, casaId: 'casa-1' }]
+      return original(url)
+    })
+    render(<EventosView />)
+    const filtro = await screen.findByLabelText('Filtrar por escopo')
+    await screen.findByText('Evento da Casa')
+    fireEvent.change(filtro, { target: { value: 'administracaoId:adm-1' } })
+    expect(screen.getByText('Evento da Casa')).toBeInTheDocument()
+    expect(screen.queryByText('Reunião Presencial')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Filtrar por pessoa')).not.toBeInTheDocument()
+  })
+
+  it('Master filtra eventos por pessoa na API e pode limpar o filtro', async () => {
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos/filtros') return { master: true, pessoas: [{ id: 'pessoa-1', nome: 'André' }] }
+      if (url === '/eventos?pessoaId=pessoa-1') return [{ ...mockEventos[0], titulo: 'Evento do André' }]
+      return original(url)
+    })
+    render(<EventosView />)
+    const filtro = await screen.findByLabelText('Filtrar por pessoa')
+    fireEvent.change(filtro, { target: { value: 'pessoa-1' } })
+    expect(await screen.findByText('Evento do André')).toBeInTheDocument()
+    expect(screen.queryByText('Reunião Presencial')).not.toBeInTheDocument()
+    fireEvent.change(filtro, { target: { value: '' } })
+    expect(await screen.findByText('Reunião Presencial')).toBeInTheDocument()
+  })
+
+  it('usuário comum não recebe filtros de pessoas nem de escopo', async () => {
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => url === '/eventos/filtros'
+      ? { master: false, filtrarEscopo: false, pessoas: [] } : original(url))
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    expect(screen.queryByLabelText('Filtrar por pessoa')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Filtrar por escopo')).not.toBeInTheDocument()
+  })
+
+  it('Próprio na Casa salva e vai para agenda sem iniciar convocação', async () => {
+    const casaId = '99999999-9999-4999-8999-999999999999'
+    const originalFetch = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => url === '/casas' ? [{ id: casaId, nome: 'Minha Casa' }] : originalFetch(url))
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({ ...mockEventos[0], pessoal: true, casaId, regionalId: null })
+    const onEventoCriado = vi.fn(), onEventoPessoalCriado = vi.fn()
+    render(<EventosView onEventoCriado={onEventoCriado} onEventoPessoalCriado={onEventoPessoalCriado} />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+    fireEvent.change(within(dialog).getByLabelText(/título/i), { target: { value: 'Meu compromisso' } })
+    fireEvent.change(within(dialog).getByLabelText(/início/i), { target: { value: '2026-10-10T10:00' } })
+    fireEvent.change(within(dialog).getByLabelText(/fim/i), { target: { value: '2026-10-10T12:00' } })
+    fireEvent.change(within(dialog).getByLabelText(/modalidade/i), { target: { value: 'ONLINE' } })
+    fireEvent.change(within(dialog).getByLabelText(/url online/i), { target: { value: 'https://example.org' } })
+    fireEvent.change(within(dialog).getByLabelText(/tipo de escopo/i), { target: { value: 'casa' } })
+    fireEvent.change(within(dialog).getByLabelText(/casa de oração \*/i), { target: { value: casaId } })
+    fireEvent.change(within(dialog).getByLabelText(/público do evento/i), { target: { value: 'PROPRIO' } })
+    expect(within(dialog).queryByLabelText(/organizador/i)).not.toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar evento/i }))
+    await waitFor(() => expect(onEventoPessoalCriado).toHaveBeenCalledOnce())
+    expect(onEventoCriado).not.toHaveBeenCalled()
+    expect(apiClient.postWithAuth).toHaveBeenCalledWith('/eventos', expect.objectContaining({ pessoal: true, casaId, organizadorMembroId: null }))
+  })
+
+  it('evento somente de leitura não oferece edição, cancelamento ou portaria', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => url === '/eventos' ? [{ ...mockEventos[0], podeGerenciar: false }] : [])
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    expect(screen.getByRole('button', { name: /^ver$/i })).toBeInTheDocument()
+    for (const name of [/^editar$/i, /cancelar evento/i, /gerar acesso de portaria/i]) expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+  })
+
   it('deve listar eventos corretamente', async () => {
     render(<EventosView />)
     expect(screen.getByText('Gestão de Eventos')).toBeInTheDocument()
@@ -291,7 +369,7 @@ describe('EventosView', () => {
     render(<EventosView />)
 
     await waitFor(() => {
-      expect(screen.getByText('Nenhum evento cadastrado.')).toBeInTheDocument()
+      expect(screen.getByText('Nenhum evento encontrado neste filtro.')).toBeInTheDocument()
     })
   })
 

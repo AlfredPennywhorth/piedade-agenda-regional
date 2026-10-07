@@ -1,6 +1,7 @@
 export interface AgendaItem {
   evento: {
     id: string
+    pessoal?: boolean
     titulo: string
     inicioEm: string
     fimEm: string
@@ -17,7 +18,7 @@ export interface AgendaItem {
   convocacao: {
     id: string
     observacoes: string | null
-  }
+  } | null
   local: {
     nome: string
     endereco: string
@@ -28,7 +29,7 @@ export interface AgendaItem {
     id: string
     nome: string
   } | null
-  destinatarioId: string
+  destinatarioId: string | null
   vinculo?: {
     funcaoId: string
     funcaoNome: string
