@@ -651,6 +651,7 @@ export const eventos = sqliteTable(
         AND ${table.destinoUf} IS NOT NULL
         AND ${table.destinoPaisCodigo} IS NULL
         AND ${table.destinoCidadeLocal} IS NOT NULL
+        AND (${table.pessoal} = 1 OR ${table.regionalGestaoId} IS NOT NULL)
       )
       OR
       (
@@ -661,6 +662,7 @@ export const eventos = sqliteTable(
         AND ${table.destinoUf} IS NULL
         AND ${table.destinoPaisCodigo} IS NOT NULL
         AND ${table.destinoCidadeLocal} IS NOT NULL
+        AND (${table.pessoal} = 1 OR ${table.regionalGestaoId} IS NOT NULL)
       )
     `
     ),
