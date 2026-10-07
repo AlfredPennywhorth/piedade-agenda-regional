@@ -915,6 +915,24 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     }
   }
 
+  const handleReativarEvento = async (item: Evento) => {
+    if (!window.confirm(`Reativar o evento "${item.titulo}"? A convocação cancelada, se houver, não será reaberta automaticamente.`)) return
+    setErro(null)
+    setErroCancelamento(null)
+    try {
+      const atualizado = await patchWithAuth<Evento>(`/eventos/${item.id}`, { ativo: true })
+      setEventos(atuais => atuais.map(evento => evento.id === item.id ? { ...evento, ...atualizado, ativo: true } : evento))
+      if (eventoDetalheIdRef.current === item.id) {
+        setEventoDetalhe(atual => atual?.id === item.id ? { ...atual, ...atualizado, ativo: true } : atual)
+      }
+    } catch (err: unknown) {
+      const mensagem = err instanceof ApiError && err.body?.error
+        ? (typeof err.body.error === 'string' ? err.body.error : 'Não foi possível reativar o evento.')
+        : err instanceof Error ? (err.message || 'Não foi possível reativar o evento.') : 'Não foi possível reativar o evento.'
+      setErroCancelamento(mensagem)
+    }
+  }
+
   const confirmarEditarThis = async () => {
     if (!eventoEditandoId || !eventoEditandoSerieId || !confirmacaoThisAberto) return
     setSalvando(true)
@@ -1157,6 +1175,15 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                             className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-red-700 hover:bg-red-50 hover:text-red-900 font-medium"
                           >
                             Cancelar Evento
+                          </button>
+                        )}
+                        {!item.ativo && item.podeGerenciar !== false && new Date(item.fimEm).getTime() > Date.now() && (
+                          <button
+                            type="button"
+                            onClick={() => void handleReativarEvento(item)}
+                            className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-900 font-medium"
+                          >
+                            Reativar Evento
                           </button>
                         )}
                       </div>
@@ -1724,6 +1751,17 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                     className="inline-flex min-h-10 items-center rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
                   >
                     Cancelar Evento
+                  </button>
+                </div>
+              )}
+              {!eventoDetalhe.ativo && eventoDetalhe.podeGerenciar !== false && new Date(eventoDetalhe.fimEm).getTime() > Date.now() && (
+                <div className="flex justify-end border-t border-slate-100 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => void handleReativarEvento(eventoDetalhe)}
+                    className="inline-flex min-h-10 items-center rounded-lg border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                  >
+                    Reativar Evento
                   </button>
                 </div>
               )}
