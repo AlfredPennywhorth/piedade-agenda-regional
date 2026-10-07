@@ -101,7 +101,7 @@ export function IosInstallPrompt() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 id="ios-install-title" className="text-base font-semibold text-slate-900">
-            Instale a Agenda no seu iPhone
+            Instale a Agenda neste dispositivo
           </h2>
           <p className="mt-1 text-sm text-slate-600">
             Abra a Agenda pela Tela de Início, como um aplicativo.
@@ -123,7 +123,7 @@ export function IosInstallPrompt() {
             <ShareIcon />
           </span>
           <span>
-            <strong>1.</strong> Toque no botão <strong>Compartilhar</strong> do Safari.
+            <strong>1.</strong> No navegador, toque em <strong>Compartilhar</strong>.
           </span>
         </li>
         <li className="flex items-start gap-3">
