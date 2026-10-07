@@ -241,31 +241,34 @@ async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAu
 
   const regionaisIds = Array.from(regionaisAgenda)
   if (regionaisIds.length > 0) {
-    const adms = await db
-      .select({ id: administracoes.id })
-      .from(administracoes)
-      .where(inArray(administracoes.regionalId, regionaisIds.slice(0, D1_IN_BATCH)))
-      .all()
+    const adms = await carregarEmLotes(regionaisIds, lote =>
+      db.select({ id: administracoes.id })
+        .from(administracoes)
+        .where(inArray(administracoes.regionalId, lote))
+        .all()
+    )
     adms.forEach((item: any) => {
       administracoesAgenda.add(item.id)
       administracoesDescendentesDeRegional.add(item.id)
     })
 
-    const gtsRegionais = await db
-      .select({ id: gruposTrabalho.id })
-      .from(gruposTrabalho)
-      .where(inArray(gruposTrabalho.regionalId, regionaisIds.slice(0, D1_IN_BATCH)))
-      .all()
+    const gtsRegionais = await carregarEmLotes(regionaisIds, lote =>
+      db.select({ id: gruposTrabalho.id })
+        .from(gruposTrabalho)
+        .where(inArray(gruposTrabalho.regionalId, lote))
+        .all()
+    )
     gtsRegionais.forEach((item: any) => gtsAgenda.add(item.id))
   }
 
   const administracoesIds = Array.from(administracoesAgenda)
   if (administracoesIds.length > 0) {
-    const itensSetor = await db
-      .select({ id: setores.id, administracaoId: setores.administracaoId })
-      .from(setores)
-      .where(inArray(setores.administracaoId, administracoesIds))
-      .all()
+    const itensSetor = await carregarEmLotes(administracoesIds, lote =>
+      db.select({ id: setores.id, administracaoId: setores.administracaoId })
+        .from(setores)
+        .where(inArray(setores.administracaoId, lote))
+        .all()
+    )
     itensSetor.forEach((item: any) => {
       setoresAgenda.add(item.id)
       if (administracoesDescendentesDeRegional.has(item.administracaoId)) {
@@ -275,31 +278,34 @@ async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAu
 
     const administracoesRegionaisIds = Array.from(administracoesDescendentesDeRegional)
     if (administracoesRegionaisIds.length > 0) {
-      const gtsAdministracao = await db
-        .select({ id: gruposTrabalho.id })
-        .from(gruposTrabalho)
-        .where(inArray(gruposTrabalho.administracaoId, administracoesRegionaisIds))
-        .all()
+      const gtsAdministracao = await carregarEmLotes(administracoesRegionaisIds, lote =>
+        db.select({ id: gruposTrabalho.id })
+          .from(gruposTrabalho)
+          .where(inArray(gruposTrabalho.administracaoId, lote))
+          .all()
+      )
       gtsAdministracao.forEach((item: any) => gtsAgenda.add(item.id))
     }
   }
 
   const setoresIds = Array.from(setoresAgenda)
   if (setoresIds.length > 0) {
-    const itensCasa = await db
-      .select({ id: casas.id })
-      .from(casas)
-      .where(inArray(casas.setorId, setoresIds))
-      .all()
+    const itensCasa = await carregarEmLotes(setoresIds, lote =>
+      db.select({ id: casas.id })
+        .from(casas)
+        .where(inArray(casas.setorId, lote))
+        .all()
+    )
     itensCasa.forEach((item: any) => casasAgenda.add(item.id))
 
     const setoresRegionaisIds = Array.from(setoresDescendentesDeRegional)
     if (setoresRegionaisIds.length > 0) {
-      const gtsSetor = await db
-        .select({ id: gruposTrabalho.id })
-        .from(gruposTrabalho)
-        .where(inArray(gruposTrabalho.setorId, setoresRegionaisIds))
-        .all()
+      const gtsSetor = await carregarEmLotes(setoresRegionaisIds, lote =>
+        db.select({ id: gruposTrabalho.id })
+          .from(gruposTrabalho)
+          .where(inArray(gruposTrabalho.setorId, lote))
+          .all()
+      )
       gtsSetor.forEach((item: any) => gtsAgenda.add(item.id))
     }
   }
