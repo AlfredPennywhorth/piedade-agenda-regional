@@ -222,12 +222,14 @@ export function ContasAcessoView({
   }
 
   const contasExibidas = useMemo(() => {
-    const membroPreservadoId = linkTemporario?.membroId ?? feedback?.membroId ?? null
-    if (!membroPreservadoId || contasFiltradas.some(conta => conta.membroId === membroPreservadoId)) {
-      return contasFiltradas
-    }
-    const contaPreservada = contas.find(conta => conta.membroId === membroPreservadoId)
-    return contaPreservada ? [contaPreservada, ...contasFiltradas] : contasFiltradas
+    const idsPreservados = new Set(
+      [linkTemporario?.membroId, feedback?.membroId].filter((id): id is string => Boolean(id))
+    )
+    const idsJaExibidos = new Set(contasFiltradas.map(conta => conta.membroId))
+    const preservadas = contas.filter(
+      conta => idsPreservados.has(conta.membroId) && !idsJaExibidos.has(conta.membroId)
+    )
+    return [...preservadas, ...contasFiltradas]
   }, [contas, contasFiltradas, feedback, linkTemporario])
 
   useEffect(() => {
