@@ -4,7 +4,7 @@ import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal, membros,
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, executarOperacaoComAudits, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
-import { podeGerenciarAgendaNoEscopo, podeGerenciarAgendaExterna, eMasterSistema } from '../security/permissoes'
+import { podeGerenciarAgendaNoEscopo, podeGerenciarAgendaExterna, obterRegionalGestaoAgendaExterna, eMasterSistema } from '../security/permissoes'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
 import { carregarEscoposOperacionaisLegados, condicaoEventosVisiveis, condicaoEventosGerenciaveis, podeLerEvento, podeGerenciarEvento } from '../security/eventos'
@@ -241,8 +241,18 @@ eventosRouter.post('/', async (c) => {
       return c.json({ error: 'Escopo da Agenda indisponível', code: 'FORBIDDEN' }, 403)
     }
 
+    const regionalGestaoId = externo
+      ? await obterRegionalGestaoAgendaExterna(db, atorMembroId)
+      : null
+
     const autorizado = externo
-      ? (parsed.pessoal === true || await podeGerenciarAgendaExterna(db, atorMembroId))
+      ? (
+          parsed.pessoal === true ||
+          (
+            !!regionalGestaoId &&
+            await podeGerenciarAgendaExterna(db, atorMembroId, regionalGestaoId)
+          )
+        )
       : await podeGerenciarAgendaNoEscopo(
           db,
           atorMembroId,
@@ -252,6 +262,12 @@ eventosRouter.post('/', async (c) => {
 
     if (!autorizado) {
       return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
+    }
+    if (externo && !parsed.pessoal && !regionalGestaoId) {
+      return c.json({
+        error: 'Não foi possível determinar uma única Regional responsável pelo atendimento externo',
+        code: 'REGIONAL_GESTAO_AMBIGUA'
+      }, 409)
     }
 
     if (parsed.pessoal) {
@@ -274,12 +290,18 @@ eventosRouter.post('/', async (c) => {
         pessoal: parsed.pessoal ?? false,
         escopoTipo: escopoTipo || '',
         escopoId: escopoId || '',
+        regionalGestaoId,
       },
     }
 
     await executarOperacaoComAudit(
       db,
-      (qdb) => [qdb.insert(eventos).values({ id, ...parsed, criadorMembroId: atorMembroId })],
+      (qdb) => [qdb.insert(eventos).values({
+        id,
+        ...parsed,
+        criadorMembroId: atorMembroId,
+        regionalGestaoId,
+      })],
       auditData
     )
 
@@ -454,10 +476,16 @@ eventosRouter.patch('/:id', async (c) => {
     }
 
     const externoFinal = merged.abrangencia === 'NACIONAL' || merged.abrangencia === 'INTERNACIONAL'
+    const regionalGestaoFinal = externoFinal
+      ? (existing.regionalGestaoId || await obterRegionalGestaoAgendaExterna(db, membroId))
+      : null
     const autorizadoFinal = externoFinal
       ? (
           (merged.pessoal === true && existing.criadorMembroId === membroId) ||
-          await podeGerenciarAgendaExterna(db, membroId)
+          (
+            !!regionalGestaoFinal &&
+            await podeGerenciarAgendaExterna(db, membroId, regionalGestaoFinal)
+          )
         )
       : await podeGerenciarAgendaNoEscopo(
           db, membroId,
@@ -512,6 +540,7 @@ eventosRouter.patch('/:id', async (c) => {
         qdb.update(eventos)
           .set({
             ...parsed,
+            regionalGestaoId: regionalGestaoFinal,
             recorrenciaExcecao: isExcecao,
             agendaRevisao: alteracaoMaterial || ativacaoAlterada ? nowIso : existing.agendaRevisao,
             agendaAviso,
