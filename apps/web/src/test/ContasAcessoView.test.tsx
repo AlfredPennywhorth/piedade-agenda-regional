@@ -168,6 +168,57 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(screen.queryByText('Pessoa Teste')).toBeNull()
   })
 
+  it('não usa dígitos de busca alfanumérica para combinar telefone', async () => {
+    const outraConta = {
+      ...contaAtiva,
+      membroId: 'membro-2',
+      nome: 'Maria Exemplo',
+      celular: '11912345678',
+      codigoCarteirinha: 'ABC-987',
+      contaAcessoId: 'conta-2',
+      acessos: [],
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva, outraConta] as any
+      return [] as any
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.change(await screen.findByLabelText('Buscar por nome, celular ou carteirinha'), {
+      target: { value: 'CARTEIRA-1' },
+    })
+
+    expect(screen.getByText('Pessoa Teste')).toBeDefined()
+    expect(screen.queryByText('Maria Exemplo')).toBeNull()
+  })
+
+  it('mantém confirmação de status visível mesmo se o filtro excluir a conta após a ação', async () => {
+    let chamadasAdmin = 0
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') {
+        chamadasAdmin += 1
+        return (chamadasAdmin === 1
+          ? [contaAtiva]
+          : [{ ...contaAtiva, status: 'BLOQUEADA' }]) as any
+      }
+      return [] as any
+    })
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValue({
+      membroId: 'membro-1',
+      contaAcessoId: 'conta-1',
+      status: 'BLOQUEADA',
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.change(await screen.findByLabelText('Filtrar por Status'), {
+      target: { value: 'ATIVA' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Bloquear' }))
+
+    expect(await screen.findByText('Conta bloqueada e sessões revogadas.')).toBeDefined()
+    expect(screen.getByText('Pessoa Teste')).toBeDefined()
+  })
+
   it('confirma o bloqueio e atualiza a listagem', async () => {
     vi.mocked(apiClient.patchWithAuth).mockResolvedValue({
       membroId: 'membro-1',
