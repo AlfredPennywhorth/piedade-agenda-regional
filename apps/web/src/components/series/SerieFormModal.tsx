@@ -9,7 +9,7 @@ export interface Lookups {
   regionais: { id: string; nome: string }[]
   administracoes: { id: string; nome: string }[]
   setores: { id: string; nome: string }[]
-  casas: { id: string; nome: string }[]
+  casas: { id: string; nome: string; setorId: string }[]
   gruposTrabalho: { id: string; nome: string }[]
 }
 
@@ -38,6 +38,7 @@ export function SerieFormModal({
 }: SerieFormModalProps) {
   const [formData, setFormData] = useState<Partial<SerieCreateInput>>(initialData)
   const [tipoEscopo, setTipoEscopo] = useState<TipoEscopo>(initialTipoEscopo)
+  const [casaSetorFiltro, setCasaSetorFiltro] = useState('')
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState<boolean>(false)
@@ -71,12 +72,18 @@ export function SerieFormModal({
 
   const { locais, espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho } = lookups
   const locaisDisponiveis = [...locais, ...locaisRapidos.filter(item => !locais.some(local => local.id === item.id))]
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   const espacosDisponiveis = [...espacos, ...espacosRapidos.filter(item => !espacos.some(espaco => espaco.id === item.id))]
 
   useEffect(() => {
     if (isOpen) {
       setFormData(initialData)
       setTipoEscopo(initialTipoEscopo)
+      setCasaSetorFiltro(
+        initialTipoEscopo === 'casa'
+          ? (casas.find(casa => casa.id === initialData.casaId)?.setorId ?? '')
+          : ''
+      )
       setErrosForm({})
       setErro(null)
       setSalvando(false)
@@ -89,7 +96,7 @@ export function SerieFormModal({
       setLocalRapido({ nome: '', endereco: '', numero: '', bairro: '', cidade: 'São Paulo', uf: 'SP', cep: '' })
       setEspacoRapidoNome('')
     }
-  }, [isOpen, initialData, initialTipoEscopo])
+  }, [isOpen, initialData, initialTipoEscopo, casas])
 
   useEffect(() => {
     if (!localRapidoOpen) return
@@ -169,6 +176,7 @@ export function SerieFormModal({
 
   const handleTipoEscopoChange = (tipo: TipoEscopo) => {
     setTipoEscopo(tipo)
+    setCasaSetorFiltro('')
     setFormData(prev => ({
       ...prev,
       regionalId: '',
@@ -781,8 +789,23 @@ export function SerieFormModal({
                         </>
                       )}
                       {tipoEscopo === 'casa' && (
-                        <>
-                          <label htmlFor="casaId" className="block text-xs font-medium text-slate-700 mb-1">Casa de Oração *</label>
+                        <div className="space-y-2">
+                          <label htmlFor="serieCasaSetorFiltro" className="block text-xs font-medium text-slate-700">Filtrar Casa por Setor</label>
+                          <select
+                            id="serieCasaSetorFiltro"
+                            value={casaSetorFiltro}
+                            onChange={e => {
+                              setCasaSetorFiltro(e.target.value)
+                              setFormData({ ...formData, casaId: '' })
+                            }}
+                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                          >
+                            <option value="">Todos os Setores</option>
+                            {[...setores].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(s => (
+                              <option key={s.id} value={s.id}>{s.nome}</option>
+                            ))}
+                          </select>
+                          <label htmlFor="casaId" className="block text-xs font-medium text-slate-700">Casa de Oração *</label>
                           <select
                             id="casaId"
                             value={formData.casaId || ''}
@@ -790,9 +813,12 @@ export function SerieFormModal({
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                           >
                             <option value="">Selecione...</option>
-                            {casas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                            {casas
+                              .filter(casa => !casaSetorFiltro || casa.setorId === casaSetorFiltro)
+                              .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+                              .map(casa => <option key={casa.id} value={casa.id}>{casa.nome}</option>)}
                           </select>
-                        </>
+                        </div>
                       )}
                       {tipoEscopo === 'grupoTrabalho' && (
                         <>
