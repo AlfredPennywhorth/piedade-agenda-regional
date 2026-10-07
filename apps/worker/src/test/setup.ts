@@ -301,6 +301,10 @@ export function setupDb(sqlite: any) {
       espaco_id text,
       url_online text,
       organizador_membro_id text,
+      abrangencia text DEFAULT 'TERRITORIAL' NOT NULL,
+      destino_uf text,
+      destino_pais_codigo text,
+      destino_cidade_local text,
       regional_id text,
       administracao_id text,
       setor_id text,
@@ -370,12 +374,30 @@ export function setupDb(sqlite: any) {
       FOREIGN KEY (casa_id) REFERENCES casas(id),
       FOREIGN KEY (grupo_trabalho_id) REFERENCES grupos_trabalho(id),
       FOREIGN KEY (serie_recorrencia_id) REFERENCES series_recorrencia(id),
-      CONSTRAINT check_evento_escopo_unico CHECK (
-        (CASE WHEN regional_id IS NOT NULL THEN 1 ELSE 0 END) +
-        (CASE WHEN administracao_id IS NOT NULL THEN 1 ELSE 0 END) +
-        (CASE WHEN setor_id IS NOT NULL THEN 1 ELSE 0 END) +
-        (CASE WHEN casa_id IS NOT NULL THEN 1 ELSE 0 END) +
-        (CASE WHEN grupo_trabalho_id IS NOT NULL THEN 1 ELSE 0 END) = 1
+      CONSTRAINT check_evento_abrangencia_destino CHECK (
+        (
+          abrangencia = 'TERRITORIAL'
+          AND (
+            (CASE WHEN regional_id IS NOT NULL THEN 1 ELSE 0 END) +
+            (CASE WHEN administracao_id IS NOT NULL THEN 1 ELSE 0 END) +
+            (CASE WHEN setor_id IS NOT NULL THEN 1 ELSE 0 END) +
+            (CASE WHEN casa_id IS NOT NULL THEN 1 ELSE 0 END) +
+            (CASE WHEN grupo_trabalho_id IS NOT NULL THEN 1 ELSE 0 END)
+          ) = 1
+          AND destino_uf IS NULL AND destino_pais_codigo IS NULL AND destino_cidade_local IS NULL
+        )
+        OR
+        (
+          abrangencia = 'NACIONAL'
+          AND regional_id IS NULL AND administracao_id IS NULL AND setor_id IS NULL AND casa_id IS NULL AND grupo_trabalho_id IS NULL
+          AND destino_uf IS NOT NULL AND destino_pais_codigo IS NULL AND destino_cidade_local IS NOT NULL
+        )
+        OR
+        (
+          abrangencia = 'INTERNACIONAL'
+          AND regional_id IS NULL AND administracao_id IS NULL AND setor_id IS NULL AND casa_id IS NULL AND grupo_trabalho_id IS NULL
+          AND destino_uf IS NULL AND destino_pais_codigo IS NOT NULL AND destino_cidade_local IS NOT NULL
+        )
       )
     );
 
@@ -383,6 +405,7 @@ export function setupDb(sqlite: any) {
     CREATE INDEX IF NOT EXISTS idx_eventos_ativo ON eventos (ativo);
     CREATE INDEX IF NOT EXISTS idx_eventos_local_id ON eventos (local_id);
     CREATE INDEX IF NOT EXISTS idx_eventos_serie_recorrencia_id ON eventos (serie_recorrencia_id);
+    CREATE INDEX IF NOT EXISTS idx_eventos_abrangencia ON eventos (abrangencia, ativo);
 
     CREATE TABLE IF NOT EXISTS convocacoes (
       id text PRIMARY KEY NOT NULL,
