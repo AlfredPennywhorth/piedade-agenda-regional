@@ -3,6 +3,24 @@ import { describe, expect, it, vi } from 'vitest'
 import { MainLayout } from '../components/layout/MainLayout'
 
 describe('MainLayout — navegação móvel', () => {
+  it('exibe código estável da tela atual', () => {
+    const { rerender } = render(
+      <MainLayout currentTab="agenda" onTabChange={vi.fn()} capacidades={{}}>
+        <div>Conteúdo</div>
+      </MainLayout>
+    )
+
+    expect(screen.getByLabelText('Código da tela AGD-MOB-001')).toHaveTextContent('Tela AGD-MOB-001')
+
+    rerender(
+      <MainLayout currentTab="membros" onTabChange={vi.fn()} capacidades={{}}>
+        <div>Conteúdo</div>
+      </MainLayout>
+    )
+
+    expect(screen.getByLabelText('Código da tela AGD-ADM-010')).toHaveTextContent('Tela AGD-ADM-010')
+  })
+
   it('abre o menu Mais e permite acessar módulos administrativos', () => {
     const onTabChange = vi.fn()
 
