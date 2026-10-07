@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EventoCreate } from '../schemas/eventos'
+import { PAISES_ISO } from '../schemas/paises'
 
 const base = {
   titulo: 'Atendimento externo',
@@ -102,4 +103,13 @@ describe('Eventos externos', () => {
     expect(online.success).toBe(true)
     expect(presencialSemLocal.success).toBe(false)
   })
+
+  it('mantém catálogo ISO 3166-1 completo e sem duplicatas', () => {
+    const codigos = PAISES_ISO.map(([codigo]) => codigo)
+
+    expect(codigos).toHaveLength(249)
+    expect(new Set(codigos).size).toBe(249)
+    expect(codigos).toEqual(expect.arrayContaining(['HK', 'MO', 'PR', 'GL']))
+  })
+
 })
