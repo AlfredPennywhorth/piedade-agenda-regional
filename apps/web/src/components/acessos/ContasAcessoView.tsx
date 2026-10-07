@@ -181,13 +181,15 @@ export function ContasAcessoView({
     const administracao = administracoes.find(item => item.id === setor?.administracaoId)
 
     const termo = buscaFiltro.trim().toLocaleLowerCase('pt-BR')
-    const digitosBusca = buscaFiltro.replace(/\D/g, '')
+    const buscaEhTelefone = /^[\d\s()+.-]+$/.test(buscaFiltro.trim())
+    const digitosBusca = buscaEhTelefone ? buscaFiltro.replace(/\D/g, '') : ''
     if (termo) {
       const nome = conta.nome.toLocaleLowerCase('pt-BR')
       const carteirinha = (conta.codigoCarteirinha ?? '').toLocaleLowerCase('pt-BR')
       const celularDigitos = (conta.celular ?? '').replace(/\D/g, '')
       const encontrouTexto = nome.includes(termo) || carteirinha.includes(termo)
-      const encontrouCelular = digitosBusca.length > 0 && celularDigitos.includes(digitosBusca)
+      const encontrouCelular =
+        buscaEhTelefone && digitosBusca.length > 0 && celularDigitos.includes(digitosBusca)
       if (!encontrouTexto && !encontrouCelular) return false
     }
 
@@ -220,12 +222,13 @@ export function ContasAcessoView({
   }
 
   const contasExibidas = useMemo(() => {
-    if (!linkTemporario || contasFiltradas.some(conta => conta.membroId === linkTemporario.membroId)) {
+    const membroPreservadoId = linkTemporario?.membroId ?? feedback?.membroId ?? null
+    if (!membroPreservadoId || contasFiltradas.some(conta => conta.membroId === membroPreservadoId)) {
       return contasFiltradas
     }
-    const contaDoLink = contas.find(conta => conta.membroId === linkTemporario.membroId)
-    return contaDoLink ? [contaDoLink, ...contasFiltradas] : contasFiltradas
-  }, [contas, contasFiltradas, linkTemporario])
+    const contaPreservada = contas.find(conta => conta.membroId === membroPreservadoId)
+    return contaPreservada ? [contaPreservada, ...contasFiltradas] : contasFiltradas
+  }, [contas, contasFiltradas, feedback, linkTemporario])
 
   useEffect(() => {
     const membroId = feedback?.membroId ?? linkTemporario?.membroId
