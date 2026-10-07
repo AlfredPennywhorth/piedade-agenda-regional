@@ -8,7 +8,7 @@ Esta é a fonte operacional mínima para ChatGPT, Codex, Copilot e demais agente
 2. HEAD/SHA conhecido e correspondente ao commit revisado.
 3. CI verde no HEAD atual.
 4. Preflight verde.
-5. Nenhuma thread de review aberta.
+5. Nenhuma thread de review aberta. Esse gate deve ser imposto pela proteção nativa do GitHub **Require conversation resolution before merging**, pois a resolução de conversa não oferece um gatilho confiável de GitHub Actions para reavaliar o mesmo SHA.
 6. Nenhuma issue aberta com label `P0`.
 7. Se houver alteração em `apps/worker/drizzle/`, tratar como migration e exigir plano de backup/rollback.
 8. Não executar merge sem autorização do PMO.
@@ -34,4 +34,4 @@ Durante revisão, comparar:
 - documentação funcional × comportamento implementado;
 - instruções de agentes × estes gates.
 
-O preflight automatiza apenas verificações objetivas. Segurança, aderência funcional e smoke continuam exigindo revisão humana.
+O preflight automatiza verificações objetivas de base/SHA/impacto e blockers P0. A resolução de threads deve permanecer sob a proteção nativa da branch. Segurança, aderência funcional e smoke continuam exigindo revisão humana.
