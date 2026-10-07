@@ -386,7 +386,7 @@ export function AdministracoesView() {
               : 'Nenhuma administração cadastrada até o momento.'}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="master-table-scroll">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                 <tr>
