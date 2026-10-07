@@ -202,6 +202,69 @@ describe('Eventos pessoais e segregação', () => {
     expect(await (await req(colega, '/minha-agenda')).json()).toEqual([])
     expect(await (await req(master, '/minha-agenda')).json()).toEqual([])
   })
+  it('colega da mesma Casa não lista, lê nem altera série alheia', async () => {
+    const res = await req(autor, '/series-recorrencia', 'POST', {
+      titulo: 'Série particular do autor',
+      modalidade: 'ONLINE',
+      urlOnline: 'https://example.org',
+      casaId: casa,
+      dataInicio: '2099-10-10',
+      dataFim: '2099-10-12',
+      horarioInicio: '09:00',
+      horarioFim: '10:00',
+      frequencia: 'DIARIA',
+      intervalo: 1,
+    })
+    expect(res.status).toBe(201)
+    const serieId = ((await res.json()) as any).serie.id
+
+    const listaColega = (await (await req(colega, '/series-recorrencia')).json()) as any[]
+    expect(listaColega.map(item => item.id)).not.toContain(serieId)
+    expect((await req(colega, `/series-recorrencia/${serieId}`)).status).toBe(403)
+    expect(
+      (
+        await req(colega, `/series-recorrencia/${serieId}`, 'PATCH', {
+          updateMode: 'ALL',
+          changes: { titulo: 'Intrusão' },
+        })
+      ).status
+    ).toBe(403)
+
+    expect(((await (await req(autor, '/series-recorrencia')).json()) as any[]).map(item => item.id)).toContain(serieId)
+  })
+
+  it('auditoria territorial não revela evento pessoal de terceiro; Master preserva trilha', async () => {
+    const privadoRes = await req(autor, '/eventos', 'POST', {
+      titulo: 'Compromisso privado',
+      modalidade: 'ONLINE',
+      ...horario,
+      urlOnline: 'https://example.org/privado',
+      casaId: casa,
+      pessoal: true,
+    })
+    expect(privadoRes.status).toBe(201)
+    const privado = (await privadoRes.json()) as any
+
+    const publicoRes = await req(autor, '/eventos', 'POST', {
+      titulo: 'Compromisso institucional',
+      modalidade: 'ONLINE',
+      ...horario,
+      urlOnline: 'https://example.org/publico',
+      casaId: casa,
+    })
+    expect(publicoRes.status).toBe(201)
+    const publico = (await publicoRes.json()) as any
+
+    const auditor = await usuario(casa, 'AUDITOR', 'REGIONAL', reg)
+    const trilhaAuditor = (await (await req(auditor, '/auditoria?recursoTipo=EVENTO&limit=100')).json()) as any
+    const idsAuditor = trilhaAuditor.items.map((item: any) => item.recursoId)
+    expect(idsAuditor).toContain(publico.id)
+    expect(idsAuditor).not.toContain(privado.id)
+
+    const trilhaMaster = (await (await req(master, '/auditoria?recursoTipo=EVENTO&limit=100')).json()) as any
+    expect(trilhaMaster.items.map((item: any) => item.recursoId)).toContain(privado.id)
+  })
+
   it.each([['auditoria', 'ALL'], ['ocorrencia', 'ALL'], ['auditoria', 'THIS_AND_FUTURE'], ['ocorrencia', 'THIS_AND_FUTURE']])('regenerar série preserva autor por %s em %s e seus acessos', async (fonte, modo) => {
     const gestor = await usuario(casa, 'GESTOR_AGENDA', 'CASA', casa)
     const res = await req(autor, '/series-recorrencia', 'POST', {
