@@ -1519,7 +1519,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                                 <select
                                   id="destinoUf"
                                   value={formData.destinoUf || ''}
-                                  onChange={e => setFormData({ ...formData, destinoUf: e.target.value })}
+                                  onChange={e => setFormData({ ...formData, destinoUf: e.target.value as (typeof UF_BRASIL)[number] })}
                                   className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                                 >
                                   <option value="">Selecione...</option>
