@@ -26,6 +26,18 @@ import { ContasAcessoView } from './components/acessos/ContasAcessoView'
 import { PerfilView } from './components/perfil/PerfilView'
 import { PortariaOperadorTemporarioView } from './components/portaria/PortariaOperadorTemporarioView'
 
+function PublicScreenCode({ code }: { code: string }) {
+  return (
+    <span
+      className="fixed bottom-2 right-2 z-50 rounded bg-white/90 px-2 py-1 text-[10px] font-medium tracking-wide text-slate-400 shadow-sm"
+      data-screen-code={code}
+      aria-label={`Código da tela ${code}`}
+    >
+      Tela {code}
+    </span>
+  )
+}
+
 function App() {
   const paramsPublicos = new URLSearchParams(window.location.search)
   const tokenPortariaPublica = paramsPublicos.get('p') || paramsPublicos.get('portaria')
@@ -148,11 +160,21 @@ function App() {
   }
 
   if ((window.location.pathname === '/portaria-operador' || window.location.pathname.startsWith('/o/')) && tokenOperadorPortaria) {
-    return <PortariaOperadorTemporarioView token={tokenOperadorPortaria} />
+    return (
+      <>
+        <PortariaOperadorTemporarioView token={tokenOperadorPortaria} />
+        <PublicScreenCode code="AGD-SHR-005" />
+      </>
+    )
   }
 
   if ((window.location.pathname === '/c' || window.location.pathname === '/convidado') && tokenPortariaPublica) {
-    return <CadastroConvidadoView token={tokenPortariaPublica} />
+    return (
+      <>
+        <CadastroConvidadoView token={tokenPortariaPublica} />
+        <PublicScreenCode code="AGD-SHR-004" />
+      </>
+    )
   }
 
   if (estadoSessao === 'verificando') {
@@ -165,11 +187,14 @@ function App() {
 
   if (estadoSessao === 'anonima') {
     return (
-      <AuthView
-        tokenAtivacao={tokenAtivacao}
-        onAuthenticated={concluirAutenticacao}
-        onCancelarAtivacao={tokenAtivacao ? cancelarAtivacao : undefined}
-      />
+      <>
+        <AuthView
+          tokenAtivacao={tokenAtivacao}
+          onAuthenticated={concluirAutenticacao}
+          onCancelarAtivacao={tokenAtivacao ? cancelarAtivacao : undefined}
+        />
+        <PublicScreenCode code="AGD-SHR-003" />
+      </>
     )
   }
 
