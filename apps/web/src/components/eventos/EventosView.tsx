@@ -51,6 +51,9 @@ interface SerieResponse {
 }
 
 export interface Evento {
+  pessoal?: boolean
+  podeGerenciar?: boolean
+  criadorMembroId?: string | null
   id: string
   titulo: string
   descricao: string | null
@@ -67,6 +70,9 @@ export interface Evento {
   setorId: string | null
   casaId: string | null
   grupoTrabalhoId: string | null
+  filtroRegionalId?: string | null
+  filtroAdministracaoId?: string | null
+  filtroSetorId?: string | null
   observacoes: string | null
   ativo: boolean
   createdAt?: string
@@ -75,9 +81,15 @@ export interface Evento {
   recorrenciaExcecao?: boolean
 }
 
-export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: string) => void }) {
+export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEventoCriado?: (eventoId: string) => void; onEventoPessoalCriado?: () => void }) {
   const [eventos, setEventos] = useState<Evento[]>([])
   
+  const [filtros, setFiltros] = useState<{ master: boolean; filtrarEscopo?: boolean; pessoas: { id: string; nome: string }[] }>({ master: false, pessoas: [] })
+  const [pessoaFiltro, setPessoaFiltro] = useState('')
+  const [escopoFiltro, setEscopoFiltro] = useState('')
+  const [statusEventoFiltro, setStatusEventoFiltro] = useState<'ATIVOS' | 'CANCELADOS' | 'TODOS'>('ATIVOS')
+  const pessoaConsultaSeq = useRef(0)
+
   // Lookups
   const [locais, setLocais] = useState<Local[]>([])
   const [espacos, setEspacos] = useState<EspacoLocal[]>([])
@@ -90,6 +102,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
 
   const [loading, setLoading] = useState<boolean>(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [erroCancelamento, setErroCancelamento] = useState<string | null>(null)
   const [acessoPortariaUrl, setAcessoPortariaUrl] = useState<string | null>(null)
   
   // Form State
@@ -112,6 +125,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
   const [eventoDetalhe, setEventoDetalhe] = useState<Evento | null>(null)
 
   const [formData, setFormData] = useState<Partial<EventoCreateInput>>({
+    pessoal: false,
     titulo: '',
     descricao: '',
     pauta: '',
@@ -132,6 +146,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
   })
   
   const [tipoEscopo, setTipoEscopo] = useState<'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | ''>('')
+  const [casaSetorFiltro, setCasaSetorFiltro] = useState('')
   
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
   const [localRapidoOpen, setLocalRapidoOpen] = useState(false)
@@ -227,7 +242,16 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     }
   }, [espacoRapidoOpen])
 
+  const montarUrlEventos = (pessoaId = pessoaFiltro) => {
+    const params = new URLSearchParams()
+    if (pessoaId) params.set('pessoaId', pessoaId)
+    if (statusEventoFiltro === 'CANCELADOS') params.set('ativo', 'false')
+    const query = params.toString()
+    return query ? `/eventos?${query}` : '/eventos'
+  }
+
   const carregarDados = async () => {
+    const seq = ++pessoaConsultaSeq.current
     setLoading(true)
     setErro(null)
     try {
@@ -235,7 +259,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
         eventosData, locaisData, espacosData, membrosData, regionaisData,
         administracoesData, setoresData, casasData, gruposData
       ] = await Promise.all([
-        fetchWithAuth<Evento[]>('/eventos'),
+        fetchWithAuth<Evento[]>(montarUrlEventos()),
         fetchWithAuth<Local[]>('/locais'),
         fetchWithAuth<EspacoLocal[]>('/espacos-locais?ativo=true'),
         fetchWithAuth<Membro[]>('/membros'),
@@ -246,7 +270,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
         fetchWithAuth<GrupoTrabalho[]>('/grupos-trabalho'),
       ])
       
-      setEventos(eventosData || [])
+      if (seq === pessoaConsultaSeq.current) setEventos(eventosData || [])
       setLocais(locaisData || [])
       setEspacos(espacosData || [])
       setMembros(membrosData || [])
@@ -256,15 +280,74 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       setCasas(casasData || [])
       setGruposTrabalho(gruposData || [])
     } catch (err: any) {
-      setErro(err.message || 'Erro ao carregar os dados.')
+      if (seq === pessoaConsultaSeq.current) setErro(err.message || 'Erro ao carregar os dados.')
     } finally {
-      setLoading(false)
+      if (seq === pessoaConsultaSeq.current) setLoading(false)
     }
   }
 
   useEffect(() => {
-    carregarDados()
+    void carregarDados()
+  }, [statusEventoFiltro])
+
+  useEffect(() => {
+    let ativo = true
+    fetchWithAuth<{ master: boolean; filtrarEscopo?: boolean; pessoas: { id: string; nome: string }[] }>('/eventos/filtros')
+      .then(data => { if (ativo && data && typeof data.master === 'boolean') setFiltros(data) })
+      .catch(() => { /* A listagem permanece protegida mesmo sem os metadados. */ })
+    return () => { ativo = false }
   }, [])
+
+  const selecionarPessoa = async (id: string) => {
+    setPessoaFiltro(id)
+    const seq = ++pessoaConsultaSeq.current
+    setLoading(true)
+    setErro(null)
+    try {
+      const data = await fetchWithAuth<Evento[]>(montarUrlEventos(id))
+      if (seq === pessoaConsultaSeq.current) setEventos(data || [])
+    } catch (err) {
+      if (seq === pessoaConsultaSeq.current) {
+        setEventos([])
+        setErro(err instanceof Error ? err.message : 'Erro ao filtrar eventos.')
+      }
+    } finally {
+      if (seq === pessoaConsultaSeq.current) setLoading(false)
+    }
+  }
+  const opcoesEscopo = [
+    ...regionais.map(item => ({ valor: `regionalId:${item.id}`, nome: `Regional: ${item.nome}` })),
+    ...administracoes.map(item => ({ valor: `administracaoId:${item.id}`, nome: `Administração: ${item.nome}` })),
+    ...setores.map(item => ({ valor: `setorId:${item.id}`, nome: `Setor: ${item.nome}` })),
+    ...casas.map(item => ({ valor: `casaId:${item.id}`, nome: `Casa: ${item.nome}` })),
+    ...gruposTrabalho.map(item => ({ valor: `grupoTrabalhoId:${item.id}`, nome: `GT: ${item.nome}` })),
+  ]
+  const eventosFiltrados = eventos.filter(evento => {
+    if (statusEventoFiltro === 'ATIVOS' && !evento.ativo) return false
+    if (statusEventoFiltro === 'CANCELADOS' && evento.ativo) return false
+    if (!escopoFiltro) return true
+    const [campo, id] = escopoFiltro.split(':')
+    if (evento[campo as keyof Evento] === id) return true
+    if (campo === 'setorId' && evento.filtroSetorId) return evento.filtroSetorId === id
+    if (campo === 'administracaoId' && evento.filtroAdministracaoId) {
+      return evento.filtroAdministracaoId === id
+    }
+    if (campo === 'regionalId' && evento.filtroRegionalId) return evento.filtroRegionalId === id
+
+    // Compatibilidade com respostas antigas durante rollout.
+    const casa = casas.find(item => item.id === evento.casaId)
+    const setor = setores.find(item => item.id === (evento.setorId || casa?.setorId))
+    const adm = administracoes.find(item => item.id === (evento.administracaoId || setor?.administracaoId))
+    if (campo === 'setorId') return setor?.id === id
+    if (campo === 'administracaoId') return adm?.id === id
+    if (campo === 'regionalId') {
+      const gt = gruposTrabalho.find(item => item.id === evento.grupoTrabalhoId)
+      const gtSetor = setores.find(item => item.id === gt?.setorId)
+      const gtAdm = administracoes.find(item => item.id === (gt?.administracaoId || gtSetor?.administracaoId))
+      return adm?.regionalId === id || (gt?.regionalId || gtAdm?.regionalId) === id
+    }
+    return false
+  })
 
   const parseDatetimeLocal = (val: string) => {
     if (!val) return ''
@@ -306,8 +389,10 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
 
   const handleTipoEscopoChange = (tipo: 'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | '') => {
     setTipoEscopo(tipo)
+    setCasaSetorFiltro('')
     setFormData(prev => ({
       ...prev,
+      pessoal: false,
       regionalId: '',
       administracaoId: '',
       setorId: '',
@@ -343,6 +428,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     setEventoEditandoSerieId(null)
     setCarregandoDetalhes(false)
     setFormData({
+      pessoal: false,
       titulo: '',
       descricao: '',
       pauta: '',
@@ -362,6 +448,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       ativo: true,
     })
     setTipoEscopo('')
+    setCasaSetorFiltro('')
     setErrosForm({})
     setErro(null)
     setFormOpen(true)
@@ -450,7 +537,9 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       else if (item.grupoTrabalhoId) tipo = 'grupoTrabalho'
       
       setTipoEscopo(tipo)
+      setCasaSetorFiltro(tipo === 'casa' ? (casas.find(casa => casa.id === item.casaId)?.setorId ?? '') : '')
       setFormData({
+        pessoal: item.pessoal ?? false,
         titulo: item.titulo || '',
         descricao: item.descricao || '',
         pauta: item.pauta || '',
@@ -554,7 +643,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       localId: formData.localId || null,
       espacoId: formData.espacoId || null,
       urlOnline: formData.urlOnline || null,
-      organizadorMembroId: formData.organizadorMembroId || null,
+      organizadorMembroId: formData.pessoal && !eventoEditandoId ? null : formData.organizadorMembroId || null,
       regionalId: formData.regionalId || null,
       administracaoId: formData.administracaoId || null,
       setorId: formData.setorId || null,
@@ -605,7 +694,11 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       } else {
         const criado = await postWithAuth<Evento>('/eventos', parsed.data)
         fecharFormularioEvento()
-        if (onEventoCriado) {
+        if (criado.pessoal && onEventoPessoalCriado) {
+          onEventoPessoalCriado()
+          return
+        }
+        if (onEventoCriado && !criado.pessoal) {
           onEventoCriado(criado.id)
           return
         }
@@ -796,13 +889,14 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     }
   }
 
-  const handleCancelarEvento = async (item: Evento, origem: 'lista' | 'detalhe' = 'lista') => {
+  const handleCancelarEvento = async (item: Evento, _origem: 'lista' | 'detalhe' = 'lista') => {
     const confirmou = window.confirm(
       `Cancelar o evento "${item.titulo}"? Se houver convocação em rascunho, as funções serão removidas e a convocação também será cancelada.`
     )
     if (!confirmou) return
 
     setErro(null)
+    setErroCancelamento(null)
 
     try {
       await postWithAuth(`/eventos/${item.id}/cancelar`, {})
@@ -817,10 +911,25 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
           : err instanceof Error
             ? (err.message || 'Não foi possível cancelar o evento.')
             : 'Não foi possível cancelar o evento.'
-      if (origem === 'detalhe' && eventoDetalheIdRef.current === item.id) {
-        fecharDetalheEvento()
+      setErroCancelamento(mensagem)
+    }
+  }
+
+  const handleReativarEvento = async (item: Evento) => {
+    if (!window.confirm(`Reativar o evento "${item.titulo}"? A convocação cancelada, se houver, não será reaberta automaticamente.`)) return
+    setErro(null)
+    setErroCancelamento(null)
+    try {
+      const atualizado = await patchWithAuth<Evento>(`/eventos/${item.id}`, { ativo: true })
+      setEventos(atuais => atuais.map(evento => evento.id === item.id ? { ...evento, ...atualizado, ativo: true } : evento))
+      if (eventoDetalheIdRef.current === item.id) {
+        setEventoDetalhe(atual => atual?.id === item.id ? { ...atual, ...atualizado, ativo: true } : atual)
       }
-      setErro(mensagem)
+    } catch (err: unknown) {
+      const mensagem = err instanceof ApiError && err.body?.error
+        ? (typeof err.body.error === 'string' ? err.body.error : 'Não foi possível reativar o evento.')
+        : err instanceof Error ? (err.message || 'Não foi possível reativar o evento.') : 'Não foi possível reativar o evento.'
+      setErroCancelamento(mensagem)
     }
   }
 
@@ -899,6 +1008,25 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
+      {erroCancelamento && !formOpen && !eventoDetalhe && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="fixed left-4 right-4 top-4 z-[100] mx-auto max-w-3xl rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 shadow-xl"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <span>{erroCancelamento}</span>
+            <button
+              type="button"
+              onClick={() => setErroCancelamento(null)}
+              className="shrink-0 rounded px-2 py-1 font-semibold text-red-800 hover:bg-red-100"
+              aria-label="Fechar erro de cancelamento"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
       <div className="bg-brand-900 text-white p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold">Gestão de Eventos</h2>
@@ -911,6 +1039,34 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
           + Novo Evento
         </button>
       </div>
+
+      {!formOpen && !eventoDetalhe && <div className="flex flex-wrap gap-4 rounded-xl border border-slate-200 bg-white p-4">
+        {(filtros.master || filtros.filtrarEscopo) && <label className="flex flex-col gap-1 text-sm text-slate-700">Escopo
+          <select aria-label="Filtrar por escopo" value={escopoFiltro} onChange={e => setEscopoFiltro(e.target.value)} className="rounded-lg border border-slate-300 p-2">
+            <option value="">{filtros.master ? 'Todos os eventos' : 'Meus eventos e escopos autorizados'}</option>
+            {opcoesEscopo.map(item => <option key={item.valor} value={item.valor}>{item.nome}</option>)}
+          </select>
+        </label>}
+        {filtros.master && <label className="flex flex-col gap-1 text-sm text-slate-700">Pessoa
+          <select aria-label="Filtrar por pessoa" value={pessoaFiltro} onChange={e => void selecionarPessoa(e.target.value)} className="rounded-lg border border-slate-300 p-2">
+            <option value="">Todas as pessoas</option>
+            {filtros.pessoas.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
+          </select>
+        </label>}
+        <label className="flex flex-col gap-1 text-sm text-slate-700">Status
+          <select
+            aria-label="Filtrar por status do evento"
+            value={statusEventoFiltro}
+            onChange={e => setStatusEventoFiltro(e.target.value as 'ATIVOS' | 'CANCELADOS' | 'TODOS')}
+            className="rounded-lg border border-slate-300 p-2"
+          >
+            <option value="ATIVOS">Ativos</option>
+            <option value="CANCELADOS">Cancelados</option>
+            <option value="TODOS">Todos</option>
+          </select>
+        </label>
+        <p className="self-end py-2 text-sm text-slate-500">{eventosFiltrados.length} evento(s)</p>
+      </div>}
 
       {erro && !formOpen && (
         <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm animate-in fade-in">
@@ -954,9 +1110,9 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
         </div>
-      ) : (eventos || []).length === 0 ? (
+      ) : eventosFiltrados.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-slate-500 mb-4">Nenhum evento cadastrado.</p>
+          <p className="text-slate-500 mb-4">Nenhum evento encontrado neste filtro.</p>
           <button onClick={abrirFormCriar} className="text-brand-600 font-medium hover:text-brand-700">
             Cadastrar primeiro evento
           </button>
@@ -975,9 +1131,9 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {eventos.map((item) => (
+                {eventosFiltrados.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900">{item.titulo}</td>
+                    <td className="px-6 py-4 font-medium text-slate-900">{item.titulo}{item.pessoal && <span className="ml-2 text-xs text-brand-700">Próprio</span>}</td>
                     <td className="px-6 py-4 text-slate-600">
                       {new Date(item.inicioEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                     </td>
@@ -998,27 +1154,36 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                         >
                           Ver
                         </button>
-                        <button
+                        {item.podeGerenciar !== false && !item.pessoal && <button
                           type="button"
                           onClick={() => void gerarAcessoPortaria(item.id)}
                           className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-green-800 hover:bg-green-50 hover:text-green-950 font-medium"
                         >
                           Gerar acesso de Portaria
-                        </button>
-                        <button
+                        </button>}
+                        {item.podeGerenciar !== false && <button
                           type="button"
                           onClick={() => handleClickEditar(item)}
                           className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-amber-700 hover:bg-amber-50 hover:text-amber-900 font-medium"
                         >
                           Editar
-                        </button>
-                        {item.ativo && (
+                        </button>}
+                        {item.ativo && item.podeGerenciar !== false && (
                           <button
                             type="button"
                             onClick={() => void handleCancelarEvento(item)}
                             className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-red-700 hover:bg-red-50 hover:text-red-900 font-medium"
                           >
                             Cancelar Evento
+                          </button>
+                        )}
+                        {!item.ativo && item.podeGerenciar !== false && new Date(item.fimEm).getTime() > Date.now() && (
+                          <button
+                            type="button"
+                            onClick={() => void handleReativarEvento(item)}
+                            className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-900 font-medium"
+                          >
+                            Reativar Evento
                           </button>
                         )}
                       </div>
@@ -1043,6 +1208,16 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
             </div>
             
             <form onSubmit={handleSubmit} noValidate className="p-6 overflow-y-auto space-y-6">
+              {erroCancelamento && (
+                <div role="alert" aria-live="assertive" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+                  <div className="flex items-start justify-between gap-4">
+                    <span>{erroCancelamento}</span>
+                    <button type="button" onClick={() => setErroCancelamento(null)} className="shrink-0 font-semibold" aria-label="Fechar erro de cancelamento">
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              )}
               {erro && (
                 <div role="alert" className="p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
                   {erro}
@@ -1132,7 +1307,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         >
                           <option value="">Selecione...</option>
-                          {locais.map(l => (
+                          {[...locais].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(l => (
                             <option key={l.id} value={l.id}>{l.nome}</option>
                           ))}
                         </select>
@@ -1203,6 +1378,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                           <select
                             id="tipoEscopo"
                             value={tipoEscopo}
+                            disabled={!!eventoEditandoId && !!formData.pessoal}
                             onChange={e => handleTipoEscopoChange(e.target.value as any)}
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                           >
@@ -1259,8 +1435,23 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                             </>
                           )}
                           {tipoEscopo === 'casa' && (
-                            <>
-                              <label htmlFor="casaId" className="block text-xs font-medium text-slate-700 mb-1">Casa de Oração *</label>
+                            <div className="space-y-2">
+                              <label htmlFor="casaSetorFiltro" className="block text-xs font-medium text-slate-700">Filtrar Casa por Setor</label>
+                              <select
+                                id="casaSetorFiltro"
+                                value={casaSetorFiltro}
+                                onChange={e => {
+                                  setCasaSetorFiltro(e.target.value)
+                                  setFormData({ ...formData, casaId: '' })
+                                }}
+                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                              >
+                                <option value="">Todos os Setores</option>
+                                {[...setores].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(s => (
+                                  <option key={s.id} value={s.id}>{s.nome}</option>
+                                ))}
+                              </select>
+                              <label htmlFor="casaId" className="block text-xs font-medium text-slate-700">Casa de Oração *</label>
                               <select
                                 id="casaId"
                                 value={formData.casaId || ''}
@@ -1268,9 +1459,12 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                                 className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                               >
                                 <option value="">Selecione...</option>
-                                {casas.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                                {casas
+                                  .filter(casa => !casaSetorFiltro || casa.setorId === casaSetorFiltro)
+                                  .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+                                  .map(casa => <option key={casa.id} value={casa.id}>{casa.nome}</option>)}
                               </select>
-                            </>
+                            </div>
                           )}
                           {tipoEscopo === 'grupoTrabalho' && (
                             <>
@@ -1288,10 +1482,23 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                           )}
                         </div>
                       </div>
+                      {tipoEscopo === 'casa' && !eventoEditandoSerieId && (
+                        <div className="mt-4">
+                          <label htmlFor="publicoEvento" className="block text-sm font-medium text-slate-700 mb-1">Público do evento</label>
+                          <select id="publicoEvento" value={formData.pessoal ? 'PROPRIO' : 'INSTITUCIONAL'} disabled={!!eventoEditandoId}
+                            onChange={e => setFormData({ ...formData, pessoal: e.target.value === 'PROPRIO' })}
+                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm">
+                            <option value="INSTITUCIONAL">Institucional — com convocação</option>
+                            <option value="PROPRIO">Próprio — somente para mim</option>
+                          </select>
+                          {formData.pessoal && <p className="mt-2 text-sm text-brand-700">Ao salvar, o evento entra diretamente na sua agenda, sem convocação.</p>}
+                        </div>
+                      )}
+                      {errosForm.pessoal && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.pessoal}</p>}
                       {errosForm.escopo && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.escopo}</p>}
                     </div>
 
-                    <div className="border-t pt-4">
+                    {!formData.pessoal && <div className="border-t pt-4">
                       <label htmlFor="organizadorMembroId" className="block text-sm font-medium text-slate-700 mb-1">Organizador (Membro)</label>
                       <select
                         id="organizadorMembroId"
@@ -1303,7 +1510,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                         {membros.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
                       </select>
                       {errosForm.organizadorMembroId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.organizadorMembroId}</p>}
-                    </div>
+                    </div>}
 
                     <div>
                       <label htmlFor="descricao" className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
@@ -1463,6 +1670,16 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
               <button onClick={fecharDetalheEvento} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
             <div className="p-6 space-y-4">
+              {erroCancelamento && (
+                <div role="alert" aria-live="assertive" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+                  <div className="flex items-start justify-between gap-4">
+                    <span>{erroCancelamento}</span>
+                    <button type="button" onClick={() => setErroCancelamento(null)} className="shrink-0 font-semibold" aria-label="Fechar erro de cancelamento">
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              )}
               <div>
                 <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Título</span>
                 <p className="text-slate-900 font-medium">{eventoDetalhe.titulo}</p>
@@ -1534,6 +1751,17 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                     className="inline-flex min-h-10 items-center rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
                   >
                     Cancelar Evento
+                  </button>
+                </div>
+              )}
+              {!eventoDetalhe.ativo && eventoDetalhe.podeGerenciar !== false && new Date(eventoDetalhe.fimEm).getTime() > Date.now() && (
+                <div className="flex justify-end border-t border-slate-100 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => void handleReativarEvento(eventoDetalhe)}
+                    className="inline-flex min-h-10 items-center rounded-lg border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                  >
+                    Reativar Evento
                   </button>
                 </div>
               )}

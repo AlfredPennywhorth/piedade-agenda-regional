@@ -4,6 +4,8 @@ import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/
 import { ConvocacaoFuncoesModal } from './ConvocacaoFuncoesModal'
 import { AcompanhamentoRsvpModal } from './AcompanhamentoRsvpModal'
 interface EventoLookup {
+  pessoal?: boolean
+  podeGerenciar?: boolean
   id: string
   titulo: string
   inicioEm: string
@@ -320,6 +322,7 @@ export function ConvocacoesView({
 
   const eventosDisponiveis = eventosLookup
     .filter(ev => {
+      if (ev.pessoal || ev.podeGerenciar === false) return false
       if (editandoId && ev.id === formData.eventoId) return true
       if (ev.ativo === false) return false
       if (new Date(ev.fimEm).getTime() < Date.now()) return false
@@ -572,7 +575,7 @@ export function ConvocacoesView({
                   )}
                 </div>
                 <div className="flex items-start gap-2 flex-wrap justify-end">
-                  {conv.status === 'RASCUNHO' && (
+                  {conv.status === 'RASCUNHO' && getEvento(conv.eventoId)?.podeGerenciar !== false && (
                     <button
                       onClick={() => setActionConfirm({ type: 'PUBLICAR', convocacao: conv })}
                       className="text-green-600 hover:text-green-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors"
@@ -580,7 +583,7 @@ export function ConvocacoesView({
                       Publicar
                     </button>
                   )}
-                  {conv.status === 'RASCUNHO' && (
+                  {conv.status === 'RASCUNHO' && getEvento(conv.eventoId)?.podeGerenciar !== false && (
                     <button
                       onClick={() => setGerenciandoFuncoesId(conv.id)}
                       className="text-slate-600 hover:text-slate-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
@@ -596,7 +599,7 @@ export function ConvocacoesView({
                       Acompanhar RSVP
                     </button>
                   )}
-                  {conv.status === 'RASCUNHO' && (
+                  {conv.status === 'RASCUNHO' && getEvento(conv.eventoId)?.podeGerenciar !== false && (
                     <button
                       onClick={() => handleClickEditar(conv)}
                       className="text-brand-600 hover:text-brand-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
@@ -604,7 +607,7 @@ export function ConvocacoesView({
                       Editar
                     </button>
                   )}
-                  {conv.status !== 'CANCELADA' && (
+                  {conv.status !== 'CANCELADA' && getEvento(conv.eventoId)?.podeGerenciar !== false && (
                     <button
                       onClick={() => setActionConfirm({ type: 'CANCELAR', convocacao: conv })}
                       className="text-red-600 hover:text-red-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"

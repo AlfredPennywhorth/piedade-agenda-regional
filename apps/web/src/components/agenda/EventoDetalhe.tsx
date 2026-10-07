@@ -46,6 +46,8 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
   }, [])
 
   useEffect(() => {
+    if (!item.convocacao) return
+    const convocacaoId = item.convocacao.id
     let ativo = true
 
     const carregarConvidados = async () => {
@@ -61,13 +63,13 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
         }
 
         const primeiraPagina = await apiClient.fetchWithAuth<AcompanhamentoResponse>(
-          `/convocacoes/${item.convocacao.id}/acompanhamento-rsvp?limit=100&page=1`
+          `/convocacoes/${convocacaoId}/acompanhamento-rsvp?limit=100&page=1`
         )
         const todos = [...primeiraPagina.data]
 
         for (let pagina = 2; pagina <= primeiraPagina.meta.lastPage; pagina++) {
           const resposta = await apiClient.fetchWithAuth<AcompanhamentoResponse>(
-            `/convocacoes/${item.convocacao.id}/acompanhamento-rsvp?limit=100&page=${pagina}`
+            `/convocacoes/${convocacaoId}/acompanhamento-rsvp?limit=100&page=${pagina}`
           )
           todos.push(...resposta.data)
         }
@@ -90,7 +92,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
     return () => {
       ativo = false
     }
-  }, [item.convocacao.id])
+  }, [item.convocacao?.id])
 
   const handleClose = () => {
     if (dialogRef.current) {
@@ -100,6 +102,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
   }
 
   const handleRsvp = async (resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI', bypassEditCheck = false) => {
+    if (!item.destinatarioId || item.evento.pessoal) return
     if (resposta === 'NAO_PARTICIPAREI' && !justificativa.trim()) {
       setRsvpError('Justificativa é obrigatória para ausência.')
       return
@@ -311,11 +314,11 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
           </div>
         )}
 
-        {item.convocacao.observacoes && (
+        {item.convocacao?.observacoes && (
           <div className="border-t border-slate-100 pt-6">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Observações</h3>
             <div className="bg-amber-50 text-amber-900 border border-amber-200 rounded-lg p-4 text-sm whitespace-pre-wrap">
-              {item.convocacao.observacoes}
+              {item.convocacao?.observacoes}
             </div>
           </div>
         )}
@@ -371,7 +374,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
           </div>
         )}
 
-        {showQrModal && (
+        {showQrModal && item.destinatarioId && (
           <QrCodeModal
             destinatarioId={item.destinatarioId}
             tituloEvento={item.evento.titulo}
@@ -379,7 +382,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
           />
         )}
 
-        <div className="border-t border-slate-100 pt-6 pb-2">
+        {!item.evento.pessoal && item.destinatarioId && <div className="border-t border-slate-100 pt-6 pb-2">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Sua Participação</h3>
             {reconfirmacaoPendente && (
@@ -521,7 +524,9 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
               )}
             </div>
           )}
-        </div>
+        </div>}
+
+        {item.evento.pessoal && <p className="rounded-lg bg-brand-50 p-4 text-sm text-brand-800">Evento Próprio — já incluído na sua agenda.</p>}
 
         {item.evento.refeicoesOferecidas && item.evento.refeicoesOferecidas.length > 0 && (
           <div className="border-t border-slate-100 pt-6">

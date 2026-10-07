@@ -11,6 +11,7 @@ const HttpUrl = z.string().url('URL inválida').refine(
 )
 
 export const baseEvento = {
+  pessoal: z.boolean().optional(),
   titulo: z.string().min(1, 'Título é obrigatório'),
   descricao: z.string().nullable().optional(),
   pauta: z.string().nullable().optional(),
@@ -39,6 +40,10 @@ export const baseEvento = {
 }
 
 const eventoSuperRefine = (data: any, ctx: z.RefinementCtx) => {
+  if (data.pessoal && !data.casaId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Evento Próprio exige escopo Casa de Oração', path: ['pessoal'] })
+  }
+
   // 1. Validar fim > inicio
   const dInicio = new Date(data.inicioEm)
   const dFim = new Date(data.fimEm)

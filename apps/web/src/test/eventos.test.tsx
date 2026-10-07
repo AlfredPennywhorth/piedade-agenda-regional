@@ -64,6 +64,84 @@ describe('EventosView', () => {
     })
   })
 
+  it('gestor filtra a Administração incluindo eventos de Casas subordinadas', async () => {
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos/filtros') return { master: false, filtrarEscopo: true, pessoas: [] }
+      if (url === '/administracoes') return [{ id: 'adm-1', nome: 'Administração SP', regionalId: REGIONAL_ID }]
+      if (url === '/setores') return [{ id: 'setor-1', nome: 'Setor', administracaoId: 'adm-1' }]
+      if (url === '/casas') return [{ id: 'casa-1', nome: 'Casa', setorId: 'setor-1' }]
+      if (url === '/eventos') return [mockEventos[0], { ...mockEventos[0], id: 'outro', titulo: 'Evento da Casa', regionalId: null, casaId: 'casa-1' }]
+      return original(url)
+    })
+    render(<EventosView />)
+    const filtro = await screen.findByLabelText('Filtrar por escopo')
+    await screen.findByText('Evento da Casa')
+    fireEvent.change(filtro, { target: { value: 'administracaoId:adm-1' } })
+    expect(screen.getByText('Evento da Casa')).toBeInTheDocument()
+    expect(screen.queryByText('Reunião Presencial')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Filtrar por pessoa')).not.toBeInTheDocument()
+  })
+
+  it('Master filtra eventos por pessoa na API e pode limpar o filtro', async () => {
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos/filtros') return { master: true, pessoas: [{ id: 'pessoa-1', nome: 'André' }] }
+      if (url === '/eventos?pessoaId=pessoa-1') return [{ ...mockEventos[0], titulo: 'Evento do André' }]
+      return original(url)
+    })
+    render(<EventosView />)
+    const filtro = await screen.findByLabelText('Filtrar por pessoa')
+    fireEvent.change(filtro, { target: { value: 'pessoa-1' } })
+    expect(await screen.findByText('Evento do André')).toBeInTheDocument()
+    expect(screen.queryByText('Reunião Presencial')).not.toBeInTheDocument()
+    fireEvent.change(filtro, { target: { value: '' } })
+    expect(await screen.findByText('Reunião Presencial')).toBeInTheDocument()
+  })
+
+  it('usuário comum não recebe filtros de pessoas nem de escopo', async () => {
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => url === '/eventos/filtros'
+      ? { master: false, filtrarEscopo: false, pessoas: [] } : original(url))
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    expect(screen.queryByLabelText('Filtrar por pessoa')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Filtrar por escopo')).not.toBeInTheDocument()
+  })
+
+  it('Próprio na Casa salva e vai para agenda sem iniciar convocação', async () => {
+    const casaId = '99999999-9999-4999-8999-999999999999'
+    const originalFetch = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => url === '/casas' ? [{ id: casaId, nome: 'Minha Casa' }] : originalFetch(url))
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({ ...mockEventos[0], pessoal: true, casaId, regionalId: null })
+    const onEventoCriado = vi.fn(), onEventoPessoalCriado = vi.fn()
+    render(<EventosView onEventoCriado={onEventoCriado} onEventoPessoalCriado={onEventoPessoalCriado} />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+    fireEvent.change(within(dialog).getByLabelText(/título/i), { target: { value: 'Meu compromisso' } })
+    fireEvent.change(within(dialog).getByLabelText(/início/i), { target: { value: '2026-10-10T10:00' } })
+    fireEvent.change(within(dialog).getByLabelText(/fim/i), { target: { value: '2026-10-10T12:00' } })
+    fireEvent.change(within(dialog).getByLabelText(/modalidade/i), { target: { value: 'ONLINE' } })
+    fireEvent.change(within(dialog).getByLabelText(/url online/i), { target: { value: 'https://example.org' } })
+    fireEvent.change(within(dialog).getByLabelText(/tipo de escopo/i), { target: { value: 'casa' } })
+    fireEvent.change(within(dialog).getByLabelText(/casa de oração \*/i), { target: { value: casaId } })
+    fireEvent.change(within(dialog).getByLabelText(/público do evento/i), { target: { value: 'PROPRIO' } })
+    expect(within(dialog).queryByLabelText(/organizador/i)).not.toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar evento/i }))
+    await waitFor(() => expect(onEventoPessoalCriado).toHaveBeenCalledOnce())
+    expect(onEventoCriado).not.toHaveBeenCalled()
+    expect(apiClient.postWithAuth).toHaveBeenCalledWith('/eventos', expect.objectContaining({ pessoal: true, casaId, organizadorMembroId: null }))
+  })
+
+  it('evento somente de leitura não oferece edição, cancelamento ou portaria', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => url === '/eventos' ? [{ ...mockEventos[0], podeGerenciar: false }] : [])
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    expect(screen.getByRole('button', { name: /^ver$/i })).toBeInTheDocument()
+    for (const name of [/^editar$/i, /cancelar evento/i, /gerar acesso de portaria/i]) expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+  })
+
   it('deve listar eventos corretamente', async () => {
     render(<EventosView />)
     expect(screen.getByText('Gestão de Eventos')).toBeInTheDocument()
@@ -72,6 +150,104 @@ describe('EventosView', () => {
       expect(screen.getByText('Reunião Presencial')).toBeInTheDocument()
       expect(screen.getByText('PRESENCIAL')).toBeInTheDocument()
     })
+  })
+
+  it('oculta cancelados por padrão e permite consultá-los pelo filtro de status', async () => {
+    const cancelado = { ...mockEventos[0], id: '77777777-7777-4777-8777-777777777777', titulo: 'Evento Cancelado', ativo: false }
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return [mockEventos[0], cancelado]
+      if (url === '/eventos?ativo=false') return [cancelado]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+
+    render(<EventosView />)
+
+    expect(await screen.findByText('Reunião Presencial')).toBeInTheDocument()
+    expect(screen.queryByText('Evento Cancelado')).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Filtrar por status do evento'), {
+      target: { value: 'CANCELADOS' },
+    })
+
+    expect(await screen.findByText('Evento Cancelado')).toBeInTheDocument()
+    expect(apiClient.fetchWithAuth).toHaveBeenCalledWith('/eventos?ativo=false')
+  })
+
+  it('reativa evento cancelado via PATCH sem reabrir convocação', async () => {
+    const cancelado = { ...mockEventos[0], id: '77777777-7777-4777-8777-777777777777', titulo: 'Evento Cancelado', ativo: false, podeGerenciar: true }
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === '/eventos?ativo=false') return [cancelado]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({ ...cancelado, ativo: true })
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.change(screen.getByLabelText('Filtrar por status do evento'), { target: { value: 'CANCELADOS' } })
+    expect(await screen.findByText('Evento Cancelado')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /reativar evento/i }))
+
+    await waitFor(() => {
+      expect(apiClient.patchWithAuth).toHaveBeenCalledWith('/eventos/77777777-7777-4777-8777-777777777777', { ativo: true })
+      expect(screen.queryByText('Evento Cancelado')).not.toBeInTheDocument()
+    })
+  })
+
+  it('não oferece reativação para evento inativo já encerrado', async () => {
+    const encerrado = {
+      ...mockEventos[0],
+      id: '77777777-7777-4777-8777-777777777778',
+      titulo: 'Evento Encerrado',
+      ativo: false,
+      podeGerenciar: true,
+      inicioEm: '2026-10-01T10:00:00.000Z',
+      fimEm: '2026-10-01T12:00:00.000Z',
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === '/eventos?ativo=false') return [encerrado]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.change(screen.getByLabelText('Filtrar por status do evento'), { target: { value: 'CANCELADOS' } })
+    expect(await screen.findByText('Evento Encerrado')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /reativar evento/i })).not.toBeInTheDocument()
+  })
+
+  it('exibe falha de reativação dentro do detalhe aberto', async () => {
+    const cancelado = { ...mockEventos[0], id: '77777777-7777-4777-8777-777777777779', titulo: 'Evento Cancelado Detalhe', ativo: false, podeGerenciar: true }
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === '/eventos?ativo=false') return [cancelado]
+      if (url === `/eventos/${cancelado.id}`) return cancelado
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+    vi.mocked(apiClient.patchWithAuth).mockRejectedValueOnce(
+      new apiClient.ApiError(409, 'Falha', { error: 'Evento não pode ser reativado.' })
+    )
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.change(screen.getByLabelText('Filtrar por status do evento'), { target: { value: 'CANCELADOS' } })
+    await screen.findByText('Evento Cancelado Detalhe')
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    fireEvent.click(within(detalhe).getByRole('button', { name: /reativar evento/i }))
+    expect(await within(detalhe).findByRole('alert')).toHaveTextContent('Evento não pode ser reativado.')
   })
 
   it('deve cancelar evento e removê-lo da lista operacional', async () => {
@@ -291,7 +467,7 @@ describe('EventosView', () => {
     render(<EventosView />)
 
     await waitFor(() => {
-      expect(screen.getByText('Nenhum evento cadastrado.')).toBeInTheDocument()
+      expect(screen.getByText('Nenhum evento encontrado neste filtro.')).toBeInTheDocument()
     })
   })
 
@@ -378,6 +554,42 @@ describe('EventosView', () => {
     fireEvent.change(getByLabelText(/modalidade/i), { target: { value: 'PRESENCIAL' } })
     expect(queryByLabelText(/url online/i)).not.toBeInTheDocument()
     expect(getByLabelText(/local \*/i)).toBeInTheDocument()
+  })
+
+  it('filtra Casas por Setor e ordena Locais alfabeticamente no formulário', async () => {
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/locais') return [
+        { id: 'local-z', nome: 'Zeta' },
+        { id: 'local-a', nome: 'Alfa' },
+      ]
+      if (url === '/setores') return [
+        { id: 'setor-1', nome: 'Setor Um', administracaoId: 'adm-1' },
+        { id: 'setor-2', nome: 'Setor Dois', administracaoId: 'adm-1' },
+      ]
+      if (url === '/casas') return [
+        { id: 'casa-1', nome: 'Casa A', setorId: 'setor-1' },
+        { id: 'casa-2', nome: 'Casa B', setorId: 'setor-2' },
+      ]
+      return original(url)
+    })
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+
+    const localSelect = within(dialog).getByLabelText(/local \*/i)
+    const locais = within(localSelect).getAllByRole('option').map(option => option.textContent)
+    expect(locais.slice(1)).toEqual(['Alfa', 'Zeta'])
+
+    fireEvent.change(within(dialog).getByLabelText(/tipo de escopo/i), { target: { value: 'casa' } })
+    const filtroSetor = within(dialog).getByLabelText(/filtrar casa por setor/i)
+    fireEvent.change(filtroSetor, { target: { value: 'setor-1' } })
+
+    const casaSelect = within(dialog).getByLabelText(/casa de oração \*/i)
+    expect(within(casaSelect).getByRole('option', { name: 'Casa A' })).toBeInTheDocument()
+    expect(within(casaSelect).queryByRole('option', { name: 'Casa B' })).not.toBeInTheDocument()
   })
 
   it('deve editar um evento existente via PATCH e limpar scopes cruzados', async () => {
@@ -893,7 +1105,7 @@ describe('EventosView', () => {
   })
 
 
-  it('deve fechar o detalhe e exibir erro global quando o cancelamento falhar', async () => {
+  it('mantém o detalhe aberto e exibe erro de cancelamento acima do modal', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/eventos') return mockEventos
@@ -916,10 +1128,38 @@ describe('EventosView', () => {
     await waitFor(() => {
       expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/eventos/${EVENTO_ID}/cancelar`, {})
     })
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: /detalhes do evento/i })).not.toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ocorrências já encerradas não podem ser canceladas.')
+    expect(screen.getByRole('dialog', { name: /detalhes do evento/i })).toBeInTheDocument()
+  })
+
+  it('mantém falha iniciada na lista visível se um detalhe for aberto durante a requisição', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === `/eventos/${EVENTO_ID}`) return mockEventos[0]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
     })
-    expect(await screen.findByText('Ocorrências já encerradas não podem ser canceladas.')).toBeInTheDocument()
+
+    let rejeitarCancelamento!: (reason?: unknown) => void
+    vi.mocked(apiClient.postWithAuth).mockImplementationOnce(
+      () => new Promise((_, reject) => { rejeitarCancelamento = reject })
+    )
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+
+    fireEvent.click(screen.getByRole('button', { name: /cancelar evento/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    expect(await screen.findByRole('dialog', { name: /detalhes do evento/i })).toBeInTheDocument()
+
+    rejeitarCancelamento(
+      new apiClient.ApiError(409, 'Falha', { error: 'Não foi possível cancelar este evento.' })
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível cancelar este evento.')
+    expect(screen.getByRole('dialog', { name: /detalhes do evento/i })).toBeInTheDocument()
   })
 
 })
