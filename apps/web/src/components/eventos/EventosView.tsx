@@ -87,6 +87,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   const [filtros, setFiltros] = useState<{ master: boolean; filtrarEscopo?: boolean; pessoas: { id: string; nome: string }[] }>({ master: false, pessoas: [] })
   const [pessoaFiltro, setPessoaFiltro] = useState('')
   const [escopoFiltro, setEscopoFiltro] = useState('')
+  const [statusEventoFiltro, setStatusEventoFiltro] = useState<'ATIVOS' | 'CANCELADOS' | 'TODOS'>('ATIVOS')
   const pessoaConsultaSeq = useRef(0)
 
   // Lookups
@@ -239,6 +240,14 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     }
   }, [espacoRapidoOpen])
 
+  const montarUrlEventos = (pessoaId = pessoaFiltro) => {
+    const params = new URLSearchParams()
+    if (pessoaId) params.set('pessoaId', pessoaId)
+    if (statusEventoFiltro === 'CANCELADOS') params.set('ativo', 'false')
+    const query = params.toString()
+    return query ? `/eventos?${query}` : '/eventos'
+  }
+
   const carregarDados = async () => {
     const seq = ++pessoaConsultaSeq.current
     setLoading(true)
@@ -248,7 +257,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         eventosData, locaisData, espacosData, membrosData, regionaisData,
         administracoesData, setoresData, casasData, gruposData
       ] = await Promise.all([
-        fetchWithAuth<Evento[]>(pessoaFiltro ? `/eventos?pessoaId=${encodeURIComponent(pessoaFiltro)}` : '/eventos'),
+        fetchWithAuth<Evento[]>(montarUrlEventos()),
         fetchWithAuth<Local[]>('/locais'),
         fetchWithAuth<EspacoLocal[]>('/espacos-locais?ativo=true'),
         fetchWithAuth<Membro[]>('/membros'),
@@ -276,8 +285,8 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   }
 
   useEffect(() => {
-    carregarDados()
-  }, [])
+    void carregarDados()
+  }, [statusEventoFiltro])
 
   useEffect(() => {
     let ativo = true
@@ -293,7 +302,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     setLoading(true)
     setErro(null)
     try {
-      const data = await fetchWithAuth<Evento[]>(id ? `/eventos?pessoaId=${encodeURIComponent(id)}` : '/eventos')
+      const data = await fetchWithAuth<Evento[]>(montarUrlEventos(id))
       if (seq === pessoaConsultaSeq.current) setEventos(data || [])
     } catch (err) {
       if (seq === pessoaConsultaSeq.current) {
@@ -312,6 +321,8 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     ...gruposTrabalho.map(item => ({ valor: `grupoTrabalhoId:${item.id}`, nome: `GT: ${item.nome}` })),
   ]
   const eventosFiltrados = eventos.filter(evento => {
+    if (statusEventoFiltro === 'ATIVOS' && !evento.ativo) return false
+    if (statusEventoFiltro === 'CANCELADOS' && evento.ativo) return false
     if (!escopoFiltro) return true
     const [campo, id] = escopoFiltro.split(':')
     if (evento[campo as keyof Evento] === id) return true
@@ -1002,6 +1013,18 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
             {filtros.pessoas.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
           </select>
         </label>}
+        <label className="flex flex-col gap-1 text-sm text-slate-700">Status
+          <select
+            aria-label="Filtrar por status do evento"
+            value={statusEventoFiltro}
+            onChange={e => setStatusEventoFiltro(e.target.value as 'ATIVOS' | 'CANCELADOS' | 'TODOS')}
+            className="rounded-lg border border-slate-300 p-2"
+          >
+            <option value="ATIVOS">Ativos</option>
+            <option value="CANCELADOS">Cancelados</option>
+            <option value="TODOS">Todos</option>
+          </select>
+        </label>
         <p className="self-end py-2 text-sm text-slate-500">{eventosFiltrados.length} evento(s)</p>
       </div>}
 
