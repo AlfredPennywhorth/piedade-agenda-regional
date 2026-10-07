@@ -32,9 +32,9 @@ describe('MainLayout — navegação móvel', () => {
     const header = container.querySelector('header') as HTMLElement
     const nav = screen.getByRole('navigation', { name: /navegação móvel principal/i })
 
-    expect(root.style.paddingBottom).toContain('env(safe-area-inset-bottom)')
-    expect(header.style.paddingTop).toContain('env(safe-area-inset-top)')
-    expect(nav.getAttribute('style')).toContain('safe-area-inset-bottom')
+    expect(root.className).toContain('safe-area-layout-bottom')
+    expect(header.className).toContain('safe-area-top')
+    expect(nav.className).toContain('safe-area-bottom')
   })
 
   it('abre o menu Mais e permite acessar módulos administrativos', () => {
