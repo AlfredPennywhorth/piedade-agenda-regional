@@ -169,11 +169,11 @@ export function ContasAcessoView({
     [casas, setores, administracoes, setorFiltro, administracaoFiltro, regionalFiltro]
   )
 
-  const perfisDisponiveis = useMemo(
-    () => Array.from(new Set(contas.flatMap(conta => conta.acessos.map(acesso => acesso.perfilCodigo))))
-      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
-    [contas]
-  )
+  const perfisDisponiveis = useMemo(() => {
+    const perfis = new Set(contas.flatMap(conta => conta.acessos.map(acesso => acesso.perfilCodigo)))
+    if (perfilFiltro && perfilFiltro !== 'SEM_ACESSO') perfis.add(perfilFiltro)
+    return Array.from(perfis).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  }, [contas, perfilFiltro])
 
   const contasFiltradas = useMemo(() => contas.filter(conta => {
     const casa = casas.find(item => item.id === conta.casaId)
@@ -223,14 +223,15 @@ export function ContasAcessoView({
 
   const contasExibidas = useMemo(() => {
     const idsPreservados = new Set(
-      [linkTemporario?.membroId, feedback?.membroId].filter((id): id is string => Boolean(id))
+      [linkTemporario?.membroId, feedback?.membroId, gerenciandoMembroId]
+        .filter((id): id is string => Boolean(id))
     )
     const idsJaExibidos = new Set(contasFiltradas.map(conta => conta.membroId))
     const preservadas = contas.filter(
       conta => idsPreservados.has(conta.membroId) && !idsJaExibidos.has(conta.membroId)
     )
     return [...preservadas, ...contasFiltradas]
-  }, [contas, contasFiltradas, feedback, linkTemporario])
+  }, [contas, contasFiltradas, feedback, linkTemporario, gerenciandoMembroId])
 
   useEffect(() => {
     const membroId = feedback?.membroId ?? linkTemporario?.membroId
