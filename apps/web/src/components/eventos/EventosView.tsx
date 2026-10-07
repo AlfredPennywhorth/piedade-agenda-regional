@@ -46,9 +46,6 @@ interface SerieResponse {
   setorId: string | null
   casaId: string | null
   grupoTrabalhoId: string | null
-  filtroRegionalId?: string | null
-  filtroAdministracaoId?: string | null
-  filtroSetorId?: string | null
   observacoes: string | null
   ativo: boolean
 }
@@ -73,6 +70,9 @@ export interface Evento {
   setorId: string | null
   casaId: string | null
   grupoTrabalhoId: string | null
+  filtroRegionalId?: string | null
+  filtroAdministracaoId?: string | null
+  filtroSetorId?: string | null
   observacoes: string | null
   ativo: boolean
   createdAt?: string
