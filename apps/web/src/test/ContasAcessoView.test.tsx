@@ -127,6 +127,47 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(screen.getByText('Pessoa Bloqueada')).toBeDefined()
   })
 
+  it('busca por nome, celular e carteirinha e filtra por perfil ativo', async () => {
+    const outraConta = {
+      ...contaAtiva,
+      membroId: 'membro-2',
+      nome: 'Maria Exemplo',
+      celular: '11912345678',
+      codigoCarteirinha: 'ABC-987',
+      contaAcessoId: 'conta-2',
+      acessos: [{
+        id: 'acesso-auditor',
+        perfilCodigo: 'AUDITOR',
+        escopoTipo: 'REGIONAL',
+        escopoId: 'regional-1',
+      }],
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva, outraConta] as any
+      return [] as any
+    })
+
+    render(<ContasAcessoView />)
+    const busca = await screen.findByLabelText('Buscar por nome, celular ou carteirinha')
+
+    fireEvent.change(busca, { target: { value: 'Maria' } })
+    expect(screen.getByText('Maria Exemplo')).toBeDefined()
+    expect(screen.queryByText('Pessoa Teste')).toBeNull()
+
+    fireEvent.change(busca, { target: { value: '912345678' } })
+    expect(screen.getByText('Maria Exemplo')).toBeDefined()
+
+    fireEvent.change(busca, { target: { value: 'ABC-987' } })
+    expect(screen.getByText('Maria Exemplo')).toBeDefined()
+
+    fireEvent.change(busca, { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText('Filtrar por Perfil ou acesso'), {
+      target: { value: 'AUDITOR' },
+    })
+    expect(screen.getByText('Maria Exemplo')).toBeDefined()
+    expect(screen.queryByText('Pessoa Teste')).toBeNull()
+  })
+
   it('confirma o bloqueio e atualiza a listagem', async () => {
     vi.mocked(apiClient.patchWithAuth).mockResolvedValue({
       membroId: 'membro-1',
