@@ -146,6 +146,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   })
   
   const [tipoEscopo, setTipoEscopo] = useState<'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | ''>('')
+  const [casaSetorFiltro, setCasaSetorFiltro] = useState('')
   
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
   const [localRapidoOpen, setLocalRapidoOpen] = useState(false)
@@ -388,6 +389,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
 
   const handleTipoEscopoChange = (tipo: 'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | '') => {
     setTipoEscopo(tipo)
+    setCasaSetorFiltro('')
     setFormData(prev => ({
       ...prev,
       pessoal: false,
@@ -446,6 +448,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       ativo: true,
     })
     setTipoEscopo('')
+    setCasaSetorFiltro('')
     setErrosForm({})
     setErro(null)
     setFormOpen(true)
@@ -534,6 +537,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       else if (item.grupoTrabalhoId) tipo = 'grupoTrabalho'
       
       setTipoEscopo(tipo)
+      setCasaSetorFiltro(tipo === 'casa' ? (casas.find(casa => casa.id === item.casaId)?.setorId ?? '') : '')
       setFormData({
         pessoal: item.pessoal ?? false,
         titulo: item.titulo || '',
@@ -1276,7 +1280,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         >
                           <option value="">Selecione...</option>
-                          {locais.map(l => (
+                          {[...locais].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(l => (
                             <option key={l.id} value={l.id}>{l.nome}</option>
                           ))}
                         </select>
@@ -1404,8 +1408,23 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                             </>
                           )}
                           {tipoEscopo === 'casa' && (
-                            <>
-                              <label htmlFor="casaId" className="block text-xs font-medium text-slate-700 mb-1">Casa de Oração *</label>
+                            <div className="space-y-2">
+                              <label htmlFor="casaSetorFiltro" className="block text-xs font-medium text-slate-700">Filtrar Casa por Setor</label>
+                              <select
+                                id="casaSetorFiltro"
+                                value={casaSetorFiltro}
+                                onChange={e => {
+                                  setCasaSetorFiltro(e.target.value)
+                                  setFormData({ ...formData, casaId: '' })
+                                }}
+                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                              >
+                                <option value="">Todos os Setores</option>
+                                {[...setores].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(s => (
+                                  <option key={s.id} value={s.id}>{s.nome}</option>
+                                ))}
+                              </select>
+                              <label htmlFor="casaId" className="block text-xs font-medium text-slate-700">Casa de Oração *</label>
                               <select
                                 id="casaId"
                                 value={formData.casaId || ''}
@@ -1413,9 +1432,12 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                                 className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                               >
                                 <option value="">Selecione...</option>
-                                {casas.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                                {casas
+                                  .filter(casa => !casaSetorFiltro || casa.setorId === casaSetorFiltro)
+                                  .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+                                  .map(casa => <option key={casa.id} value={casa.id}>{casa.nome}</option>)}
                               </select>
-                            </>
+                            </div>
                           )}
                           {tipoEscopo === 'grupoTrabalho' && (
                             <>
