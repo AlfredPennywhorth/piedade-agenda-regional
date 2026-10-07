@@ -33,25 +33,21 @@ describe('Eventos pessoais e segregação', () => {
       acessoId = uuid()
     await db.insert(s.membros).values({ id, nome: id, casaId, ativo: true })
     await db.insert(s.contasAcesso).values({ id: contaId, membroId: id, status: 'ATIVA' })
-    await db
-      .insert(s.acessosConta)
-      .values({
-        id: acessoId,
-        contaAcessoId: contaId,
-        perfilCodigo: perfil,
-        escopoTipo: tipo,
-        escopoId,
-      })
+    await db.insert(s.acessosConta).values({
+      id: acessoId,
+      contaAcessoId: contaId,
+      perfilCodigo: perfil,
+      escopoTipo: tipo,
+      escopoId,
+    })
     if (perfil === 'ADMINISTRADOR_SISTEMA') registrarCienciaPmo(sqlite, contaId, acessoId)
-    await db
-      .insert(s.sessoes)
-      .values({
-        id: uuid(),
-        contaAcessoId: contaId,
-        membroId: id,
-        tokenHash: await hashToken(token),
-        expiraEm: '2099-12-31T00:00:00Z',
-      })
+    await db.insert(s.sessoes).values({
+      id: uuid(),
+      contaAcessoId: contaId,
+      membroId: id,
+      tokenHash: await hashToken(token),
+      expiraEm: '2099-12-31T00:00:00Z',
+    })
     return { id, token }
   }
   function req(u: typeof autor, path: string, method = 'GET', body?: unknown) {
@@ -63,18 +59,16 @@ describe('Eventos pessoais e segregação', () => {
   }
   async function evento(escopo: Record<string, string>, overrides: Record<string, unknown> = {}) {
     const id = uuid()
-    await db
-      .insert(s.eventos)
-      .values({
-        id,
-        titulo: id,
-        modalidade: 'ONLINE',
-        urlOnline: 'https://example.org/reuniao',
-        ...horario,
-        criadorMembroId: colega.id,
-        ...escopo,
-        ...overrides,
-      })
+    await db.insert(s.eventos).values({
+      id,
+      titulo: id,
+      modalidade: 'ONLINE',
+      urlOnline: 'https://example.org/reuniao',
+      ...horario,
+      criadorMembroId: colega.id,
+      ...escopo,
+      ...overrides,
+    })
     return id
   }
   const visiveis = async (u: typeof autor) =>
@@ -267,6 +261,27 @@ describe('Eventos pessoais e segregação', () => {
       200
     )
   })
+  it('gestor não usa a própria Casa para mover evento alheio para fora da delegação', async () => {
+    const gestor = await usuario(casa, 'GESTOR_AGENDA', 'REGIONAL', outraReg)
+    const id = await evento({ casaId: casaOutraReg })
+    expect((await req(gestor, `/eventos/${id}`, 'PATCH', { casaId: casa })).status).toBe(403)
+    expect(
+      (await req(gestor, `/eventos/${id}`, 'PATCH', { titulo: 'Dentro da delegação' })).status
+    ).toBe(200)
+  })
+
+  it('autor mantém gestão do evento pessoal original quando muda de Casa', async () => {
+    const id = await evento(
+      { casaId: casa },
+      { pessoal: true, criadorMembroId: autor.id, organizadorMembroId: autor.id }
+    )
+    sqlite.prepare('UPDATE membros SET casa_id = ? WHERE id = ?').run(casaOutraReg, autor.id)
+    expect(
+      (await req(autor, `/eventos/${id}`, 'PATCH', { titulo: 'Pessoal preservado' })).status
+    ).toBe(200)
+    expect((await req(autor, `/eventos/${id}`, 'PATCH', { casaId: casaOutraAdm })).status).toBe(403)
+  })
+
   it('convocação não permite contornar a restrição de gestão de evento alheio', async () => {
     const id = await evento({ casaId: casa })
     expect((await req(autor, '/convocacoes', 'POST', { eventoId: id })).status).toBe(403)

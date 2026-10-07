@@ -34,7 +34,10 @@ separado; acesso ao Setor não concede acesso ao GT Regional.
 
 A API fixa `criadorMembroId` na identidade autenticada, ignorando autoria enviada
 pelo cliente. Evento Próprio exige Casa e não pode ser transferido a outro usuário.
-O público fica imutável após a criação. Eventos encerrados permanecem imutáveis.
+O público fica imutável após a criação. Mudanças de escopo exigem autoridade
+de gestão no destino; a permissão de criar na própria Casa não permite mover
+eventos alheios para fora da delegação. O autor preserva a gestão de seu evento
+pessoal na Casa original mesmo que seu cadastro mude de Casa. Eventos encerrados permanecem imutáveis.
 A tela só oferece edição, cancelamento e portaria quando a API autoriza gestão;
 eventos pessoais não são oferecidos no seletor de nova convocação.
 
@@ -59,7 +62,7 @@ aprovação. Nenhum deploy é disparado por esta alteração.
 
 ## Evidências locais
 
-- Worker: 586 testes passando, incluindo 17 testes de segregação, eventos
+- Worker: 588 testes passando, incluindo 19 testes de segregação, eventos
   pessoais, conflitos, atalhos de convocação e migration.
 - Frontend: 281 testes passando, incluindo criação pessoal sem convocação,
   consulta sem ações de gestão e abertura pessoal na agenda/calendário sem RSVP/QR.

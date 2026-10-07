@@ -443,7 +443,8 @@ export async function podeGerenciarAgendaNoEscopo(
   db: any,
   membroId: string,
   escopoTipo: Exclude<AcessoTecnico['escopoTipo'], 'GLOBAL'>,
-  escopoId: string
+  escopoId: string,
+  permitirCasaAutomatica = true
 ): Promise<boolean> {
   if (!db || !membroId || !escopoId) return false
 
@@ -457,7 +458,7 @@ export async function podeGerenciarAgendaNoEscopo(
   if (podeAdministrarRegional(contexto, regionalAlvo)) return true
 
   // Regra institucional: todo membro pode gerir automaticamente a Agenda da própria Casa.
-  if (escopoTipo === 'CASA') {
+  if (permitirCasaAutomatica && escopoTipo === 'CASA') {
     const membro = await db
       .select({ casaId: schema.membros.casaId })
       .from(schema.membros)

@@ -344,9 +344,11 @@ eventosRouter.patch('/:id', async (c) => {
     const autorizadoFinal = await podeGerenciarAgendaNoEscopo(
       db, membroId,
       escopoFinal.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-      escopoFinal.escopoId
+      escopoFinal.escopoId,
+      existing.criadorMembroId === membroId || existing.organizadorMembroId === membroId
     )
-    if (!autorizadoFinal) return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
+    const preservaCasaPessoal = existing.pessoal && merged.casaId === existing.casaId
+    if (!autorizadoFinal && !preservaCasaPessoal) return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
 
     if ((existing.pessoal ?? false) !== (merged.pessoal ?? false)) {
       return c.json({ error: 'O público do evento não pode ser alterado depois da criação', code: 'PUBLICO_EVENTO_IMUTAVEL' }, 409)
