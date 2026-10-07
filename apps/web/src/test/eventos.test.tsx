@@ -1162,4 +1162,69 @@ describe('EventosView', () => {
     expect(screen.getByRole('dialog', { name: /detalhes do evento/i })).toBeInTheDocument()
   })
 
+
+  it('exibe destino dinâmico e salva Evento Próprio Nacional sem Local de SP', async () => {
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      ...mockEventos[0],
+      pessoal: true,
+      abrangencia: 'NACIONAL',
+      destinoUf: 'MG',
+      destinoCidadeLocal: 'Belo Horizonte',
+      localId: null,
+      regionalId: null,
+      casaId: null,
+    })
+    const onEventoPessoalCriado = vi.fn()
+
+    render(<EventosView onEventoPessoalCriado={onEventoPessoalCriado} />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+    fireEvent.change(within(dialog).getByLabelText(/título/i), { target: { value: 'Viagem ministerial' } })
+    fireEvent.change(within(dialog).getByLabelText(/início/i), { target: { value: '2026-10-10T10:00' } })
+    fireEvent.change(within(dialog).getByLabelText(/fim/i), { target: { value: '2026-10-10T12:00' } })
+    fireEvent.change(within(dialog).getByLabelText(/tipo de escopo/i), { target: { value: 'nacional' } })
+
+    expect(within(dialog).queryByLabelText(/^local \*$/i)).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText(/casa de oração \*/i)).not.toBeInTheDocument()
+
+    fireEvent.change(within(dialog).getByLabelText(/^uf \*$/i), { target: { value: 'MG' } })
+    fireEvent.change(within(dialog).getByLabelText(/cidade \/ local de atendimento \*/i), {
+      target: { value: 'Belo Horizonte' },
+    })
+    fireEvent.change(within(dialog).getByLabelText(/público do evento/i), { target: { value: 'PROPRIO' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar evento/i }))
+
+    await waitFor(() => expect(onEventoPessoalCriado).toHaveBeenCalledOnce())
+    expect(apiClient.postWithAuth).toHaveBeenCalledWith('/eventos', expect.objectContaining({
+      pessoal: true,
+      abrangencia: 'NACIONAL',
+      destinoUf: 'MG',
+      destinoCidadeLocal: 'Belo Horizonte',
+      localId: null,
+      regionalId: null,
+      administracaoId: null,
+      setorId: null,
+      casaId: null,
+      grupoTrabalhoId: null,
+    }))
+  })
+
+  it('troca o destino externo para País em escopo Internacional', async () => {
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+
+    fireEvent.change(within(dialog).getByLabelText(/tipo de escopo/i), {
+      target: { value: 'internacional' },
+    })
+
+    const pais = within(dialog).getByLabelText(/^país \*$/i)
+    expect(pais).toBeInTheDocument()
+    expect(within(dialog).queryByLabelText(/^uf \*$/i)).not.toBeInTheDocument()
+    expect(within(pais).getByRole('option', { name: 'Portugal' })).toHaveValue('PT')
+  })
+
 })
