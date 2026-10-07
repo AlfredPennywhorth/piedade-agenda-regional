@@ -418,6 +418,17 @@ convocacoesRouter.post('/:id/publicar', async c => {
     inArray(vinculosFuncionais.funcaoId, funcaoIds),
   ]
 
+  const eventoExterno = evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL'
+  if (eventoExterno) {
+    if (!evento.regionalGestaoId) {
+      return c.json({
+        error: 'Evento externo sem Regional responsável não pode publicar convocação',
+        code: 'REGIONAL_GESTAO_AUSENTE',
+      }, 409)
+    }
+    conditions.push(eq(vinculosFuncionais.regionalId, evento.regionalGestaoId))
+  }
+
   if (evento.regionalId) conditions.push(eq(vinculosFuncionais.regionalId, evento.regionalId))
   if (evento.administracaoId)
     conditions.push(eq(vinculosFuncionais.administracaoId, evento.administracaoId))
