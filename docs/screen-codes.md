@@ -6,7 +6,7 @@ Os códigos abaixo são estáveis e devem ser usados por QA, suporte e manutenç
 |---|---|---|---|---|
 | AGD-MOB-001 | Minha Agenda | Usuário / mobile-first | aba `agenda` | `AgendaView` |
 | AGD-MOB-002 | Calendário | Usuário / mobile-first | aba `calendario` | `CalendarioView` |
-| AGD-MOB-003 | Meu Cadastro | Usuário / mobile-first | aba `cadastro` | `PerfilView` |
+| AGD-SHR-001 | Meu Cadastro | Responsivo dual | aba `cadastro` | `PerfilView` |
 | AGD-ADM-001 | Gestão de Eventos | Administrativo | aba `eventos` | `EventosView` |
 | AGD-ADM-002 | Séries | Administrativo | aba `series` | `SeriesView` |
 | AGD-ADM-003 | Relatórios | Administrativo | aba `relatorios` | `RelatoriosView` |
@@ -22,11 +22,14 @@ Os códigos abaixo são estáveis e devem ser usados por QA, suporte e manutenç
 | AGD-ADM-013 | Locais | Administrativo | aba `locais` | `LocaisView` |
 | AGD-ADM-014 | Convocações | Administrativo | aba `convocacoes` | `ConvocacoesView` |
 | AGD-ADM-015 | Contas e Acessos | Administrativo | aba `acessos` | `ContasAcessoView` |
-| AGD-SHR-001 | Avisos | Compartilhado | aba `avisos` | `NotificacoesControl` |
-| AGD-SHR-002 | Portaria | Compartilhado | aba `portaria` | `PortariaView` |
-| AGD-SHR-003 | Autenticação / Ativação | Compartilhado | entrada autenticada | `AuthView` |
-| AGD-SHR-004 | Cadastro de Convidado | Compartilhado / público | `/c`, `/convidado` | `CadastroConvidadoView` |
-| AGD-SHR-005 | Portaria Temporária | Compartilhado / público | `/portaria-operador`, `/o/:token` | `PortariaOperadorTemporarioView` |
+| AGD-MOB-003 | Avisos | Mobile-first | aba `avisos` | `NotificacoesControl` |
+| AGD-MOB-004 | Portaria autenticada | Mobile-first | aba `portaria` | `PortariaView` |
+| AGD-SHR-002 | Login | Responsivo dual | fluxo anônimo | `AuthView` |
+| AGD-SHR-003 | Ativação de conta | Responsivo dual | `AuthView` com token | `AuthView` |
+| AGD-SHR-004 | Recuperação de PIN | Responsivo dual | fluxo anônimo | `AuthView` |
+| AGD-MOB-006 | Cadastro de Convidado | Mobile-first / público | `/c`, `/convidado` | `CadastroConvidadoView` |
+| AGD-MOB-005 | Portaria Temporária | Mobile-first / público | `/portaria-operador`, `/o/:token` | `PortariaOperadorTemporarioView` |
+| AGD-SHR-005 | Ciência de responsabilidade regional | Responsivo dual | gate autenticado | `ResponsabilidadeRegionalGate` |
 
 ## Regras
 
