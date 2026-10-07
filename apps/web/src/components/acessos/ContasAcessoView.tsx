@@ -152,21 +152,7 @@ export function ContasAcessoView({
     () => setores.filter(item => {
       const administracao = administracoes.find(adm => adm.id === item.administracaoId)
       if (administracaoFiltro && item.administracaoId !== administracaoFiltro) return false
-      const termo = buscaFiltro.trim().toLocaleLowerCase('pt-BR')
-    const digitosBusca = buscaFiltro.replace(/\D/g, '')
-    if (termo) {
-      const nome = conta.nome.toLocaleLowerCase('pt-BR')
-      const carteirinha = (conta.codigoCarteirinha ?? '').toLocaleLowerCase('pt-BR')
-      const celularDigitos = (conta.celular ?? '').replace(/\D/g, '')
-      const encontrouTexto = nome.includes(termo) || carteirinha.includes(termo)
-      const encontrouCelular = digitosBusca.length > 0 && celularDigitos.includes(digitosBusca)
-      if (!encontrouTexto && !encontrouCelular) return false
-    }
-
-    if (perfilFiltro === 'SEM_ACESSO' && conta.acessos.length > 0) return false
-    if (perfilFiltro && perfilFiltro !== 'SEM_ACESSO' && !conta.acessos.some(acesso => acesso.perfilCodigo === perfilFiltro)) return false
-
-    if (regionalFiltro && administracao?.regionalId !== regionalFiltro) return false
+      if (regionalFiltro && administracao?.regionalId !== regionalFiltro) return false
       return true
     }),
     [setores, administracoes, administracaoFiltro, regionalFiltro]
@@ -193,6 +179,24 @@ export function ContasAcessoView({
     const casa = casas.find(item => item.id === conta.casaId)
     const setor = setores.find(item => item.id === casa?.setorId)
     const administracao = administracoes.find(item => item.id === setor?.administracaoId)
+
+    const termo = buscaFiltro.trim().toLocaleLowerCase('pt-BR')
+    const digitosBusca = buscaFiltro.replace(/\D/g, '')
+    if (termo) {
+      const nome = conta.nome.toLocaleLowerCase('pt-BR')
+      const carteirinha = (conta.codigoCarteirinha ?? '').toLocaleLowerCase('pt-BR')
+      const celularDigitos = (conta.celular ?? '').replace(/\D/g, '')
+      const encontrouTexto = nome.includes(termo) || carteirinha.includes(termo)
+      const encontrouCelular = digitosBusca.length > 0 && celularDigitos.includes(digitosBusca)
+      if (!encontrouTexto && !encontrouCelular) return false
+    }
+
+    if (perfilFiltro === 'SEM_ACESSO' && conta.acessos.length > 0) return false
+    if (
+      perfilFiltro &&
+      perfilFiltro !== 'SEM_ACESSO' &&
+      !conta.acessos.some(acesso => acesso.perfilCodigo === perfilFiltro)
+    ) return false
 
     if (regionalFiltro && administracao?.regionalId !== regionalFiltro) return false
     if (administracaoFiltro && administracao?.id !== administracaoFiltro) return false
