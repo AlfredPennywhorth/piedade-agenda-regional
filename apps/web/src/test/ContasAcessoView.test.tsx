@@ -233,6 +233,12 @@ describe('ContasAcessoView — PR-ACC-05', () => {
       if (endpoint === '/admin/acessos') {
         chamadasAdmin += 1
         if (chamadasAdmin === 1) return [contaAtiva, contaSemConta] as any
+        if (chamadasAdmin === 2) {
+          return [
+            contaAtiva,
+            { ...contaSemConta, contaAcessoId: 'conta-2', status: 'PENDENTE_ATIVACAO' },
+          ] as any
+        }
         return [
           { ...contaAtiva, status: 'BLOQUEADA' },
           { ...contaSemConta, contaAcessoId: 'conta-2', status: 'PENDENTE_ATIVACAO' },
