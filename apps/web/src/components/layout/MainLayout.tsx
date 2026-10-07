@@ -13,6 +13,29 @@ export interface CapacidadesFrontend {
   podeGerirAgenda?: boolean
 }
 
+const SCREEN_CODES = {
+  agenda: 'AGD-MOB-001',
+  eventos: 'AGD-ADM-001',
+  series: 'AGD-ADM-002',
+  calendario: 'AGD-MOB-002',
+  avisos: 'AGD-SHR-001',
+  cadastro: 'AGD-MOB-003',
+  portaria: 'AGD-SHR-002',
+  relatorios: 'AGD-ADM-003',
+  auditoria: 'AGD-ADM-004',
+  regionais: 'AGD-ADM-005',
+  administracoes: 'AGD-ADM-006',
+  setores: 'AGD-ADM-007',
+  casas: 'AGD-ADM-008',
+  'grupos-trabalho': 'AGD-ADM-009',
+  membros: 'AGD-ADM-010',
+  funcoes: 'AGD-ADM-011',
+  'vinculos-funcionais': 'AGD-ADM-012',
+  locais: 'AGD-ADM-013',
+  convocacoes: 'AGD-ADM-014',
+  acessos: 'AGD-ADM-015',
+} as const
+
 interface MainLayoutProps {
   children: ReactNode
   currentTab: 'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes' | 'acessos'
@@ -144,6 +167,13 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
           </div>
         )}
         {children}
+        <div
+          className="px-4 pb-4 pt-2 text-right text-[10px] font-medium tracking-wide text-slate-400"
+          data-screen-code={SCREEN_CODES[currentTab]}
+          aria-label={`Código da tela ${SCREEN_CODES[currentTab]}`}
+        >
+          Tela {SCREEN_CODES[currentTab]}
+        </div>
       </main>
 
       {/* Navegação principal única */}
