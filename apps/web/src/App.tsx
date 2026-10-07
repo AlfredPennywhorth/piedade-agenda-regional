@@ -163,7 +163,7 @@ function App() {
     return (
       <>
         <PortariaOperadorTemporarioView token={tokenOperadorPortaria} />
-        <PublicScreenCode code="AGD-SHR-005" />
+        <PublicScreenCode code="AGD-MOB-005" />
       </>
     )
   }
@@ -172,7 +172,7 @@ function App() {
     return (
       <>
         <CadastroConvidadoView token={tokenPortariaPublica} />
-        <PublicScreenCode code="AGD-SHR-004" />
+        <PublicScreenCode code="AGD-MOB-006" />
       </>
     )
   }
@@ -193,7 +193,6 @@ function App() {
           onAuthenticated={concluirAutenticacao}
           onCancelarAtivacao={tokenAtivacao ? cancelarAtivacao : undefined}
         />
-        <PublicScreenCode code="AGD-SHR-003" />
       </>
     )
   }
