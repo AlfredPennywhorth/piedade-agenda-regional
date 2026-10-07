@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { eq, and, or, sql } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal, membros } from '../db/schema'
+import { eq, and, or, sql, inArray } from 'drizzle-orm'
+import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal, membros, casas, setores, administracoes, gruposTrabalho } from '../db/schema'
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, executarOperacaoComAudits, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
@@ -10,6 +10,81 @@ import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/e
 import { carregarEscoposOperacionaisLegados, condicaoEventosVisiveis, condicaoEventosGerenciaveis, podeLerEvento, podeGerenciarEvento } from '../security/eventos'
 
 export const eventosRouter = new Hono<any>()
+
+async function enriquecerAncestralidadeEventos(db: any, itens: any[]) {
+  if (itens.length === 0) return itens
+
+  const idsUnicos = (valores: Array<string | null | undefined>) =>
+    Array.from(new Set(valores.filter((valor): valor is string => Boolean(valor))))
+
+  const casaIds = idsUnicos(itens.map(item => item.evento.casaId))
+  const gtIds = idsUnicos(itens.map(item => item.evento.grupoTrabalhoId))
+
+  const [casasRows, gtsRows] = await Promise.all([
+    casaIds.length
+      ? db.select({ id: casas.id, setorId: casas.setorId }).from(casas).where(inArray(casas.id, casaIds)).all()
+      : [],
+    gtIds.length
+      ? db.select({
+          id: gruposTrabalho.id,
+          regionalId: gruposTrabalho.regionalId,
+          administracaoId: gruposTrabalho.administracaoId,
+          setorId: gruposTrabalho.setorId,
+        }).from(gruposTrabalho).where(inArray(gruposTrabalho.id, gtIds)).all()
+      : [],
+  ])
+
+  const casaPorId = new Map(casasRows.map((item: any) => [item.id, item]))
+  const gtPorId = new Map(gtsRows.map((item: any) => [item.id, item]))
+  const setorIds = idsUnicos([
+    ...itens.map(item => item.evento.setorId),
+    ...casasRows.map((item: any) => item.setorId),
+    ...gtsRows.map((item: any) => item.setorId),
+  ])
+  const setoresRows = setorIds.length
+    ? await db.select({ id: setores.id, administracaoId: setores.administracaoId })
+      .from(setores).where(inArray(setores.id, setorIds)).all()
+    : []
+  const setorPorId = new Map(setoresRows.map((item: any) => [item.id, item]))
+
+  const administracaoIds = idsUnicos([
+    ...itens.map(item => item.evento.administracaoId),
+    ...setoresRows.map((item: any) => item.administracaoId),
+    ...gtsRows.map((item: any) => item.administracaoId),
+  ])
+  const administracoesRows = administracaoIds.length
+    ? await db.select({ id: administracoes.id, regionalId: administracoes.regionalId })
+      .from(administracoes).where(inArray(administracoes.id, administracaoIds)).all()
+    : []
+  const administracaoPorId = new Map(administracoesRows.map((item: any) => [item.id, item]))
+
+  return itens.map((item: any) => {
+    const evento = item.evento
+    const gt = evento.grupoTrabalhoId ? gtPorId.get(evento.grupoTrabalhoId) as any : null
+    const casa = evento.casaId ? casaPorId.get(evento.casaId) as any : null
+    const filtroSetorId = evento.setorId ?? casa?.setorId ?? gt?.setorId ?? null
+    const setor = filtroSetorId ? setorPorId.get(filtroSetorId) as any : null
+    const filtroAdministracaoId = evento.administracaoId ?? setor?.administracaoId ?? gt?.administracaoId ?? null
+    const administracao = filtroAdministracaoId
+      ? administracaoPorId.get(filtroAdministracaoId) as any
+      : null
+    const gtSetor = gt?.setorId ? setorPorId.get(gt.setorId) as any : null
+    const gtAdministracaoId = gt?.administracaoId ?? gtSetor?.administracaoId ?? null
+    const gtAdministracao = gtAdministracaoId
+      ? administracaoPorId.get(gtAdministracaoId) as any
+      : null
+    const filtroRegionalId =
+      evento.regionalId ?? administracao?.regionalId ?? gt?.regionalId ?? gtAdministracao?.regionalId ?? null
+
+    return {
+      ...evento,
+      podeGerenciar: item.podeGerenciar === 1,
+      filtroRegionalId,
+      filtroAdministracaoId,
+      filtroSetorId,
+    }
+  })
+}
 
 function mesmoInstante(a: string, b: string) {
   return new Date(a).getTime() === new Date(b).getTime()
@@ -111,7 +186,7 @@ eventosRouter.get('/', async (c) => {
   conditions.push(await condicaoEventosVisiveis(db, c.get('contextoPermissoes')))
   const gerenciavel = condicaoEventosGerenciaveis(c.get('contextoPermissoes'))
   const data = await db.select({ evento: eventos, podeGerenciar: sql<number>`CASE WHEN ${gerenciavel} THEN 1 ELSE 0 END` }).from(eventos).where(and(...conditions)).all()
-  return c.json(data.map((item: any) => ({ ...item.evento, podeGerenciar: item.podeGerenciar === 1 })))
+  return c.json(await enriquecerAncestralidadeEventos(db, data))
 
 })
 
