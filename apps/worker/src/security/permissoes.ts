@@ -439,9 +439,45 @@ export function temPerfilNoEscopo(
   )
 }
 
-export async function podeGerenciarAgendaExterna(
+async function obterRegionalDaCasaDoMembro(db: any, membroId: string): Promise<string | null> {
+  const row = await db
+    .select({ regionalId: schema.administracoes.regionalId })
+    .from(schema.membros)
+    .innerJoin(schema.casas, eq(schema.membros.casaId, schema.casas.id))
+    .innerJoin(schema.setores, eq(schema.casas.setorId, schema.setores.id))
+    .innerJoin(schema.administracoes, eq(schema.setores.administracaoId, schema.administracoes.id))
+    .where(and(eq(schema.membros.id, membroId), eq(schema.membros.ativo, true)))
+    .get()
+  return row?.regionalId ?? null
+}
+
+export async function obterRegionalGestaoAgendaExterna(
   db: any,
   membroId: string
+): Promise<string | null> {
+  if (!db || !membroId) return null
+  const contexto = await carregarContextoPermissoes(db, membroId)
+
+  const regionaisGestao = Array.from(new Set(
+    contexto.acessosAtivos
+      .filter(acesso =>
+        ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) &&
+        acesso.escopoTipo === 'REGIONAL' &&
+        acesso.escopoId !== null
+      )
+      .map(acesso => acesso.escopoId as string)
+  ))
+
+  if (regionaisGestao.length === 1) return regionaisGestao[0]
+  if (regionaisGestao.length > 1) return null
+
+  return obterRegionalDaCasaDoMembro(db, membroId)
+}
+
+export async function podeGerenciarAgendaExterna(
+  db: any,
+  membroId: string,
+  regionalGestaoId?: string | null
 ): Promise<boolean> {
   if (!db || !membroId) return false
   const contexto = await carregarContextoPermissoes(db, membroId)
@@ -451,7 +487,8 @@ export async function podeGerenciarAgendaExterna(
     acesso =>
       ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) &&
       acesso.escopoTipo === 'REGIONAL' &&
-      acesso.escopoId !== null
+      acesso.escopoId !== null &&
+      (!regionalGestaoId || acesso.escopoId === regionalGestaoId)
   )
 }
 
