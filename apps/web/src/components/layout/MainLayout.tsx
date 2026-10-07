@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { IosInstallPrompt } from '../pwa/IosInstallPrompt'
 
 export interface CapacidadesFrontend {
   podeVisualizarRelatorios?: boolean
@@ -105,7 +106,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 pb-16">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900" style={{ paddingBottom: 'calc(4rem + env(safe-area-inset-bottom))' }}>
       <a
         href="#conteudo-principal"
         className="sr-only z-50 rounded-md bg-white px-3 py-2 text-sm font-semibold text-brand-800 shadow focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
@@ -113,7 +114,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
         Ir para o conteúdo principal
       </a>
       {/* Header */}
-      <header className="bg-brand-900 text-white p-4 shadow-md sticky top-0 z-10">
+      <header className="bg-brand-900 text-white p-4 shadow-md sticky top-0 z-10" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <img
@@ -250,7 +251,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
         </div>
       )}
 
-      <nav aria-label="Navegação móvel principal" className="bg-white border-t border-slate-200 fixed bottom-0 w-full z-30 safe-area-bottom">
+      <nav aria-label="Navegação móvel principal" className="bg-white border-t border-slate-200 fixed bottom-0 w-full z-30" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="mx-auto grid max-w-2xl grid-cols-5 items-stretch">
           <button type="button" aria-current={currentTab === 'agenda' ? 'page' : undefined} onClick={() => navegar('agenda')} className={`flex flex-col items-center p-2 text-[10px] ${currentTab === 'agenda' ? 'text-brand-600' : 'text-slate-400'}`}>
             <span className="text-base">☰</span><span>Minha Agenda</span>
@@ -282,6 +283,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
         </div>
       </nav>
 
+      <IosInstallPrompt />
     </div>
   )
 }
