@@ -107,6 +107,8 @@ export function ContasAcessoView({
   const [setorFiltro, setSetorFiltro] = useState('')
   const [casaFiltro, setCasaFiltro] = useState('')
   const [statusFiltro, setStatusFiltro] = useState('')
+  const [buscaFiltro, setBuscaFiltro] = useState('')
+  const [perfilFiltro, setPerfilFiltro] = useState('')
 
   const carregar = async () => {
     setErroGlobal(null)
@@ -150,7 +152,21 @@ export function ContasAcessoView({
     () => setores.filter(item => {
       const administracao = administracoes.find(adm => adm.id === item.administracaoId)
       if (administracaoFiltro && item.administracaoId !== administracaoFiltro) return false
-      if (regionalFiltro && administracao?.regionalId !== regionalFiltro) return false
+      const termo = buscaFiltro.trim().toLocaleLowerCase('pt-BR')
+    const digitosBusca = buscaFiltro.replace(/\D/g, '')
+    if (termo) {
+      const nome = conta.nome.toLocaleLowerCase('pt-BR')
+      const carteirinha = (conta.codigoCarteirinha ?? '').toLocaleLowerCase('pt-BR')
+      const celularDigitos = (conta.celular ?? '').replace(/\D/g, '')
+      const encontrouTexto = nome.includes(termo) || carteirinha.includes(termo)
+      const encontrouCelular = digitosBusca.length > 0 && celularDigitos.includes(digitosBusca)
+      if (!encontrouTexto && !encontrouCelular) return false
+    }
+
+    if (perfilFiltro === 'SEM_ACESSO' && conta.acessos.length > 0) return false
+    if (perfilFiltro && perfilFiltro !== 'SEM_ACESSO' && !conta.acessos.some(acesso => acesso.perfilCodigo === perfilFiltro)) return false
+
+    if (regionalFiltro && administracao?.regionalId !== regionalFiltro) return false
       return true
     }),
     [setores, administracoes, administracaoFiltro, regionalFiltro]
@@ -167,6 +183,12 @@ export function ContasAcessoView({
     [casas, setores, administracoes, setorFiltro, administracaoFiltro, regionalFiltro]
   )
 
+  const perfisDisponiveis = useMemo(
+    () => Array.from(new Set(contas.flatMap(conta => conta.acessos.map(acesso => acesso.perfilCodigo))))
+      .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [contas]
+  )
+
   const contasFiltradas = useMemo(() => contas.filter(conta => {
     const casa = casas.find(item => item.id === conta.casaId)
     const setor = setores.find(item => item.id === casa?.setorId)
@@ -181,7 +203,7 @@ export function ContasAcessoView({
     if (statusFiltro === 'RECUPERACAO_PIN' && !conta.recuperacaoPinPendente) return false
     if (statusFiltro && !['SEM_CONTA', 'RECUPERACAO_PIN'].includes(statusFiltro) && conta.status !== statusFiltro) return false
     return true
-  }), [contas, casas, setores, administracoes, regionalFiltro, administracaoFiltro, setorFiltro, casaFiltro, statusFiltro])
+  }), [contas, casas, setores, administracoes, regionalFiltro, administracaoFiltro, setorFiltro, casaFiltro, statusFiltro, buscaFiltro, perfilFiltro])
 
   const limparFiltros = () => {
     setRegionalFiltro('')
@@ -189,6 +211,8 @@ export function ContasAcessoView({
     setSetorFiltro('')
     setCasaFiltro('')
     setStatusFiltro('')
+    setBuscaFiltro('')
+    setPerfilFiltro('')
   }
 
   const contasExibidas = useMemo(() => {
@@ -427,7 +451,18 @@ export function ContasAcessoView({
       )}
 
       <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <label className="mb-3 block text-sm text-slate-700">
+          <span className="mb-1 block font-medium">Buscar pessoa</span>
+          <input
+            type="search"
+            aria-label="Buscar por nome, celular ou carteirinha"
+            value={buscaFiltro}
+            onChange={event => setBuscaFiltro(event.target.value)}
+            placeholder="Nome, celular ou carteirinha"
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+          />
+        </label>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           <label className="text-sm text-slate-700">
             <span className="mb-1 block font-medium">Regional</span>
             <select
@@ -493,6 +528,21 @@ export function ContasAcessoView({
               <option value="">Todas</option>
               {[...casasFiltradas].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(item => (
                 <option key={item.id} value={item.id}>{item.nome}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm text-slate-700">
+            <span className="mb-1 block font-medium">Perfil / acesso</span>
+            <select
+              aria-label="Filtrar por Perfil ou acesso"
+              value={perfilFiltro}
+              onChange={event => setPerfilFiltro(event.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+            >
+              <option value="">Todos</option>
+              <option value="SEM_ACESSO">Sem perfil ativo</option>
+              {perfisDisponiveis.map(perfil => (
+                <option key={perfil} value={perfil}>{perfil}</option>
               ))}
             </select>
           </label>
