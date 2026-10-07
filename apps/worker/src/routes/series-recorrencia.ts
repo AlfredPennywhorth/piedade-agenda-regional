@@ -30,6 +30,49 @@ async function recuperarCriadorDaSerie(db: any, serieId: string): Promise<string
   return criacao?.membroId ?? ocorrenciaOriginal?.membroId ?? null
 
 }
+async function recuperarCriadoresDasSeries(db: any, serieIds: string[]): Promise<Map<string, string>> {
+  const criadores = new Map<string, string>()
+  if (serieIds.length === 0) return criadores
+
+  const criacoes = await db.select({
+    serieId: auditoriaLogs.recursoId,
+    membroId: auditoriaLogs.atorMembroId,
+    criadoEm: auditoriaLogs.criadoEm,
+    id: auditoriaLogs.id,
+  }).from(auditoriaLogs).where(and(
+    eq(auditoriaLogs.acao, 'SERIE_RECORRENCIA_CRIADA'),
+    eq(auditoriaLogs.recursoTipo, 'SERIE_RECORRENCIA'),
+    inArray(auditoriaLogs.recursoId, serieIds),
+    isNotNull(auditoriaLogs.atorMembroId)
+  )).orderBy(auditoriaLogs.criadoEm, auditoriaLogs.id).all()
+
+  for (const item of criacoes) {
+    if (item.serieId && item.membroId && !criadores.has(item.serieId)) {
+      criadores.set(item.serieId, item.membroId)
+    }
+  }
+
+  const faltantes = serieIds.filter(id => !criadores.has(id))
+  if (faltantes.length === 0) return criadores
+
+  const ocorrencias = await db.select({
+    serieId: eventos.serieRecorrenciaId,
+    membroId: eventos.criadorMembroId,
+    createdAt: eventos.createdAt,
+    id: eventos.id,
+  }).from(eventos).where(and(
+    inArray(eventos.serieRecorrenciaId, faltantes),
+    isNotNull(eventos.criadorMembroId)
+  )).orderBy(eventos.createdAt, eventos.id).all()
+
+  for (const item of ocorrencias) {
+    if (item.serieId && item.membroId && !criadores.has(item.serieId)) {
+      criadores.set(item.serieId, item.membroId)
+    }
+  }
+  return criadores
+}
+
 
 function mesmoInstante(a: string, b: string) {
   return new Date(a).getTime() === new Date(b).getTime()
@@ -286,7 +329,11 @@ async function podeGerenciarSerie(c: any, serie: any): Promise<boolean> {
   return membro?.ativo === true && membro.casaId === serie.casaId
 }
 
-async function podeGerenciarEntidade(c: any, entidade: any): Promise<boolean> {
+async function podeGerenciarEntidade(
+  c: any,
+  entidade: any,
+  permitirCasaAutomatica = true
+): Promise<boolean> {
   const db = c.get('db')
   const membroId = c.get('membroId')
   const escopo = extrairEscopoDoEvento(entidade)
@@ -297,8 +344,17 @@ async function podeGerenciarEntidade(c: any, entidade: any): Promise<boolean> {
     db,
     membroId,
     escopo.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-    escopo.escopoId
+    escopo.escopoId,
+    permitirCasaAutomatica
   )
+}
+
+function atorEhAutorOuOrganizador(
+  membroId: string | null,
+  criadorMembroId: string | null | undefined,
+  organizadorMembroId: string | null | undefined
+) {
+  return !!membroId && (membroId === criadorMembroId || membroId === organizadorMembroId)
 }
 
 seriesRecorrenciaRouter.get('/', async (c) => {
@@ -315,10 +371,27 @@ seriesRecorrenciaRouter.get('/', async (c) => {
     ? await query.where(and(...conditions)).all()
     : await query.all()
 
-  const autorizadas: any[] = []
-  for (const serie of data) {
-    if (await podeGerenciarSerie(c, serie)) autorizadas.push(serie)
-  }
+  const membroId = c.get('membroId')
+  const contexto = c.get('contextoPermissoes')
+  if (!membroId) return c.json([])
+
+  const escopos = await carregarEscoposAgendaAutorizados(c)
+  const membro = eMasterSistema(contexto) ? null : await db
+    .select({ casaId: membros.casaId, ativo: membros.ativo })
+    .from(membros)
+    .where(eq(membros.id, membroId))
+    .get()
+  const criadores = await recuperarCriadoresDasSeries(db, data.map((serie: any) => serie.id))
+
+  const autorizadas = data.filter((serie: any) => {
+    if (escopos.tudo || serieAutorizadaNoEscopo(serie, escopos)) return true
+    if (!serie.casaId || membro?.ativo !== true || membro.casaId !== serie.casaId) return false
+    return atorEhAutorOuOrganizador(
+      membroId,
+      criadores.get(serie.id) ?? null,
+      serie.organizadorMembroId
+    )
+  })
   return c.json(autorizadas)
 })
 
@@ -475,7 +548,12 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         }
         return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
       }
-      if (!(await podeGerenciarEntidade(c, mergedEvent))) {
+      const permitirCasaAutomaticaDestino = atorEhAutorOuOrganizador(
+        c.get('membroId'),
+        existingEvent.criadorMembroId,
+        existingEvent.organizadorMembroId
+      )
+      if (!(await podeGerenciarEntidade(c, mergedEvent, permitirCasaAutomaticaDestino))) {
         return c.json({ error: 'Acesso não autorizado para mover o evento para este escopo', code: 'FORBIDDEN' }, 403)
       }
       
@@ -529,7 +607,13 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
           }
           return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
         }
-        if (!(await podeGerenciarEntidade(c, mergedSerieData))) {
+        const criadorOriginal = await recuperarCriadorDaSerie(db, existingSerie.id)
+        const permitirCasaAutomaticaDestino = atorEhAutorOuOrganizador(
+          c.get('membroId'),
+          criadorOriginal,
+          existingSerie.organizadorMembroId
+        )
+        if (!(await podeGerenciarEntidade(c, mergedSerieData, permitirCasaAutomaticaDestino))) {
           return c.json({ error: 'Acesso não autorizado para mover a série para este escopo', code: 'FORBIDDEN' }, 403)
         }
       }
@@ -761,7 +845,13 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         }
         return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
       }
-      if (!(await podeGerenciarEntidade(c, serieBData))) {
+      const criadorOriginal = await recuperarCriadorDaSerie(db, existingSerie.id)
+      const permitirCasaAutomaticaDestino = atorEhAutorOuOrganizador(
+        c.get('membroId'),
+        criadorOriginal,
+        existingSerie.organizadorMembroId
+      )
+      if (!(await podeGerenciarEntidade(c, serieBData, permitirCasaAutomaticaDestino))) {
         return c.json({ error: 'Acesso não autorizado para mover a série para este escopo', code: 'FORBIDDEN' }, 403)
       }
       if (alteracaoApenasOperacional) {
