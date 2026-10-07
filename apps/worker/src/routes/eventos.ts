@@ -11,6 +11,19 @@ import { carregarEscoposOperacionaisLegados, condicaoEventosVisiveis, condicaoEv
 
 export const eventosRouter = new Hono<any>()
 
+const D1_IN_BATCH = 80
+
+async function carregarEmLotes<T>(
+  ids: string[],
+  carregar: (lote: string[]) => Promise<T[]>
+): Promise<T[]> {
+  const resultado: T[] = []
+  for (let i = 0; i < ids.length; i += D1_IN_BATCH) {
+    resultado.push(...await carregar(ids.slice(i, i + D1_IN_BATCH)))
+  }
+  return resultado
+}
+
 async function enriquecerAncestralidadeEventos(db: any, itens: any[]) {
   if (itens.length === 0) return itens
 
@@ -21,17 +34,18 @@ async function enriquecerAncestralidadeEventos(db: any, itens: any[]) {
   const gtIds = idsUnicos(itens.map(item => item.evento.grupoTrabalhoId))
 
   const [casasRows, gtsRows] = await Promise.all([
-    casaIds.length
-      ? db.select({ id: casas.id, setorId: casas.setorId }).from(casas).where(inArray(casas.id, casaIds)).all()
-      : [],
-    gtIds.length
-      ? db.select({
-          id: gruposTrabalho.id,
-          regionalId: gruposTrabalho.regionalId,
-          administracaoId: gruposTrabalho.administracaoId,
-          setorId: gruposTrabalho.setorId,
-        }).from(gruposTrabalho).where(inArray(gruposTrabalho.id, gtIds)).all()
-      : [],
+    carregarEmLotes(casaIds, lote =>
+      db.select({ id: casas.id, setorId: casas.setorId })
+        .from(casas).where(inArray(casas.id, lote)).all()
+    ),
+    carregarEmLotes(gtIds, lote =>
+      db.select({
+        id: gruposTrabalho.id,
+        regionalId: gruposTrabalho.regionalId,
+        administracaoId: gruposTrabalho.administracaoId,
+        setorId: gruposTrabalho.setorId,
+      }).from(gruposTrabalho).where(inArray(gruposTrabalho.id, lote)).all()
+    ),
   ])
 
   const casaPorId = new Map(casasRows.map((item: any) => [item.id, item]))
@@ -41,10 +55,10 @@ async function enriquecerAncestralidadeEventos(db: any, itens: any[]) {
     ...casasRows.map((item: any) => item.setorId),
     ...gtsRows.map((item: any) => item.setorId),
   ])
-  const setoresRows = setorIds.length
-    ? await db.select({ id: setores.id, administracaoId: setores.administracaoId })
-      .from(setores).where(inArray(setores.id, setorIds)).all()
-    : []
+  const setoresRows = await carregarEmLotes(setorIds, lote =>
+    db.select({ id: setores.id, administracaoId: setores.administracaoId })
+      .from(setores).where(inArray(setores.id, lote)).all()
+  )
   const setorPorId = new Map(setoresRows.map((item: any) => [item.id, item]))
 
   const administracaoIds = idsUnicos([
@@ -52,10 +66,10 @@ async function enriquecerAncestralidadeEventos(db: any, itens: any[]) {
     ...setoresRows.map((item: any) => item.administracaoId),
     ...gtsRows.map((item: any) => item.administracaoId),
   ])
-  const administracoesRows = administracaoIds.length
-    ? await db.select({ id: administracoes.id, regionalId: administracoes.regionalId })
-      .from(administracoes).where(inArray(administracoes.id, administracaoIds)).all()
-    : []
+  const administracoesRows = await carregarEmLotes(administracaoIds, lote =>
+    db.select({ id: administracoes.id, regionalId: administracoes.regionalId })
+      .from(administracoes).where(inArray(administracoes.id, lote)).all()
+  )
   const administracaoPorId = new Map(administracoesRows.map((item: any) => [item.id, item]))
 
   return itens.map((item: any) => {
