@@ -99,5 +99,6 @@ describe('App — S07 Minha Agenda', () => {
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Entrar' })).toBeDefined()
     expect(screen.queryByRole('navigation', { name: /navegação móvel principal/i })).toBeNull()
+    expect(screen.getByLabelText('Código da tela AGD-SHR-003')).toHaveTextContent('Tela AGD-SHR-003')
   })
 })
