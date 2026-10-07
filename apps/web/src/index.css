@@ -65,13 +65,14 @@
   .master-table-scroll {
     max-height: min(70vh, 48rem);
     overflow: auto;
-    overscroll-behavior: contain;
+    overscroll-behavior-x: contain;
+    overscroll-behavior-y: auto;
     scrollbar-gutter: stable both-edges;
   }
 
   .master-table-scroll table {
-    min-width: max-content;
-    width: 100%;
+    min-width: 100%;
+    width: max-content;
   }
 
   .master-table-scroll thead th {
@@ -86,6 +87,10 @@
     position: sticky;
     left: 0;
     z-index: 10;
+    width: clamp(10rem, 28vw, 18rem);
+    max-width: 18rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
     background: #ffffff;
     box-shadow: 1px 0 0 #e2e8f0;
   }
