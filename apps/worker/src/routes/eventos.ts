@@ -4,7 +4,7 @@ import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal, membros,
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, executarOperacaoComAudits, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
-import { podeGerenciarAgendaNoEscopo, eMasterSistema } from '../security/permissoes'
+import { podeGerenciarAgendaNoEscopo, podeGerenciarAgendaExterna, eMasterSistema } from '../security/permissoes'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
 import { carregarEscoposOperacionaisLegados, condicaoEventosVisiveis, condicaoEventosGerenciaveis, podeLerEvento, podeGerenciarEvento } from '../security/eventos'
@@ -235,16 +235,21 @@ eventosRouter.post('/', async (c) => {
 
     const { escopoTipo, escopoId } = extrairEscopoDoEvento(parsed)
     const atorMembroId = c.get('membroId') || null
+    const externo = parsed.abrangencia === 'NACIONAL' || parsed.abrangencia === 'INTERNACIONAL'
 
     if (!atorMembroId || !escopoTipo || !escopoId) {
       return c.json({ error: 'Escopo da Agenda indisponível', code: 'FORBIDDEN' }, 403)
     }
-    const autorizado = await podeGerenciarAgendaNoEscopo(
-      db,
-      atorMembroId,
-      escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-      escopoId
-    )
+
+    const autorizado = externo
+      ? (parsed.pessoal === true || await podeGerenciarAgendaExterna(db, atorMembroId))
+      : await podeGerenciarAgendaNoEscopo(
+          db,
+          atorMembroId,
+          escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+          escopoId
+        )
+
     if (!autorizado) {
       return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
     }
@@ -448,13 +453,22 @@ eventosRouter.patch('/:id', async (c) => {
       return c.json({ error: 'Escopo da Agenda indisponível', code: 'FORBIDDEN' }, 403)
     }
 
-    const autorizadoFinal = await podeGerenciarAgendaNoEscopo(
-      db, membroId,
-      escopoFinal.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-      escopoFinal.escopoId,
-      existing.criadorMembroId === membroId || existing.organizadorMembroId === membroId
-    )
-    const preservaCasaPessoal = existing.pessoal && merged.casaId === existing.casaId
+    const externoFinal = merged.abrangencia === 'NACIONAL' || merged.abrangencia === 'INTERNACIONAL'
+    const autorizadoFinal = externoFinal
+      ? (
+          (merged.pessoal === true && existing.criadorMembroId === membroId) ||
+          await podeGerenciarAgendaExterna(db, membroId)
+        )
+      : await podeGerenciarAgendaNoEscopo(
+          db, membroId,
+          escopoFinal.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+          escopoFinal.escopoId,
+          existing.criadorMembroId === membroId || existing.organizadorMembroId === membroId
+        )
+    const preservaCasaPessoal =
+      !externoFinal &&
+      existing.pessoal &&
+      merged.casaId === existing.casaId
     if (!autorizadoFinal && !preservaCasaPessoal) return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
 
     if ((existing.pessoal ?? false) !== (merged.pessoal ?? false)) {
