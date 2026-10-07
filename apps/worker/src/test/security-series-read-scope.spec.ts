@@ -82,10 +82,10 @@ describe('PR-SEC-01 — leitura de séries por escopo sem N+1', () => {
 
       INSERT INTO series_recorrencia
         (id, titulo, modalidade, frequencia, intervalo, data_inicio, data_fim,
-         horario_inicio, horario_fim, timezone, casa_id, ativo)
+         horario_inicio, horario_fim, timezone, organizador_membro_id, casa_id, ativo)
       VALUES
         ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Série Casa A', 'ONLINE', 'DIARIA', 1,
-         '2030-01-01', '2030-01-02', '09:00', '10:00', 'America/Sao_Paulo', '${ids.casaA}', 1);
+         '2030-01-01', '2030-01-02', '09:00', '10:00', 'America/Sao_Paulo', '${ids.membroA}', '${ids.casaA}', 1);
 
       INSERT INTO grupos_trabalho (id, nome, administracao_id, ativo)
       VALUES ('dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'GT Adm A', '${ids.admA}', 1);
@@ -113,7 +113,7 @@ describe('PR-SEC-01 — leitura de séries por escopo sem N+1', () => {
     `)
   })
 
-  it('usuário comum vê apenas a série da própria Casa', async () => {
+  it('usuário comum vê a própria série da Casa, mas não séries alheias', async () => {
     const token = await criarSessao()
     const res = await app.request('/api/v1/series-recorrencia', {
       headers: { Authorization: `Bearer ${token}` },
