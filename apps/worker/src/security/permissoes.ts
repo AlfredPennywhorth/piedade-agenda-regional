@@ -458,6 +458,17 @@ export async function obterRegionalGestaoAgendaExterna(
   if (!db || !membroId) return null
   const contexto = await carregarContextoPermissoes(db, membroId)
 
+  if (eMasterSistema(contexto)) {
+    const regionalCasa = await obterRegionalDaCasaDoMembro(db, membroId)
+    if (regionalCasa) return regionalCasa
+    const regionalAtiva = await db
+      .select({ id: schema.regionais.id })
+      .from(schema.regionais)
+      .where(eq(schema.regionais.ativo, true))
+      .get()
+    return regionalAtiva?.id ?? null
+  }
+
   const regionaisGestao = Array.from(new Set(
     contexto.acessosAtivos
       .filter(acesso =>
