@@ -46,6 +46,67 @@ export function condicaoEscopo(acesso: AcessoTecnico): SQL | undefined {
   }
 }
 
+
+function condicaoEscoposTecnicosDaConta(
+  contexto: ContextoPermissoes,
+  perfisSql: string
+): SQL {
+  if (!contexto.contaAcessoId) return sql`0 = 1`
+  const e = schema.eventos
+  const perfis = sql.raw(perfisSql)
+  return sql`EXISTS (
+    SELECT 1
+    FROM acessos_conta ac
+    WHERE ac.conta_acesso_id = ${contexto.contaAcessoId}
+      AND ac.ativo = 1
+      AND ac.perfil_codigo IN (${perfis})
+      AND (
+        (ac.escopo_tipo = 'REGIONAL' AND (
+          ${e.regionalId} = ac.escopo_id
+          OR ${e.administracaoId} IN (
+            SELECT id FROM administracoes WHERE regional_id = ac.escopo_id
+          )
+          OR ${e.setorId} IN (
+            SELECT s.id FROM setores s
+            JOIN administracoes a ON a.id = s.administracao_id
+            WHERE a.regional_id = ac.escopo_id
+          )
+          OR ${e.casaId} IN (
+            SELECT c.id FROM casas c
+            JOIN setores s ON s.id = c.setor_id
+            JOIN administracoes a ON a.id = s.administracao_id
+            WHERE a.regional_id = ac.escopo_id
+          )
+          OR ${e.grupoTrabalhoId} IN (
+            SELECT g.id FROM grupos_trabalho g
+            LEFT JOIN setores s ON s.id = g.setor_id
+            LEFT JOIN administracoes a ON a.id = COALESCE(g.administracao_id, s.administracao_id)
+            WHERE COALESCE(g.regional_id, a.regional_id) = ac.escopo_id
+          )
+        ))
+        OR (ac.escopo_tipo = 'ADMINISTRACAO' AND (
+          ${e.administracaoId} = ac.escopo_id
+          OR ${e.setorId} IN (
+            SELECT id FROM setores WHERE administracao_id = ac.escopo_id
+          )
+          OR ${e.casaId} IN (
+            SELECT c.id FROM casas c
+            JOIN setores s ON s.id = c.setor_id
+            WHERE s.administracao_id = ac.escopo_id
+          )
+        ))
+        OR (ac.escopo_tipo = 'SETOR' AND (
+          ${e.setorId} = ac.escopo_id
+          OR ${e.casaId} IN (
+            SELECT id FROM casas WHERE setor_id = ac.escopo_id
+          )
+        ))
+        OR (ac.escopo_tipo = 'CASA' AND ${e.casaId} = ac.escopo_id)
+        OR (ac.escopo_tipo = 'GRUPO_TRABALHO' AND ${e.grupoTrabalhoId} = ac.escopo_id)
+      )
+  )`
+}
+
 export async function carregarEscoposOperacionaisLegados(db: any, membroId: string): Promise<SQL[]> {
   const legados = await db
     .select({ vinculo: schema.vinculosFuncionais, codigo: schema.funcoes.codigo })
@@ -79,19 +140,11 @@ export async function condicaoEventosVisiveis(db: any, contexto: ContextoPermiss
   if (eMasterSistema(contexto)) return sql`1 = 1`
   const e = schema.eventos
   const membroId = contexto.membroId
-  const perfis = new Set([
-    'ADMINISTRADOR_SISTEMA',
-    'GESTOR_AGENDA',
-    'GESTOR_RELATORIOS',
-    'AUDITOR',
-    'OPERADOR_PORTARIA_PERMANENTE',
-  ])
-  const escopos = contexto.acessosAtivos
-    .filter(a => perfis.has(a.perfilCodigo))
-    .map(condicaoEscopo)
-    .filter((c): c is SQL => !!c)
-
-  escopos.push(...await carregarEscoposOperacionaisLegados(db, membroId))
+  const escoposLegados = await carregarEscoposOperacionaisLegados(db, membroId)
+  const escoposTecnicos = condicaoEscoposTecnicosDaConta(
+    contexto,
+    "'ADMINISTRADOR_SISTEMA','GESTOR_AGENDA','GESTOR_RELATORIOS','AUDITOR','OPERADOR_PORTARIA_PERMANENTE'"
+  )
 
   return or(
     eq(e.criadorMembroId, membroId),
@@ -99,7 +152,8 @@ export async function condicaoEventosVisiveis(db: any, contexto: ContextoPermiss
       eq(e.pessoal, false),
       or(
         eq(e.organizadorMembroId, membroId),
-        ...escopos,
+        escoposTecnicos,
+        ...escoposLegados,
         sql`EXISTS (SELECT 1 FROM convocacoes c JOIN convocacao_destinatarios d ON d.convocacao_id = c.id WHERE c.evento_id = ${e.id} AND c.status = 'PUBLICADA' AND c.ativo = 1 AND d.membro_id = ${membroId})`
       )
     )
@@ -122,16 +176,16 @@ export async function podeLerEvento(
 export function condicaoEventosGerenciaveis(contexto: ContextoPermissoes): SQL {
   if (eMasterSistema(contexto)) return sql`1 = 1`
   const e = schema.eventos
-  const escopos = contexto.acessosAtivos
-    .filter(a => ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(a.perfilCodigo))
-    .map(condicaoEscopo)
-    .filter((c): c is SQL => !!c)
+  const escoposTecnicos = condicaoEscoposTecnicosDaConta(
+    contexto,
+    "'ADMINISTRADOR_SISTEMA','GESTOR_AGENDA'"
+  )
   return or(
     and(eq(e.pessoal, true), eq(e.criadorMembroId, contexto.membroId)),
     and(
       eq(e.pessoal, false),
       or(
-        ...escopos,
+        escoposTecnicos,
         and(
           or(
             eq(e.criadorMembroId, contexto.membroId),
