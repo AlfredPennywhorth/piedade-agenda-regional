@@ -119,6 +119,12 @@ describe('Eventos pessoais e segregação', () => {
     expect(filtros).toEqual({ master: false, filtrarEscopo: true, pessoas: [] })
     const id = await evento({ casaId: casa })
     expect(await visiveis(autor)).toContain(id)
+    const listagem = await (await req(autor, '/eventos')).json() as any[]
+    expect(listagem.find((item: any) => item.id === id)).toMatchObject({
+      filtroRegionalId: reg,
+      filtroAdministracaoId: adm,
+      filtroSetorId: setor,
+    })
     await db.update(s.vinculosFuncionais).set({ ativo: false }).where(eq(s.vinculosFuncionais.id, vinculoId))
     expect(await (await req(autor, '/eventos/filtros')).json()).toEqual({ master: false, filtrarEscopo: false, pessoas: [] })
     expect(await visiveis(autor)).not.toContain(id)
@@ -202,6 +208,57 @@ describe('Eventos pessoais e segregação', () => {
     expect(await (await req(colega, '/minha-agenda')).json()).toEqual([])
     expect(await (await req(master, '/minha-agenda')).json()).toEqual([])
   })
+  it('convocação não revela evento pessoal antes de autorizar o solicitante', async () => {
+    const privado = await evento(
+      { casaId: casa },
+      { pessoal: true, criadorMembroId: autor.id, organizadorMembroId: autor.id }
+    )
+
+    const intruso = await req(colega, '/convocacoes', 'POST', { eventoId: privado })
+    expect(intruso.status).toBe(403)
+
+    const dono = await req(autor, '/convocacoes', 'POST', { eventoId: privado })
+    expect(dono.status).toBe(409)
+    expect((await dono.json() as any).code).toBe('EVENTO_PESSOAL_SEM_CONVOCACAO')
+  })
+
+  it('gestor delegado não move série alheia para a própria Casa fora da delegação', async () => {
+    const donoOutraReg = await usuario(casaOutraReg)
+    const gestorOutraReg = await usuario(casa, 'GESTOR_AGENDA', 'REGIONAL', outraReg)
+
+    const criada = await req(donoOutraReg, '/series-recorrencia', 'POST', {
+      titulo: 'Série da outra Regional',
+      modalidade: 'ONLINE',
+      urlOnline: 'https://example.org',
+      casaId: casaOutraReg,
+      dataInicio: '2099-10-10',
+      dataFim: '2099-10-12',
+      horarioInicio: '09:00',
+      horarioFim: '10:00',
+      frequencia: 'DIARIA',
+      intervalo: 1,
+    })
+    expect(criada.status).toBe(201)
+    const serieId = ((await criada.json()) as any).serie.id
+    const ocorrencias = sqlite.prepare(
+      'SELECT id FROM eventos WHERE serie_recorrencia_id = ? ORDER BY inicio_em'
+    ).all(serieId) as Array<{ id: string }>
+    expect(ocorrencias.length).toBeGreaterThan(1)
+
+    for (const payload of [
+      { updateMode: 'THIS', fromEventId: ocorrencias[0].id, changes: { casaId: casa } },
+      { updateMode: 'ALL', changes: { casaId: casa } },
+      {
+        updateMode: 'THIS_AND_FUTURE',
+        fromEventId: ocorrencias[1].id,
+        changes: { casaId: casa },
+      },
+    ]) {
+      const res = await req(gestorOutraReg, `/series-recorrencia/${serieId}`, 'PATCH', payload)
+      expect(res.status).toBe(403)
+    }
+  })
+
   it('colega da mesma Casa não lista, lê nem altera série alheia', async () => {
     const res = await req(autor, '/series-recorrencia', 'POST', {
       titulo: 'Série particular do autor',
