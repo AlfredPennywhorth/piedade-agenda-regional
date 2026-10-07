@@ -111,6 +111,12 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(screen.getByText('Pessoa Teste')).toBeDefined()
     expect(screen.queryByText('Pessoa Bloqueada')).toBeNull()
 
+    const setorSelect = screen.getByLabelText('Filtrar por Setor')
+    expect(within(setorSelect).queryByRole('option', { name: 'Setor 2' })).toBeNull()
+    const casaSelect = screen.getByLabelText('Filtrar por Casa de Oração')
+    expect(within(casaSelect).queryByRole('option', { name: 'Casa 2' })).toBeNull()
+
+
     fireEvent.change(screen.getByLabelText('Filtrar por Status'), {
       target: { value: 'BLOQUEADA' },
     })
@@ -139,6 +145,39 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     })
     expect(window.confirm).toHaveBeenCalled()
     expect(await screen.findByText('Conta bloqueada e sessões revogadas.')).toBeDefined()
+  })
+
+  it('mantém link gerado visível mesmo quando o novo status deixa de atender ao filtro', async () => {
+    const contaSemAcesso = {
+      ...contaAtiva,
+      contaAcessoId: null,
+      status: null,
+      acessos: [],
+    }
+    let chamadasAdmin = 0
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') {
+        chamadasAdmin += 1
+        return (chamadasAdmin === 1
+          ? [contaSemAcesso]
+          : [{ ...contaSemAcesso, contaAcessoId: 'conta-nova', status: 'PENDENTE_ATIVACAO' }]) as any
+      }
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-filtrado',
+      expiraEm: '2099-01-01T00:00:00.000Z',
+      membroId: 'membro-1',
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.change(await screen.findByLabelText('Filtrar por Status'), {
+      target: { value: 'SEM_CONTA' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar ativação' }))
+
+    const campo = await screen.findByLabelText('Link temporário de Pessoa Teste')
+    expect((campo as HTMLInputElement).value).toContain('ativacao=token-filtrado')
   })
 
   it('gera link temporário de redefinição sem persistir o token no cliente', async () => {
@@ -171,7 +210,10 @@ describe('ContasAcessoView — PR-ACC-05', () => {
       contaAcessoId: 'conta-2',
       acessos: [],
     }
-    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([contaAtiva, outraConta])
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva, outraConta] as any
+      return [] as any
+    })
     vi.mocked(apiClient.postWithAuth).mockResolvedValue({
       token: 'token-contextual',
       expiraEm: '2099-01-01T00:00:00.000Z',
@@ -201,7 +243,10 @@ describe('ContasAcessoView — PR-ACC-05', () => {
       contaAcessoId: 'conta-2',
       acessos: [],
     }
-    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([contaAtiva, outraConta])
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva, outraConta] as any
+      return [] as any
+    })
     vi.mocked(apiClient.postWithAuth).mockResolvedValue({
       token: 'token-preservado',
       expiraEm: '2099-01-01T00:00:00.000Z',
@@ -273,7 +318,10 @@ describe('ContasAcessoView — PR-ACC-05', () => {
       status: null,
       acessos: [],
     }
-    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([contaSemAcesso])
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaSemAcesso] as any
+      return [] as any
+    })
     vi.mocked(apiClient.postWithAuth).mockResolvedValue({
       token: 'token-ativacao',
       expiraEm: '2099-01-01T12:30:00.000Z',
@@ -296,9 +344,10 @@ describe('ContasAcessoView — PR-ACC-05', () => {
   })
 
   it('bloqueia envio pelo WhatsApp quando o celular é malformado', async () => {
-    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([
-      { ...contaAtiva, celular: '123' },
-    ])
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [{ ...contaAtiva, celular: '123' }] as any
+      return [] as any
+    })
     vi.mocked(apiClient.postWithAuth).mockResolvedValue({
       token: 'token-celular-invalido',
       expiraEm: '2099-01-01T12:30:00.000Z',
@@ -317,9 +366,10 @@ describe('ContasAcessoView — PR-ACC-05', () => {
   })
 
   it('não oferece envio pelo WhatsApp sem celular válido e mantém o link disponível', async () => {
-    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([
-      { ...contaAtiva, celular: null },
-    ])
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [{ ...contaAtiva, celular: null }] as any
+      return [] as any
+    })
     vi.mocked(apiClient.postWithAuth).mockResolvedValue({
       token: 'token-sem-celular',
       expiraEm: '2099-01-01T12:30:00.000Z',
@@ -433,7 +483,10 @@ describe('ContasAcessoView — PR-ACC-05', () => {
       contaAcessoId: 'conta-2',
       acessos: [],
     }
-    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([contaAtiva, outraConta])
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva, outraConta] as any
+      return [] as any
+    })
     vi.mocked(apiClient.postWithAuth).mockResolvedValue({
       message: 'Sessões revogadas',
       membroId: 'membro-2',
@@ -536,7 +589,11 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     await waitFor(() => {
       expect(nivel.value).toBe('ADMINISTRACAO')
     })
-    expect(await screen.findByText('Administração Centro')).toBeDefined()
+    expect(
+      await within(screen.getByLabelText('Unidade territorial')).findByRole('option', {
+        name: 'Administração Centro',
+      })
+    ).toBeDefined()
   })
 
 
@@ -548,6 +605,7 @@ describe('ContasAcessoView — PR-ACC-05', () => {
         nome: 'Sem pendência',
         celular: '11911111111',
         codigoCarteirinha: 'C1',
+        casaId: 'casa-1',
         contaAcessoId: 'conta-1',
         status: 'ATIVA',
         ativadoEm: null,
@@ -560,6 +618,7 @@ describe('ContasAcessoView — PR-ACC-05', () => {
         nome: 'Com pendência',
         celular: '11922222222',
         codigoCarteirinha: 'C2',
+        casaId: 'casa-1',
         contaAcessoId: 'conta-2',
         status: 'ATIVA',
         ativadoEm: null,
