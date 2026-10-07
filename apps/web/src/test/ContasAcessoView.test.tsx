@@ -219,6 +219,57 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(screen.getByText('Pessoa Teste')).toBeDefined()
   })
 
+  it('preserva simultaneamente link temporário e feedback de outra conta filtrada', async () => {
+    const contaSemConta = {
+      ...contaAtiva,
+      membroId: 'membro-2',
+      nome: 'Pessoa Sem Conta',
+      contaAcessoId: null,
+      status: null,
+      acessos: [],
+    }
+    let chamadasAdmin = 0
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') {
+        chamadasAdmin += 1
+        if (chamadasAdmin === 1) return [contaAtiva, contaSemConta] as any
+        return [
+          { ...contaAtiva, status: 'BLOQUEADA' },
+          { ...contaSemConta, contaAcessoId: 'conta-2', status: 'PENDENTE_ATIVACAO' },
+        ] as any
+      }
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-a',
+      expiraEm: '2099-01-01T00:00:00.000Z',
+      membroId: 'membro-2',
+    })
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValue({
+      membroId: 'membro-1',
+      contaAcessoId: 'conta-1',
+      status: 'BLOQUEADA',
+    })
+
+    render(<ContasAcessoView />)
+    await screen.findByText('Pessoa Sem Conta')
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Status'), {
+      target: { value: 'SEM_CONTA' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Gerar link de ativação/i }))
+    expect(await screen.findByText(/ativacao=token-a/)).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    fireEvent.change(screen.getByLabelText('Filtrar por Status'), {
+      target: { value: 'ATIVA' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Bloquear' }))
+
+    expect(await screen.findByText('Conta bloqueada e sessões revogadas.')).toBeDefined()
+    expect(screen.getByText(/ativacao=token-a/)).toBeDefined()
+  })
+
   it('confirma o bloqueio e atualiza a listagem', async () => {
     vi.mocked(apiClient.patchWithAuth).mockResolvedValue({
       membroId: 'membro-1',
