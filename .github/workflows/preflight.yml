@@ -1,0 +1,71 @@
+name: Preflight — Merge e Deploy
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+concurrency:
+  group: preflight-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: Base · SHA · P0 · Impacto
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Preflight local
+        id: impact
+        env:
+          PREFLIGHT_BASE: ${{ github.event.pull_request.base.ref || github.base_ref || 'develop' }}
+          PREFLIGHT_HEAD: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
+        run: node scripts/preflight.mjs
+
+      - name: Lembrar gate nativo de conversas
+        if: ${{ github.event.pull_request.number }}
+        shell: bash
+        run: |
+          echo "Threads de review devem ser bloqueadas pela proteção nativa do GitHub: Require conversation resolution before merging."
+          echo "O workflow não replica esse bloqueio porque a resolução de uma conversa não gera um gatilho confiável de GitHub Actions para reavaliar o mesmo SHA."
+
+      - name: Bloquear issues P0 abertas
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          total="$(gh api --method GET search/issues             -f q="repo:$GITHUB_REPOSITORY is:issue is:open label:P0"             --jq '.total_count')"
+          test "$total" = "0" || {
+            echo "Bloqueio: existem $total issue(s) P0 abertas."
+            exit 1
+          }
+
+      - name: Resumo de impacto
+        shell: bash
+        run: |
+          {
+            echo "### Preflight"
+            echo "- Worker requer deploy: **${{ steps.impact.outputs.worker_changed }}**"
+            echo "- Pages requer deploy: **${{ steps.impact.outputs.web_changed }}**"
+            echo "- Migration alterada: **${{ steps.impact.outputs.migration_changed }}**"
+            if [ "${{ steps.impact.outputs.migration_changed }}" = "true" ]; then
+              echo "- ⚠️ Planejar backup/ponto de restauração e migration no D1."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
