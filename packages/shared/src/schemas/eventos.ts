@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { isSameDayInSaoPaulo } from '../utils/date-utils'
 import { TipoRefeicao } from './convocacoes'
+import { PAISES_ISO } from './paises'
 
 export const ModalidadeEvento = z.enum(['PRESENCIAL', 'ONLINE', 'HIBRIDO'])
 export type ModalidadeEventoEnum = z.infer<typeof ModalidadeEvento>
@@ -15,8 +16,10 @@ export const UF_BRASIL = [
 export const UfBrasil = z.enum(UF_BRASIL)
 export type UfBrasilEnum = z.infer<typeof UfBrasil>
 
-export const CodigoPaisISO2 = z.string()
-  .regex(/^[A-Z]{2}$/, 'País deve usar código ISO 3166-1 alpha-2')
+const CODIGOS_PAIS_ISO = PAISES_ISO.map(([codigo]) => codigo) as [string, ...string[]]
+export const CodigoPaisISO2 = z.enum(CODIGOS_PAIS_ISO, {
+  errorMap: () => ({ message: 'País deve usar código ISO 3166-1 alpha-2 válido' }),
+})
 export type CodigoPaisISO2Type = z.infer<typeof CodigoPaisISO2>
 
 const HttpUrl = z.string().url('URL inválida').refine(
