@@ -12,7 +12,6 @@ const expectedSha = process.env.GITHUB_SHA || git('rev-parse', 'HEAD')
 const actualSha = git('rev-parse', 'HEAD')
 
 const errors = []
-const notes = []
 
 if (expectedSha !== actualSha) errors.push(`SHA inesperado: checkout=${actualSha}, esperado=${expectedSha}`)
 
