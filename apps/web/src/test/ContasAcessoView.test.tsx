@@ -258,9 +258,8 @@ describe('ContasAcessoView — PR-ACC-05', () => {
       target: { value: 'SEM_CONTA' },
     })
     fireEvent.click(screen.getByRole('button', { name: /Gerar ativação/i }))
-    expect(await screen.findByLabelText('Link temporário de Pessoa Sem Conta')).toHaveValue(
-      expect.stringContaining('ativacao=token-a')
-    )
+    const linkTemporarioInicial = await screen.findByLabelText('Link temporário de Pessoa Sem Conta')
+    expect((linkTemporarioInicial as HTMLInputElement).value).toContain('ativacao=token-a')
 
     fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
     fireEvent.change(screen.getByLabelText('Filtrar por Status'), {
@@ -269,9 +268,8 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Bloquear' }))
 
     expect(await screen.findByText('Conta bloqueada e sessões revogadas.')).toBeDefined()
-    expect(screen.getByLabelText('Link temporário de Pessoa Sem Conta')).toHaveValue(
-      expect.stringContaining('ativacao=token-a')
-    )
+    const linkTemporarioMantido = screen.getByLabelText('Link temporário de Pessoa Sem Conta')
+    expect((linkTemporarioMantido as HTMLInputElement).value).toContain('ativacao=token-a')
   })
 
   it('confirma o bloqueio e atualiza a listagem', async () => {
