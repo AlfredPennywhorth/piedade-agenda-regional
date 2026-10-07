@@ -58,7 +58,8 @@ ou à Administração. Nenhum cadastro é modificado automaticamente.
 - A API recusa filtro por pessoa para outros perfis e só fornece a lista de
   pessoas ao Master. Respostas antigas de filtros não substituem a seleção atual.
 - Gestor de Relatórios consulta destinatários no escopo e nos níveis abaixo,
-  tanto por acesso técnico quanto por vínculo funcional legado.
+  tanto por acesso técnico quanto por vínculo funcional legado. O seletor de
+  escopo também reconhece vínculos ativos legados de relatórios, auditoria e portaria.
 
 ## Banco e compatibilidade
 
@@ -73,6 +74,8 @@ Migration: `apps/worker/drizzle/0042_eventos_pessoais.sql`.
 - Cria índice para agenda pessoal e gatilhos para rejeitar eventos pessoais sem
   Casa/autor, vinculados a séries ou com nova convocação.
 - As novas ocorrências de séries institucionais também registram o autor.
+- Regenerações em “Todas” e “Esta e futuras” usam a mesma recuperação de autoria
+  pela auditoria ou ocorrências, sem atribuí-la ao gestor que editou a série.
 
 **Aplicar a migration antes do novo Worker.** Sem as colunas novas, as consultas
 novas de eventos falharão. No deploy do Worker Beta, marcar `apply_migrations`.
@@ -81,7 +84,7 @@ aprovação. Nenhum deploy é disparado por esta alteração.
 
 ## Evidências locais
 
-- Worker: 597 testes passando, incluindo 28 testes de segregação, eventos
+- Worker: 602 testes passando, incluindo 33 testes de segregação, eventos
   pessoais, conflitos, atalhos de convocação e migration.
 - Frontend: 284 testes passando, incluindo criação pessoal sem convocação,
   consulta sem ações de gestão e abertura pessoal na agenda/calendário sem RSVP/QR.

@@ -11,6 +11,25 @@ import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/e
 
 export const seriesRecorrenciaRouter = new Hono<any>()
 
+// Usado por todas as regenerações: editar ou dividir uma série não transfere autoria.
+async function recuperarCriadorDaSerie(db: any, serieId: string): Promise<string | null> {
+  const criacao = await db.select({ membroId: auditoriaLogs.atorMembroId })
+    .from(auditoriaLogs)
+    .where(and(
+      eq(auditoriaLogs.acao, 'SERIE_RECORRENCIA_CRIADA'),
+      eq(auditoriaLogs.recursoTipo, 'SERIE_RECORRENCIA'),
+      eq(auditoriaLogs.recursoId, serieId),
+      isNotNull(auditoriaLogs.atorMembroId)
+    ))
+    .orderBy(auditoriaLogs.criadoEm, auditoriaLogs.id).get()
+  const ocorrenciaOriginal = criacao ? null : await db
+    .select({ membroId: eventos.criadorMembroId }).from(eventos)
+    .where(and(eq(eventos.serieRecorrenciaId, serieId), isNotNull(eventos.criadorMembroId)))
+    .orderBy(eventos.createdAt, eventos.id).get()
+  return criacao?.membroId ?? ocorrenciaOriginal?.membroId ?? null
+
+}
+
 function mesmoInstante(a: string, b: string) {
   return new Date(a).getTime() === new Date(b).getTime()
 }
@@ -599,22 +618,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         .filter(occ => occ.inicioEm >= nowIso)
         .filter(occ => !exceptionDates.has(getLocalDateFromUtc(occ.inicioEm)))
         
-      // A edição não transfere a autoria. A auditoria também cobre séries
-      // legadas sem ocorrências restantes ou sem autoria recuperada.
-      const criacao = await db.select({ membroId: auditoriaLogs.atorMembroId })
-        .from(auditoriaLogs)
-        .where(and(
-          eq(auditoriaLogs.acao, 'SERIE_RECORRENCIA_CRIADA'),
-          eq(auditoriaLogs.recursoTipo, 'SERIE_RECORRENCIA'),
-          eq(auditoriaLogs.recursoId, serieId),
-          isNotNull(auditoriaLogs.atorMembroId)
-        ))
-        .orderBy(auditoriaLogs.criadoEm, auditoriaLogs.id).get()
-      const ocorrenciaOriginal = criacao ? null : await db
-        .select({ membroId: eventos.criadorMembroId }).from(eventos)
-        .where(and(eq(eventos.serieRecorrenciaId, serieId), isNotNull(eventos.criadorMembroId)))
-        .orderBy(eventos.createdAt, eventos.id).get()
-      const criadorMembroId = criacao?.membroId ?? ocorrenciaOriginal?.membroId ?? null
+      const criadorMembroId = await recuperarCriadorDaSerie(db, serieId)
 
       const eventosToInsert = futureOccurrences.map(occ => {
         const { ...serieBaseData } = mergedSerieData
@@ -887,6 +891,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         )
       )
       
+      const criadorMembroId = await recuperarCriadorDaSerie(db, serieId)
       const occurrencesDates = generateOccurrences(serieBData)
       const eventosToInsert = occurrencesDates
         .filter(occ => !exceptionDates.has(getLocalDateFromUtc(occ.inicioEm)))
@@ -901,7 +906,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
             localId: serieBaseData.localId,
             espacoId: serieBaseData.espacoId,
             urlOnline: serieBaseData.urlOnline,
-            criadorMembroId: c.get('membroId'),
+            criadorMembroId,
           organizadorMembroId: serieBaseData.organizadorMembroId,
             regionalId: serieBaseData.regionalId,
             administracaoId: serieBaseData.administracaoId,

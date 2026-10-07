@@ -46,6 +46,35 @@ export function condicaoEscopo(acesso: AcessoTecnico): SQL | undefined {
   }
 }
 
+export async function carregarEscoposOperacionaisLegados(db: any, membroId: string): Promise<SQL[]> {
+  const legados = await db
+    .select({ vinculo: schema.vinculosFuncionais, codigo: schema.funcoes.codigo })
+    .from(schema.vinculosFuncionais)
+    .innerJoin(schema.funcoes, eq(schema.vinculosFuncionais.funcaoId, schema.funcoes.id))
+    .where(
+      and(
+        eq(schema.vinculosFuncionais.membroId, membroId),
+        eq(schema.vinculosFuncionais.ativo, true),
+        eq(schema.funcoes.ativo, true)
+      )
+    )
+    .all()
+  const escopos: SQL[] = []
+  for (const { vinculo, codigo } of legados) {
+    if (!['GESTOR_RELATORIOS', 'OPERADOR_PORTARIA', 'AUDITOR_SISTEMA'].includes(codigo)) continue
+    const escopo = extrairEscopoDoEvento(vinculo)
+    const condicao = condicaoEscopo({
+      id: vinculo.id,
+      perfilCodigo: codigo,
+      escopoTipo: escopo.escopoTipo as AcessoTecnico['escopoTipo'],
+      escopoId: escopo.escopoId,
+    })
+    if (condicao) escopos.push(condicao)
+  }
+
+  return escopos
+}
+
 export async function condicaoEventosVisiveis(db: any, contexto: ContextoPermissoes): Promise<SQL> {
   if (eMasterSistema(contexto)) return sql`1 = 1`
   const e = schema.eventos
@@ -62,30 +91,7 @@ export async function condicaoEventosVisiveis(db: any, contexto: ContextoPermiss
     .map(condicaoEscopo)
     .filter((c): c is SQL => !!c)
 
-  // Compatibilidade com os vínculos legados que já conferiam leitura operacional.
-  const legados = await db
-    .select({ vinculo: schema.vinculosFuncionais, codigo: schema.funcoes.codigo })
-    .from(schema.vinculosFuncionais)
-    .innerJoin(schema.funcoes, eq(schema.vinculosFuncionais.funcaoId, schema.funcoes.id))
-    .where(
-      and(
-        eq(schema.vinculosFuncionais.membroId, membroId),
-        eq(schema.vinculosFuncionais.ativo, true),
-        eq(schema.funcoes.ativo, true)
-      )
-    )
-    .all()
-  for (const { vinculo, codigo } of legados) {
-    if (!['GESTOR_RELATORIOS', 'OPERADOR_PORTARIA', 'AUDITOR_SISTEMA'].includes(codigo)) continue
-    const escopo = extrairEscopoDoEvento(vinculo)
-    const condicao = condicaoEscopo({
-      id: vinculo.id,
-      perfilCodigo: codigo,
-      escopoTipo: escopo.escopoTipo as AcessoTecnico['escopoTipo'],
-      escopoId: escopo.escopoId,
-    })
-    if (condicao) escopos.push(condicao)
-  }
+  escopos.push(...await carregarEscoposOperacionaisLegados(db, membroId))
 
   return or(
     eq(e.criadorMembroId, membroId),

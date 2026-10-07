@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
+import { eq } from 'drizzle-orm'
 import { readFileSync } from 'node:fs'
 import { URL as NodeURL } from 'node:url'
 import { createApp } from '../index'
@@ -110,6 +111,19 @@ describe('Eventos pessoais e segregação', () => {
     expect((await req(regional, `/eventos/${id}`, 'PATCH', { titulo: 'GT Regional' })).status).toBe(200)
   })
 
+  it.each(['GESTOR_RELATORIOS', 'OPERADOR_PORTARIA', 'AUDITOR_SISTEMA'])('filtro de escopo respeita vínculo legado %s ativo', async codigo => {
+    const funcaoId = uuid(), vinculoId = uuid()
+    await db.insert(s.funcoes).values({ id: funcaoId, nome: codigo, codigo, ativo: true })
+    await db.insert(s.vinculosFuncionais).values({ id: vinculoId, membroId: autor.id, funcaoId, regionalId: reg, ativo: true })
+    const filtros = await (await req(autor, '/eventos/filtros')).json() as any
+    expect(filtros).toEqual({ master: false, filtrarEscopo: true, pessoas: [] })
+    const id = await evento({ casaId: casa })
+    expect(await visiveis(autor)).toContain(id)
+    await db.update(s.vinculosFuncionais).set({ ativo: false }).where(eq(s.vinculosFuncionais.id, vinculoId))
+    expect(await (await req(autor, '/eventos/filtros')).json()).toEqual({ master: false, filtrarEscopo: false, pessoas: [] })
+    expect(await visiveis(autor)).not.toContain(id)
+  })
+
   beforeEach(async () => {
     sqlite = new Database(':memory:')
     sqlite.pragma('foreign_keys = ON')
@@ -188,7 +202,7 @@ describe('Eventos pessoais e segregação', () => {
     expect(await (await req(colega, '/minha-agenda')).json()).toEqual([])
     expect(await (await req(master, '/minha-agenda')).json()).toEqual([])
   })
-  it.each(['auditoria', 'ocorrencia'])('regenerar série preserva autor por %s e seus acessos', async fonte => {
+  it.each([['auditoria', 'ALL'], ['ocorrencia', 'ALL'], ['auditoria', 'THIS_AND_FUTURE'], ['ocorrencia', 'THIS_AND_FUTURE']])('regenerar série preserva autor por %s em %s e seus acessos', async (fonte, modo) => {
     const gestor = await usuario(casa, 'GESTOR_AGENDA', 'CASA', casa)
     const res = await req(autor, '/series-recorrencia', 'POST', {
       titulo: 'Série original', modalidade: 'ONLINE', urlOnline: 'https://example.org',
@@ -202,12 +216,14 @@ describe('Eventos pessoais e segregação', () => {
       sqlite.prepare('UPDATE eventos SET criador_membro_id = NULL WHERE serie_recorrencia_id = ?').run(serieId)
     else
       sqlite.prepare("DELETE FROM auditoria_logs WHERE acao = 'SERIE_RECORRENCIA_CRIADA' AND recurso_id = ?").run(serieId)
+    const origem = sqlite.prepare('SELECT id FROM eventos WHERE serie_recorrencia_id = ? ORDER BY inicio_em LIMIT 1 OFFSET 1').get(serieId) as { id: string }
     const alteracao = await req(gestor, `/series-recorrencia/${serieId}`, 'PATCH', {
-      updateMode: 'ALL', changes: { dataFim: '2099-10-13' },
+      updateMode: modo, fromEventId: modo === 'THIS_AND_FUTURE' ? origem.id : undefined, changes: { dataFim: '2099-10-13' },
     })
     expect(alteracao.status).toBe(200)
-    const futuros = sqlite.prepare('SELECT id, criador_membro_id FROM eventos WHERE serie_recorrencia_id = ? AND ativo = 1').all(serieId) as any[]
-    expect(futuros).toHaveLength(4)
+    const resultado = await alteracao.json() as { novaSerieId?: string }
+    const futuros = sqlite.prepare('SELECT id, criador_membro_id FROM eventos WHERE serie_recorrencia_id = ? AND ativo = 1').all(resultado.novaSerieId || serieId) as any[]
+    expect(futuros).toHaveLength(modo === 'ALL' ? 4 : 3)
     for (const e of futuros) {
       expect(e.criador_membro_id).toBe(autor.id)
       expect(await visiveis(autor)).toContain(e.id)

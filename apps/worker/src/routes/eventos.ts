@@ -7,7 +7,7 @@ import { authMiddleware } from '../middleware/auth'
 import { podeGerenciarAgendaNoEscopo, eMasterSistema } from '../security/permissoes'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
-import { condicaoEventosVisiveis, condicaoEventosGerenciaveis, podeLerEvento, podeGerenciarEvento } from '../security/eventos'
+import { carregarEscoposOperacionaisLegados, condicaoEventosVisiveis, condicaoEventosGerenciaveis, podeLerEvento, podeGerenciarEvento } from '../security/eventos'
 
 export const eventosRouter = new Hono<any>()
 
@@ -81,7 +81,8 @@ eventosRouter.get('/filtros', async c => {
   const master = eMasterSistema(c.get('contextoPermissoes'))
   const pessoas = master ? await c.get('db').select({ id: membros.id, nome: membros.nome })
     .from(membros).orderBy(membros.nome).all() : []
-  const filtrarEscopo = master || c.get('contextoPermissoes').acessosAtivos.some((acesso: any) => ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA', 'GESTOR_RELATORIOS', 'AUDITOR', 'OPERADOR_PORTARIA_PERMANENTE'].includes(acesso.perfilCodigo))
+  const filtrarEscopo = master || c.get('contextoPermissoes').acessosAtivos.some((acesso: any) => ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA', 'GESTOR_RELATORIOS', 'AUDITOR', 'OPERADOR_PORTARIA_PERMANENTE'].includes(acesso.perfilCodigo)) ||
+    (await carregarEscoposOperacionaisLegados(c.get('db'), c.get('membroId'))).length > 0
   return c.json({ master, filtrarEscopo, pessoas })
 })
 
