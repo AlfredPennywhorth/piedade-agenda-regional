@@ -482,6 +482,42 @@ describe('EventosView', () => {
     expect(getByLabelText(/local \*/i)).toBeInTheDocument()
   })
 
+  it('filtra Casas por Setor e ordena Locais alfabeticamente no formulário', async () => {
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/locais') return [
+        { id: 'local-z', nome: 'Zeta' },
+        { id: 'local-a', nome: 'Alfa' },
+      ]
+      if (url === '/setores') return [
+        { id: 'setor-1', nome: 'Setor Um', administracaoId: 'adm-1' },
+        { id: 'setor-2', nome: 'Setor Dois', administracaoId: 'adm-1' },
+      ]
+      if (url === '/casas') return [
+        { id: 'casa-1', nome: 'Casa A', setorId: 'setor-1' },
+        { id: 'casa-2', nome: 'Casa B', setorId: 'setor-2' },
+      ]
+      return original(url)
+    })
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+
+    const localSelect = within(dialog).getByLabelText(/local \*/i)
+    const locais = within(localSelect).getAllByRole('option').map(option => option.textContent)
+    expect(locais.slice(1)).toEqual(['Alfa', 'Zeta'])
+
+    fireEvent.change(within(dialog).getByLabelText(/tipo de escopo/i), { target: { value: 'casa' } })
+    const filtroSetor = within(dialog).getByLabelText(/filtrar casa por setor/i)
+    fireEvent.change(filtroSetor, { target: { value: 'setor-1' } })
+
+    const casaSelect = within(dialog).getByLabelText(/casa de oração \*/i)
+    expect(within(casaSelect).getByRole('option', { name: 'Casa A' })).toBeInTheDocument()
+    expect(within(casaSelect).queryByRole('option', { name: 'Casa B' })).not.toBeInTheDocument()
+  })
+
   it('deve editar um evento existente via PATCH e limpar scopes cruzados', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url.startsWith(`/eventos/${EVENTO_ID}`)) return mockEventos[0]
