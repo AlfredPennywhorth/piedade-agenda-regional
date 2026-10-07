@@ -5,6 +5,20 @@ import { TipoRefeicao } from './convocacoes'
 export const ModalidadeEvento = z.enum(['PRESENCIAL', 'ONLINE', 'HIBRIDO'])
 export type ModalidadeEventoEnum = z.infer<typeof ModalidadeEvento>
 
+export const AbrangenciaEvento = z.enum(['TERRITORIAL', 'NACIONAL', 'INTERNACIONAL'])
+export type AbrangenciaEventoEnum = z.infer<typeof AbrangenciaEvento>
+
+export const UF_BRASIL = [
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG',
+  'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
+] as const
+export const UfBrasil = z.enum(UF_BRASIL)
+export type UfBrasilEnum = z.infer<typeof UfBrasil>
+
+export const CodigoPaisISO2 = z.string()
+  .regex(/^[A-Z]{2}$/, 'País deve usar código ISO 3166-1 alpha-2')
+export type CodigoPaisISO2Type = z.infer<typeof CodigoPaisISO2>
+
 const HttpUrl = z.string().url('URL inválida').refine(
   val => val.startsWith('http://') || val.startsWith('https://'), 
   { message: 'URL deve usar protocolo http ou https' }
@@ -22,8 +36,13 @@ export const baseEvento = {
   espacoId: z.string().uuid('Espaço ID inválido').nullable().optional(),
   urlOnline: HttpUrl.nullable().optional(),
   organizadorMembroId: z.string().uuid('Membro ID inválido').nullable().optional(),
+
+  abrangencia: AbrangenciaEvento.default('TERRITORIAL').optional(),
+  destinoUf: UfBrasil.nullable().optional(),
+  destinoPaisCodigo: CodigoPaisISO2.nullable().optional(),
+  destinoCidadeLocal: z.string().trim().min(2, 'Cidade / Local de Atendimento é obrigatório').max(180).nullable().optional(),
   
-  // Escopos (pelo menos um e no máximo um)
+  // Escopos institucionais territoriais (exatamente um quando abrangencia=TERRITORIAL)
   regionalId: z.string().uuid('Regional ID inválido').nullable().optional(),
   administracaoId: z.string().uuid('Administração ID inválida').nullable().optional(),
   setorId: z.string().uuid('Setor ID inválido').nullable().optional(),
@@ -40,8 +59,11 @@ export const baseEvento = {
 }
 
 const eventoSuperRefine = (data: any, ctx: z.RefinementCtx) => {
-  if (data.pessoal && !data.casaId) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Evento Próprio exige escopo Casa de Oração', path: ['pessoal'] })
+  const abrangencia = data.abrangencia ?? 'TERRITORIAL'
+  const externo = abrangencia === 'NACIONAL' || abrangencia === 'INTERNACIONAL'
+
+  if (data.pessoal && !externo && !data.casaId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Evento Próprio territorial exige escopo Casa de Oração', path: ['pessoal'] })
   }
 
   // 1. Validar fim > inicio
@@ -66,10 +88,10 @@ const eventoSuperRefine = (data: any, ctx: z.RefinementCtx) => {
 
   // 3. Validar Modalidade
   if (data.modalidade === 'PRESENCIAL') {
-    if (!data.localId) {
+    if (!data.localId && !externo) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Eventos presenciais exigem localId',
+        message: 'Eventos presenciais territoriais exigem localId',
         path: ['localId']
       })
     }
@@ -88,10 +110,10 @@ const eventoSuperRefine = (data: any, ctx: z.RefinementCtx) => {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Eventos online não devem ter espacoId', path: ['espacoId'] })
     }
   } else if (data.modalidade === 'HIBRIDO') {
-    if (!data.localId) {
+    if (!data.localId && !externo) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Eventos híbridos exigem localId',
+        message: 'Eventos híbridos territoriais exigem localId',
         path: ['localId']
       })
     }
@@ -104,21 +126,68 @@ const eventoSuperRefine = (data: any, ctx: z.RefinementCtx) => {
     }
   }
 
-  // 4. Validar escopo único
+  // 4. Validar abrangência e destino
   const scopes = [
     data.regionalId,
     data.administracaoId,
     data.setorId,
     data.casaId,
     data.grupoTrabalhoId
-  ].filter(val => val !== null && val !== undefined && val !== '')
+  ].filter((val: unknown) => val !== null && val !== undefined && val !== '')
 
-  if (scopes.length !== 1) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'O evento deve ter exatamente um escopo institucional',
-      path: ['escopo'] // Using a generic path as it touches multiple fields
-    })
+  if (abrangencia === 'TERRITORIAL') {
+    if (scopes.length !== 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Evento territorial deve ter exatamente um escopo institucional',
+        path: ['escopo']
+      })
+    }
+    if (data.destinoUf || data.destinoPaisCodigo || data.destinoCidadeLocal) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Evento territorial não deve informar destino externo',
+        path: ['abrangencia']
+      })
+    }
+  } else {
+    if (scopes.length !== 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Evento externo não deve usar escopos territoriais de SP',
+        path: ['escopo']
+      })
+    }
+    if (!data.destinoCidadeLocal?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Cidade / Local de Atendimento é obrigatório',
+        path: ['destinoCidadeLocal']
+      })
+    }
+    if (abrangencia === 'NACIONAL') {
+      if (!data.destinoUf) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'UF é obrigatória para atendimento Nacional', path: ['destinoUf'] })
+      }
+      if (data.destinoPaisCodigo) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Atendimento Nacional não deve informar País', path: ['destinoPaisCodigo'] })
+      }
+    }
+    if (abrangencia === 'INTERNACIONAL') {
+      if (!data.destinoPaisCodigo) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'País é obrigatório para atendimento Internacional', path: ['destinoPaisCodigo'] })
+      }
+      if (data.destinoUf) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Atendimento Internacional não deve informar UF', path: ['destinoUf'] })
+      }
+    }
+    if (data.localId || data.espacoId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Evento externo deve usar o destino informado, sem Local/Espaço da Regional SP',
+        path: ['localId']
+      })
+    }
   }
 }
 
