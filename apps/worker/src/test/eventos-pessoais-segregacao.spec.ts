@@ -151,6 +151,32 @@ describe('Eventos pessoais e segregação', () => {
     expect(await (await req(colega, '/minha-agenda')).json()).toEqual([])
     expect(await (await req(master, '/minha-agenda')).json()).toEqual([])
   })
+  it.each(['auditoria', 'ocorrencia'])('regenerar série preserva autor por %s e seus acessos', async fonte => {
+    const gestor = await usuario(casa, 'GESTOR_AGENDA', 'CASA', casa)
+    const res = await req(autor, '/series-recorrencia', 'POST', {
+      titulo: 'Série original', modalidade: 'ONLINE', urlOnline: 'https://example.org',
+      casaId: casa, dataInicio: '2099-10-10', dataFim: '2099-10-12',
+      horarioInicio: '09:00', horarioFim: '10:00', frequencia: 'DIARIA', intervalo: 1,
+    })
+    expect(res.status).toBe(201)
+    const serie = await res.json() as any
+    const serieId = serie.serie.id
+    if (fonte === 'auditoria')
+      sqlite.prepare('UPDATE eventos SET criador_membro_id = NULL WHERE serie_recorrencia_id = ?').run(serieId)
+    else
+      sqlite.prepare("DELETE FROM auditoria_logs WHERE acao = 'SERIE_RECORRENCIA_CRIADA' AND recurso_id = ?").run(serieId)
+    const alteracao = await req(gestor, `/series-recorrencia/${serieId}`, 'PATCH', {
+      updateMode: 'ALL', changes: { dataFim: '2099-10-13' },
+    })
+    expect(alteracao.status).toBe(200)
+    const futuros = sqlite.prepare('SELECT id, criador_membro_id FROM eventos WHERE serie_recorrencia_id = ? AND ativo = 1').all(serieId) as any[]
+    expect(futuros).toHaveLength(4)
+    for (const e of futuros) {
+      expect(e.criador_membro_id).toBe(autor.id)
+      expect(await visiveis(autor)).toContain(e.id)
+      expect((await req(autor, `/eventos/${e.id}`, 'PATCH', { titulo: 'Autor preservado' })).status).toBe(200)
+    }
+  })
   it('evento institucional não entra na agenda sem convocação publicada', async () => {
     await evento({ casaId: casa }, { criadorMembroId: autor.id })
     expect(await (await req(autor, '/minha-agenda')).json()).toEqual([])

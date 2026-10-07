@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { eq, and, gte, sql, inArray } from 'drizzle-orm'
-import { administracoes, casas, eventos, gruposTrabalho, membros, seriesRecorrencia, setores, locais, espacosLocal } from '../db/schema'
+import { eq, and, gte, sql, inArray, isNotNull } from 'drizzle-orm'
+import { auditoriaLogs, administracoes, casas, eventos, gruposTrabalho, membros, seriesRecorrencia, setores, locais, espacosLocal } from '../db/schema'
 import { SerieCreate, SerieUpdatePayload, generateOccurrences, getLocalDateFromUtc } from '@piedade/shared'
 import { EventoCreate } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
@@ -599,6 +599,23 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         .filter(occ => occ.inicioEm >= nowIso)
         .filter(occ => !exceptionDates.has(getLocalDateFromUtc(occ.inicioEm)))
         
+      // A edição não transfere a autoria. A auditoria também cobre séries
+      // legadas sem ocorrências restantes ou sem autoria recuperada.
+      const criacao = await db.select({ membroId: auditoriaLogs.atorMembroId })
+        .from(auditoriaLogs)
+        .where(and(
+          eq(auditoriaLogs.acao, 'SERIE_RECORRENCIA_CRIADA'),
+          eq(auditoriaLogs.recursoTipo, 'SERIE_RECORRENCIA'),
+          eq(auditoriaLogs.recursoId, serieId),
+          isNotNull(auditoriaLogs.atorMembroId)
+        ))
+        .orderBy(auditoriaLogs.criadoEm, auditoriaLogs.id).get()
+      const ocorrenciaOriginal = criacao ? null : await db
+        .select({ membroId: eventos.criadorMembroId }).from(eventos)
+        .where(and(eq(eventos.serieRecorrenciaId, serieId), isNotNull(eventos.criadorMembroId)))
+        .orderBy(eventos.createdAt, eventos.id).get()
+      const criadorMembroId = criacao?.membroId ?? ocorrenciaOriginal?.membroId ?? null
+
       const eventosToInsert = futureOccurrences.map(occ => {
         const { ...serieBaseData } = mergedSerieData
         return {
@@ -610,7 +627,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
           localId: serieBaseData.localId,
           espacoId: serieBaseData.espacoId,
           urlOnline: serieBaseData.urlOnline,
-          criadorMembroId: c.get('membroId'),
+          criadorMembroId,
           organizadorMembroId: serieBaseData.organizadorMembroId,
           regionalId: serieBaseData.regionalId,
           administracaoId: serieBaseData.administracaoId,
