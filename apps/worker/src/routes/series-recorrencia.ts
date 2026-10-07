@@ -34,17 +34,19 @@ async function recuperarCriadoresDasSeries(db: any, serieIds: string[]): Promise
   const criadores = new Map<string, string>()
   if (serieIds.length === 0) return criadores
 
-  const criacoes = await db.select({
-    serieId: auditoriaLogs.recursoId,
-    membroId: auditoriaLogs.atorMembroId,
-    criadoEm: auditoriaLogs.criadoEm,
-    id: auditoriaLogs.id,
-  }).from(auditoriaLogs).where(and(
-    eq(auditoriaLogs.acao, 'SERIE_RECORRENCIA_CRIADA'),
-    eq(auditoriaLogs.recursoTipo, 'SERIE_RECORRENCIA'),
-    inArray(auditoriaLogs.recursoId, serieIds),
-    isNotNull(auditoriaLogs.atorMembroId)
-  )).orderBy(auditoriaLogs.criadoEm, auditoriaLogs.id).all()
+  const criacoes = await carregarEmLotes(serieIds, lote =>
+    db.select({
+      serieId: auditoriaLogs.recursoId,
+      membroId: auditoriaLogs.atorMembroId,
+      criadoEm: auditoriaLogs.criadoEm,
+      id: auditoriaLogs.id,
+    }).from(auditoriaLogs).where(and(
+      eq(auditoriaLogs.acao, 'SERIE_RECORRENCIA_CRIADA'),
+      eq(auditoriaLogs.recursoTipo, 'SERIE_RECORRENCIA'),
+      inArray(auditoriaLogs.recursoId, lote),
+      isNotNull(auditoriaLogs.atorMembroId)
+    )).orderBy(auditoriaLogs.criadoEm, auditoriaLogs.id).all()
+  )
 
   for (const item of criacoes) {
     if (item.serieId && item.membroId && !criadores.has(item.serieId)) {
@@ -55,15 +57,17 @@ async function recuperarCriadoresDasSeries(db: any, serieIds: string[]): Promise
   const faltantes = serieIds.filter(id => !criadores.has(id))
   if (faltantes.length === 0) return criadores
 
-  const ocorrencias = await db.select({
-    serieId: eventos.serieRecorrenciaId,
-    membroId: eventos.criadorMembroId,
-    createdAt: eventos.createdAt,
-    id: eventos.id,
-  }).from(eventos).where(and(
-    inArray(eventos.serieRecorrenciaId, faltantes),
-    isNotNull(eventos.criadorMembroId)
-  )).orderBy(eventos.createdAt, eventos.id).all()
+  const ocorrencias = await carregarEmLotes(faltantes, lote =>
+    db.select({
+      serieId: eventos.serieRecorrenciaId,
+      membroId: eventos.criadorMembroId,
+      createdAt: eventos.createdAt,
+      id: eventos.id,
+    }).from(eventos).where(and(
+      inArray(eventos.serieRecorrenciaId, lote),
+      isNotNull(eventos.criadorMembroId)
+    )).orderBy(eventos.createdAt, eventos.id).all()
+  )
 
   for (const item of ocorrencias) {
     if (item.serieId && item.membroId && !criadores.has(item.serieId)) {
@@ -177,6 +181,19 @@ async function criarAvisoAlteracaoOcorrencia(db: any, anterior: any, atual: any)
 
 seriesRecorrenciaRouter.use('*', authMiddleware)
 
+const D1_IN_BATCH = 80
+
+async function carregarEmLotes<T>(
+  ids: string[],
+  carregar: (lote: string[]) => Promise<T[]>
+): Promise<T[]> {
+  const resultado: T[] = []
+  for (let i = 0; i < ids.length; i += D1_IN_BATCH) {
+    resultado.push(...await carregar(ids.slice(i, i + D1_IN_BATCH)))
+  }
+  return resultado
+}
+
 interface EscoposAgendaAutorizados {
   tudo: boolean
   regionaisIds: Set<string>
@@ -227,7 +244,7 @@ async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAu
     const adms = await db
       .select({ id: administracoes.id })
       .from(administracoes)
-      .where(inArray(administracoes.regionalId, regionaisIds))
+      .where(inArray(administracoes.regionalId, regionaisIds.slice(0, D1_IN_BATCH)))
       .all()
     adms.forEach((item: any) => {
       administracoesAgenda.add(item.id)
@@ -237,7 +254,7 @@ async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAu
     const gtsRegionais = await db
       .select({ id: gruposTrabalho.id })
       .from(gruposTrabalho)
-      .where(inArray(gruposTrabalho.regionalId, regionaisIds))
+      .where(inArray(gruposTrabalho.regionalId, regionaisIds.slice(0, D1_IN_BATCH)))
       .all()
     gtsRegionais.forEach((item: any) => gtsAgenda.add(item.id))
   }
