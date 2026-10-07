@@ -278,6 +278,38 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect((linkTemporarioMantido as HTMLInputElement).value).toContain('ativacao=token-a')
   })
 
+  it('preserva filtro de perfil e painel após revogar o último acesso correspondente', async () => {
+    let chamadasAdmin = 0
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string, options?: RequestInit) => {
+      if (endpoint === '/admin/acessos') {
+        chamadasAdmin += 1
+        return (chamadasAdmin === 1
+          ? [contaAtiva]
+          : [{ ...contaAtiva, acessos: contaAtiva.acessos.filter(acesso => acesso.id !== 'acesso-2') }]) as any
+      }
+      if (endpoint === '/regionais') return [{ id: 'regional-1', nome: 'Regional 1' }] as any
+      if (endpoint === '/admin/acessos/acesso-2' && options?.method === 'DELETE') return {} as any
+      return [] as any
+    })
+
+    render(<ContasAcessoView />)
+
+    fireEvent.change(await screen.findByLabelText('Filtrar por Perfil ou acesso'), {
+      target: { value: 'GESTOR_AGENDA' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Gerenciar acessos' }))
+    const revogar = await screen.findByRole('button', { name: 'Revogar' })
+    await waitFor(() => expect(revogar).not.toBeDisabled())
+    fireEvent.click(revogar)
+
+    expect(await screen.findByText('Acesso revogado com sucesso.')).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Gerenciar acessos' })).toBeDefined()
+    const filtroPerfil = screen.getByLabelText('Filtrar por Perfil ou acesso') as HTMLSelectElement
+    expect(filtroPerfil.value).toBe('GESTOR_AGENDA')
+    expect(within(filtroPerfil).getByRole('option', { name: 'GESTOR_AGENDA' })).toBeDefined()
+    expect(screen.getByText('Pessoa Teste')).toBeDefined()
+  })
+
   it('confirma o bloqueio e atualiza a listagem', async () => {
     vi.mocked(apiClient.patchWithAuth).mockResolvedValue({
       membroId: 'membro-1',
