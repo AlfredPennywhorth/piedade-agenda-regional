@@ -34,7 +34,12 @@ async function recuperarCriadoresDasSeries(db: any, serieIds: string[]): Promise
   const criadores = new Map<string, string>()
   if (serieIds.length === 0) return criadores
 
-  const criacoes = await carregarEmLotes(serieIds, lote =>
+  const criacoes = await carregarEmLotes<{
+    serieId: string | null
+    membroId: string | null
+    criadoEm: string
+    id: string
+  }>(serieIds, lote =>
     db.select({
       serieId: auditoriaLogs.recursoId,
       membroId: auditoriaLogs.atorMembroId,
@@ -57,7 +62,12 @@ async function recuperarCriadoresDasSeries(db: any, serieIds: string[]): Promise
   const faltantes = serieIds.filter(id => !criadores.has(id))
   if (faltantes.length === 0) return criadores
 
-  const ocorrencias = await carregarEmLotes(faltantes, lote =>
+  const ocorrencias = await carregarEmLotes<{
+    serieId: string | null
+    membroId: string | null
+    createdAt: string
+    id: string
+  }>(faltantes, lote =>
     db.select({
       serieId: eventos.serieRecorrenciaId,
       membroId: eventos.criadorMembroId,
