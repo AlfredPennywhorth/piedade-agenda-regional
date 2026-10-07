@@ -66,7 +66,7 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(await screen.findByText('Pessoa Teste')).toBeDefined()
     expect(screen.getByText('11999990000')).toBeDefined()
     expect(screen.getByText(/CARTEIRA-1/)).toBeDefined()
-    expect(screen.getByText(/USUARIO_COMUM/)).toBeDefined()
+    expect(within(screen.getByLabelText('Perfis ativos')).getByText(/USUARIO_COMUM/)).toBeDefined()
     expect(apiClient.fetchWithAuth).toHaveBeenCalledWith('/admin/acessos')
   })
 
