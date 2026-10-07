@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { readFileSync } from 'node:fs'
 import { URL as NodeURL } from 'node:url'
 import { createApp } from '../index'
@@ -9,6 +9,8 @@ import * as s from '../db/schema'
 import { setupDb } from './setup'
 import { hashToken } from '../security/tokens'
 import { registrarCienciaPmo } from './responsabilidade-pmo-test-helper'
+import { carregarContextoPermissoes } from '../security/permissoes'
+import { condicaoEventosGerenciaveis, condicaoEventosVisiveis } from '../security/eventos'
 const uuid = () => crypto.randomUUID()
 
 describe('Eventos pessoais e segregação', () => {
@@ -74,6 +76,37 @@ describe('Eventos pessoais e segregação', () => {
   }
   const visiveis = async (u: typeof autor) =>
     ((await (await req(u, '/eventos')).json()) as Array<{ id: string }>).map(e => e.id)
+  it('mantém parâmetros da listagem limitados mesmo com múltiplos grants Regionais', async () => {
+    const gestor = await usuario(casa, 'GESTOR_AGENDA', 'REGIONAL', reg)
+    const conta = await db.select({ id: s.contasAcesso.id })
+      .from(s.contasAcesso)
+      .where(eq(s.contasAcesso.membroId, gestor.id))
+      .get()
+
+    await db.insert(s.acessosConta).values(
+      Array.from({ length: 9 }, () => ({
+        id: uuid(),
+        contaAcessoId: conta.id,
+        perfilCodigo: 'GESTOR_AGENDA',
+        escopoTipo: 'REGIONAL',
+        escopoId: uuid(),
+      }))
+    )
+
+    const contexto = await carregarContextoPermissoes(db, gestor.id)
+    const visivel = await condicaoEventosVisiveis(db, contexto)
+    const gerenciavel = condicaoEventosGerenciaveis(contexto)
+    const consulta = db.select({
+      id: s.eventos.id,
+      podeGerenciar: sql<number>`CASE WHEN ${gerenciavel} THEN 1 ELSE 0 END`,
+    }).from(s.eventos).where(visivel).toSQL()
+
+    expect(consulta.params.length).toBeLessThan(100)
+
+    await evento({ casaId: casa })
+    expect((await req(gestor, '/eventos')).status).toBe(200)
+  })
+
   it('Master filtra por pessoa sem permitir o filtro a usuários comuns', async () => {
     const proprio = await evento({ casaId: casa }, { pessoal: true, criadorMembroId: autor.id })
     await evento({ casaId: casa })
