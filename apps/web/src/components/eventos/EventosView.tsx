@@ -54,6 +54,10 @@ interface SerieResponse {
   ativo: boolean
 }
 
+type EventoFormData = Omit<Partial<EventoCreateInput>, 'destinoUf'> & {
+  destinoUf?: EventoCreateInput['destinoUf'] | ''
+}
+
 export interface Evento {
   pessoal?: boolean
   podeGerenciar?: boolean
@@ -69,6 +73,11 @@ export interface Evento {
   espacoId: string | null
   urlOnline: string | null
   organizadorMembroId: string | null
+  abrangencia?: 'TERRITORIAL' | 'NACIONAL' | 'INTERNACIONAL'
+  destinoUf?: (typeof UF_BRASIL)[number] | null
+  destinoPaisCodigo?: string | null
+  destinoCidadeLocal?: string | null
+  regionalGestaoId?: string | null
   regionalId: string | null
   administracaoId: string | null
   setorId: string | null
@@ -128,7 +137,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   // Modal Details
   const [eventoDetalhe, setEventoDetalhe] = useState<Evento | null>(null)
 
-  const [formData, setFormData] = useState<Partial<EventoCreateInput>>({
+  const [formData, setFormData] = useState<EventoFormData>({
     pessoal: false,
     titulo: '',
     descricao: '',
