@@ -12,7 +12,7 @@ Os principais riscos residuais confirmados são:
 2. tokens temporários de portaria/cadastro presentes em URL;
 3. autocadastro público de convidados sem rate limiting próprio;
 4. CSP de `connect-src` ainda ampla para `*.workers.dev`;
-5. endpoints de login/ativação ainda dependem de parsing JSON sem tratamento local de erro;
+5. ativação de conta aceita tentativas ilimitadas por token/IP e ainda depende de parsing JSON sem tratamento local de erro;
 6. workflows usam Actions por tag major (`@v4`) e não por SHA imutável.
 
 O bootstrap do primeiro Master e a recuperação de PIN foram significativamente endurecidos desde a auditoria anterior.
@@ -52,14 +52,21 @@ O bootstrap do primeiro Master e a recuperação de PIN foram significativamente
 - **Impacto:** em caso de XSS ou abuso de código já permitido no origin, amplia a superfície de exfiltração por `fetch` para Workers arbitrários.
 - **Recomendação:** substituir o wildcard pelos hosts exatos de Beta/Produção usados pelo projeto, mantendo apenas integrações necessárias.
 
-### 5. Parsing JSON de login e ativação sem tratamento local
+### 5. Ativação de conta sem throttle por token/IP
+
+- **Status:** confirmado.
+- **Evidência atual:** `apps/worker/src/routes/auth/ativacao.ts` valida token, carteirinha e celular, mas não consulta nem atualiza um rate limit antes das tentativas. Falhas de conferência cadastral são registradas em `tentativasAcesso`, permitindo tentativas repetidas enquanto o link estiver válido.
+- **Impacto:** quem obtiver um link de ativação válido pode tentar combinações de carteirinha/celular sem bloqueio progressivo e aumentar o volume da tabela de tentativas; se os dados corretos forem descobertos, pode concluir a ativação escolhendo o PIN.
+- **Recomendação:** aplicar throttle por token + IP e/ou lockout progressivo da ativação, com resposta uniforme e limite de tentativas por janela.
+
+### 6. Parsing JSON de login e ativação sem tratamento local
 
 - **Status:** confirmado como robustez/hardening; impacto depende do handler global do Hono.
 - **Evidência atual:** `apps/worker/src/routes/auth/login.ts` e `apps/worker/src/routes/auth/ativacao.ts` chamam `await c.req.json()` diretamente. Em contraste, bootstrap, recuperação de PIN e portaria pública já tratam parsing inválido.
 - **Impacto:** payload JSON malformado pode cair no tratamento global e produzir 500/ruído operacional em vez de 400 controlado.
 - **Recomendação:** envolver o parsing em `try/catch` e retornar 400 genérico; considerar limite explícito de tamanho do corpo para endpoints públicos.
 
-### 6. Supply chain: Actions não fixadas por SHA
+### 7. Supply chain: Actions não fixadas por SHA
 
 - **Status:** recomendação de hardening.
 - **Evidência atual:** workflows usam `actions/checkout@v4`, `actions/setup-node@v4` e `pnpm/action-setup@v4`.
@@ -69,7 +76,7 @@ O bootstrap do primeiro Master e a recuperação de PIN foram significativamente
 
 ## Prioridade baixa / hardening
 
-### 7. Bootstrap Master continua exposto como endpoint público protegido por segredo
+### 8. Bootstrap Master continua exposto como endpoint público protegido por segredo
 
 - **Status:** risco residual, fortemente mitigado.
 - **Evidência atual:** `apps/worker/src/routes/bootstrap/master.ts` exige `MASTER_BOOTSTRAP_SECRET` com no mínimo 32 caracteres, comparação de hash, confirmação literal, identidade elegível, bloqueia bootstrap repetido e registra auditoria.
@@ -128,11 +135,12 @@ Foi adicionada a camada `Preflight — Merge e Deploy`:
 ## Ações priorizadas
 
 1. Planejar migração do token de sessão para cookie HttpOnly ou registrar formalmente a aceitação temporária do risco de `localStorage`.
-2. Implementar rate limit no autocadastro público de convidados.
-3. Reduzir `connect-src` aos hosts exatos da API.
-4. Tratar JSON inválido em login/ativação com 400 controlado.
-5. Evoluir tokens de Portaria em URL para troca por sessão temporária e limpeza imediata da URL.
-6. Fixar GitHub Actions por SHA.
+2. Implementar throttle/lockout na ativação por token + IP.
+3. Implementar rate limit no autocadastro público de convidados.
+4. Reduzir `connect-src` aos hosts exatos da API.
+5. Tratar JSON inválido em login/ativação com 400 controlado.
+6. Evoluir tokens de Portaria em URL para troca por sessão temporária e limpeza imediata da URL.
+7. Fixar GitHub Actions por SHA.
 
 ## Riscos residuais
 
