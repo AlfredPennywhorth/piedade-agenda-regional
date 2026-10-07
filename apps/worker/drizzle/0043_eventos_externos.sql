@@ -21,6 +21,7 @@ CREATE TABLE eventos_novo (
   destino_uf text,
   destino_pais_codigo text,
   destino_cidade_local text,
+  regional_gestao_id text REFERENCES regionais(id),
   regional_id text REFERENCES regionais(id),
   administracao_id text REFERENCES administracoes(id),
   setor_id text REFERENCES setores(id),
@@ -76,7 +77,7 @@ INSERT INTO eventos_novo (
   id, pessoal, criador_membro_id, titulo, descricao, pauta, modalidade,
   inicio_em, fim_em, agenda_revisao, agenda_aviso, local_id, espaco_id,
   url_online, organizador_membro_id, abrangencia, destino_uf,
-  destino_pais_codigo, destino_cidade_local, regional_id, administracao_id,
+  destino_pais_codigo, destino_cidade_local, regional_gestao_id, regional_id, administracao_id,
   setor_id, casa_id, grupo_trabalho_id, observacoes, serie_recorrencia_id,
   recorrencia_origem_inicio_em, recorrencia_excecao, possui_manha,
   possui_tarde, possui_noite, ativo, created_at, updated_at
@@ -84,7 +85,7 @@ INSERT INTO eventos_novo (
 SELECT
   id, pessoal, criador_membro_id, titulo, descricao, pauta, modalidade,
   inicio_em, fim_em, agenda_revisao, agenda_aviso, local_id, espaco_id,
-  url_online, organizador_membro_id, 'TERRITORIAL', NULL, NULL, NULL,
+  url_online, organizador_membro_id, 'TERRITORIAL', NULL, NULL, NULL, regional_id,
   regional_id, administracao_id, setor_id, casa_id, grupo_trabalho_id,
   observacoes, serie_recorrencia_id, recorrencia_origem_inicio_em,
   recorrencia_excecao, possui_manha, possui_tarde, possui_noite, ativo,
@@ -100,6 +101,7 @@ CREATE INDEX idx_eventos_ativo ON eventos (ativo);
 CREATE INDEX idx_eventos_local_id ON eventos (local_id);
 CREATE INDEX idx_eventos_serie_recorrencia_id ON eventos (serie_recorrencia_id);
 CREATE INDEX idx_eventos_abrangencia ON eventos (abrangencia, ativo);
+CREATE INDEX idx_eventos_abrangencia_gestao ON eventos (abrangencia, regional_gestao_id, ativo);
 
 CREATE TRIGGER trg_evento_nao_inativar_com_convocacao_ativa
 BEFORE UPDATE OF ativo ON eventos
