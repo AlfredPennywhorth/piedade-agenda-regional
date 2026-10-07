@@ -305,6 +305,7 @@ export function setupDb(sqlite: any) {
       destino_uf text,
       destino_pais_codigo text,
       destino_cidade_local text,
+      regional_gestao_id text,
       regional_id text,
       administracao_id text,
       setor_id text,
@@ -317,6 +318,7 @@ export function setupDb(sqlite: any) {
       FOREIGN KEY (local_id) REFERENCES locais(id),
       FOREIGN KEY (espaco_id) REFERENCES espacos_local(id),
       FOREIGN KEY (organizador_membro_id) REFERENCES membros(id),
+      FOREIGN KEY (regional_gestao_id) REFERENCES regionais(id),
       FOREIGN KEY (regional_id) REFERENCES regionais(id),
       FOREIGN KEY (administracao_id) REFERENCES administracoes(id),
       FOREIGN KEY (setor_id) REFERENCES setores(id),
@@ -406,6 +408,7 @@ export function setupDb(sqlite: any) {
     CREATE INDEX IF NOT EXISTS idx_eventos_local_id ON eventos (local_id);
     CREATE INDEX IF NOT EXISTS idx_eventos_serie_recorrencia_id ON eventos (serie_recorrencia_id);
     CREATE INDEX IF NOT EXISTS idx_eventos_abrangencia ON eventos (abrangencia, ativo);
+    CREATE INDEX IF NOT EXISTS idx_eventos_abrangencia_gestao ON eventos (abrangencia, regional_gestao_id, ativo);
 
     CREATE TABLE IF NOT EXISTS convocacoes (
       id text PRIMARY KEY NOT NULL,
