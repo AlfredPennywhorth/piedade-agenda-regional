@@ -599,6 +599,7 @@ export const eventos = sqliteTable(
     destinoUf: text('destino_uf'),
     destinoPaisCodigo: text('destino_pais_codigo'),
     destinoCidadeLocal: text('destino_cidade_local'),
+    regionalGestaoId: text('regional_gestao_id').references(() => regionais.id),
 
     // Escopo Institucional territorial
     regionalId: text('regional_id').references(() => regionais.id),
@@ -666,6 +667,7 @@ export const eventos = sqliteTable(
     idxCriadorPessoal: index('idx_eventos_criador_pessoal').on(table.criadorMembroId, table.pessoal, table.ativo),
     idxInicioEm: index('idx_eventos_inicio_em').on(table.inicioEm),
     idxAtivo: index('idx_eventos_ativo').on(table.ativo),
+    idxAbrangenciaGestao: index('idx_eventos_abrangencia_gestao').on(table.abrangencia, table.regionalGestaoId, table.ativo),
     idxLocalId: index('idx_eventos_local_id').on(table.localId),
     idxSerieRecorrenciaId: index('idx_eventos_serie_recorrencia_id').on(table.serieRecorrenciaId),
   })
