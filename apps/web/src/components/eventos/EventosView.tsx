@@ -46,6 +46,9 @@ interface SerieResponse {
   setorId: string | null
   casaId: string | null
   grupoTrabalhoId: string | null
+  filtroRegionalId?: string | null
+  filtroAdministracaoId?: string | null
+  filtroSetorId?: string | null
   observacoes: string | null
   ativo: boolean
 }
@@ -312,6 +315,13 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     if (!escopoFiltro) return true
     const [campo, id] = escopoFiltro.split(':')
     if (evento[campo as keyof Evento] === id) return true
+    if (campo === 'setorId' && evento.filtroSetorId) return evento.filtroSetorId === id
+    if (campo === 'administracaoId' && evento.filtroAdministracaoId) {
+      return evento.filtroAdministracaoId === id
+    }
+    if (campo === 'regionalId' && evento.filtroRegionalId) return evento.filtroRegionalId === id
+
+    // Compatibilidade com respostas antigas durante rollout.
     const casa = casas.find(item => item.id === evento.casaId)
     const setor = setores.find(item => item.id === (evento.setorId || casa?.setorId))
     const adm = administracoes.find(item => item.id === (evento.administracaoId || setor?.administracaoId))
