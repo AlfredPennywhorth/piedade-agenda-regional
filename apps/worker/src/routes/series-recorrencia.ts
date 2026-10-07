@@ -6,6 +6,7 @@ import { EventoCreate } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, podeGerenciarAgendaNoEscopo, regionaisAdministradas } from '../security/permissoes'
+import { podeGerenciarEvento } from '../security/eventos'
 import { criarAuditQuery, executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
@@ -179,13 +180,6 @@ async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAu
     if (acesso.escopoTipo === 'GRUPO_TRABALHO') gtsAgenda.add(acesso.escopoId)
   }
 
-  const membro = await db
-    .select({ casaId: membros.casaId })
-    .from(membros)
-    .where(eq(membros.id, membroId))
-    .get()
-  if (membro?.casaId) casasAgenda.add(membro.casaId)
-
   const regionaisIds = Array.from(regionaisAgenda)
   if (regionaisIds.length > 0) {
     const adms = await db
@@ -269,6 +263,30 @@ function serieAutorizadaNoEscopo(serie: any, escopos: EscoposAgendaAutorizados):
   return false
 }
 
+async function podeGerenciarSerie(c: any, serie: any): Promise<boolean> {
+  const db = c.get('db')
+  const membroId = c.get('membroId')
+  const contexto = c.get('contextoPermissoes')
+  if (!membroId) return false
+  if (eMasterSistema(contexto)) return true
+
+  const escopos = await carregarEscoposAgendaAutorizados(c)
+  if (serieAutorizadaNoEscopo(serie, escopos)) return true
+
+  // Autoria/organização não transformam a Casa inteira em área de gestão:
+  // só o próprio autor/organizador, enquanto vinculado à mesma Casa, pode gerir.
+  if (!serie.casaId) return false
+  const criadorMembroId = await recuperarCriadorDaSerie(db, serie.id)
+  if (criadorMembroId !== membroId && serie.organizadorMembroId !== membroId) return false
+
+  const membro = await db
+    .select({ casaId: membros.casaId, ativo: membros.ativo })
+    .from(membros)
+    .where(eq(membros.id, membroId))
+    .get()
+  return membro?.ativo === true && membro.casaId === serie.casaId
+}
+
 async function podeGerenciarEntidade(c: any, entidade: any): Promise<boolean> {
   const db = c.get('db')
   const membroId = c.get('membroId')
@@ -298,8 +316,11 @@ seriesRecorrenciaRouter.get('/', async (c) => {
     ? await query.where(and(...conditions)).all()
     : await query.all()
 
-  const escoposAutorizados = await carregarEscoposAgendaAutorizados(c)
-  return c.json(data.filter((serie: any) => serieAutorizadaNoEscopo(serie, escoposAutorizados)))
+  const autorizadas: any[] = []
+  for (const serie of data) {
+    if (await podeGerenciarSerie(c, serie)) autorizadas.push(serie)
+  }
+  return c.json(autorizadas)
 })
 
 seriesRecorrenciaRouter.get('/:id', async (c) => {
@@ -308,7 +329,7 @@ seriesRecorrenciaRouter.get('/:id', async (c) => {
   const data = await db.select().from(seriesRecorrencia).where(eq(seriesRecorrencia.id, id)).get()
   
   if (!data) return c.json({ error: 'Série não encontrada' }, 404)
-  if (!(await podeGerenciarEntidade(c, data))) {
+  if (!(await podeGerenciarSerie(c, data))) {
     return c.json({ error: 'Acesso não autorizado para gerir esta série', code: 'FORBIDDEN' }, 403)
   }
   return c.json(data)
@@ -414,7 +435,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
     
     const existingSerie = await db.select().from(seriesRecorrencia).where(eq(seriesRecorrencia.id, serieId)).get()
     if (!existingSerie) return c.json({ error: 'Série não encontrada' }, 404)
-    if (!(await podeGerenciarEntidade(c, existingSerie))) {
+    if (!(await podeGerenciarSerie(c, existingSerie))) {
       return c.json({ error: 'Acesso não autorizado para gerir esta série', code: 'FORBIDDEN' }, 403)
     }
     
@@ -435,7 +456,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         }, 409)
       }
       
-      if (!(await podeGerenciarEntidade(c, existingEvent))) {
+      if (!(await podeGerenciarEvento(db, c.get('membroId'), existingEvent))) {
         return c.json({ error: 'Acesso não autorizado para gerir este evento', code: 'FORBIDDEN' }, 403)
       }
 
@@ -706,7 +727,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         }, 409)
       }
       
-      if (!(await podeGerenciarEntidade(c, existingEvent))) {
+      if (!(await podeGerenciarEvento(db, c.get('membroId'), existingEvent))) {
         return c.json({ error: 'Acesso não autorizado para gerir este evento', code: 'FORBIDDEN' }, 403)
       }
 
