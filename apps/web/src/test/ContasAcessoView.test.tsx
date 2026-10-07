@@ -47,7 +47,10 @@ const contaAtiva = {
 describe('ContasAcessoView — PR-ACC-05', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([contaAtiva])
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva] as any
+      return [] as any
+    })
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.spyOn(window, 'open').mockImplementation(() => null)
     Object.defineProperty(navigator, 'clipboard', {
@@ -64,6 +67,57 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(screen.getByText(/CARTEIRA-1/)).toBeDefined()
     expect(screen.getByText(/USUARIO_COMUM/)).toBeDefined()
     expect(apiClient.fetchWithAuth).toHaveBeenCalledWith('/admin/acessos')
+  })
+
+  it('filtra contas por hierarquia geográfica e status', async () => {
+    const outraConta = {
+      ...contaAtiva,
+      membroId: 'membro-2',
+      nome: 'Pessoa Bloqueada',
+      contaAcessoId: 'conta-2',
+      status: 'BLOQUEADA',
+      casaId: 'casa-2',
+      acessos: [],
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva, outraConta] as any
+      if (endpoint === '/regionais') return [
+        { id: 'regional-1', nome: 'Regional 1' },
+        { id: 'regional-2', nome: 'Regional 2' },
+      ] as any
+      if (endpoint === '/administracoes') return [
+        { id: 'adm-1', nome: 'Administração 1', regionalId: 'regional-1' },
+        { id: 'adm-2', nome: 'Administração 2', regionalId: 'regional-2' },
+      ] as any
+      if (endpoint === '/setores') return [
+        { id: 'setor-1', nome: 'Setor 1', administracaoId: 'adm-1' },
+        { id: 'setor-2', nome: 'Setor 2', administracaoId: 'adm-2' },
+      ] as any
+      if (endpoint === '/casas') return [
+        { id: 'casa-1', nome: 'Casa 1', setorId: 'setor-1' },
+        { id: 'casa-2', nome: 'Casa 2', setorId: 'setor-2' },
+      ] as any
+      return [] as any
+    })
+
+    render(<ContasAcessoView />)
+    expect(await screen.findByText('Pessoa Teste')).toBeDefined()
+    expect(screen.getByText('Pessoa Bloqueada')).toBeDefined()
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Regional'), {
+      target: { value: 'regional-1' },
+    })
+    expect(screen.getByText('Pessoa Teste')).toBeDefined()
+    expect(screen.queryByText('Pessoa Bloqueada')).toBeNull()
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Status'), {
+      target: { value: 'BLOQUEADA' },
+    })
+    expect(screen.queryByText('Pessoa Teste')).toBeNull()
+    expect(screen.getByText('Nenhuma conta corresponde aos filtros selecionados.')).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    expect(screen.getByText('Pessoa Bloqueada')).toBeDefined()
   })
 
   it('confirma o bloqueio e atualiza a listagem', async () => {
