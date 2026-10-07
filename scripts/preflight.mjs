@@ -24,16 +24,18 @@ if (!['main', 'develop'].includes(baseRef)) {
 }
 
 let changed = []
+let diffAvailable = true
 try {
   git('fetch', 'origin', baseRef, '--depth=50')
   changed = git('diff', '--name-only', `origin/${baseRef}...HEAD`).split('\n').filter(Boolean)
 } catch {
-  notes.push('Não foi possível calcular o diff remoto; impacto de deploy ficará conservador.')
+  diffAvailable = false
+  errors.push('Não foi possível calcular o diff remoto; o preflight falha fechado para não omitir impacto de deploy ou migration.')
 }
 
-const workerChanged = changed.some(p => p.startsWith('apps/worker/') || p.startsWith('packages/shared/'))
-const webChanged = changed.some(p => p.startsWith('apps/web/') || p.startsWith('packages/shared/'))
-const migrationChanged = changed.some(p => p.startsWith('apps/worker/drizzle/'))
+const workerChanged = !diffAvailable || changed.some(p => p.startsWith('apps/worker/') || p.startsWith('packages/shared/'))
+const webChanged = !diffAvailable || changed.some(p => p.startsWith('apps/web/') || p.startsWith('packages/shared/'))
+const migrationChanged = !diffAvailable || changed.some(p => p.startsWith('apps/worker/drizzle/'))
 
 const requiredDeclarations = [
   ['.github/workflows/deploy-worker-production.yml', 'CLOUDFLARE_D1_DATABASE_ID'],
@@ -58,7 +60,6 @@ console.log(`Arquivos alterados: ${changed.length}`)
 console.log(`Worker requer deploy: ${workerChanged ? 'SIM' : 'não'}`)
 console.log(`Web requer deploy: ${webChanged ? 'SIM' : 'não'}`)
 console.log(`Migration alterada: ${migrationChanged ? 'SIM' : 'não'}`)
-for (const note of notes) console.log(`AVISO: ${note}`)
 
 if (process.env.GITHUB_OUTPUT) {
   const fs = await import('node:fs')
