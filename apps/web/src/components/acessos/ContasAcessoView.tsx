@@ -147,12 +147,24 @@ export function ContasAcessoView({
     [administracoes, regionalFiltro]
   )
   const setoresFiltrados = useMemo(
-    () => setores.filter(item => !administracaoFiltro || item.administracaoId === administracaoFiltro),
-    [setores, administracaoFiltro]
+    () => setores.filter(item => {
+      const administracao = administracoes.find(adm => adm.id === item.administracaoId)
+      if (administracaoFiltro && item.administracaoId !== administracaoFiltro) return false
+      if (regionalFiltro && administracao?.regionalId !== regionalFiltro) return false
+      return true
+    }),
+    [setores, administracoes, administracaoFiltro, regionalFiltro]
   )
   const casasFiltradas = useMemo(
-    () => casas.filter(item => !setorFiltro || item.setorId === setorFiltro),
-    [casas, setorFiltro]
+    () => casas.filter(item => {
+      const setor = setores.find(s => s.id === item.setorId)
+      const administracao = administracoes.find(adm => adm.id === setor?.administracaoId)
+      if (setorFiltro && item.setorId !== setorFiltro) return false
+      if (administracaoFiltro && setor?.administracaoId !== administracaoFiltro) return false
+      if (regionalFiltro && administracao?.regionalId !== regionalFiltro) return false
+      return true
+    }),
+    [casas, setores, administracoes, setorFiltro, administracaoFiltro, regionalFiltro]
   )
 
   const contasFiltradas = useMemo(() => contas.filter(conta => {
@@ -178,6 +190,14 @@ export function ContasAcessoView({
     setCasaFiltro('')
     setStatusFiltro('')
   }
+
+  const contasExibidas = useMemo(() => {
+    if (!linkTemporario || contasFiltradas.some(conta => conta.membroId === linkTemporario.membroId)) {
+      return contasFiltradas
+    }
+    const contaDoLink = contas.find(conta => conta.membroId === linkTemporario.membroId)
+    return contaDoLink ? [contaDoLink, ...contasFiltradas] : contasFiltradas
+  }, [contas, contasFiltradas, linkTemporario])
 
   useEffect(() => {
     const membroId = feedback?.membroId ?? linkTemporario?.membroId
@@ -503,7 +523,7 @@ export function ContasAcessoView({
       </div>
 
       <div className="space-y-3">
-        {[...contasFiltradas]
+        {[...contasExibidas]
           .sort((a, b) => Number(Boolean(b.recuperacaoPinPendente)) - Number(Boolean(a.recuperacaoPinPendente)))
           .map(conta => (
           <article key={conta.membroId} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
