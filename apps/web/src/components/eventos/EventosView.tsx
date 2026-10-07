@@ -102,6 +102,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
 
   const [loading, setLoading] = useState<boolean>(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [erroCancelamento, setErroCancelamento] = useState<string | null>(null)
   const [acessoPortariaUrl, setAcessoPortariaUrl] = useState<string | null>(null)
   
   // Form State
@@ -884,13 +885,14 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     }
   }
 
-  const handleCancelarEvento = async (item: Evento, origem: 'lista' | 'detalhe' = 'lista') => {
+  const handleCancelarEvento = async (item: Evento, _origem: 'lista' | 'detalhe' = 'lista') => {
     const confirmou = window.confirm(
       `Cancelar o evento "${item.titulo}"? Se houver convocação em rascunho, as funções serão removidas e a convocação também será cancelada.`
     )
     if (!confirmou) return
 
     setErro(null)
+    setErroCancelamento(null)
 
     try {
       await postWithAuth(`/eventos/${item.id}/cancelar`, {})
@@ -905,10 +907,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
           : err instanceof Error
             ? (err.message || 'Não foi possível cancelar o evento.')
             : 'Não foi possível cancelar o evento.'
-      if (origem === 'detalhe' && eventoDetalheIdRef.current === item.id) {
-        fecharDetalheEvento()
-      }
-      setErro(mensagem)
+      setErroCancelamento(mensagem)
     }
   }
 
@@ -987,6 +986,25 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
+      {erroCancelamento && !formOpen && !eventoDetalhe && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="fixed left-4 right-4 top-4 z-[100] mx-auto max-w-3xl rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 shadow-xl"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <span>{erroCancelamento}</span>
+            <button
+              type="button"
+              onClick={() => setErroCancelamento(null)}
+              className="shrink-0 rounded px-2 py-1 font-semibold text-red-800 hover:bg-red-100"
+              aria-label="Fechar erro de cancelamento"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
       <div className="bg-brand-900 text-white p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold">Gestão de Eventos</h2>
@@ -1159,6 +1177,16 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
             </div>
             
             <form onSubmit={handleSubmit} noValidate className="p-6 overflow-y-auto space-y-6">
+              {erroCancelamento && (
+                <div role="alert" aria-live="assertive" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+                  <div className="flex items-start justify-between gap-4">
+                    <span>{erroCancelamento}</span>
+                    <button type="button" onClick={() => setErroCancelamento(null)} className="shrink-0 font-semibold" aria-label="Fechar erro de cancelamento">
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              )}
               {erro && (
                 <div role="alert" className="p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
                   {erro}
@@ -1593,6 +1621,16 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
               <button onClick={fecharDetalheEvento} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
             <div className="p-6 space-y-4">
+              {erroCancelamento && (
+                <div role="alert" aria-live="assertive" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+                  <div className="flex items-start justify-between gap-4">
+                    <span>{erroCancelamento}</span>
+                    <button type="button" onClick={() => setErroCancelamento(null)} className="shrink-0 font-semibold" aria-label="Fechar erro de cancelamento">
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              )}
               <div>
                 <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Título</span>
                 <p className="text-slate-900 font-medium">{eventoDetalhe.titulo}</p>
