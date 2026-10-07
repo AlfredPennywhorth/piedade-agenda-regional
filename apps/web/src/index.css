@@ -100,3 +100,18 @@
     background: #f8fafc;
   }
 }
+
+
+@layer utilities {
+  .safe-area-top {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-layout-bottom {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+}
