@@ -100,10 +100,18 @@ convocacoesRouter.post('/', async c => {
       .where(and(eq(eventos.id, parsed.eventoId), eq(eventos.ativo, true)))
       .get()
     if (!evento) return c.json({ error: 'Evento não encontrado ou inativo' }, 409)
-    if (evento.pessoal) return c.json({ error: 'Evento Próprio entra diretamente na agenda e não recebe convocação', code: 'EVENTO_PESSOAL_SEM_CONVOCACAO' }, 409)
 
     const membroId = c.get('membroId')
-    if (!membroId || !(await podeGerirConvocacao(db, membroId, evento))) {
+    if (!membroId || !(await podeGerenciarEvento(db, membroId, evento))) {
+      return c.json({ error: 'Acesso não autorizado para gerir a convocação', code: 'FORBIDDEN' }, 403)
+    }
+    if (evento.pessoal) {
+      return c.json({
+        error: 'Evento Próprio entra diretamente na agenda e não recebe convocação',
+        code: 'EVENTO_PESSOAL_SEM_CONVOCACAO'
+      }, 409)
+    }
+    if (!(await podeGerirConvocacao(db, membroId, evento))) {
       return c.json({ error: 'Acesso não autorizado para gerir a convocação', code: 'FORBIDDEN' }, 403)
     }
 
