@@ -5,10 +5,6 @@ on:
   pull_request:
     branches: [main, develop]
     types: [opened, synchronize, reopened, ready_for_review]
-  pull_request_review:
-    types: [submitted, dismissed]
-  pull_request_review_comment:
-    types: [created, edited, deleted]
 
 permissions:
   contents: read
@@ -21,7 +17,7 @@ concurrency:
 
 jobs:
   preflight:
-    name: Base · SHA · Threads · P0 · Impacto
+    name: Base · SHA · P0 · Impacto
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     steps:
@@ -38,30 +34,16 @@ jobs:
       - name: Preflight local
         id: impact
         env:
-          PREFLIGHT_BASE: ${{ github.base_ref || 'develop' }}
-          PREFLIGHT_HEAD: ${{ github.head_ref || github.ref_name }}
+          PREFLIGHT_BASE: ${{ github.event.pull_request.base.ref || github.base_ref || 'develop' }}
+          PREFLIGHT_HEAD: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
         run: node scripts/preflight.mjs
 
-      - name: Bloquear threads de review abertas
+      - name: Lembrar gate nativo de conversas
         if: ${{ github.event.pull_request.number }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         shell: bash
         run: |
-          set -euo pipefail
-          unresolved="$(gh api graphql -f query='
-            query($owner:String!, $repo:String!, $number:Int!) {
-              repository(owner:$owner, name:$repo) {
-                pullRequest(number:$number) {
-                  reviewThreads(first:100) { nodes { isResolved } }
-                }
-              }
-            }' -F owner="${GITHUB_REPOSITORY%/*}" -F repo="${GITHUB_REPOSITORY#*/}" -F number="$PR_NUMBER"             --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length')"
-          test "$unresolved" = "0" || {
-            echo "Bloqueio: $unresolved thread(s) de review não resolvida(s)."
-            exit 1
-          }
+          echo "Threads de review devem ser bloqueadas pela proteção nativa do GitHub: Require conversation resolution before merging."
+          echo "O workflow não replica esse bloqueio porque a resolução de uma conversa não gera um gatilho confiável de GitHub Actions para reavaliar o mesmo SHA."
 
       - name: Bloquear issues P0 abertas
         env:
