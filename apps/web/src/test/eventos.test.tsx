@@ -152,6 +152,30 @@ describe('EventosView', () => {
     })
   })
 
+  it('oculta cancelados por padrão e permite consultá-los pelo filtro de status', async () => {
+    const cancelado = { ...mockEventos[0], id: '77777777-7777-4777-8777-777777777777', titulo: 'Evento Cancelado', ativo: false }
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return [mockEventos[0], cancelado]
+      if (url === '/eventos?ativo=false') return [cancelado]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+
+    render(<EventosView />)
+
+    expect(await screen.findByText('Reunião Presencial')).toBeInTheDocument()
+    expect(screen.queryByText('Evento Cancelado')).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Filtrar por status do evento'), {
+      target: { value: 'CANCELADOS' },
+    })
+
+    expect(await screen.findByText('Evento Cancelado')).toBeInTheDocument()
+    expect(apiClient.fetchWithAuth).toHaveBeenCalledWith('/eventos?ativo=false')
+  })
+
   it('deve cancelar evento e removê-lo da lista operacional', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.mocked(apiClient.postWithAuth).mockResolvedValueOnce({
