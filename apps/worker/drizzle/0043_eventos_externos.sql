@@ -59,6 +59,7 @@ CREATE TABLE eventos_novo (
       AND destino_uf IN ('AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO')
       AND destino_pais_codigo IS NULL
       AND length(trim(destino_cidade_local)) >= 2
+      AND (pessoal = 1 OR regional_gestao_id IS NOT NULL)
     )
     OR
     (
@@ -69,6 +70,7 @@ CREATE TABLE eventos_novo (
       AND length(destino_pais_codigo) = 2
       AND destino_pais_codigo GLOB '[A-Z][A-Z]'
       AND length(trim(destino_cidade_local)) >= 2
+      AND (pessoal = 1 OR regional_gestao_id IS NOT NULL)
     )
   )
 );
