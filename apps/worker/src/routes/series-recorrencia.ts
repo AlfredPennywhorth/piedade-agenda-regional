@@ -146,7 +146,6 @@ interface EscoposAgendaAutorizados {
 async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAutorizados> {
   const db = c.get('db')
   const contexto = c.get('contextoPermissoes')
-  const membroId = c.get('membroId')
 
   const resultado: EscoposAgendaAutorizados = {
     tudo: eMasterSistema(contexto),
