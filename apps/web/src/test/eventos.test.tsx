@@ -176,6 +176,80 @@ describe('EventosView', () => {
     expect(apiClient.fetchWithAuth).toHaveBeenCalledWith('/eventos?ativo=false')
   })
 
+  it('reativa evento cancelado via PATCH sem reabrir convocação', async () => {
+    const cancelado = { ...mockEventos[0], id: '77777777-7777-4777-8777-777777777777', titulo: 'Evento Cancelado', ativo: false, podeGerenciar: true }
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === '/eventos?ativo=false') return [cancelado]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({ ...cancelado, ativo: true })
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.change(screen.getByLabelText('Filtrar por status do evento'), { target: { value: 'CANCELADOS' } })
+    expect(await screen.findByText('Evento Cancelado')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /reativar evento/i }))
+
+    await waitFor(() => {
+      expect(apiClient.patchWithAuth).toHaveBeenCalledWith('/eventos/77777777-7777-4777-8777-777777777777', { ativo: true })
+      expect(screen.queryByText('Evento Cancelado')).not.toBeInTheDocument()
+    })
+  })
+
+  it('não oferece reativação para evento inativo já encerrado', async () => {
+    const encerrado = {
+      ...mockEventos[0],
+      id: '77777777-7777-4777-8777-777777777778',
+      titulo: 'Evento Encerrado',
+      ativo: false,
+      podeGerenciar: true,
+      inicioEm: '2026-10-01T10:00:00.000Z',
+      fimEm: '2026-10-01T12:00:00.000Z',
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === '/eventos?ativo=false') return [encerrado]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.change(screen.getByLabelText('Filtrar por status do evento'), { target: { value: 'CANCELADOS' } })
+    expect(await screen.findByText('Evento Encerrado')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /reativar evento/i })).not.toBeInTheDocument()
+  })
+
+  it('exibe falha de reativação dentro do detalhe aberto', async () => {
+    const cancelado = { ...mockEventos[0], id: '77777777-7777-4777-8777-777777777779', titulo: 'Evento Cancelado Detalhe', ativo: false, podeGerenciar: true }
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === '/eventos?ativo=false') return [cancelado]
+      if (url === `/eventos/${cancelado.id}`) return cancelado
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+    vi.mocked(apiClient.patchWithAuth).mockRejectedValueOnce(
+      new apiClient.ApiError(409, 'Falha', { error: 'Evento não pode ser reativado.' })
+    )
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.change(screen.getByLabelText('Filtrar por status do evento'), { target: { value: 'CANCELADOS' } })
+    await screen.findByText('Evento Cancelado Detalhe')
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    fireEvent.click(within(detalhe).getByRole('button', { name: /reativar evento/i }))
+    expect(await within(detalhe).findByRole('alert')).toHaveTextContent('Evento não pode ser reativado.')
+  })
+
   it('deve cancelar evento e removê-lo da lista operacional', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.mocked(apiClient.postWithAuth).mockResolvedValueOnce({
