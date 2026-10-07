@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ApiError, fetchWithAuth, patchWithAuth, postWithAuth } from '../../api/apiClient'
 import { GerenciarAcessosPanel } from './GerenciarAcessosPanel'
 
@@ -21,6 +21,11 @@ interface ContaAdministrada {
   recuperacaoPinSolicitadaEm?: string | null
   acessos: Acesso[]
 }
+
+interface Regional { id: string; nome: string }
+interface Administracao { id: string; nome: string; regionalId: string }
+interface Setor { id: string; nome: string; administracaoId: string }
+interface Casa { id: string; nome: string; setorId: string }
 
 interface LinkTemporario {
   token: string
@@ -92,6 +97,15 @@ export function ContasAcessoView({
   const [gerenciandoMembroId, setGerenciandoMembroId] = useState<string | null>(null)
   const [sessoesAbertasMembroId, setSessoesAbertasMembroId] = useState<string | null>(null)
   const [sessoesPorMembro, setSessoesPorMembro] = useState<Record<string, SessaoAdministrada[]>>({})
+  const [regionais, setRegionais] = useState<Regional[]>([])
+  const [administracoes, setAdministracoes] = useState<Administracao[]>([])
+  const [setores, setSetores] = useState<Setor[]>([])
+  const [casas, setCasas] = useState<Casa[]>([])
+  const [regionalFiltro, setRegionalFiltro] = useState('')
+  const [administracaoFiltro, setAdministracaoFiltro] = useState('')
+  const [setorFiltro, setSetorFiltro] = useState('')
+  const [casaFiltro, setCasaFiltro] = useState('')
+  const [statusFiltro, setStatusFiltro] = useState('')
 
   const carregar = async () => {
     setErroGlobal(null)
@@ -110,7 +124,59 @@ export function ContasAcessoView({
 
   useEffect(() => {
     void carregar()
+    void Promise.all([
+      fetchWithAuth<Regional[]>('/regionais'),
+      fetchWithAuth<Administracao[]>('/administracoes'),
+      fetchWithAuth<Setor[]>('/setores'),
+      fetchWithAuth<Casa[]>('/casas'),
+    ])
+      .then(([r, a, s, c]) => {
+        setRegionais(r)
+        setAdministracoes(a)
+        setSetores(s)
+        setCasas(c)
+      })
+      .catch(() => {
+        // A listagem principal continua utilizável mesmo se algum lookup falhar.
+      })
   }, [])
+
+  const administracoesFiltradas = useMemo(
+    () => administracoes.filter(item => !regionalFiltro || item.regionalId === regionalFiltro),
+    [administracoes, regionalFiltro]
+  )
+  const setoresFiltrados = useMemo(
+    () => setores.filter(item => !administracaoFiltro || item.administracaoId === administracaoFiltro),
+    [setores, administracaoFiltro]
+  )
+  const casasFiltradas = useMemo(
+    () => casas.filter(item => !setorFiltro || item.setorId === setorFiltro),
+    [casas, setorFiltro]
+  )
+
+  const contasFiltradas = useMemo(() => contas.filter(conta => {
+    const casa = casas.find(item => item.id === conta.casaId)
+    const setor = setores.find(item => item.id === casa?.setorId)
+    const administracao = administracoes.find(item => item.id === setor?.administracaoId)
+
+    if (regionalFiltro && administracao?.regionalId !== regionalFiltro) return false
+    if (administracaoFiltro && administracao?.id !== administracaoFiltro) return false
+    if (setorFiltro && setor?.id !== setorFiltro) return false
+    if (casaFiltro && conta.casaId !== casaFiltro) return false
+
+    if (statusFiltro === 'SEM_CONTA' && conta.contaAcessoId) return false
+    if (statusFiltro === 'RECUPERACAO_PIN' && !conta.recuperacaoPinPendente) return false
+    if (statusFiltro && !['SEM_CONTA', 'RECUPERACAO_PIN'].includes(statusFiltro) && conta.status !== statusFiltro) return false
+    return true
+  }), [contas, casas, setores, administracoes, regionalFiltro, administracaoFiltro, setorFiltro, casaFiltro, statusFiltro])
+
+  const limparFiltros = () => {
+    setRegionalFiltro('')
+    setAdministracaoFiltro('')
+    setSetorFiltro('')
+    setCasaFiltro('')
+    setStatusFiltro('')
+  }
 
   useEffect(() => {
     const membroId = feedback?.membroId ?? linkTemporario?.membroId
@@ -339,8 +405,104 @@ export function ContasAcessoView({
         </div>
       )}
 
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <label className="text-sm text-slate-700">
+            <span className="mb-1 block font-medium">Regional</span>
+            <select
+              aria-label="Filtrar por Regional"
+              value={regionalFiltro}
+              onChange={event => {
+                setRegionalFiltro(event.target.value)
+                setAdministracaoFiltro('')
+                setSetorFiltro('')
+                setCasaFiltro('')
+              }}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+            >
+              <option value="">Todas</option>
+              {[...regionais].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(item => (
+                <option key={item.id} value={item.id}>{item.nome}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm text-slate-700">
+            <span className="mb-1 block font-medium">Administração</span>
+            <select
+              aria-label="Filtrar por Administração"
+              value={administracaoFiltro}
+              onChange={event => {
+                setAdministracaoFiltro(event.target.value)
+                setSetorFiltro('')
+                setCasaFiltro('')
+              }}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+            >
+              <option value="">Todas</option>
+              {[...administracoesFiltradas].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(item => (
+                <option key={item.id} value={item.id}>{item.nome}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm text-slate-700">
+            <span className="mb-1 block font-medium">Setor</span>
+            <select
+              aria-label="Filtrar por Setor"
+              value={setorFiltro}
+              onChange={event => {
+                setSetorFiltro(event.target.value)
+                setCasaFiltro('')
+              }}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+            >
+              <option value="">Todos</option>
+              {[...setoresFiltrados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(item => (
+                <option key={item.id} value={item.id}>{item.nome}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm text-slate-700">
+            <span className="mb-1 block font-medium">Casa de Oração</span>
+            <select
+              aria-label="Filtrar por Casa de Oração"
+              value={casaFiltro}
+              onChange={event => setCasaFiltro(event.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+            >
+              <option value="">Todas</option>
+              {[...casasFiltradas].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(item => (
+                <option key={item.id} value={item.id}>{item.nome}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm text-slate-700">
+            <span className="mb-1 block font-medium">Status</span>
+            <select
+              aria-label="Filtrar por Status"
+              value={statusFiltro}
+              onChange={event => setStatusFiltro(event.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+            >
+              <option value="">Todos</option>
+              <option value="SEM_CONTA">Sem conta</option>
+              <option value="PENDENTE_ATIVACAO">Pendente de ativação</option>
+              <option value="ATIVA">Ativa</option>
+              <option value="BLOQUEADA">Bloqueada</option>
+              <option value="DESATIVADA">Desativada</option>
+              <option value="RECUPERACAO_PIN">Recuperação de PIN pendente</option>
+            </select>
+          </label>
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-3 text-sm text-slate-600">
+          <span>{contasFiltradas.length} de {contas.length} pessoa(s)</span>
+          <button type="button" onClick={limparFiltros} className="font-medium text-brand-700 hover:underline">
+            Limpar filtros
+          </button>
+        </div>
+      </div>
+
       <div className="space-y-3">
-        {[...contas]
+        {[...contasFiltradas]
           .sort((a, b) => Number(Boolean(b.recuperacaoPinPendente)) - Number(Boolean(a.recuperacaoPinPendente)))
           .map(conta => (
           <article key={conta.membroId} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -561,9 +723,11 @@ export function ContasAcessoView({
             )}
           </article>
         ))}
-        {contas.length === 0 && (
+        {contasFiltradas.length === 0 && (
           <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
-            Nenhuma pessoa disponível no seu escopo administrativo.
+            {contas.length === 0
+              ? 'Nenhuma pessoa disponível no seu escopo administrativo.'
+              : 'Nenhuma conta corresponde aos filtros selecionados.'}
           </p>
         )}
       </div>
