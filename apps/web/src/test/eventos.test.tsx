@@ -995,7 +995,7 @@ describe('EventosView', () => {
   })
 
 
-  it('deve fechar o detalhe e exibir erro global quando o cancelamento falhar', async () => {
+  it('mantém o detalhe aberto e exibe erro de cancelamento acima do modal', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/eventos') return mockEventos
@@ -1018,10 +1018,38 @@ describe('EventosView', () => {
     await waitFor(() => {
       expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/eventos/${EVENTO_ID}/cancelar`, {})
     })
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: /detalhes do evento/i })).not.toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ocorrências já encerradas não podem ser canceladas.')
+    expect(screen.getByRole('dialog', { name: /detalhes do evento/i })).toBeInTheDocument()
+  })
+
+  it('mantém falha iniciada na lista visível se um detalhe for aberto durante a requisição', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === `/eventos/${EVENTO_ID}`) return mockEventos[0]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
     })
-    expect(await screen.findByText('Ocorrências já encerradas não podem ser canceladas.')).toBeInTheDocument()
+
+    let rejeitarCancelamento!: (reason?: unknown) => void
+    vi.mocked(apiClient.postWithAuth).mockImplementationOnce(
+      () => new Promise((_, reject) => { rejeitarCancelamento = reject })
+    )
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+
+    fireEvent.click(screen.getByRole('button', { name: /cancelar evento/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    expect(await screen.findByRole('dialog', { name: /detalhes do evento/i })).toBeInTheDocument()
+
+    rejeitarCancelamento(
+      new apiClient.ApiError(409, 'Falha', { error: 'Não foi possível cancelar este evento.' })
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível cancelar este evento.')
+    expect(screen.getByRole('dialog', { name: /detalhes do evento/i })).toBeInTheDocument()
   })
 
 })
