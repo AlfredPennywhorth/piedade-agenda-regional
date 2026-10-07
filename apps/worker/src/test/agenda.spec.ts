@@ -730,4 +730,41 @@ describe('S07 - Minha Agenda', () => {
     const itemDepois = agendaDepois.find(item => item.evento.id === 'ev-1')
     expect(itemDepois.rsvp.reconfirmacaoPendente).toBe(false)
   })
+
+  it('EXT-05 Evento Próprio externo entra na agenda e conflita com compromisso local', async () => {
+    sqlite.exec(`
+      INSERT INTO eventos (
+        id, pessoal, criador_membro_id, titulo, modalidade, inicio_em, fim_em,
+        abrangencia, destino_uf, destino_cidade_local, regional_gestao_id, ativo
+      )
+      VALUES (
+        'ev-externo-pessoal', 1, '${membroId}', 'Atendimento em Minas', 'PRESENCIAL',
+        '2026-01-01T10:15:00Z', '2026-01-01T10:45:00Z',
+        'NACIONAL', 'MG', 'Belo Horizonte — atendimento', 'reg-1', 1
+      );
+    `)
+
+    const res = await req('/api/v1/minha-agenda', {
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    })
+    expect(res.status).toBe(200)
+
+    const agenda = await res.json() as any[]
+    const externo = agenda.find(item => item.evento.id === 'ev-externo-pessoal')
+    const local = agenda.find(item => item.evento.id === 'ev-1')
+
+    expect(externo).toBeDefined()
+    expect(externo.evento.abrangencia).toBe('NACIONAL')
+    expect(externo.conflito.eventos).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ eventoId: 'ev-1', tipo: 'SOBREPOSICAO' }),
+      ])
+    )
+    expect(local.conflito.eventos).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ eventoId: 'ev-externo-pessoal', tipo: 'SOBREPOSICAO' }),
+      ])
+    )
+  })
+
 })
