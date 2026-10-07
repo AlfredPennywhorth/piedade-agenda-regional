@@ -218,10 +218,7 @@ export function condicaoEventosGerenciaveis(contexto: ContextoPermissoes): SQL {
             eq(e.criadorMembroId, contexto.membroId),
             eq(e.organizadorMembroId, contexto.membroId)
           ),
-          or(
-            sql`${e.casaId} IN (SELECT casa_id FROM membros WHERE id = ${contexto.membroId} AND ativo = 1)`,
-            sql`${e.abrangencia} IN ('NACIONAL','INTERNACIONAL')`
-          )
+          sql`${e.casaId} IN (SELECT casa_id FROM membros WHERE id = ${contexto.membroId} AND ativo = 1)`
         )
       )
     )
