@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 
@@ -76,7 +77,7 @@ describe('migration 0043 — eventos externos', () => {
     `)
 
     const migration = readFileSync(
-      new URL('../../drizzle/0043_eventos_externos.sql', import.meta.url),
+      resolve(process.cwd(), 'drizzle/0043_eventos_externos.sql'),
       'utf8'
     )
 
