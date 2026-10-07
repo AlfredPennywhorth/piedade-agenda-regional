@@ -148,6 +148,24 @@ async function criarAvisoAlteracaoMaterial(db: any, anterior: any, atual: any) {
     partes.push(`Acesso online: ${anterior.urlOnline ? 'link anterior' : 'sem link'} → ${atual.urlOnline ? 'novo link disponível' : 'removido'}`)
   }
 
+  if (
+    anterior.abrangencia !== atual.abrangencia ||
+    anterior.destinoUf !== atual.destinoUf ||
+    anterior.destinoPaisCodigo !== atual.destinoPaisCodigo ||
+    anterior.destinoCidadeLocal !== atual.destinoCidadeLocal
+  ) {
+    const formatarDestino = (evento: any) => {
+      if (evento.abrangencia === 'NACIONAL') {
+        return [evento.destinoCidadeLocal, evento.destinoUf].filter(Boolean).join(' — ') || 'destino nacional não informado'
+      }
+      if (evento.abrangencia === 'INTERNACIONAL') {
+        return [evento.destinoCidadeLocal, evento.destinoPaisCodigo].filter(Boolean).join(' — ') || 'destino internacional não informado'
+      }
+      return 'escopo territorial da Regional'
+    }
+    partes.push(`Destino: ${formatarDestino(anterior)} → ${formatarDestino(atual)}`)
+  }
+
   if (partes.length === 0) return null
   return `Atenção! O evento "${anterior.titulo}" foi alterado. ${partes.join('; ')}. Favor reconfirmar sua presença.`
 }
@@ -159,7 +177,11 @@ function houveAlteracaoMaterial(anterior: any, atual: any) {
     anterior.modalidade !== atual.modalidade ||
     anterior.localId !== atual.localId ||
     anterior.espacoId !== atual.espacoId ||
-    anterior.urlOnline !== atual.urlOnline
+    anterior.urlOnline !== atual.urlOnline ||
+    anterior.abrangencia !== atual.abrangencia ||
+    anterior.destinoUf !== atual.destinoUf ||
+    anterior.destinoPaisCodigo !== atual.destinoPaisCodigo ||
+    anterior.destinoCidadeLocal !== atual.destinoCidadeLocal
   )
 }
 
