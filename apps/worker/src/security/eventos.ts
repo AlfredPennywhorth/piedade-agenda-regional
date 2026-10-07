@@ -47,6 +47,18 @@ export function condicaoEscopo(acesso: AcessoTecnico): SQL | undefined {
 }
 
 
+function possuiGestaoRegionalExterna(
+  contexto: ContextoPermissoes,
+  perfis: string[]
+): boolean {
+  return contexto.acessosAtivos.some(
+    acesso =>
+      perfis.includes(acesso.perfilCodigo) &&
+      acesso.escopoTipo === 'REGIONAL' &&
+      acesso.escopoId !== null
+  )
+}
+
 function condicaoEscoposTecnicosDaConta(
   contexto: ContextoPermissoes,
   perfisSql: string
@@ -146,6 +158,11 @@ export async function condicaoEventosVisiveis(db: any, contexto: ContextoPermiss
     "'ADMINISTRADOR_SISTEMA','GESTOR_AGENDA','GESTOR_RELATORIOS','AUDITOR','OPERADOR_PORTARIA_PERMANENTE'"
   )
 
+  const podeVerExternoRegional = possuiGestaoRegionalExterna(
+    contexto,
+    ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA', 'GESTOR_RELATORIOS', 'AUDITOR', 'OPERADOR_PORTARIA_PERMANENTE']
+  )
+
   return or(
     eq(e.criadorMembroId, membroId),
     and(
@@ -154,6 +171,9 @@ export async function condicaoEventosVisiveis(db: any, contexto: ContextoPermiss
         eq(e.organizadorMembroId, membroId),
         escoposTecnicos,
         ...escoposLegados,
+        podeVerExternoRegional
+          ? sql`${e.abrangencia} IN ('NACIONAL','INTERNACIONAL')`
+          : sql`0 = 1`,
         sql`EXISTS (SELECT 1 FROM convocacoes c JOIN convocacao_destinatarios d ON d.convocacao_id = c.id WHERE c.evento_id = ${e.id} AND c.status = 'PUBLICADA' AND c.ativo = 1 AND d.membro_id = ${membroId})`
       )
     )
@@ -180,18 +200,28 @@ export function condicaoEventosGerenciaveis(contexto: ContextoPermissoes): SQL {
     contexto,
     "'ADMINISTRADOR_SISTEMA','GESTOR_AGENDA'"
   )
+  const podeGerirExternoRegional = possuiGestaoRegionalExterna(
+    contexto,
+    ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA']
+  )
   return or(
     and(eq(e.pessoal, true), eq(e.criadorMembroId, contexto.membroId)),
     and(
       eq(e.pessoal, false),
       or(
         escoposTecnicos,
+        podeGerirExternoRegional
+          ? sql`${e.abrangencia} IN ('NACIONAL','INTERNACIONAL')`
+          : sql`0 = 1`,
         and(
           or(
             eq(e.criadorMembroId, contexto.membroId),
             eq(e.organizadorMembroId, contexto.membroId)
           ),
-          sql`${e.casaId} IN (SELECT casa_id FROM membros WHERE id = ${contexto.membroId} AND ativo = 1)`
+          or(
+            sql`${e.casaId} IN (SELECT casa_id FROM membros WHERE id = ${contexto.membroId} AND ativo = 1)`,
+            sql`${e.abrangencia} IN ('NACIONAL','INTERNACIONAL')`
+          )
         )
       )
     )
