@@ -25,6 +25,29 @@ function configurarNavigatorIos({ standalone = false }: { standalone?: boolean }
   })
 }
 
+function configurarNavigatorIpadDesktop() {
+  Object.defineProperty(window.navigator, 'userAgent', {
+    configurable: true,
+    value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15',
+  })
+  Object.defineProperty(window.navigator, 'platform', {
+    configurable: true,
+    value: 'MacIntel',
+  })
+  Object.defineProperty(window.navigator, 'maxTouchPoints', {
+    configurable: true,
+    value: 5,
+  })
+  Object.defineProperty(window.navigator, 'standalone', {
+    configurable: true,
+    value: false,
+  })
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: vi.fn().mockReturnValue({ matches: false }),
+  })
+}
+
 function configurarNavigatorDesktop() {
   Object.defineProperty(window.navigator, 'userAgent', {
     configurable: true,
@@ -59,9 +82,20 @@ describe('IosInstallPrompt', () => {
 
     render(<IosInstallPrompt />)
 
-    expect(await screen.findByText('Instale a Agenda no seu iPhone')).toBeDefined()
+    expect(await screen.findByText('Instale a Agenda neste dispositivo')).toBeDefined()
     expect(screen.getByText(/Adicionar à Tela de Início/)).toBeDefined()
     expect(screen.getByRole('button', { name: 'Agora não' })).toBeDefined()
+  })
+
+  it('exibe orientação neutra em iPad no modo desktop', async () => {
+    configurarNavigatorIpadDesktop()
+
+    render(<IosInstallPrompt />)
+
+    expect(await screen.findByText('Instale a Agenda neste dispositivo')).toBeDefined()
+    expect(screen.getByText(/No navegador, toque em/)).toBeDefined()
+    expect(screen.queryByText(/iPhone/i)).toBeNull()
+    expect(screen.queryByText(/Safari/i)).toBeNull()
   })
 
   it('não exibe em desktop', () => {
@@ -69,7 +103,7 @@ describe('IosInstallPrompt', () => {
 
     render(<IosInstallPrompt />)
 
-    expect(screen.queryByText('Instale a Agenda no seu iPhone')).toBeNull()
+    expect(screen.queryByText('Instale a Agenda neste dispositivo')).toBeNull()
   })
 
   it('não exibe quando já está instalado em modo standalone', () => {
@@ -77,7 +111,7 @@ describe('IosInstallPrompt', () => {
 
     render(<IosInstallPrompt />)
 
-    expect(screen.queryByText('Instale a Agenda no seu iPhone')).toBeNull()
+    expect(screen.queryByText('Instale a Agenda neste dispositivo')).toBeNull()
   })
 
   it('persiste dispensa e não volta a exibir dentro de 14 dias', () => {
@@ -94,7 +128,7 @@ describe('IosInstallPrompt', () => {
     unmount()
     render(<IosInstallPrompt />)
 
-    expect(screen.queryByText('Instale a Agenda no seu iPhone')).toBeNull()
+    expect(screen.queryByText('Instale a Agenda neste dispositivo')).toBeNull()
   })
 
   it('volta a exibir após expirar o período de dispensa', async () => {
@@ -108,6 +142,6 @@ describe('IosInstallPrompt', () => {
 
     render(<IosInstallPrompt />)
 
-    expect(await screen.findByText('Instale a Agenda no seu iPhone')).toBeDefined()
+    expect(await screen.findByText('Instale a Agenda neste dispositivo')).toBeDefined()
   })
 })
