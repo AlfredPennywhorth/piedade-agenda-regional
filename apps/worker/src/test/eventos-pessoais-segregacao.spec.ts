@@ -73,6 +73,43 @@ describe('Eventos pessoais e segregação', () => {
   }
   const visiveis = async (u: typeof autor) =>
     ((await (await req(u, '/eventos')).json()) as Array<{ id: string }>).map(e => e.id)
+  it('Master filtra por pessoa sem permitir o filtro a usuários comuns', async () => {
+    const proprio = await evento({ casaId: casa }, { pessoal: true, criadorMembroId: autor.id })
+    await evento({ casaId: casa })
+    expect((await req(colega, `/eventos?pessoaId=${autor.id}`)).status).toBe(403)
+    const res = await req(master, `/eventos?pessoaId=${autor.id}`)
+    expect(res.status).toBe(200)
+    expect((await res.json() as any[]).map(e => e.id)).toEqual([proprio])
+    const comum = await (await req(colega, '/eventos/filtros')).json() as any
+    expect(comum).toEqual({ master: false, filtrarEscopo: false, pessoas: [] })
+    const filtros = await (await req(master, '/eventos/filtros')).json() as any
+    expect(filtros.master).toBe(true)
+    expect(filtros.pessoas.some((p: any) => p.id === autor.id)).toBe(true)
+  })
+
+  it.each(['REGIONAL', 'ADMINISTRACAO', 'SETOR'])('relator %s consulta destinatários descendentes sem acessar pessoais', async tipo => {
+    const relator = await usuario(casa, 'GESTOR_RELATORIOS', tipo, tipo === 'REGIONAL' ? reg : tipo === 'ADMINISTRACAO' ? adm : setor)
+    const id = await evento({ casaId: casa })
+    const convocacaoId = uuid()
+    await db.insert(s.convocacoes).values({ id: convocacaoId, eventoId: id, status: 'RASCUNHO' })
+    expect((await req(relator, `/convocacoes/${convocacaoId}/destinatarios`)).status).toBe(200)
+    const fora = await evento({ casaId: casaOutraReg })
+    const foraConv = uuid()
+    await db.insert(s.convocacoes).values({ id: foraConv, eventoId: fora, status: 'RASCUNHO' })
+    expect((await req(relator, `/convocacoes/${foraConv}/destinatarios`)).status).toBe(403)
+  })
+
+  it('gestão Regional resolve a Regional dos GTs legados sem delegar ao Setor', async () => {
+    const legado = uuid()
+    await db.insert(s.gruposTrabalho).values({ id: legado, nome: 'GT legado', setorId: setor })
+    const id = await evento({ grupoTrabalhoId: legado })
+    const regional = await usuario(casa, 'GESTOR_AGENDA', 'REGIONAL', reg)
+    const gestorSetor = await usuario(casa, 'GESTOR_AGENDA', 'SETOR', setor)
+    expect(await visiveis(regional)).toContain(id)
+    expect(await visiveis(gestorSetor)).not.toContain(id)
+    expect((await req(regional, `/eventos/${id}`, 'PATCH', { titulo: 'GT Regional' })).status).toBe(200)
+  })
+
   beforeEach(async () => {
     sqlite = new Database(':memory:')
     sqlite.pragma('foreign_keys = ON')

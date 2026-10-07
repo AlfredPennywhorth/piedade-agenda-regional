@@ -10,7 +10,7 @@ import { extrairEscopoDoEvento } from '../services/auditoria'
 
 // Autoridade de eventos descende da permissão concedida. Pertencer a uma Casa
 // ou exercer uma função comum não autoriza consultar agendas de outras pessoas.
-function condicaoEscopo(acesso: AcessoTecnico): SQL | undefined {
+export function condicaoEscopo(acesso: AcessoTecnico): SQL | undefined {
   const id = acesso.escopoId
   if (!id) return undefined
   const e = schema.eventos
@@ -21,7 +21,10 @@ function condicaoEscopo(acesso: AcessoTecnico): SQL | undefined {
         sql`${e.administracaoId} IN (SELECT id FROM administracoes WHERE regional_id = ${id})`,
         sql`${e.setorId} IN (SELECT s.id FROM setores s JOIN administracoes a ON a.id = s.administracao_id WHERE a.regional_id = ${id})`,
         sql`${e.casaId} IN (SELECT c.id FROM casas c JOIN setores s ON s.id = c.setor_id JOIN administracoes a ON a.id = s.administracao_id WHERE a.regional_id = ${id})`,
-        sql`${e.grupoTrabalhoId} IN (SELECT id FROM grupos_trabalho WHERE regional_id = ${id})`
+        sql`${e.grupoTrabalhoId} IN (SELECT g.id FROM grupos_trabalho g
+          LEFT JOIN setores s ON s.id = g.setor_id
+          LEFT JOIN administracoes a ON a.id = COALESCE(g.administracao_id, s.administracao_id)
+          WHERE COALESCE(g.regional_id, a.regional_id) = ${id})`
       )
     case 'ADMINISTRACAO':
       return or(

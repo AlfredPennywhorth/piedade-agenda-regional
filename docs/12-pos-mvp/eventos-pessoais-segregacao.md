@@ -41,6 +41,25 @@ pessoal na Casa original mesmo que seu cadastro mude de Casa. Eventos encerrados
 A tela só oferece edição, cancelamento e portaria quando a API autoriza gestão;
 eventos pessoais não são oferecidos no seletor de nova convocação.
 
+## Matriz confirmada e filtros (07/10/2026)
+
+André confirmou as regras de consulta/gestão acima e **GT somente Regional**.
+Criação e edição de GT já exigem Regional na API. Para não perder acesso a
+registros legados vinculados por Administração/Setor, a permissão Regional
+resolve sua ancestralidade; esses vínculos não concedem gestão de GT ao Setor
+ou à Administração. Nenhum cadastro é modificado automaticamente.
+
+- Usuário comum abre Eventos vendo apenas autoria, organização e participação
+  em convocação publicada; não recebe seletor de escopos nem de pessoas.
+- Gestores abrem a lista autorizada e podem filtrar por escopo, incluindo
+  descendentes. O filtro reduz a lista; nunca amplia a permissão da API.
+- Master dispõe também de filtro por pessoa: autor, organizador ou destinatário
+  de convocação publicada. Pode limpar a seleção para voltar à visão global.
+- A API recusa filtro por pessoa para outros perfis e só fornece a lista de
+  pessoas ao Master. Respostas antigas de filtros não substituem a seleção atual.
+- Gestor de Relatórios consulta destinatários no escopo e nos níveis abaixo,
+  tanto por acesso técnico quanto por vínculo funcional legado.
+
 ## Banco e compatibilidade
 
 Migration: `apps/worker/drizzle/0042_eventos_pessoais.sql`.
@@ -62,9 +81,9 @@ aprovação. Nenhum deploy é disparado por esta alteração.
 
 ## Evidências locais
 
-- Worker: 592 testes passando, incluindo 23 testes de segregação, eventos
+- Worker: 597 testes passando, incluindo 28 testes de segregação, eventos
   pessoais, conflitos, atalhos de convocação e migration.
-- Frontend: 281 testes passando, incluindo criação pessoal sem convocação,
+- Frontend: 284 testes passando, incluindo criação pessoal sem convocação,
   consulta sem ações de gestão e abertura pessoal na agenda/calendário sem RSVP/QR.
 - Shared: 26 testes passando.
 - Lint: sem erros; os avisos de `any` existentes não bloqueiam o projeto.
@@ -93,6 +112,12 @@ aprovação. Nenhum deploy é disparado por esta alteração.
    conflitos. A priorização funciona sem RSVP. Cancelar retira da agenda.
 8. Conferir um evento antigo com autoria auditada, um evento organizado pelo
    usuário e um sem autoria conhecida, preservando as regras da tabela acima.
+
+9. Como Master, selecionar uma pessoa e conferir seus eventos próprios,
+   organizados e convocações publicadas; limpar o filtro. Como usuário comum,
+   confirmar ausência dos seletores de pessoas e escopos.
+10. Como gestor Regional/Administração/Setor, filtrar seu escopo e consultar
+    destinatários de convocação da Casa subordinada, sem acesso a outra Regional.
 
 Após CI e revisão do HEAD: solicitar autorização para merge, executar os deploys
 no fluxo acordado e realizar este roteiro antes de promover a produção.

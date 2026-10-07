@@ -81,6 +81,11 @@ export interface Evento {
 export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEventoCriado?: (eventoId: string) => void; onEventoPessoalCriado?: () => void }) {
   const [eventos, setEventos] = useState<Evento[]>([])
   
+  const [filtros, setFiltros] = useState<{ master: boolean; filtrarEscopo?: boolean; pessoas: { id: string; nome: string }[] }>({ master: false, pessoas: [] })
+  const [pessoaFiltro, setPessoaFiltro] = useState('')
+  const [escopoFiltro, setEscopoFiltro] = useState('')
+  const pessoaConsultaSeq = useRef(0)
+
   // Lookups
   const [locais, setLocais] = useState<Local[]>([])
   const [espacos, setEspacos] = useState<EspacoLocal[]>([])
@@ -232,6 +237,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   }, [espacoRapidoOpen])
 
   const carregarDados = async () => {
+    const seq = ++pessoaConsultaSeq.current
     setLoading(true)
     setErro(null)
     try {
@@ -239,7 +245,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         eventosData, locaisData, espacosData, membrosData, regionaisData,
         administracoesData, setoresData, casasData, gruposData
       ] = await Promise.all([
-        fetchWithAuth<Evento[]>('/eventos'),
+        fetchWithAuth<Evento[]>(pessoaFiltro ? `/eventos?pessoaId=${encodeURIComponent(pessoaFiltro)}` : '/eventos'),
         fetchWithAuth<Local[]>('/locais'),
         fetchWithAuth<EspacoLocal[]>('/espacos-locais?ativo=true'),
         fetchWithAuth<Membro[]>('/membros'),
@@ -250,7 +256,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         fetchWithAuth<GrupoTrabalho[]>('/grupos-trabalho'),
       ])
       
-      setEventos(eventosData || [])
+      if (seq === pessoaConsultaSeq.current) setEventos(eventosData || [])
       setLocais(locaisData || [])
       setEspacos(espacosData || [])
       setMembros(membrosData || [])
@@ -260,15 +266,65 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       setCasas(casasData || [])
       setGruposTrabalho(gruposData || [])
     } catch (err: any) {
-      setErro(err.message || 'Erro ao carregar os dados.')
+      if (seq === pessoaConsultaSeq.current) setErro(err.message || 'Erro ao carregar os dados.')
     } finally {
-      setLoading(false)
+      if (seq === pessoaConsultaSeq.current) setLoading(false)
     }
   }
 
   useEffect(() => {
     carregarDados()
   }, [])
+
+  useEffect(() => {
+    let ativo = true
+    fetchWithAuth<{ master: boolean; filtrarEscopo?: boolean; pessoas: { id: string; nome: string }[] }>('/eventos/filtros')
+      .then(data => { if (ativo && data && typeof data.master === 'boolean') setFiltros(data) })
+      .catch(() => { /* A listagem permanece protegida mesmo sem os metadados. */ })
+    return () => { ativo = false }
+  }, [])
+
+  const selecionarPessoa = async (id: string) => {
+    setPessoaFiltro(id)
+    const seq = ++pessoaConsultaSeq.current
+    setLoading(true)
+    setErro(null)
+    try {
+      const data = await fetchWithAuth<Evento[]>(id ? `/eventos?pessoaId=${encodeURIComponent(id)}` : '/eventos')
+      if (seq === pessoaConsultaSeq.current) setEventos(data || [])
+    } catch (err) {
+      if (seq === pessoaConsultaSeq.current) {
+        setEventos([])
+        setErro(err instanceof Error ? err.message : 'Erro ao filtrar eventos.')
+      }
+    } finally {
+      if (seq === pessoaConsultaSeq.current) setLoading(false)
+    }
+  }
+  const opcoesEscopo = [
+    ...regionais.map(item => ({ valor: `regionalId:${item.id}`, nome: `Regional: ${item.nome}` })),
+    ...administracoes.map(item => ({ valor: `administracaoId:${item.id}`, nome: `Administração: ${item.nome}` })),
+    ...setores.map(item => ({ valor: `setorId:${item.id}`, nome: `Setor: ${item.nome}` })),
+    ...casas.map(item => ({ valor: `casaId:${item.id}`, nome: `Casa: ${item.nome}` })),
+    ...gruposTrabalho.map(item => ({ valor: `grupoTrabalhoId:${item.id}`, nome: `GT: ${item.nome}` })),
+  ]
+  const eventosFiltrados = eventos.filter(evento => {
+    if (!escopoFiltro) return true
+    const [campo, id] = escopoFiltro.split(':')
+    if (evento[campo as keyof Evento] === id) return true
+    const casa = casas.find(item => item.id === evento.casaId)
+    const setor = setores.find(item => item.id === (evento.setorId || casa?.setorId))
+    const adm = administracoes.find(item => item.id === (evento.administracaoId || setor?.administracaoId))
+    if (campo === 'setorId') return setor?.id === id
+    if (campo === 'administracaoId') return adm?.id === id
+    if (campo === 'regionalId') {
+      const gt = gruposTrabalho.find(item => item.id === evento.grupoTrabalhoId)
+      const gtSetor = setores.find(item => item.id === gt?.setorId)
+      const gtAdm = administracoes.find(item => item.id === (gt?.administracaoId || gtSetor?.administracaoId))
+      return adm?.regionalId === id || (gt?.regionalId || gtAdm?.regionalId) === id
+    }
+    return false
+  })
 
   const parseDatetimeLocal = (val: string) => {
     if (!val) return ''
@@ -923,6 +979,22 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         </button>
       </div>
 
+      {!formOpen && !eventoDetalhe && <div className="flex flex-wrap gap-4 rounded-xl border border-slate-200 bg-white p-4">
+        {(filtros.master || filtros.filtrarEscopo) && <label className="flex flex-col gap-1 text-sm text-slate-700">Escopo
+          <select aria-label="Filtrar por escopo" value={escopoFiltro} onChange={e => setEscopoFiltro(e.target.value)} className="rounded-lg border border-slate-300 p-2">
+            <option value="">{filtros.master ? 'Todos os eventos' : 'Meus eventos e escopos autorizados'}</option>
+            {opcoesEscopo.map(item => <option key={item.valor} value={item.valor}>{item.nome}</option>)}
+          </select>
+        </label>}
+        {filtros.master && <label className="flex flex-col gap-1 text-sm text-slate-700">Pessoa
+          <select aria-label="Filtrar por pessoa" value={pessoaFiltro} onChange={e => void selecionarPessoa(e.target.value)} className="rounded-lg border border-slate-300 p-2">
+            <option value="">Todas as pessoas</option>
+            {filtros.pessoas.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
+          </select>
+        </label>}
+        <p className="self-end py-2 text-sm text-slate-500">{eventosFiltrados.length} evento(s)</p>
+      </div>}
+
       {erro && !formOpen && (
         <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm animate-in fade-in">
           {erro}
@@ -965,9 +1037,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
         </div>
-      ) : (eventos || []).length === 0 ? (
+      ) : eventosFiltrados.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-slate-500 mb-4">Nenhum evento cadastrado.</p>
+          <p className="text-slate-500 mb-4">Nenhum evento encontrado neste filtro.</p>
           <button onClick={abrirFormCriar} className="text-brand-600 font-medium hover:text-brand-700">
             Cadastrar primeiro evento
           </button>
@@ -986,7 +1058,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {eventos.map((item) => (
+                {eventosFiltrados.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 font-medium text-slate-900">{item.titulo}{item.pessoal && <span className="ml-2 text-xs text-brand-700">Próprio</span>}</td>
                     <td className="px-6 py-4 text-slate-600">

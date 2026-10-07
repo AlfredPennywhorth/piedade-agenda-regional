@@ -657,7 +657,7 @@ export async function eOperadorPortariaAutorizado(
  * Valida se o membro possui permissão de relatórios para um evento específico.
  * Autorizado se:
  * 1. É o organizador do evento (evento.organizadorMembroId === membroId); OU
- * 2. Possui vínculo ativo com a função GESTOR_RELATORIOS no exato escopo do evento.
+ * 2. Possui vínculo ativo com a função GESTOR_RELATORIOS no escopo do evento ou em um ancestral autorizado.
  */
 export async function eGestorRelatoriosAutorizadoParaEvento(db: any, membroId: string, evento: any): Promise<boolean> {
   if (!db || !membroId || !evento) return false
@@ -666,61 +666,31 @@ export async function eGestorRelatoriosAutorizadoParaEvento(db: any, membroId: s
   if (eMasterSistema(contexto)) return true
   if (evento.pessoal) return evento.criadorMembroId === membroId
 
-  const escopoEvento =
-    evento.regionalId ? { tipo: 'REGIONAL', id: evento.regionalId } :
-    evento.administracaoId ? { tipo: 'ADMINISTRACAO', id: evento.administracaoId } :
-    evento.setorId ? { tipo: 'SETOR', id: evento.setorId } :
-    evento.casaId ? { tipo: 'CASA', id: evento.casaId } :
-    evento.grupoTrabalhoId ? { tipo: 'GRUPO_TRABALHO', id: evento.grupoTrabalhoId } :
-    null
-
-  if (
-    escopoEvento &&
-    contexto.acessosAtivos.some(
-      acesso =>
-        acesso.perfilCodigo === 'GESTOR_RELATORIOS' &&
-        acesso.escopoTipo === escopoEvento.tipo &&
-        acesso.escopoId === escopoEvento.id
-    )
-  ) {
-    return true
-  }
-
-  // Compatibilidade: organizador do evento.
-  if (evento.organizadorMembroId === membroId) {
-    return true
-  }
-
-  // Compatibilidade legada: vínculo funcional GESTOR_RELATORIOS no mesmo escopo
-  const vinculosGestor = await db
-    .select({
-      v: schema.vinculosFuncionais,
-      f: schema.funcoes
-    })
+  if (evento.organizadorMembroId === membroId) return true
+  const { condicaoEscopo } = await import('./eventos')
+  const condicoes = contexto.acessosAtivos
+    .filter(acesso => acesso.perfilCodigo === 'GESTOR_RELATORIOS')
+    .map(condicaoEscopo)
+    .filter(condicao => !!condicao)
+  const legados = await db
+    .select({ v: schema.vinculosFuncionais })
     .from(schema.vinculosFuncionais)
     .innerJoin(schema.funcoes, eq(schema.vinculosFuncionais.funcaoId, schema.funcoes.id))
-    .where(
-      and(
-        eq(schema.vinculosFuncionais.membroId, membroId),
-        eq(schema.vinculosFuncionais.ativo, true),
-        eq(schema.funcoes.ativo, true),
-        eq(schema.funcoes.codigo, 'GESTOR_RELATORIOS')
-      )
-    )
-    .all()
-
-  if (!vinculosGestor || vinculosGestor.length === 0) {
-    return false
+    .where(and(eq(schema.vinculosFuncionais.membroId, membroId),
+      eq(schema.vinculosFuncionais.ativo, true), eq(schema.funcoes.ativo, true),
+      eq(schema.funcoes.codigo, 'GESTOR_RELATORIOS'))).all()
+  for (const { v } of legados) {
+    const campos = [ ['REGIONAL', v.regionalId], ['ADMINISTRACAO', v.administracaoId],
+      ['SETOR', v.setorId], ['CASA', v.casaId], ['GRUPO_TRABALHO', v.grupoTrabalhoId] ] as const
+    for (const [escopoTipo, escopoId] of campos) {
+      if (!escopoId) continue
+      const condicao = condicaoEscopo({ id: v.id, perfilCodigo: 'GESTOR_RELATORIOS', escopoTipo, escopoId })
+      if (condicao) condicoes.push(condicao)
+    }
   }
-
-  return vinculosGestor.some(({ v }: any) => {
-    if (evento.regionalId && v.regionalId === evento.regionalId) return true
-    if (evento.administracaoId && v.administracaoId === evento.administracaoId) return true
-    if (evento.setorId && v.setorId === evento.setorId) return true
-    if (evento.casaId && v.casaId === evento.casaId) return true
-    if (evento.grupoTrabalhoId && v.grupoTrabalhoId === evento.grupoTrabalhoId) return true
-    return false
-  })
+  if (!condicoes.length) return false
+  return !!(await db.select({ id: schema.eventos.id }).from(schema.eventos)
+    .where(and(eq(schema.eventos.id, evento.id), or(...condicoes))).get())
 }
 
 /**

@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
-import { eq, and, sql } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal } from '../db/schema'
+import { eq, and, or, sql } from 'drizzle-orm'
+import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal, membros } from '../db/schema'
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, executarOperacaoComAudits, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
-import { podeGerenciarAgendaNoEscopo } from '../security/permissoes'
+import { podeGerenciarAgendaNoEscopo, eMasterSistema } from '../security/permissoes'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
 import { condicaoEventosVisiveis, condicaoEventosGerenciaveis, podeLerEvento, podeGerenciarEvento } from '../security/eventos'
@@ -76,6 +76,15 @@ function houveAlteracaoMaterial(anterior: any, atual: any) {
 
 eventosRouter.use('*', authMiddleware)
 
+// Metadados de filtro não concedem acesso a eventos fora da autorização.
+eventosRouter.get('/filtros', async c => {
+  const master = eMasterSistema(c.get('contextoPermissoes'))
+  const pessoas = master ? await c.get('db').select({ id: membros.id, nome: membros.nome })
+    .from(membros).orderBy(membros.nome).all() : []
+  const filtrarEscopo = master || c.get('contextoPermissoes').acessosAtivos.some((acesso: any) => ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA', 'GESTOR_RELATORIOS', 'AUDITOR', 'OPERADOR_PORTARIA_PERMANENTE'].includes(acesso.perfilCodigo))
+  return c.json({ master, filtrarEscopo, pessoas })
+})
+
 eventosRouter.get('/', async (c) => {
   const db = c.get('db')
   // Basic filtering for S04
@@ -90,6 +99,14 @@ eventosRouter.get('/', async (c) => {
     conditions.push(eq(eventos.modalidade, modalidade))
   }
 
+  const pessoaId = c.req.query('pessoaId')
+  if (pessoaId) {
+    if (!eMasterSistema(c.get('contextoPermissoes'))) {
+      return c.json({ error: 'Filtro por pessoa exclusivo do Master', code: 'FORBIDDEN' }, 403)
+    }
+    conditions.push(or(eq(eventos.criadorMembroId, pessoaId), eq(eventos.organizadorMembroId, pessoaId),
+      sql`EXISTS (SELECT 1 FROM convocacoes c JOIN convocacao_destinatarios d ON d.convocacao_id = c.id WHERE c.evento_id = ${eventos.id} AND c.status = 'PUBLICADA' AND c.ativo = 1 AND d.membro_id = ${pessoaId})`))
+  }
   conditions.push(await condicaoEventosVisiveis(db, c.get('contextoPermissoes')))
   const gerenciavel = condicaoEventosGerenciaveis(c.get('contextoPermissoes'))
   const data = await db.select({ evento: eventos, podeGerenciar: sql<number>`CASE WHEN ${gerenciavel} THEN 1 ELSE 0 END` }).from(eventos).where(and(...conditions)).all()
