@@ -47,16 +47,22 @@ export function condicaoEscopo(acesso: AcessoTecnico): SQL | undefined {
 }
 
 
-function possuiGestaoRegionalExterna(
+function condicaoGestaoRegionalExternaDaConta(
   contexto: ContextoPermissoes,
-  perfis: string[]
-): boolean {
-  return contexto.acessosAtivos.some(
-    acesso =>
-      perfis.includes(acesso.perfilCodigo) &&
-      acesso.escopoTipo === 'REGIONAL' &&
-      acesso.escopoId !== null
-  )
+  perfisSql: string
+): SQL {
+  if (!contexto.contaAcessoId) return sql`0 = 1`
+  const e = schema.eventos
+  const perfis = sql.raw(perfisSql)
+  return sql`EXISTS (
+    SELECT 1
+    FROM acessos_conta ac
+    WHERE ac.conta_acesso_id = ${contexto.contaAcessoId}
+      AND ac.ativo = 1
+      AND ac.perfil_codigo IN (${perfis})
+      AND ac.escopo_tipo = 'REGIONAL'
+      AND ac.escopo_id = ${e.regionalGestaoId}
+  )`
 }
 
 function condicaoEscoposTecnicosDaConta(
@@ -158,9 +164,9 @@ export async function condicaoEventosVisiveis(db: any, contexto: ContextoPermiss
     "'ADMINISTRADOR_SISTEMA','GESTOR_AGENDA','GESTOR_RELATORIOS','AUDITOR','OPERADOR_PORTARIA_PERMANENTE'"
   )
 
-  const podeVerExternoRegional = possuiGestaoRegionalExterna(
+  const escopoExternoTecnico = condicaoGestaoRegionalExternaDaConta(
     contexto,
-    ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA', 'GESTOR_RELATORIOS', 'AUDITOR', 'OPERADOR_PORTARIA_PERMANENTE']
+    "'ADMINISTRADOR_SISTEMA','GESTOR_AGENDA','GESTOR_RELATORIOS','AUDITOR','OPERADOR_PORTARIA_PERMANENTE'"
   )
 
   return or(
@@ -171,9 +177,10 @@ export async function condicaoEventosVisiveis(db: any, contexto: ContextoPermiss
         eq(e.organizadorMembroId, membroId),
         escoposTecnicos,
         ...escoposLegados,
-        podeVerExternoRegional
-          ? sql`${e.abrangencia} IN ('NACIONAL','INTERNACIONAL')`
-          : sql`0 = 1`,
+        and(
+          sql`${e.abrangencia} IN ('NACIONAL','INTERNACIONAL')`,
+          escopoExternoTecnico
+        ),
         sql`EXISTS (SELECT 1 FROM convocacoes c JOIN convocacao_destinatarios d ON d.convocacao_id = c.id WHERE c.evento_id = ${e.id} AND c.status = 'PUBLICADA' AND c.ativo = 1 AND d.membro_id = ${membroId})`
       )
     )
@@ -200,9 +207,9 @@ export function condicaoEventosGerenciaveis(contexto: ContextoPermissoes): SQL {
     contexto,
     "'ADMINISTRADOR_SISTEMA','GESTOR_AGENDA'"
   )
-  const podeGerirExternoRegional = possuiGestaoRegionalExterna(
+  const escopoExternoGerenciavel = condicaoGestaoRegionalExternaDaConta(
     contexto,
-    ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA']
+    "'ADMINISTRADOR_SISTEMA','GESTOR_AGENDA'"
   )
   return or(
     and(eq(e.pessoal, true), eq(e.criadorMembroId, contexto.membroId)),
@@ -210,9 +217,10 @@ export function condicaoEventosGerenciaveis(contexto: ContextoPermissoes): SQL {
       eq(e.pessoal, false),
       or(
         escoposTecnicos,
-        podeGerirExternoRegional
-          ? sql`${e.abrangencia} IN ('NACIONAL','INTERNACIONAL')`
-          : sql`0 = 1`,
+        and(
+          sql`${e.abrangencia} IN ('NACIONAL','INTERNACIONAL')`,
+          escopoExternoGerenciavel
+        ),
         and(
           or(
             eq(e.criadorMembroId, contexto.membroId),
