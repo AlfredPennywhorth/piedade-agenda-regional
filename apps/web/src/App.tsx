@@ -26,6 +26,18 @@ import { ContasAcessoView } from './components/acessos/ContasAcessoView'
 import { PerfilView } from './components/perfil/PerfilView'
 import { PortariaOperadorTemporarioView } from './components/portaria/PortariaOperadorTemporarioView'
 
+function PublicScreenCode({ code }: { code: string }) {
+  return (
+    <span
+      className="fixed bottom-2 right-2 z-50 rounded bg-white/90 px-2 py-1 text-[10px] font-medium tracking-wide text-slate-400 shadow-sm"
+      data-screen-code={code}
+      aria-label={`Código da tela ${code}`}
+    >
+      Tela {code}
+    </span>
+  )
+}
+
 function App() {
   const paramsPublicos = new URLSearchParams(window.location.search)
   const tokenPortariaPublica = paramsPublicos.get('p') || paramsPublicos.get('portaria')
@@ -34,8 +46,11 @@ function App() {
     : paramsPublicos.get('op')
 
   const [currentTab, setCurrentTab] = useState<'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes' | 'acessos'>('agenda')
+  const [fluxoEventoId, setFluxoEventoId] = useState<string | null>(null)
   const [capacidades, setCapacidades] = useState<CapacidadesFrontend>({})
   const [nomeUsuario, setNomeUsuario] = useState('')
+  const [recuperacoesPinPendentes, setRecuperacoesPinPendentes] = useState(0)
+  const [revisaoEscopoAutorizado, setRevisaoEscopoAutorizado] = useState(0)
   const [estadoSessao, setEstadoSessao] = useState<'verificando' | 'autenticada' | 'anonima'>('verificando')
   const [tokenAtivacao, setTokenAtivacao] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search)
@@ -55,6 +70,7 @@ function App() {
       }>('/auth/me')
       setNomeUsuario(data.nome || '')
       setCapacidades(data.capacidades || {})
+      setRevisaoEscopoAutorizado(revisao => revisao + 1)
       setEstadoSessao('autenticada')
     } catch {
       limparTokenSessao()
@@ -67,6 +83,30 @@ function App() {
   useEffect(() => {
     carregarIdentidade()
   }, [])
+
+  useEffect(() => {
+    if (estadoSessao !== 'autenticada' || capacidades.podeAdministrarAcessos !== true) {
+      setRecuperacoesPinPendentes(0)
+      return
+    }
+
+    let ativo = true
+    void fetchWithAuth<Array<{ recuperacaoPinPendente?: boolean }>>('/admin/acessos')
+      .then(contas => {
+        if (ativo) {
+          setRecuperacoesPinPendentes(
+            contas.filter(conta => conta.recuperacaoPinPendente === true).length
+          )
+        }
+      })
+      .catch(() => {
+        // O alerta não deve bloquear a entrada no sistema se a consulta administrativa falhar.
+      })
+
+    return () => {
+      ativo = false
+    }
+  }, [estadoSessao, capacidades.podeAdministrarAcessos, revisaoEscopoAutorizado])
 
   const podeAcessarAba = (tab: typeof currentTab) => {
     if (tab === 'portaria') {
@@ -113,17 +153,28 @@ function App() {
       limparTokenSessao()
       setNomeUsuario('')
       setCapacidades({})
+      setRecuperacoesPinPendentes(0)
       setCurrentTab('agenda')
       setEstadoSessao('anonima')
     }
   }
 
   if ((window.location.pathname === '/portaria-operador' || window.location.pathname.startsWith('/o/')) && tokenOperadorPortaria) {
-    return <PortariaOperadorTemporarioView token={tokenOperadorPortaria} />
+    return (
+      <>
+        <PortariaOperadorTemporarioView token={tokenOperadorPortaria} />
+        <PublicScreenCode code="AGD-MOB-005" />
+      </>
+    )
   }
 
   if ((window.location.pathname === '/c' || window.location.pathname === '/convidado') && tokenPortariaPublica) {
-    return <CadastroConvidadoView token={tokenPortariaPublica} />
+    return (
+      <>
+        <CadastroConvidadoView token={tokenPortariaPublica} />
+        <PublicScreenCode code="AGD-MOB-006" />
+      </>
+    )
   }
 
   if (estadoSessao === 'verificando') {
@@ -136,11 +187,13 @@ function App() {
 
   if (estadoSessao === 'anonima') {
     return (
-      <AuthView
-        tokenAtivacao={tokenAtivacao}
-        onAuthenticated={concluirAutenticacao}
-        onCancelarAtivacao={tokenAtivacao ? cancelarAtivacao : undefined}
-      />
+      <>
+        <AuthView
+          tokenAtivacao={tokenAtivacao}
+          onAuthenticated={concluirAutenticacao}
+          onCancelarAtivacao={tokenAtivacao ? cancelarAtivacao : undefined}
+        />
+      </>
     )
   }
 
@@ -152,11 +205,28 @@ function App() {
       capacidades={capacidades}
       nomeUsuario={nomeUsuario}
       onLogout={sair}
+      recuperacoesPinPendentes={recuperacoesPinPendentes}
     >
       {currentTab === 'agenda' && <AgendaView />}
-      {currentTab === 'eventos' && capacidades.podeGerirAgenda === true && <EventosView />}
+      {currentTab === 'eventos' && capacidades.podeGerirAgenda === true && (
+        <EventosView
+          onEventoPessoalCriado={() => {
+            setFluxoEventoId(null)
+            setCurrentTab('agenda')
+          }}
+          onEventoCriado={eventoId => {
+            setFluxoEventoId(eventoId)
+            setCurrentTab('convocacoes')
+          }}
+        />
+      )}
       {currentTab === 'series' && capacidades.podeGerirAgenda === true && <SeriesView />}
-      {currentTab === 'convocacoes' && capacidades.podeGerirAgenda === true && <ConvocacoesView />}
+      {currentTab === 'convocacoes' && capacidades.podeGerirAgenda === true && (
+        <ConvocacoesView
+          initialEventoId={fluxoEventoId}
+          onFluxoConcluido={() => setFluxoEventoId(null)}
+        />
+      )}
       {currentTab === 'calendario' && <CalendarioView />}
       {currentTab === 'portaria' &&
         (capacidades.podeOperarPortaria === true || capacidades.podeGerirAgenda === true) && (
@@ -175,7 +245,12 @@ function App() {
       {currentTab === 'funcoes' && capacidades.podeAdministrarFuncoes === true && <FuncoesView />}
       {currentTab === 'vinculos-funcionais' && capacidades.podeAdministrarPessoas === true && <VinculosFuncionaisView />}
       {currentTab === 'locais' && capacidades.podeGerirAgenda === true && <LocaisView />}
-      {currentTab === 'acessos' && capacidades.podeAdministrarAcessos === true && <ContasAcessoView />}
+      {currentTab === 'acessos' && capacidades.podeAdministrarAcessos === true && (
+        <ContasAcessoView
+          onPendenciasAtualizadas={setRecuperacoesPinPendentes}
+          podeGerenciarSessoes={capacidades.podeGerenciarSessoes === true}
+        />
+      )}
       
       {currentTab === 'avisos' && (
         <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">

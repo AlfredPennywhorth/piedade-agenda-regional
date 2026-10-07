@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput, SerieCreateInput, createUtcDateFromSaoPaulo } from '@piedade/shared'
+import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput, SerieCreateInput, LocalCreate, EspacoLocalCreate, createUtcDateFromSaoPaulo } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import { SerieFormModal, TipoEscopo } from '../series/SerieFormModal'
 import { generateQrMatrix } from '../agenda/qrGenerator'
@@ -51,6 +51,9 @@ interface SerieResponse {
 }
 
 export interface Evento {
+  pessoal?: boolean
+  podeGerenciar?: boolean
+  criadorMembroId?: string | null
   id: string
   titulo: string
   descricao: string | null
@@ -67,6 +70,9 @@ export interface Evento {
   setorId: string | null
   casaId: string | null
   grupoTrabalhoId: string | null
+  filtroRegionalId?: string | null
+  filtroAdministracaoId?: string | null
+  filtroSetorId?: string | null
   observacoes: string | null
   ativo: boolean
   createdAt?: string
@@ -75,9 +81,15 @@ export interface Evento {
   recorrenciaExcecao?: boolean
 }
 
-export function EventosView() {
+export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEventoCriado?: (eventoId: string) => void; onEventoPessoalCriado?: () => void }) {
   const [eventos, setEventos] = useState<Evento[]>([])
   
+  const [filtros, setFiltros] = useState<{ master: boolean; filtrarEscopo?: boolean; pessoas: { id: string; nome: string }[] }>({ master: false, pessoas: [] })
+  const [pessoaFiltro, setPessoaFiltro] = useState('')
+  const [escopoFiltro, setEscopoFiltro] = useState('')
+  const [statusEventoFiltro, setStatusEventoFiltro] = useState<'ATIVOS' | 'CANCELADOS' | 'TODOS'>('ATIVOS')
+  const pessoaConsultaSeq = useRef(0)
+
   // Lookups
   const [locais, setLocais] = useState<Local[]>([])
   const [espacos, setEspacos] = useState<EspacoLocal[]>([])
@@ -90,6 +102,7 @@ export function EventosView() {
 
   const [loading, setLoading] = useState<boolean>(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [erroCancelamento, setErroCancelamento] = useState<string | null>(null)
   const [acessoPortariaUrl, setAcessoPortariaUrl] = useState<string | null>(null)
   
   // Form State
@@ -105,12 +118,14 @@ export function EventosView() {
   // Serie Form State
   const [serieFormOpen, setSerieFormOpen] = useState(false)
   const [serieInitialData, setSerieInitialData] = useState<Partial<SerieCreateInput>>({})
+  const [serieOriginal, setSerieOriginal] = useState<SerieResponse | null>(null)
   const [serieInitialTipoEscopo, setSerieInitialTipoEscopo] = useState<TipoEscopo>('')
 
   // Modal Details
   const [eventoDetalhe, setEventoDetalhe] = useState<Evento | null>(null)
 
   const [formData, setFormData] = useState<Partial<EventoCreateInput>>({
+    pessoal: false,
     titulo: '',
     descricao: '',
     pauta: '',
@@ -131,11 +146,112 @@ export function EventosView() {
   })
   
   const [tipoEscopo, setTipoEscopo] = useState<'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | ''>('')
+  const [casaSetorFiltro, setCasaSetorFiltro] = useState('')
   
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
+  const [localRapidoOpen, setLocalRapidoOpen] = useState(false)
+  const [salvandoLocalRapido, setSalvandoLocalRapido] = useState(false)
+  const [localRapidoErro, setLocalRapidoErro] = useState<string | null>(null)
+  const [consultandoCepRapido, setConsultandoCepRapido] = useState(false)
+  const [cepRapidoMensagem, setCepRapidoMensagem] = useState<string | null>(null)
+  const [cepRapidoErro, setCepRapidoErro] = useState(false)
+  const cepRapidoConsultaSeq = useRef(0)
+  const cepRapidoAbortControllerRef = useRef<AbortController | null>(null)
+  const [localRapido, setLocalRapido] = useState({
+    nome: '',
+    endereco: '',
+    numero: '',
+    bairro: '',
+    cidade: 'São Paulo',
+    uf: 'SP',
+    cep: '',
+  })
+  const [espacoRapidoOpen, setEspacoRapidoOpen] = useState(false)
+  const [salvandoEspacoRapido, setSalvandoEspacoRapido] = useState(false)
+  const [espacoRapidoErro, setEspacoRapidoErro] = useState<string | null>(null)
+  const [espacoRapidoNome, setEspacoRapidoNome] = useState('')
+  const localRapidoDialogRef = useRef<HTMLDivElement | null>(null)
+  const espacoRapidoDialogRef = useRef<HTMLDivElement | null>(null)
+  const localRapidoTriggerRef = useRef<HTMLElement | null>(null)
+  const espacoRapidoTriggerRef = useRef<HTMLElement | null>(null)
   const eventoFormConsultaSeq = useRef(0)
+  const eventoDetalheConsultaSeq = useRef(0)
+  const eventoDetalheIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!localRapidoOpen) return
+    const dialog = localRapidoDialogRef.current
+    const focaveis = dialog?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    focaveis?.[0]?.focus()
+
+    const aoTeclar = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !dialog) return
+      const itens = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ))
+      if (itens.length === 0) return
+      const primeiro = itens[0]
+      const ultimo = itens[itens.length - 1]
+      if (event.shiftKey && document.activeElement === primeiro) {
+        event.preventDefault()
+        ultimo.focus()
+      } else if (!event.shiftKey && document.activeElement === ultimo) {
+        event.preventDefault()
+        primeiro.focus()
+      }
+    }
+
+    document.addEventListener('keydown', aoTeclar)
+    return () => {
+      document.removeEventListener('keydown', aoTeclar)
+      if (localRapidoTriggerRef.current?.isConnected) localRapidoTriggerRef.current.focus()
+    }
+  }, [localRapidoOpen])
+
+  useEffect(() => {
+    if (!espacoRapidoOpen) return
+    const dialog = espacoRapidoDialogRef.current
+    const focaveis = dialog?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    focaveis?.[0]?.focus()
+
+    const aoTeclar = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !dialog) return
+      const itens = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ))
+      if (itens.length === 0) return
+      const primeiro = itens[0]
+      const ultimo = itens[itens.length - 1]
+      if (event.shiftKey && document.activeElement === primeiro) {
+        event.preventDefault()
+        ultimo.focus()
+      } else if (!event.shiftKey && document.activeElement === ultimo) {
+        event.preventDefault()
+        primeiro.focus()
+      }
+    }
+
+    document.addEventListener('keydown', aoTeclar)
+    return () => {
+      document.removeEventListener('keydown', aoTeclar)
+      if (espacoRapidoTriggerRef.current?.isConnected) espacoRapidoTriggerRef.current.focus()
+    }
+  }, [espacoRapidoOpen])
+
+  const montarUrlEventos = (pessoaId = pessoaFiltro) => {
+    const params = new URLSearchParams()
+    if (pessoaId) params.set('pessoaId', pessoaId)
+    if (statusEventoFiltro === 'CANCELADOS') params.set('ativo', 'false')
+    const query = params.toString()
+    return query ? `/eventos?${query}` : '/eventos'
+  }
 
   const carregarDados = async () => {
+    const seq = ++pessoaConsultaSeq.current
     setLoading(true)
     setErro(null)
     try {
@@ -143,7 +259,7 @@ export function EventosView() {
         eventosData, locaisData, espacosData, membrosData, regionaisData,
         administracoesData, setoresData, casasData, gruposData
       ] = await Promise.all([
-        fetchWithAuth<Evento[]>('/eventos'),
+        fetchWithAuth<Evento[]>(montarUrlEventos()),
         fetchWithAuth<Local[]>('/locais'),
         fetchWithAuth<EspacoLocal[]>('/espacos-locais?ativo=true'),
         fetchWithAuth<Membro[]>('/membros'),
@@ -154,7 +270,7 @@ export function EventosView() {
         fetchWithAuth<GrupoTrabalho[]>('/grupos-trabalho'),
       ])
       
-      setEventos(eventosData || [])
+      if (seq === pessoaConsultaSeq.current) setEventos(eventosData || [])
       setLocais(locaisData || [])
       setEspacos(espacosData || [])
       setMembros(membrosData || [])
@@ -164,15 +280,74 @@ export function EventosView() {
       setCasas(casasData || [])
       setGruposTrabalho(gruposData || [])
     } catch (err: any) {
-      setErro(err.message || 'Erro ao carregar os dados.')
+      if (seq === pessoaConsultaSeq.current) setErro(err.message || 'Erro ao carregar os dados.')
     } finally {
-      setLoading(false)
+      if (seq === pessoaConsultaSeq.current) setLoading(false)
     }
   }
 
   useEffect(() => {
-    carregarDados()
+    void carregarDados()
+  }, [statusEventoFiltro])
+
+  useEffect(() => {
+    let ativo = true
+    fetchWithAuth<{ master: boolean; filtrarEscopo?: boolean; pessoas: { id: string; nome: string }[] }>('/eventos/filtros')
+      .then(data => { if (ativo && data && typeof data.master === 'boolean') setFiltros(data) })
+      .catch(() => { /* A listagem permanece protegida mesmo sem os metadados. */ })
+    return () => { ativo = false }
   }, [])
+
+  const selecionarPessoa = async (id: string) => {
+    setPessoaFiltro(id)
+    const seq = ++pessoaConsultaSeq.current
+    setLoading(true)
+    setErro(null)
+    try {
+      const data = await fetchWithAuth<Evento[]>(montarUrlEventos(id))
+      if (seq === pessoaConsultaSeq.current) setEventos(data || [])
+    } catch (err) {
+      if (seq === pessoaConsultaSeq.current) {
+        setEventos([])
+        setErro(err instanceof Error ? err.message : 'Erro ao filtrar eventos.')
+      }
+    } finally {
+      if (seq === pessoaConsultaSeq.current) setLoading(false)
+    }
+  }
+  const opcoesEscopo = [
+    ...regionais.map(item => ({ valor: `regionalId:${item.id}`, nome: `Regional: ${item.nome}` })),
+    ...administracoes.map(item => ({ valor: `administracaoId:${item.id}`, nome: `Administração: ${item.nome}` })),
+    ...setores.map(item => ({ valor: `setorId:${item.id}`, nome: `Setor: ${item.nome}` })),
+    ...casas.map(item => ({ valor: `casaId:${item.id}`, nome: `Casa: ${item.nome}` })),
+    ...gruposTrabalho.map(item => ({ valor: `grupoTrabalhoId:${item.id}`, nome: `GT: ${item.nome}` })),
+  ]
+  const eventosFiltrados = eventos.filter(evento => {
+    if (statusEventoFiltro === 'ATIVOS' && !evento.ativo) return false
+    if (statusEventoFiltro === 'CANCELADOS' && evento.ativo) return false
+    if (!escopoFiltro) return true
+    const [campo, id] = escopoFiltro.split(':')
+    if (evento[campo as keyof Evento] === id) return true
+    if (campo === 'setorId' && evento.filtroSetorId) return evento.filtroSetorId === id
+    if (campo === 'administracaoId' && evento.filtroAdministracaoId) {
+      return evento.filtroAdministracaoId === id
+    }
+    if (campo === 'regionalId' && evento.filtroRegionalId) return evento.filtroRegionalId === id
+
+    // Compatibilidade com respostas antigas durante rollout.
+    const casa = casas.find(item => item.id === evento.casaId)
+    const setor = setores.find(item => item.id === (evento.setorId || casa?.setorId))
+    const adm = administracoes.find(item => item.id === (evento.administracaoId || setor?.administracaoId))
+    if (campo === 'setorId') return setor?.id === id
+    if (campo === 'administracaoId') return adm?.id === id
+    if (campo === 'regionalId') {
+      const gt = gruposTrabalho.find(item => item.id === evento.grupoTrabalhoId)
+      const gtSetor = setores.find(item => item.id === gt?.setorId)
+      const gtAdm = administracoes.find(item => item.id === (gt?.administracaoId || gtSetor?.administracaoId))
+      return adm?.regionalId === id || (gt?.regionalId || gtAdm?.regionalId) === id
+    }
+    return false
+  })
 
   const parseDatetimeLocal = (val: string) => {
     if (!val) return ''
@@ -214,8 +389,10 @@ export function EventosView() {
 
   const handleTipoEscopoChange = (tipo: 'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | '') => {
     setTipoEscopo(tipo)
+    setCasaSetorFiltro('')
     setFormData(prev => ({
       ...prev,
+      pessoal: false,
       regionalId: '',
       administracaoId: '',
       setorId: '',
@@ -251,6 +428,7 @@ export function EventosView() {
     setEventoEditandoSerieId(null)
     setCarregandoDetalhes(false)
     setFormData({
+      pessoal: false,
       titulo: '',
       descricao: '',
       pauta: '',
@@ -270,6 +448,7 @@ export function EventosView() {
       ativo: true,
     })
     setTipoEscopo('')
+    setCasaSetorFiltro('')
     setErrosForm({})
     setErro(null)
     setFormOpen(true)
@@ -281,6 +460,44 @@ export function EventosView() {
     } else {
       abrirFormEditar(item.id, null)
     }
+  }
+
+  const abrirDetalheEvento = async (item: Evento) => {
+    const consultaAtual = ++eventoDetalheConsultaSeq.current
+    setErro(null)
+    eventoDetalheIdRef.current = item.id
+    setEventoDetalhe(item)
+    let itemCompleto = item
+
+    try {
+      itemCompleto = await fetchWithAuth<Evento>(`/eventos/${item.id}`)
+    } catch {
+      // Mantém o resumo da listagem disponível caso a consulta pontual falhe.
+    }
+
+    if (consultaAtual !== eventoDetalheConsultaSeq.current) return
+    setEventoDetalhe(itemCompleto)
+
+    if (!itemCompleto.espacoId || !itemCompleto.localId || espacos.some(espaco => espaco.id === itemCompleto.espacoId)) {
+      return
+    }
+
+    try {
+      const espacosDoLocal = await fetchWithAuth<EspacoLocal[]>(`/espacos-locais?localId=${itemCompleto.localId}`)
+      if (consultaAtual !== eventoDetalheConsultaSeq.current) return
+      const espacoAtual = (espacosDoLocal || []).find(espaco => espaco.id === itemCompleto.espacoId)
+      if (espacoAtual) {
+        setEspacos(prev => prev.some(espaco => espaco.id === espacoAtual.id) ? prev : [...prev, espacoAtual])
+      }
+    } catch {
+      // O detalhe continua disponível mesmo se o lookup histórico falhar.
+    }
+  }
+
+  const fecharDetalheEvento = () => {
+    eventoDetalheConsultaSeq.current += 1
+    eventoDetalheIdRef.current = null
+    setEventoDetalhe(null)
   }
 
   const abrirFormEditar = async (id: string, serieId: string | null) => {
@@ -320,7 +537,9 @@ export function EventosView() {
       else if (item.grupoTrabalhoId) tipo = 'grupoTrabalho'
       
       setTipoEscopo(tipo)
+      setCasaSetorFiltro(tipo === 'casa' ? (casas.find(casa => casa.id === item.casaId)?.setorId ?? '') : '')
       setFormData({
+        pessoal: item.pessoal ?? false,
         titulo: item.titulo || '',
         descricao: item.descricao || '',
         pauta: item.pauta || '',
@@ -359,6 +578,7 @@ export function EventosView() {
     
     try {
       const serie = await fetchWithAuth<SerieResponse>(`/series-recorrencia/${evento.serieRecorrenciaId}`)
+      setSerieOriginal(serie)
       
       let tipo: TipoEscopo = ''
       if (serie.regionalId) tipo = 'regional'
@@ -423,7 +643,7 @@ export function EventosView() {
       localId: formData.localId || null,
       espacoId: formData.espacoId || null,
       urlOnline: formData.urlOnline || null,
-      organizadorMembroId: formData.organizadorMembroId || null,
+      organizadorMembroId: formData.pessoal && !eventoEditandoId ? null : formData.organizadorMembroId || null,
       regionalId: formData.regionalId || null,
       administracaoId: formData.administracaoId || null,
       setorId: formData.setorId || null,
@@ -472,7 +692,16 @@ export function EventosView() {
         }
         await patchWithAuth(`/eventos/${eventoEditandoId}`, updatePayload)
       } else {
-        await postWithAuth('/eventos', parsed.data)
+        const criado = await postWithAuth<Evento>('/eventos', parsed.data)
+        fecharFormularioEvento()
+        if (criado.pessoal && onEventoPessoalCriado) {
+          onEventoPessoalCriado()
+          return
+        }
+        if (onEventoCriado && !criado.pessoal) {
+          onEventoCriado(criado.id)
+          return
+        }
       }
 
       fecharFormularioEvento()
@@ -485,6 +714,222 @@ export function EventosView() {
       }
     } finally {
       setSalvando(false)
+    }
+  }
+
+  const formatarCepRapido = (valor: string) => {
+    const digitos = valor.replace(/\D/g, '').slice(0, 8)
+    return digitos.length > 5 ? `${digitos.slice(0, 5)}-${digitos.slice(5)}` : digitos
+  }
+
+  const buscarCepRapido = async (cepInformado: string) => {
+    const cep = cepInformado.replace(/\D/g, '')
+    if (cep.length !== 8) return
+
+    cepRapidoAbortControllerRef.current?.abort()
+    const controller = new AbortController()
+    cepRapidoAbortControllerRef.current = controller
+    const seq = ++cepRapidoConsultaSeq.current
+    const timeout = window.setTimeout(() => controller.abort(), 8000)
+
+    setConsultandoCepRapido(true)
+    setCepRapidoMensagem(null)
+    setCepRapidoErro(false)
+
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, { signal: controller.signal })
+      if (!response.ok) throw new Error('Falha ao consultar CEP')
+
+      const data = await response.json() as {
+        cep?: string
+        logradouro?: string
+        bairro?: string
+        localidade?: string
+        uf?: string
+        erro?: boolean
+      }
+      if (seq !== cepRapidoConsultaSeq.current) return
+
+      if (data.erro) {
+        setCepRapidoMensagem('CEP não encontrado. Preencha o endereço manualmente.')
+        setCepRapidoErro(true)
+        return
+      }
+
+      setLocalRapido(atual => ({
+        ...atual,
+        cep: data.cep || formatarCepRapido(cep),
+        endereco: data.logradouro || atual.endereco,
+        bairro: data.bairro || atual.bairro,
+        cidade: data.localidade || atual.cidade,
+        uf: (data.uf || atual.uf).toUpperCase(),
+      }))
+      setCepRapidoMensagem('Endereço preenchido automaticamente pelo CEP.')
+    } catch {
+      if (seq !== cepRapidoConsultaSeq.current) return
+      setCepRapidoMensagem('Consulta de CEP encerrada. Você pode preencher o endereço manualmente.')
+      setCepRapidoErro(false)
+    } finally {
+      window.clearTimeout(timeout)
+      if (cepRapidoAbortControllerRef.current === controller) {
+        cepRapidoAbortControllerRef.current = null
+      }
+      if (seq === cepRapidoConsultaSeq.current) {
+        setConsultandoCepRapido(false)
+      }
+    }
+  }
+
+  const handleCepRapidoChange = (valor: string) => {
+    const cepFormatado = formatarCepRapido(valor)
+    setLocalRapido(atual => ({ ...atual, cep: cepFormatado }))
+    setCepRapidoMensagem(null)
+    setCepRapidoErro(false)
+
+    if (cepFormatado.replace(/\D/g, '').length === 8) {
+      void buscarCepRapido(cepFormatado)
+    } else {
+      cepRapidoAbortControllerRef.current?.abort()
+      cepRapidoAbortControllerRef.current = null
+      cepRapidoConsultaSeq.current += 1
+      setConsultandoCepRapido(false)
+    }
+  }
+
+  const cancelarConsultaCepRapido = () => {
+    cepRapidoAbortControllerRef.current?.abort()
+    cepRapidoAbortControllerRef.current = null
+    cepRapidoConsultaSeq.current += 1
+    setConsultandoCepRapido(false)
+    setCepRapidoMensagem('Consulta de CEP cancelada. Preencha o endereço manualmente.')
+    setCepRapidoErro(false)
+  }
+
+  const fecharLocalRapido = () => {
+    cepRapidoAbortControllerRef.current?.abort()
+    cepRapidoAbortControllerRef.current = null
+    cepRapidoConsultaSeq.current += 1
+    setConsultandoCepRapido(false)
+    setCepRapidoMensagem(null)
+    setCepRapidoErro(false)
+    setLocalRapidoOpen(false)
+  }
+
+  const salvarLocalRapido = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (consultandoCepRapido) {
+      setCepRapidoMensagem('Aguarde a consulta do CEP terminar antes de criar o local.')
+      return
+    }
+    const parsed = LocalCreate.safeParse({
+      nome: localRapido.nome,
+      endereco: localRapido.endereco,
+      numero: localRapido.numero,
+      bairro: localRapido.bairro || null,
+      cidade: localRapido.cidade,
+      uf: localRapido.uf,
+      cep: localRapido.cep || null,
+      complemento: null,
+      referencia: null,
+      latitude: null,
+      longitude: null,
+      urlMaps: null,
+      urlWaze: null,
+      ativo: true,
+    })
+    if (!parsed.success) {
+      setLocalRapidoErro(parsed.error.issues[0]?.message || 'Dados inválidos')
+      return
+    }
+
+    setSalvandoLocalRapido(true)
+    setLocalRapidoErro(null)
+    try {
+      const criado = await postWithAuth<Local>('/locais', parsed.data)
+      setLocais(atuais => [...atuais.filter(item => item.id !== criado.id), criado]
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
+      setFormData(atual => ({ ...atual, localId: criado.id, espacoId: '' }))
+      fecharLocalRapido()
+      setLocalRapido({ nome: '', endereco: '', numero: '', bairro: '', cidade: 'São Paulo', uf: 'SP', cep: '' })
+    } catch (err: unknown) {
+      setLocalRapidoErro(err instanceof Error ? err.message : 'Erro ao criar local')
+    } finally {
+      setSalvandoLocalRapido(false)
+    }
+  }
+
+  const salvarEspacoRapido = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.localId) return
+    const parsed = EspacoLocalCreate.safeParse({
+      localId: formData.localId,
+      nome: espacoRapidoNome,
+      descricao: null,
+      capacidade: null,
+      ativo: true,
+    })
+    if (!parsed.success) {
+      setEspacoRapidoErro(parsed.error.issues[0]?.message || 'Dados inválidos')
+      return
+    }
+
+    setSalvandoEspacoRapido(true)
+    setEspacoRapidoErro(null)
+    try {
+      const criado = await postWithAuth<EspacoLocal>('/espacos-locais', parsed.data)
+      setEspacos(atuais => [...atuais.filter(item => item.id !== criado.id), criado]
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
+      setFormData(atual => ({ ...atual, espacoId: criado.id }))
+      setEspacoRapidoOpen(false)
+      setEspacoRapidoNome('')
+    } catch (err: unknown) {
+      setEspacoRapidoErro(err instanceof Error ? err.message : 'Erro ao criar espaço')
+    } finally {
+      setSalvandoEspacoRapido(false)
+    }
+  }
+
+  const handleCancelarEvento = async (item: Evento, _origem: 'lista' | 'detalhe' = 'lista') => {
+    const confirmou = window.confirm(
+      `Cancelar o evento "${item.titulo}"? Se houver convocação em rascunho, as funções serão removidas e a convocação também será cancelada.`
+    )
+    if (!confirmou) return
+
+    setErro(null)
+    setErroCancelamento(null)
+
+    try {
+      await postWithAuth(`/eventos/${item.id}/cancelar`, {})
+      setEventos(atuais => atuais.filter(evento => evento.id !== item.id))
+      if (eventoDetalheIdRef.current === item.id) {
+        fecharDetalheEvento()
+      }
+    } catch (err: unknown) {
+      const mensagem =
+        err instanceof ApiError && err.body?.error
+          ? (typeof err.body.error === 'string' ? err.body.error : 'Não foi possível cancelar o evento.')
+          : err instanceof Error
+            ? (err.message || 'Não foi possível cancelar o evento.')
+            : 'Não foi possível cancelar o evento.'
+      setErroCancelamento(mensagem)
+    }
+  }
+
+  const handleReativarEvento = async (item: Evento) => {
+    if (!window.confirm(`Reativar o evento "${item.titulo}"? A convocação cancelada, se houver, não será reaberta automaticamente.`)) return
+    setErro(null)
+    setErroCancelamento(null)
+    try {
+      const atualizado = await patchWithAuth<Evento>(`/eventos/${item.id}`, { ativo: true })
+      setEventos(atuais => atuais.map(evento => evento.id === item.id ? { ...evento, ...atualizado, ativo: true } : evento))
+      if (eventoDetalheIdRef.current === item.id) {
+        setEventoDetalhe(atual => atual?.id === item.id ? { ...atual, ...atualizado, ativo: true } : atual)
+      }
+    } catch (err: unknown) {
+      const mensagem = err instanceof ApiError && err.body?.error
+        ? (typeof err.body.error === 'string' ? err.body.error : 'Não foi possível reativar o evento.')
+        : err instanceof Error ? (err.message || 'Não foi possível reativar o evento.') : 'Não foi possível reativar o evento.'
+      setErroCancelamento(mensagem)
     }
   }
 
@@ -521,18 +966,21 @@ export function EventosView() {
     setSalvando(true)
     setErro(null)
     try {
-      const {
-        titulo, descricao, pauta, modalidade, frequencia, dataInicio,
-        dataFim, horarioInicio, horarioFim, diaSemana, diaMes,
-        posicaoSemanaMes, localId, espacoId, urlOnline, organizadorMembroId, regionalId,
-        administracaoId, setorId, casaId, grupoTrabalhoId, observacoes, ativo
-      } = confirmacaoFutureAberto
+      const normalizar = (valor: unknown) => valor === '' || valor === undefined ? null : valor
+      const baseline = serieOriginal ?? serieInitialData
+      const changes = Object.fromEntries(
+        Object.entries(confirmacaoFutureAberto).filter(([campo, valor]) => {
+          // O contrato atual não permite editar intervalo (SerieCreate usa literal 1).
+          // Em séries legadas, nunca transformar esse valor técnico em delta estrutural.
+          if (campo === 'intervalo') return false
+          return normalizar(valor) !== normalizar((baseline as Record<string, unknown>)[campo])
+        })
+      ) as Partial<SerieCreateInput>
 
-      const changes = {
-        titulo, descricao, pauta, modalidade, frequencia, intervalo: 1, dataInicio,
-        dataFim, horarioInicio, horarioFim, diaSemana, diaMes,
-        posicaoSemanaMes, localId, espacoId, urlOnline, organizadorMembroId, regionalId,
-        administracaoId, setorId, casaId, grupoTrabalhoId, observacoes, ativo
+      if (Object.keys(changes).length === 0) {
+        setConfirmacaoFutureAberto(null)
+        setSerieFormOpen(false)
+        return
       }
 
       const updatePayload = {
@@ -560,6 +1008,25 @@ export function EventosView() {
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
+      {erroCancelamento && !formOpen && !eventoDetalhe && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="fixed left-4 right-4 top-4 z-[100] mx-auto max-w-3xl rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 shadow-xl"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <span>{erroCancelamento}</span>
+            <button
+              type="button"
+              onClick={() => setErroCancelamento(null)}
+              className="shrink-0 rounded px-2 py-1 font-semibold text-red-800 hover:bg-red-100"
+              aria-label="Fechar erro de cancelamento"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
       <div className="bg-brand-900 text-white p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold">Gestão de Eventos</h2>
@@ -572,6 +1039,34 @@ export function EventosView() {
           + Novo Evento
         </button>
       </div>
+
+      {!formOpen && !eventoDetalhe && <div className="flex flex-wrap gap-4 rounded-xl border border-slate-200 bg-white p-4">
+        {(filtros.master || filtros.filtrarEscopo) && <label className="flex flex-col gap-1 text-sm text-slate-700">Escopo
+          <select aria-label="Filtrar por escopo" value={escopoFiltro} onChange={e => setEscopoFiltro(e.target.value)} className="rounded-lg border border-slate-300 p-2">
+            <option value="">{filtros.master ? 'Todos os eventos' : 'Meus eventos e escopos autorizados'}</option>
+            {opcoesEscopo.map(item => <option key={item.valor} value={item.valor}>{item.nome}</option>)}
+          </select>
+        </label>}
+        {filtros.master && <label className="flex flex-col gap-1 text-sm text-slate-700">Pessoa
+          <select aria-label="Filtrar por pessoa" value={pessoaFiltro} onChange={e => void selecionarPessoa(e.target.value)} className="rounded-lg border border-slate-300 p-2">
+            <option value="">Todas as pessoas</option>
+            {filtros.pessoas.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
+          </select>
+        </label>}
+        <label className="flex flex-col gap-1 text-sm text-slate-700">Status
+          <select
+            aria-label="Filtrar por status do evento"
+            value={statusEventoFiltro}
+            onChange={e => setStatusEventoFiltro(e.target.value as 'ATIVOS' | 'CANCELADOS' | 'TODOS')}
+            className="rounded-lg border border-slate-300 p-2"
+          >
+            <option value="ATIVOS">Ativos</option>
+            <option value="CANCELADOS">Cancelados</option>
+            <option value="TODOS">Todos</option>
+          </select>
+        </label>
+        <p className="self-end py-2 text-sm text-slate-500">{eventosFiltrados.length} evento(s)</p>
+      </div>}
 
       {erro && !formOpen && (
         <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm animate-in fade-in">
@@ -615,9 +1110,9 @@ export function EventosView() {
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
         </div>
-      ) : (eventos || []).length === 0 ? (
+      ) : eventosFiltrados.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-slate-500 mb-4">Nenhum evento cadastrado.</p>
+          <p className="text-slate-500 mb-4">Nenhum evento encontrado neste filtro.</p>
           <button onClick={abrirFormCriar} className="text-brand-600 font-medium hover:text-brand-700">
             Cadastrar primeiro evento
           </button>
@@ -636,9 +1131,9 @@ export function EventosView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {eventos.map((item) => (
+                {eventosFiltrados.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900">{item.titulo}</td>
+                    <td className="px-6 py-4 font-medium text-slate-900">{item.titulo}{item.pessoal && <span className="ml-2 text-xs text-brand-700">Próprio</span>}</td>
                     <td className="px-6 py-4 text-slate-600">
                       {new Date(item.inicioEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                     </td>
@@ -654,25 +1149,43 @@ export function EventosView() {
                       <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 min-w-[220px]">
                         <button
                           type="button"
-                          onClick={() => setEventoDetalhe(item)}
+                          onClick={() => void abrirDetalheEvento(item)}
                           className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-brand-700 hover:bg-brand-50 hover:text-brand-900 font-medium"
                         >
                           Ver
                         </button>
-                        <button
+                        {item.podeGerenciar !== false && !item.pessoal && <button
                           type="button"
                           onClick={() => void gerarAcessoPortaria(item.id)}
                           className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-green-800 hover:bg-green-50 hover:text-green-950 font-medium"
                         >
                           Gerar acesso de Portaria
-                        </button>
-                        <button
+                        </button>}
+                        {item.podeGerenciar !== false && <button
                           type="button"
                           onClick={() => handleClickEditar(item)}
                           className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-amber-700 hover:bg-amber-50 hover:text-amber-900 font-medium"
                         >
                           Editar
-                        </button>
+                        </button>}
+                        {item.ativo && item.podeGerenciar !== false && (
+                          <button
+                            type="button"
+                            onClick={() => void handleCancelarEvento(item)}
+                            className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-red-700 hover:bg-red-50 hover:text-red-900 font-medium"
+                          >
+                            Cancelar Evento
+                          </button>
+                        )}
+                        {!item.ativo && item.podeGerenciar !== false && new Date(item.fimEm).getTime() > Date.now() && (
+                          <button
+                            type="button"
+                            onClick={() => void handleReativarEvento(item)}
+                            className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-900 font-medium"
+                          >
+                            Reativar Evento
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -695,6 +1208,16 @@ export function EventosView() {
             </div>
             
             <form onSubmit={handleSubmit} noValidate className="p-6 overflow-y-auto space-y-6">
+              {erroCancelamento && (
+                <div role="alert" aria-live="assertive" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+                  <div className="flex items-start justify-between gap-4">
+                    <span>{erroCancelamento}</span>
+                    <button type="button" onClick={() => setErroCancelamento(null)} className="shrink-0 font-semibold" aria-label="Fechar erro de cancelamento">
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              )}
               {erro && (
                 <div role="alert" className="p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
                   {erro}
@@ -761,7 +1284,22 @@ export function EventosView() {
 
                     {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && (
                       <div>
-                        <label htmlFor="localId" className="block text-sm font-medium text-slate-700 mb-1">Local *</label>
+                        <div className="mb-1 flex items-center justify-between gap-3">
+                          <label htmlFor="localId" className="block text-sm font-medium text-slate-700">Local *</label>
+                          <button
+                              type="button"
+                              onClick={event => {
+                                localRapidoTriggerRef.current = event.currentTarget
+                                setLocalRapidoErro(null)
+                                setCepRapidoMensagem(null)
+                                setCepRapidoErro(false)
+                                setLocalRapidoOpen(true)
+                              }}
+                              className="text-xs font-semibold text-brand-700 hover:text-brand-900"
+                            >
+                              + Criar local sem sair
+                            </button>
+                        </div>
                         <select
                           id="localId"
                           value={formData.localId || ''}
@@ -769,7 +1307,7 @@ export function EventosView() {
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         >
                           <option value="">Selecione...</option>
-                          {locais.map(l => (
+                          {[...locais].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(l => (
                             <option key={l.id} value={l.id}>{l.nome}</option>
                           ))}
                         </select>
@@ -779,7 +1317,21 @@ export function EventosView() {
 
                     {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.localId && (
                       <div>
-                        <label htmlFor="espacoId" className="block text-sm font-medium text-slate-700 mb-1">Espaço</label>
+                        <div className="mb-1 flex items-center justify-between gap-3">
+                          <label htmlFor="espacoId" className="block text-sm font-medium text-slate-700">Espaço</label>
+                          <button
+                              type="button"
+                              onClick={event => {
+                                espacoRapidoTriggerRef.current = event.currentTarget
+                                setEspacoRapidoErro(null)
+                                setEspacoRapidoNome('')
+                                setEspacoRapidoOpen(true)
+                              }}
+                              className="text-xs font-semibold text-brand-700 hover:text-brand-900"
+                            >
+                              + Criar espaço sem sair
+                            </button>
+                        </div>
                         <select
                           id="espacoId"
                           value={formData.espacoId || ''}
@@ -826,6 +1378,7 @@ export function EventosView() {
                           <select
                             id="tipoEscopo"
                             value={tipoEscopo}
+                            disabled={!!eventoEditandoId && !!formData.pessoal}
                             onChange={e => handleTipoEscopoChange(e.target.value as any)}
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                           >
@@ -882,8 +1435,23 @@ export function EventosView() {
                             </>
                           )}
                           {tipoEscopo === 'casa' && (
-                            <>
-                              <label htmlFor="casaId" className="block text-xs font-medium text-slate-700 mb-1">Casa de Oração *</label>
+                            <div className="space-y-2">
+                              <label htmlFor="casaSetorFiltro" className="block text-xs font-medium text-slate-700">Filtrar Casa por Setor</label>
+                              <select
+                                id="casaSetorFiltro"
+                                value={casaSetorFiltro}
+                                onChange={e => {
+                                  setCasaSetorFiltro(e.target.value)
+                                  setFormData({ ...formData, casaId: '' })
+                                }}
+                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                              >
+                                <option value="">Todos os Setores</option>
+                                {[...setores].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(s => (
+                                  <option key={s.id} value={s.id}>{s.nome}</option>
+                                ))}
+                              </select>
+                              <label htmlFor="casaId" className="block text-xs font-medium text-slate-700">Casa de Oração *</label>
                               <select
                                 id="casaId"
                                 value={formData.casaId || ''}
@@ -891,9 +1459,12 @@ export function EventosView() {
                                 className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                               >
                                 <option value="">Selecione...</option>
-                                {casas.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                                {casas
+                                  .filter(casa => !casaSetorFiltro || casa.setorId === casaSetorFiltro)
+                                  .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+                                  .map(casa => <option key={casa.id} value={casa.id}>{casa.nome}</option>)}
                               </select>
-                            </>
+                            </div>
                           )}
                           {tipoEscopo === 'grupoTrabalho' && (
                             <>
@@ -911,10 +1482,23 @@ export function EventosView() {
                           )}
                         </div>
                       </div>
+                      {tipoEscopo === 'casa' && !eventoEditandoSerieId && (
+                        <div className="mt-4">
+                          <label htmlFor="publicoEvento" className="block text-sm font-medium text-slate-700 mb-1">Público do evento</label>
+                          <select id="publicoEvento" value={formData.pessoal ? 'PROPRIO' : 'INSTITUCIONAL'} disabled={!!eventoEditandoId}
+                            onChange={e => setFormData({ ...formData, pessoal: e.target.value === 'PROPRIO' })}
+                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm">
+                            <option value="INSTITUCIONAL">Institucional — com convocação</option>
+                            <option value="PROPRIO">Próprio — somente para mim</option>
+                          </select>
+                          {formData.pessoal && <p className="mt-2 text-sm text-brand-700">Ao salvar, o evento entra diretamente na sua agenda, sem convocação.</p>}
+                        </div>
+                      )}
+                      {errosForm.pessoal && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.pessoal}</p>}
                       {errosForm.escopo && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.escopo}</p>}
                     </div>
 
-                    <div className="border-t pt-4">
+                    {!formData.pessoal && <div className="border-t pt-4">
                       <label htmlFor="organizadorMembroId" className="block text-sm font-medium text-slate-700 mb-1">Organizador (Membro)</label>
                       <select
                         id="organizadorMembroId"
@@ -926,7 +1510,7 @@ export function EventosView() {
                         {membros.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
                       </select>
                       {errosForm.organizadorMembroId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.organizadorMembroId}</p>}
-                    </div>
+                    </div>}
 
                     <div>
                       <label htmlFor="descricao" className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
@@ -1000,6 +1584,81 @@ export function EventosView() {
         </div>
       )}
 
+      {localRapidoOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
+          <div ref={localRapidoDialogRef} role="dialog" aria-modal="true" aria-labelledby="local-rapido-title" className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <h3 id="local-rapido-title" className="font-semibold text-slate-900">Criar Local</h3>
+              <p className="mt-1 text-xs text-slate-500">O novo local será selecionado automaticamente no evento.</p>
+            </div>
+            <form onSubmit={salvarLocalRapido} className="space-y-3 p-5">
+              {localRapidoErro && <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{localRapidoErro}</p>}
+              <div>
+                <input autoFocus aria-label="CEP do novo local" placeholder="CEP" value={localRapido.cep} onChange={e => handleCepRapidoChange(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                <p className="mt-1 text-xs text-slate-500">Informe o CEP primeiro para preencher o endereço automaticamente.</p>
+              </div>
+              {(consultandoCepRapido || cepRapidoMensagem) && (
+                <div className="flex items-center justify-between gap-3">
+                  <p role={cepRapidoErro ? 'alert' : undefined} className={`text-xs ${cepRapidoErro ? 'text-red-700' : 'text-slate-500'}`}>
+                    {consultandoCepRapido ? 'Consultando CEP...' : cepRapidoMensagem}
+                  </p>
+                  {consultandoCepRapido && (
+                    <button type="button" onClick={cancelarConsultaCepRapido} className="text-xs font-semibold text-brand-700 hover:text-brand-900">
+                      Usar endereço manualmente
+                    </button>
+                  )}
+                </div>
+              )}
+              <input aria-label="Nome do novo local" placeholder="Nome *" value={localRapido.nome} onChange={e => setLocalRapido({ ...localRapido, nome: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+              <div className="grid grid-cols-[1fr_110px] gap-3">
+                <input aria-label="Endereço do novo local" placeholder="Endereço *" value={localRapido.endereco} onChange={e => {
+                  if (consultandoCepRapido) cancelarConsultaCepRapido()
+                  setLocalRapido({ ...localRapido, endereco: e.target.value })
+                }} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                <input aria-label="Número do novo local" placeholder="Número *" value={localRapido.numero} onChange={e => setLocalRapido({ ...localRapido, numero: e.target.value })} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+              </div>
+              <input aria-label="Bairro do novo local" placeholder="Bairro" value={localRapido.bairro} onChange={e => {
+                if (consultandoCepRapido) cancelarConsultaCepRapido()
+                setLocalRapido({ ...localRapido, bairro: e.target.value })
+              }} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+              <div className="grid grid-cols-[1fr_80px] gap-3">
+                <input aria-label="Cidade do novo local" placeholder="Cidade *" value={localRapido.cidade} onChange={e => {
+                  if (consultandoCepRapido) cancelarConsultaCepRapido()
+                  setLocalRapido({ ...localRapido, cidade: e.target.value })
+                }} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+                <input aria-label="UF do novo local" placeholder="UF *" maxLength={2} value={localRapido.uf} onChange={e => {
+                  if (consultandoCepRapido) cancelarConsultaCepRapido()
+                  setLocalRapido({ ...localRapido, uf: e.target.value.toUpperCase() })
+                }} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm uppercase" />
+              </div>
+              <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+                <button type="button" disabled={salvandoLocalRapido} onClick={fecharLocalRapido} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Voltar ao evento</button>
+                <button type="submit" disabled={salvandoLocalRapido || consultandoCepRapido} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{salvandoLocalRapido ? 'Criando...' : consultandoCepRapido ? 'Consultando CEP...' : 'Criar e selecionar'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {espacoRapidoOpen && formData.localId && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
+          <div ref={espacoRapidoDialogRef} role="dialog" aria-modal="true" aria-labelledby="espaco-rapido-title" className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <h3 id="espaco-rapido-title" className="font-semibold text-slate-900">Criar Espaço</h3>
+              <p className="mt-1 text-xs text-slate-500">O novo espaço será selecionado automaticamente.</p>
+            </div>
+            <form onSubmit={salvarEspacoRapido} className="space-y-3 p-5">
+              {espacoRapidoErro && <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{espacoRapidoErro}</p>}
+              <input autoFocus aria-label="Nome do novo espaço" placeholder="Nome do espaço *" value={espacoRapidoNome} onChange={e => setEspacoRapidoNome(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
+              <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
+                <button type="button" disabled={salvandoEspacoRapido} onClick={() => setEspacoRapidoOpen(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Voltar ao evento</button>
+                <button type="submit" disabled={salvandoEspacoRapido} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{salvandoEspacoRapido ? 'Criando...' : 'Criar e selecionar'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Modal Detalhe */}
       {eventoDetalhe && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
@@ -1008,9 +1667,19 @@ export function EventosView() {
               <h3 id="modal-detalhe-title" className="text-lg font-semibold text-slate-900">
                 Detalhes do Evento
               </h3>
-              <button onClick={() => setEventoDetalhe(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+              <button onClick={fecharDetalheEvento} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
             <div className="p-6 space-y-4">
+              {erroCancelamento && (
+                <div role="alert" aria-live="assertive" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+                  <div className="flex items-start justify-between gap-4">
+                    <span>{erroCancelamento}</span>
+                    <button type="button" onClick={() => setErroCancelamento(null)} className="shrink-0 font-semibold" aria-label="Fechar erro de cancelamento">
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              )}
               <div>
                 <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Título</span>
                 <p className="text-slate-900 font-medium">{eventoDetalhe.titulo}</p>
@@ -1035,10 +1704,65 @@ export function EventosView() {
                   <p className="text-slate-900">{eventoDetalhe.ativo ? 'Ativo' : 'Inativo'}</p>
                 </div>
               </div>
+              {(eventoDetalhe.modalidade === 'PRESENCIAL' || eventoDetalhe.modalidade === 'HIBRIDO') && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Local</span>
+                    <p className="text-slate-900">
+                      {eventoDetalhe.localId
+                        ? (locais.find(local => local.id === eventoDetalhe.localId)?.nome || 'Local não encontrado')
+                        : 'Não informado'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Espaço</span>
+                    <p className="text-slate-900">
+                      {eventoDetalhe.espacoId
+                        ? (espacos.find(espaco => espaco.id === eventoDetalhe.espacoId)?.nome || 'Espaço não encontrado')
+                        : 'Local inteiro / não especificado'}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {(eventoDetalhe.modalidade === 'ONLINE' || eventoDetalhe.modalidade === 'HIBRIDO') && eventoDetalhe.urlOnline && (
+                <div>
+                  <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Acesso online</span>
+                  <a
+                    href={eventoDetalhe.urlOnline}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="break-all text-brand-700 underline"
+                  >
+                    {eventoDetalhe.urlOnline}
+                  </a>
+                </div>
+              )}
               {eventoDetalhe.descricao && (
                 <div>
                   <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Descrição</span>
                   <p className="text-slate-900">{eventoDetalhe.descricao}</p>
+                </div>
+              )}
+              {eventoDetalhe.ativo && (
+                <div className="flex justify-end border-t border-slate-100 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => void handleCancelarEvento(eventoDetalhe, 'detalhe')}
+                    className="inline-flex min-h-10 items-center rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                  >
+                    Cancelar Evento
+                  </button>
+                </div>
+              )}
+              {!eventoDetalhe.ativo && eventoDetalhe.podeGerenciar !== false && new Date(eventoDetalhe.fimEm).getTime() > Date.now() && (
+                <div className="flex justify-end border-t border-slate-100 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => void handleReativarEvento(eventoDetalhe)}
+                    className="inline-flex min-h-10 items-center rounded-lg border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                  >
+                    Reativar Evento
+                  </button>
                 </div>
               )}
             </div>
@@ -1138,7 +1862,7 @@ export function EventosView() {
             </div>
             <div className="p-6">
               <p className="text-slate-700 mb-6">
-                Tem certeza que deseja alterar este e os próximos eventos a partir daqui? Isso atualizará a série e recriará os eventos futuros.
+                Tem certeza que deseja alterar este e os próximos eventos a partir daqui? Alterações apenas de Local, Espaço, Modalidade ou acesso online preservarão os eventos e convocações existentes; mudanças estruturais podem exigir regeneração.
               </p>
               <div className="flex justify-end gap-3">
                 <button

@@ -42,10 +42,10 @@ describe('S10 - Notificações (Web Push)', () => {
       INSERT INTO setores (id, administracao_id, nome) VALUES ('set-1', 'adm-1', 'Set 1');
       INSERT INTO casas (id, setor_id, nome) VALUES ('casa-1', 'set-1', 'Casa 1');
       
-      INSERT INTO membros (id, nome, celular, casa_id, ativo)
+      INSERT INTO membros (id, nome, celular, codigo_carteirinha, casa_id, ativo)
       VALUES 
-        ('${membroId}', 'João Silva', '11999999999', 'casa-1', 1),
-        ('${membroIdOutro}', 'Maria Souza', '11888888888', 'casa-1', 1);
+        ('${membroId}', 'João Silva', '11999999999', 'CARTEIRA-1', 'casa-1', 1),
+        ('${membroIdOutro}', 'Maria Souza', '11888888888', 'CARTEIRA-2', 'casa-1', 1);
 
       INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo)
       VALUES 
@@ -64,10 +64,11 @@ describe('S10 - Notificações (Web Push)', () => {
     const genSession = async (mid: string, cel: string) => {
       const resLink = await req(`/api/v1/admin/membros/${mid}/link-ativacao`, { method: 'POST' })
       const linkJson = await resLink.json() as any
+      const membro = sqlite.prepare('SELECT codigo_carteirinha FROM membros WHERE id = ?').get(mid) as { codigo_carteirinha: string }
       const resAtivar = await req('/api/v1/auth/ativar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: linkJson.token, celular: cel, pin: '123456', confirmacaoPin: '123456' })
+        body: JSON.stringify({ token: linkJson.token, codigoCarteirinha: membro.codigo_carteirinha, celular: cel, pin: '123456', confirmacaoPin: '123456' })
       })
       const ativarJson = await resAtivar.json() as any
       return ativarJson.sessionToken

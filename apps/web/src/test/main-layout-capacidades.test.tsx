@@ -56,3 +56,23 @@ describe('MainLayout — capabilities', () => {
     expect(screen.getByRole('button', { name: 'Acessos' })).toBeInTheDocument()
   })
 })
+
+
+  it('mostra alerta proativo de recuperação de PIN para administrador e navega para acessos', () => {
+    const onTabChange = vi.fn()
+
+    render(
+      <MainLayout
+        currentTab="agenda"
+        onTabChange={onTabChange}
+        capacidades={{ podeAdministrarAcessos: true }}
+        recuperacoesPinPendentes={2}
+      >
+        <div>Conteúdo</div>
+      </MainLayout>
+    )
+
+    expect(screen.getByText('Há 2 solicitações de redefinição de PIN pendentes.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver solicitações' }))
+    expect(onTabChange).toHaveBeenCalledWith('acessos')
+  })

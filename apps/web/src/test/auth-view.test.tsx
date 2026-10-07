@@ -27,6 +27,7 @@ describe('AuthView — ativação e login', () => {
     const autenticado = vi.fn()
 
     render(<AuthView onAuthenticated={autenticado} />)
+    expect(screen.getByLabelText('Código da tela AGD-SHR-002')).toHaveTextContent('Tela AGD-SHR-002')
 
     fireEvent.change(screen.getByLabelText('Celular'), {
       target: { value: '(11) 99999-9999' },
@@ -58,8 +59,12 @@ describe('AuthView — ativação e login', () => {
     )
 
     expect(screen.getByRole('heading', { name: 'Ativar conta de acesso' })).toBeDefined()
+    expect(screen.getByLabelText('Código da tela AGD-SHR-003')).toHaveTextContent('Tela AGD-SHR-003')
     expect(screen.queryByDisplayValue('token-secreto-do-link')).toBeNull()
 
+    fireEvent.change(screen.getByLabelText('Código da carteirinha'), {
+      target: { value: 'CARTEIRA-TESTE' },
+    })
     fireEvent.change(screen.getByLabelText('Celular'), {
       target: { value: '11988887777' },
     })
@@ -74,6 +79,7 @@ describe('AuthView — ativação e login', () => {
     await waitFor(() => {
       expect(apiClient.postPublic).toHaveBeenCalledWith('/auth/ativar', {
         token: 'token-secreto-do-link',
+        codigoCarteirinha: 'CARTEIRA-TESTE',
         celular: '11988887777',
         pin: '654321',
         confirmacaoPin: '654321',
@@ -91,6 +97,7 @@ describe('AuthView — ativação e login', () => {
     render(<AuthView onAuthenticated={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Esqueci meu PIN' }))
+    expect(screen.getByLabelText('Código da tela AGD-SHR-004')).toHaveTextContent('Tela AGD-SHR-004')
     fireEvent.change(screen.getByLabelText('Celular'), {
       target: { value: '11999999999' },
     })

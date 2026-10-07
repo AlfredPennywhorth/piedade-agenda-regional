@@ -19,11 +19,8 @@ import {
   extrairEscopoDoEvento,
   executarOperacaoComAudit,
 } from '../services/auditoria'
-import {
-  eGestorRelatoriosAutorizadoParaEvento,
-  obterEscoposTerritoriaisVisiveis,
-  podeGerenciarAgendaNoEscopo,
-} from '../security/permissoes'
+import { eGestorRelatoriosAutorizadoParaEvento } from '../security/permissoes'
+import { condicaoEventosVisiveis, podeLerEvento, podeGerenciarEvento } from '../security/eventos'
 import { authMiddleware, Variables } from '../middleware/auth'
 
 export const convocacoesRouter = new Hono<{ Variables: Variables }>()
@@ -38,67 +35,40 @@ function emLotes<T>(itens: T[], tamanho: number): T[][] {
 
 convocacoesRouter.use('*', authMiddleware)
 
-function eventoVisivelNoEscopo(evento: any, escopos: any): boolean {
-  if (escopos.tudo) return true
-  if (evento.regionalId && escopos.regionaisIds.has(evento.regionalId)) return true
-  if (evento.administracaoId && escopos.administracoesIds.has(evento.administracaoId)) return true
-  if (evento.setorId && escopos.setoresIds.has(evento.setorId)) return true
-  if (evento.casaId && escopos.casasIds.has(evento.casaId)) return true
-  if (evento.grupoTrabalhoId && escopos.gruposTrabalhoIds.has(evento.grupoTrabalhoId)) return true
-  return false
+function hierarquiaVinculo(escopoTipo: string | null) {
+  if (escopoTipo === 'REGIONAL' || escopoTipo === 'GRUPO_TRABALHO') return 4
+  if (escopoTipo === 'ADMINISTRACAO') return 3
+  if (escopoTipo === 'SETOR') return 2
+  if (escopoTipo === 'CASA') return 1
+  return 0
 }
 
-async function idsConvocacoesDoDestinatario(db: any, membroId: string): Promise<Set<string>> {
-  const rows = await db
-    .select({ convocacaoId: convocacaoDestinatarios.convocacaoId })
-    .from(convocacaoDestinatarios)
-    .where(eq(convocacaoDestinatarios.membroId, membroId))
-    .all()
-
-  return new Set(rows.map((row: { convocacaoId: string }) => row.convocacaoId))
+function escolherMaiorVinculo<T extends {
+  funcaoNome: string | null
+  escopoTipo: string | null
+  [key: string]: unknown
+}>(vinculos: T[]): T | null {
+  return [...vinculos].sort((a, b) => {
+    const nivel = hierarquiaVinculo(b.escopoTipo) - hierarquiaVinculo(a.escopoTipo)
+    if (nivel !== 0) return nivel
+    return (a.funcaoNome ?? '').localeCompare(b.funcaoNome ?? '', 'pt-BR')
+  })[0] ?? null
 }
 
-function podeLerConvocacao(
-  convocacao: any,
-  evento: any,
-  escopos: any,
-  destinatarias: Set<string>
-): boolean {
-  if (evento && eventoVisivelNoEscopo(evento, escopos)) return true
-  return destinatarias.has(convocacao.id)
-}
 
 async function podeGerirConvocacao(db: any, membroId: string, evento: any): Promise<boolean> {
-  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
-  if (!escopoTipo || !escopoId) return false
-  return podeGerenciarAgendaNoEscopo(
-    db,
-    membroId,
-    escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-    escopoId
-  )
+  return !evento.pessoal && podeGerenciarEvento(db, membroId, evento)
 }
 
 convocacoesRouter.get('/', async c => {
   const db = c.get('db')
-  const membroId = c.get('membroId')
-  const contexto = c.get('contextoPermissoes')
-  const escopos = await obterEscoposTerritoriaisVisiveis(db, contexto)
-  const destinatarias = await idsConvocacoesDoDestinatario(db, membroId)
-
-  const data = await db
-    .select({ convocacao: convocacoes, evento: eventos })
+  const condicao = await condicaoEventosVisiveis(db, c.get('contextoPermissoes'))
+  const data = await db.select({ convocacao: convocacoes })
     .from(convocacoes)
     .innerJoin(eventos, eq(convocacoes.eventoId, eventos.id))
+    .where(condicao)
     .all()
-
-  return c.json(
-    data
-      .filter((item: any) =>
-        eventoVisivelNoEscopo(item.evento, escopos) || destinatarias.has(item.convocacao.id)
-      )
-      .map((item: any) => item.convocacao)
-  )
+  return c.json(data.map((item: any) => item.convocacao))
 })
 
 convocacoesRouter.get('/:id', async c => {
@@ -109,10 +79,8 @@ convocacoesRouter.get('/:id', async c => {
   if (!data) return c.json({ error: 'Convocação não encontrada' }, 404)
 
   const evento = await db.select().from(eventos).where(eq(eventos.id, data.eventoId)).get()
-  const escopos = await obterEscoposTerritoriaisVisiveis(db, c.get('contextoPermissoes'))
-  const destinatarias = await idsConvocacoesDoDestinatario(db, c.get('membroId'))
 
-  if (!podeLerConvocacao(data, evento, escopos, destinatarias)) {
+  if (!evento || !(await podeLerEvento(db, c.get('contextoPermissoes'), evento.id))) {
     return c.json({ error: 'Acesso não autorizado para esta convocação', code: 'FORBIDDEN' }, 403)
   }
 
@@ -134,7 +102,16 @@ convocacoesRouter.post('/', async c => {
     if (!evento) return c.json({ error: 'Evento não encontrado ou inativo' }, 409)
 
     const membroId = c.get('membroId')
-    if (!membroId || !(await podeGerirConvocacao(db, membroId, evento))) {
+    if (!membroId || !(await podeGerenciarEvento(db, membroId, evento))) {
+      return c.json({ error: 'Acesso não autorizado para gerir a convocação', code: 'FORBIDDEN' }, 403)
+    }
+    if (evento.pessoal) {
+      return c.json({
+        error: 'Evento Próprio entra diretamente na agenda e não recebe convocação',
+        code: 'EVENTO_PESSOAL_SEM_CONVOCACAO'
+      }, 409)
+    }
+    if (!(await podeGerirConvocacao(db, membroId, evento))) {
       return c.json({ error: 'Acesso não autorizado para gerir a convocação', code: 'FORBIDDEN' }, 403)
     }
 
@@ -280,9 +257,7 @@ convocacoesRouter.get('/:id/funcoes', async c => {
   if (!convocacao) return c.json({ error: 'Convocação não encontrada' }, 404)
 
   const evento = await db.select().from(eventos).where(eq(eventos.id, convocacao.eventoId)).get()
-  const escopos = await obterEscoposTerritoriaisVisiveis(db, c.get('contextoPermissoes'))
-  const destinatarias = await idsConvocacoesDoDestinatario(db, c.get('membroId'))
-  if (!podeLerConvocacao(convocacao, evento, escopos, destinatarias)) {
+  if (!evento || !(await podeLerEvento(db, c.get('contextoPermissoes'), evento.id))) {
     return c.json({ error: 'Acesso não autorizado para esta convocação', code: 'FORBIDDEN' }, 403)
   }
 
@@ -631,6 +606,13 @@ convocacoesRouter.post('/:id/cancelar', async c => {
 convocacoesRouter.get('/:id/destinatarios', async c => {
   const db = c.get('db')
   const id = c.req.param('id')
+  const convocacao = await db.select().from(convocacoes).where(eq(convocacoes.id, id)).get()
+  if (!convocacao) return c.json({ error: 'Convocação não encontrada' }, 404)
+  const evento = await db.select().from(eventos).where(eq(eventos.id, convocacao.eventoId)).get()
+  const membroId = c.get('membroId')
+  if (!evento || !(await podeGerirConvocacao(db, membroId, evento)) && !(await eGestorRelatoriosAutorizadoParaEvento(db, membroId, evento))) {
+    return c.json({ error: 'Acesso não autorizado para consultar destinatários', code: 'FORBIDDEN' }, 403)
+  }
   const destinatarios = await db
     .select()
     .from(convocacaoDestinatarios)
@@ -702,7 +684,8 @@ convocacoesRouter.get('/:id/acompanhamento-rsvp', async c => {
       destinatarioId: convocacaoDestinatarios.id,
       membroId: membros.id,
       membroNome: membros.nome,
-      respostaRsvp: sql`COALESCE(${rsvp.resposta}, 'SEM_RESPOSTA')`.as('respostaRsvp')
+      respostaRsvp: sql`COALESCE(${rsvp.resposta}, 'SEM_RESPOSTA')`.as('respostaRsvp'),
+      rsvpAtualizadoEm: rsvp.atualizadoEm
     })
     .from(convocacaoDestinatarios)
     .innerJoin(membros, eq(membros.id, convocacaoDestinatarios.membroId))
@@ -725,11 +708,15 @@ convocacoesRouter.get('/:id/acompanhamento-rsvp', async c => {
     membroId: string
     membroNome: string
     respostaRsvp: string
+    rsvpAtualizadoEm: string | null
   }
   type EvidenciaItem = {
     convocacaoDestinatarioId: string
     funcaoId: string
     vinculoFuncionalId: string
+    funcaoNome: string | null
+    escopoTipo: string | null
+    escopoId: string | null
   }
 
   const destIds = destinatariosPage.map((d: DestinatarioPage) => d.destinatarioId)
@@ -737,24 +724,39 @@ convocacoesRouter.get('/:id/acompanhamento-rsvp', async c => {
     .select({
       convocacaoDestinatarioId: convocacaoDestinatarioEvidencias.convocacaoDestinatarioId,
       funcaoId: convocacaoDestinatarioEvidencias.funcaoId,
-      vinculoFuncionalId: convocacaoDestinatarioEvidencias.vinculoFuncionalId
+      vinculoFuncionalId: convocacaoDestinatarioEvidencias.vinculoFuncionalId,
+      funcaoNome: convocacaoDestinatarioEvidencias.funcaoNomeSnapshot,
+      escopoTipo: convocacaoDestinatarioEvidencias.escopoTipoSnapshot,
+      escopoId: convocacaoDestinatarioEvidencias.escopoIdSnapshot
     })
     .from(convocacaoDestinatarioEvidencias)
     .where(inArray(convocacaoDestinatarioEvidencias.convocacaoDestinatarioId, destIds))
     .all()
 
-  const data = destinatariosPage.map((d: DestinatarioPage) => ({
-    destinatarioId: d.destinatarioId,
-    membroId: d.membroId,
-    membroNome: d.membroNome,
-    respostaRsvp: d.respostaRsvp,
-    evidencias: evidencias
+  const data = destinatariosPage.map((d: DestinatarioPage) => {
+    const evidenciasDestinatario = evidencias
       .filter((e: EvidenciaItem) => e.convocacaoDestinatarioId === d.destinatarioId)
-      .map((e: EvidenciaItem) => ({
+    const vinculo = escolherMaiorVinculo(evidenciasDestinatario)
+
+    return {
+      destinatarioId: d.destinatarioId,
+      membroId: d.membroId,
+      membroNome: d.membroNome,
+      respostaRsvp: d.respostaRsvp,
+      reconfirmacaoPendente:
+        Boolean(d.rsvpAtualizadoEm) &&
+        new Date(d.rsvpAtualizadoEm!).getTime() < new Date(evento.agendaRevisao).getTime(),
+      vinculo: vinculo?.funcaoNome ? {
+        funcaoId: vinculo.funcaoId,
+        funcaoNome: vinculo.funcaoNome,
+        vinculoFuncionalId: vinculo.vinculoFuncionalId,
+      } : null,
+      evidencias: evidenciasDestinatario.map((e: EvidenciaItem) => ({
         funcaoId: e.funcaoId,
         vinculoFuncionalId: e.vinculoFuncionalId
       }))
-  }))
+    }
+  })
 
   return c.json({
     data,

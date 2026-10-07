@@ -38,6 +38,11 @@ const mockEventos = [
     local: { nome: 'Sede Regional', endereco: 'Rua X' },
     espaco: { id: 'esp-1', nome: 'Sala A' },
     destinatarioId: 'dest-1',
+    vinculo: {
+      funcaoId: 'funcao-dco',
+      funcaoNome: 'Diácono da Casa de Oração',
+      vinculoFuncionalId: 'vinculo-dco',
+    },
     rsvp: null
   },
   {
@@ -126,6 +131,25 @@ describe('S07 - Minha Agenda e Calendário', () => {
     })
   }
 
+  it('evento Próprio abre na agenda e calendário sem RSVP, convocação ou QR', async () => {
+    const pessoal = { ...mockEventos[0], evento: { ...mockEventos[0].evento, pessoal: true, titulo: 'Meu compromisso' }, convocacao: null, destinatarioId: null, vinculo: null, rsvp: null }
+    mockAgenda([pessoal])
+    render(<App />)
+    fireEvent.click(await screen.findByText('Meu compromisso'))
+    let dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/já incluído na sua agenda/i)).toBeInTheDocument()
+    expect(within(dialog).queryByText('Sua Participação')).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /apresentar qr code/i })).not.toBeInTheDocument()
+    expect(apiClient.fetchWithAuth).not.toHaveBeenCalledWith(expect.stringContaining('/convocacoes/'))
+    fireEvent.click(within(dialog).getByRole('button', { name: /fechar/i }))
+    fireEvent.click((await mobileNav()).getByText('Calendário'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Selecionar dia 24' }))
+    fireEvent.click(await screen.findByText('Meu compromisso'))
+    dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/já incluído na sua agenda/i)).toBeInTheDocument()
+    expect(apiClient.putWithAuth).not.toHaveBeenCalled()
+  })
+
   it('1. Renderiza o Layout Principal com Navegação', async () => {
     mockAgenda([])
     render(<App />)
@@ -176,6 +200,188 @@ describe('S07 - Minha Agenda e Calendário', () => {
     expect(decodeURIComponent(url)).toContain('Espaço: Sala A')
 
     openSpy.mockRestore()
+  })
+
+  it('3c. alerta conflito e permite priorizar um compromisso', async () => {
+    const comConflito = JSON.parse(JSON.stringify(mockEventos))
+    comConflito[0].conflito = {
+      tipo: 'SOBREPOSICAO',
+      janelaTransicaoMinutos: 60,
+      priorizado: false,
+      atenuado: false,
+      eventos: [{
+        eventoId: '2',
+        titulo: 'Encontro Online',
+        inicioEm: comConflito[1].evento.inicioEm,
+        fimEm: comConflito[1].evento.fimEm,
+        tipo: 'SOBREPOSICAO',
+      }],
+    }
+
+    mockAgenda(comConflito)
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      message: 'Compromisso priorizado',
+      eventoId: '1',
+      eventosConflitantes: ['2'],
+    })
+
+    render(<App />)
+
+    expect(await screen.findByText('Conflito de horário')).toBeInTheDocument()
+    expect(screen.getByText('Também há: Encontro Online (conflito de horário).')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Priorizar este compromisso' }))
+
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith('/minha-agenda/prioridade/1', {})
+    })
+  })
+
+  it('3d. recalcula conflitos depois de alterar o RSVP', async () => {
+    const comConflito = JSON.parse(JSON.stringify(mockEventos))
+    comConflito[0].conflito = {
+      tipo: 'SOBREPOSICAO',
+      janelaTransicaoMinutos: 60,
+      priorizado: false,
+      atenuado: false,
+      eventos: [{
+        eventoId: '2',
+        titulo: 'Encontro Online',
+        inicioEm: comConflito[1].evento.inicioEm,
+        fimEm: comConflito[1].evento.fimEm,
+        tipo: 'SOBREPOSICAO',
+      }],
+    }
+
+    let leiturasAgenda = 0
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/auth/me') return { nome: 'Pessoa Teste', capacidades: {} }
+      if (endpoint === '/governanca/responsabilidade-regional') {
+        return { versao: 'teste', texto: 'Responsabilidades', acessos: [] }
+      }
+      if (endpoint.includes('/convocacoes/') && endpoint.includes('/acompanhamento-rsvp')) {
+        return { data: [], meta: { total: 0, page: 1, lastPage: 1 } }
+      }
+      if (endpoint === '/minha-agenda') {
+        leiturasAgenda += 1
+        return leiturasAgenda === 1 ? comConflito : mockEventos
+      }
+      return []
+    })
+    vi.mocked(apiClient.putWithAuth).mockResolvedValue({})
+
+    render(<App />)
+
+    expect(await screen.findByText('Conflito de horário')).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: /Reunião de Setor/i }))
+
+    const dialog = within(await screen.findByRole('dialog'))
+    fireEvent.click(dialog.getByLabelText('✗ Não vou participar'))
+    fireEvent.change(dialog.getByPlaceholderText(/justifique sua ausência/i), {
+      target: { value: 'Outro compromisso' },
+    })
+    fireEvent.click(dialog.getByText('Confirmar Ausência'))
+
+    await waitFor(() => {
+      expect(leiturasAgenda).toBeGreaterThanOrEqual(2)
+    })
+    await waitFor(() => {
+      expect(screen.queryByText('Conflito de horário')).not.toBeInTheDocument()
+    })
+  })
+
+  it('3d. atenua visualmente compromisso não priorizado', async () => {
+    const comPrioridade = JSON.parse(JSON.stringify(mockEventos))
+    comPrioridade[0].conflito = {
+      tipo: 'SOBREPOSICAO',
+      janelaTransicaoMinutos: 60,
+      priorizado: false,
+      atenuado: true,
+      eventos: [{
+        eventoId: '2',
+        titulo: 'Encontro Online',
+        inicioEm: comPrioridade[1].evento.inicioEm,
+        fimEm: comPrioridade[1].evento.fimEm,
+        tipo: 'SOBREPOSICAO',
+      }],
+    }
+
+    mockAgenda(comPrioridade)
+    render(<App />)
+
+    const card = await screen.findByRole('button', { name: /Reunião de Setor/i })
+    expect(card.className).toContain('opacity-50')
+    expect(within(card).getByText('Conflito')).toBeInTheDocument()
+  })
+
+  it('3e. permite repriorizar compromisso com prioridade parcial', async () => {
+    const parcial = JSON.parse(JSON.stringify(mockEventos))
+    parcial[0].conflito = {
+      tipo: 'SOBREPOSICAO',
+      janelaTransicaoMinutos: 60,
+      priorizado: true,
+      atenuado: true,
+      eventos: [{
+        eventoId: '2',
+        titulo: 'Encontro Online',
+        inicioEm: parcial[1].evento.inicioEm,
+        fimEm: parcial[1].evento.fimEm,
+        tipo: 'SOBREPOSICAO',
+      }],
+    }
+
+    mockAgenda(parcial)
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      message: 'Compromisso priorizado',
+      eventoId: '1',
+      eventosConflitantes: ['2'],
+    })
+
+    render(<App />)
+
+    const cardParcial = await screen.findByRole('button', { name: /Reunião de Setor/i })
+    expect(within(cardParcial).getByText('Prioridade parcial')).toBeInTheDocument()
+    expect(screen.getAllByText('Prioridade parcial').length).toBeGreaterThanOrEqual(2)
+    const acao = screen.getByRole('button', { name: 'Priorizar este compromisso' })
+    expect(acao).toBeInTheDocument()
+
+    fireEvent.click(acao)
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith('/minha-agenda/prioridade/1', {})
+    })
+  })
+
+  it('3f. exibe sobreposição e proximidade quando o compromisso tem conflitos mistos', async () => {
+    const misto = JSON.parse(JSON.stringify(mockEventos))
+    misto[0].conflito = {
+      tipo: 'SOBREPOSICAO',
+      janelaTransicaoMinutos: 60,
+      priorizado: false,
+      atenuado: false,
+      eventos: [
+        {
+          eventoId: '2',
+          titulo: 'Encontro Online',
+          inicioEm: misto[1].evento.inicioEm,
+          fimEm: misto[1].evento.fimEm,
+          tipo: 'SOBREPOSICAO',
+        },
+        {
+          eventoId: '3',
+          titulo: 'Compromisso Próximo',
+          inicioEm: misto[1].evento.fimEm,
+          fimEm: misto[1].evento.fimEm,
+          tipo: 'PROXIMIDADE',
+        },
+      ],
+    }
+
+    mockAgenda(misto)
+    render(<App />)
+
+    expect(await screen.findByText('Conflito de horário e compromissos próximos')).toBeInTheDocument()
+    expect(screen.getByText(/Encontro Online \(conflito de horário\)/)).toBeInTheDocument()
+    expect(screen.getByText(/Compromisso Próximo \(próximo, até 60 min de transição\)/)).toBeInTheDocument()
   })
 
   it('4. Navega para Calendário e exibe grid mensal', async () => {
@@ -241,6 +447,66 @@ describe('S07 - Minha Agenda e Calendário', () => {
     // Expect empty state
     await waitFor(() => {
       expect(screen.getByText('Nenhum evento agendado para este dia.')).toBeInTheDocument()
+    })
+  })
+
+  it('7b. recalcula conflitos do Calendário após alterar o RSVP', async () => {
+    const comConflito = JSON.parse(JSON.stringify(mockEventos))
+    comConflito[0].conflito = {
+      tipo: 'SOBREPOSICAO',
+      janelaTransicaoMinutos: 60,
+      priorizado: false,
+      atenuado: true,
+      eventos: [{
+        eventoId: '2',
+        titulo: 'Encontro Online',
+        inicioEm: comConflito[1].evento.inicioEm,
+        fimEm: comConflito[1].evento.fimEm,
+        tipo: 'SOBREPOSICAO',
+      }],
+    }
+
+    let leiturasAgenda = 0
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/auth/me') return { nome: 'Pessoa Teste', capacidades: {} }
+      if (endpoint === '/governanca/responsabilidade-regional') {
+        return { versao: 'teste', texto: 'Responsabilidades', acessos: [] }
+      }
+      if (endpoint.includes('/convocacoes/') && endpoint.includes('/acompanhamento-rsvp')) {
+        return { data: [], meta: { total: 0, page: 1, lastPage: 1 } }
+      }
+      if (endpoint === '/minha-agenda') {
+        leiturasAgenda += 1
+        return leiturasAgenda <= 2 ? comConflito : mockEventos
+      }
+      return []
+    })
+    vi.mocked(apiClient.putWithAuth).mockResolvedValue({})
+
+    render(<App />)
+    fireEvent.click((await mobileNav()).getByText('Calendário'))
+    await waitFor(() => expect(screen.getByText('Dom')).toBeInTheDocument())
+
+    const dia = new Date(TEST_NOW + 86400000)
+    fireEvent.click(screen.getByLabelText(`Selecionar dia ${dia.getDate()}`))
+
+    const cardInicial = await screen.findByRole('button', { name: /Reunião de Setor/i })
+    expect(cardInicial.className).toContain('opacity-50')
+    fireEvent.click(cardInicial)
+
+    const dialog = within(await screen.findByRole('dialog'))
+    fireEvent.click(dialog.getByLabelText('✗ Não vou participar'))
+    fireEvent.change(dialog.getByPlaceholderText(/justifique sua ausência/i), {
+      target: { value: 'Outro compromisso' },
+    })
+    fireEvent.click(dialog.getByText('Confirmar Ausência'))
+
+    await waitFor(() => expect(leiturasAgenda).toBeGreaterThanOrEqual(2))
+    fireEvent.click(dialog.getByLabelText('Fechar detalhes'))
+
+    await waitFor(() => {
+      const cardAtualizado = screen.getByRole('button', { name: /Reunião de Setor/i })
+      expect(cardAtualizado.className).not.toContain('opacity-50')
     })
   })
 
@@ -327,6 +593,19 @@ describe('S07 - Minha Agenda e Calendário', () => {
 
     const cardAtualizado = screen.getByRole('button', { name: /Reunião de Setor/i })
     expect(within(cardAtualizado).getByText('Confirmado')).toBeInTheDocument()
+  })
+
+  it('9c. Exibe o vínculo que originou a convocação na agenda', async () => {
+    mockAgenda(mockEventos)
+    render(<App />)
+
+    expect((await mobileNav()).getByText('Minha Agenda')).toBeInTheDocument()
+    expect(await screen.findByText('Diácono da Casa de Oração')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Reunião de Setor'))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Vínculo da convocação')).toBeInTheDocument()
+    expect(within(dialog).getByText('Diácono da Casa de Oração')).toBeInTheDocument()
   })
 
   it('10. Exibe seção de RSVP no detalhe', async () => {

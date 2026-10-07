@@ -578,12 +578,18 @@ export const eventos = sqliteTable(
   'eventos',
   {
     id: text('id').primaryKey(), // UUID
+    pessoal: integer('pessoal', { mode: 'boolean' }).notNull().default(false),
+    criadorMembroId: text('criador_membro_id').references(() => membros.id),
     titulo: text('titulo').notNull(),
     descricao: text('descricao'),
     pauta: text('pauta'),
     modalidade: text('modalidade').notNull(), // PRESENCIAL, ONLINE, HIBRIDO
     inicioEm: text('inicio_em').notNull(), // ISO 8601 UTC
     fimEm: text('fim_em').notNull(), // ISO 8601 UTC
+    agendaRevisao: text('agenda_revisao')
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+    agendaAviso: text('agenda_aviso'),
     localId: text('local_id').references(() => locais.id),
     espacoId: text('espaco_id').references(() => espacosLocal.id),
     urlOnline: text('url_online'),
@@ -624,6 +630,7 @@ export const eventos = sqliteTable(
       (CASE WHEN ${table.grupoTrabalhoId} IS NOT NULL THEN 1 ELSE 0 END) = 1
     `
     ),
+    idxCriadorPessoal: index('idx_eventos_criador_pessoal').on(table.criadorMembroId, table.pessoal, table.ativo),
     idxInicioEm: index('idx_eventos_inicio_em').on(table.inicioEm),
     idxAtivo: index('idx_eventos_ativo').on(table.ativo),
     idxLocalId: index('idx_eventos_local_id').on(table.localId),
@@ -719,6 +726,9 @@ export const convocacaoDestinatarioEvidencias = sqliteTable(
     vinculoFuncionalId: text('vinculo_funcional_id')
       .notNull()
       .references(() => vinculosFuncionais.id),
+    funcaoNomeSnapshot: text('funcao_nome_snapshot'),
+    escopoTipoSnapshot: text('escopo_tipo_snapshot'),
+    escopoIdSnapshot: text('escopo_id_snapshot'),
     createdAt: text('created_at')
       .notNull()
       .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
@@ -732,6 +742,36 @@ export const convocacaoDestinatarioEvidencias = sqliteTable(
     idxDestinatarioId: index('idx_convocacao_evidencias_dest_id').on(
       table.convocacaoDestinatarioId
     ),
+  })
+)
+
+export const agendaPrioridadesConflito = sqliteTable(
+  'agenda_prioridades_conflito',
+  {
+    id: text('id').primaryKey(),
+    membroId: text('membro_id')
+      .notNull()
+      .references(() => membros.id),
+    eventoId: text('evento_id')
+      .notNull()
+      .references(() => eventos.id),
+    conflitoParChave: text('conflito_par_chave').notNull(),
+    conflitoChave: text('conflito_chave').notNull(),
+    priorizadoEm: text('priorizado_em')
+      .notNull()
+      .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+    ...timestampsS02,
+  },
+  table => ({
+    uniqueMembroConflito: uniqueIndex('idx_agenda_prioridade_membro_conflito').on(
+      table.membroId,
+      table.conflitoChave
+    ),
+    idxMembroPar: index('idx_agenda_prioridade_membro_par').on(
+      table.membroId,
+      table.conflitoParChave
+    ),
+    idxMembro: index('idx_agenda_prioridade_membro').on(table.membroId),
   })
 )
 

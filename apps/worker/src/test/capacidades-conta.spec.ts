@@ -37,6 +37,7 @@ describe('ACC-11 — capacidades consolidadas da conta', () => {
       podeVisualizarAuditoria: false,
       podeOperarPortaria: false,
       podeAdministrarAcessos: false,
+      podeGerenciarSessoes: false,
       podeAdministrarRegionais: false,
       podeAdministrarEstrutura: false,
       podeAdministrarPessoas: false,
@@ -136,6 +137,7 @@ describe('ACC-11 — capacidades consolidadas da conta', () => {
 
     const capacidades = await obterCapacidadesMembro(db, 'membro-1', 'conta-1')
     expect(capacidades.podeAdministrarAcessos).toBe(true)
+    expect(capacidades.podeGerenciarSessoes).toBe(false)
     expect(capacidades.podeAdministrarRegionais).toBe(false)
     expect(capacidades.podeAdministrarEstrutura).toBe(true)
     expect(capacidades.podeAdministrarPessoas).toBe(true)
@@ -152,6 +154,7 @@ describe('ACC-11 — capacidades consolidadas da conta', () => {
 
     const capacidades = await obterCapacidadesMembro(db, 'membro-1', 'conta-1')
     expect(capacidades.podeAdministrarAcessos).toBe(true)
+    expect(capacidades.podeGerenciarSessoes).toBe(true)
     expect(capacidades.podeAdministrarRegionais).toBe(true)
     expect(capacidades.podeAdministrarEstrutura).toBe(true)
     expect(capacidades.podeAdministrarPessoas).toBe(true)

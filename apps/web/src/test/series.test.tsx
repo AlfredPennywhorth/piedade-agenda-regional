@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
 import { SeriesView } from '../components/series/SeriesView'
 import * as apiClient from '../api/apiClient'
 
@@ -23,6 +23,8 @@ const MOCK_SERIES = [
   {
     id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
     titulo: 'Reunião Semanal',
+    descricao: null,
+    pauta: null,
     modalidade: 'ONLINE',
     frequencia: 'SEMANAL',
     intervalo: 1,
@@ -34,7 +36,9 @@ const MOCK_SERIES = [
     diaMes: null,
     posicaoSemanaMes: null,
     localId: null,
+    espacoId: null,
     urlOnline: 'https://meet.google.com/abc',
+    observacoes: null,
     organizadorMembroId: '2b4c13a0-7f2e-4b9d-a8e5-3d5f9c8b7a6d',
     regionalId: 'd290f1ee-6c54-4b01-90e6-d701748f0851',
     administracaoId: null,
@@ -71,7 +75,8 @@ describe('SeriesView', () => {
   })
 
   afterEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('deve listar as séries e permitir visualizar os detalhes num diálogo acessível', async () => {
@@ -249,16 +254,239 @@ describe('SeriesView', () => {
 
     // Confirmar
     vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({})
-    fireEvent.click(screen.getByText('Confirmar e Reconstruir'))
+    fireEvent.click(screen.getByText('Confirmar alterações'))
 
     await waitFor(() => {
-      expect(apiClient.patchWithAuth).toHaveBeenCalledWith('/series-recorrencia/f47ac10b-58cc-4372-a567-0e02b2c3d479', expect.objectContaining({
-        updateMode: 'ALL',
-        changes: expect.objectContaining({
-          titulo: 'Reunião Semanal Editada'
-        })
-      }))
+      expect(apiClient.patchWithAuth).toHaveBeenCalledWith(
+        '/series-recorrencia/f47ac10b-58cc-4372-a567-0e02b2c3d479',
+        {
+          updateMode: 'ALL',
+          changes: { titulo: 'Reunião Semanal Editada' }
+        }
+      )
     })
+  })
+
+  it('deve oferecer cadastro rápido de Local e Espaço ao editar série presencial', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        cep: '03127-001',
+        logradouro: 'Rua Ibitirama',
+        bairro: 'Vila Prudente',
+        localidade: 'São Paulo',
+        uf: 'SP',
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const localId = MOCK_LOOKUPS.locais[0].id
+    const novoEspacoId = '33333333-3333-4333-8333-333333333333'
+    const seriePresencial = {
+      ...MOCK_SERIES[0],
+      modalidade: 'PRESENCIAL',
+      localId,
+      espacoId: null,
+      urlOnline: null,
+    }
+
+    vi.mocked(apiClient.postWithAuth).mockImplementation(async (url) => {
+      if (url === '/espacos-locais') {
+        return { id: novoEspacoId, localId, nome: 'Sala Nova', ativo: true }
+      }
+      return {}
+    })
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/series-recorrencia') return [seriePresencial]
+      if (url === '/locais') return MOCK_LOOKUPS.locais
+      if (url === '/espacos-locais?ativo=true') return []
+      if (url === '/membros') return MOCK_LOOKUPS.membros
+      if (url === '/regionais') return MOCK_LOOKUPS.regionais
+      if (url === '/administracoes') return MOCK_LOOKUPS.administracoes
+      if (url === '/setores') return MOCK_LOOKUPS.setores
+      if (url === '/casas') return MOCK_LOOKUPS.casas
+      if (url === '/grupos-trabalho') return MOCK_LOOKUPS.gruposTrabalho
+      return []
+    })
+
+    render(<SeriesView />)
+    await screen.findByText('Reunião Semanal')
+    fireEvent.click(screen.getByText('Editar'))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Editar Série de Recorrência' })
+    await waitFor(() => {
+      expect(within(dialog).getByLabelText(/Local \*/i)).toHaveValue(localId)
+    })
+
+    const criarLocal = within(dialog).getByRole('button', { name: /criar local sem sair/i })
+    const criarEspaco = within(dialog).getByRole('button', { name: /criar espaço sem sair/i })
+    expect(criarLocal).toBeInTheDocument()
+    expect(criarEspaco).toBeInTheDocument()
+
+    fireEvent.click(criarLocal)
+    const localRapido = await screen.findByRole('dialog', { name: /criar local/i })
+    fireEvent.change(within(localRapido).getByLabelText('CEP do novo local'), {
+      target: { value: '03127001' },
+    })
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://viacep.com.br/ws/03127001/json/',
+        expect.objectContaining({ signal: expect.anything() })
+      )
+      expect(within(localRapido).getByLabelText('Endereço do novo local')).toHaveValue('Rua Ibitirama')
+      expect(within(localRapido).getByLabelText('Bairro do novo local')).toHaveValue('Vila Prudente')
+      expect(within(localRapido).getByLabelText('Cidade do novo local')).toHaveValue('São Paulo')
+      expect(within(localRapido).getByLabelText('UF do novo local')).toHaveValue('SP')
+    })
+
+    fireEvent.click(within(localRapido).getByRole('button', { name: /voltar à série/i }))
+
+    fireEvent.click(criarEspaco)
+    const espacoRapido = await screen.findByRole('dialog', { name: /criar espaço/i })
+    fireEvent.change(within(espacoRapido).getByLabelText('Nome do novo espaço'), {
+      target: { value: 'Sala Nova' },
+    })
+    fireEvent.click(within(espacoRapido).getByRole('button', { name: /criar e selecionar/i }))
+
+    await waitFor(() => {
+      expect(within(dialog).getByLabelText('Espaço')).toHaveValue(novoEspacoId)
+    })
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar série/i }))
+
+    expect(await screen.findByRole('dialog', { name: 'Confirmar Edição de Série' })).toBeInTheDocument()
+  })
+
+  it('deve cancelar ViaCEP e preservar endereço manual no cadastro rápido da série', async () => {
+    let resolver: ((value: any) => void) | undefined
+    const pendente = new Promise<any>(resolve => {
+      resolver = resolve
+    })
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(pendente))
+
+    const localId = MOCK_LOOKUPS.locais[0].id
+    const seriePresencial = {
+      ...MOCK_SERIES[0],
+      modalidade: 'PRESENCIAL',
+      localId,
+      espacoId: null,
+      urlOnline: null,
+    }
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/series-recorrencia') return [seriePresencial]
+      if (url === '/locais') return MOCK_LOOKUPS.locais
+      if (url === '/espacos-locais?ativo=true') return []
+      if (url === '/membros') return MOCK_LOOKUPS.membros
+      if (url === '/regionais') return MOCK_LOOKUPS.regionais
+      if (url === '/administracoes') return MOCK_LOOKUPS.administracoes
+      if (url === '/setores') return MOCK_LOOKUPS.setores
+      if (url === '/casas') return MOCK_LOOKUPS.casas
+      if (url === '/grupos-trabalho') return MOCK_LOOKUPS.gruposTrabalho
+      return []
+    })
+
+    render(<SeriesView />)
+    await screen.findByText('Reunião Semanal')
+    fireEvent.click(screen.getByText('Editar'))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Editar Série de Recorrência' })
+    await waitFor(() => expect(within(dialog).getByLabelText(/Local \*/i)).toHaveValue(localId))
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /criar local sem sair/i }))
+    const localRapido = await screen.findByRole('dialog', { name: /criar local/i })
+
+    fireEvent.change(within(localRapido).getByLabelText('CEP do novo local'), {
+      target: { value: '03127001' },
+    })
+
+    const usarManual = await within(localRapido).findByRole('button', { name: /usar endereço manualmente/i })
+    fireEvent.click(usarManual)
+
+    const endereco = within(localRapido).getByLabelText('Endereço do novo local')
+    fireEvent.change(endereco, { target: { value: 'Rua Digitada Manualmente' } })
+    expect(endereco).toHaveValue('Rua Digitada Manualmente')
+
+    await act(async () => {
+      resolver?.({
+        ok: true,
+        json: async () => ({
+          cep: '03127-001',
+          logradouro: 'Rua ViaCEP',
+          bairro: 'Vila Prudente',
+          localidade: 'São Paulo',
+          uf: 'SP',
+        }),
+      })
+      await pendente
+    })
+
+    expect(endereco).toHaveValue('Rua Digitada Manualmente')
+  })
+
+  it('deve conter e restaurar foco nos diálogos rápidos da série', async () => {
+    const localId = MOCK_LOOKUPS.locais[0].id
+    const seriePresencial = {
+      ...MOCK_SERIES[0],
+      modalidade: 'PRESENCIAL',
+      localId,
+      espacoId: null,
+      urlOnline: null,
+    }
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/series-recorrencia') return [seriePresencial]
+      if (url === '/locais') return MOCK_LOOKUPS.locais
+      if (url === '/espacos-locais?ativo=true') return []
+      if (url === '/membros') return MOCK_LOOKUPS.membros
+      if (url === '/regionais') return MOCK_LOOKUPS.regionais
+      if (url === '/administracoes') return MOCK_LOOKUPS.administracoes
+      if (url === '/setores') return MOCK_LOOKUPS.setores
+      if (url === '/casas') return MOCK_LOOKUPS.casas
+      if (url === '/grupos-trabalho') return MOCK_LOOKUPS.gruposTrabalho
+      return []
+    })
+
+    render(<SeriesView />)
+    await screen.findByText('Reunião Semanal')
+    fireEvent.click(screen.getByText('Editar'))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Editar Série de Recorrência' })
+    await waitFor(() => expect(within(dialog).getByLabelText(/Local \*/i)).toHaveValue(localId))
+
+    const abrirLocal = within(dialog).getByRole('button', { name: /criar local sem sair/i })
+    abrirLocal.focus()
+    fireEvent.click(abrirLocal)
+
+    const localRapido = await screen.findByRole('dialog', { name: /criar local/i })
+    const primeiroLocal = within(localRapido).getByLabelText('CEP do novo local')
+    await waitFor(() => expect(primeiroLocal).toHaveFocus())
+
+    const ultimoLocal = within(localRapido).getByRole('button', { name: /criar e selecionar/i })
+    ultimoLocal.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(primeiroLocal).toHaveFocus()
+
+    fireEvent.click(within(localRapido).getByRole('button', { name: /voltar à série/i }))
+    await waitFor(() => expect(abrirLocal).toHaveFocus())
+
+    const abrirEspaco = within(dialog).getByRole('button', { name: /criar espaço sem sair/i })
+    abrirEspaco.focus()
+    fireEvent.click(abrirEspaco)
+
+    const espacoRapido = await screen.findByRole('dialog', { name: /criar espaço/i })
+    const primeiroEspaco = within(espacoRapido).getByLabelText('Nome do novo espaço')
+    await waitFor(() => expect(primeiroEspaco).toHaveFocus())
+
+    const ultimoEspaco = within(espacoRapido).getByRole('button', { name: /criar e selecionar/i })
+    ultimoEspaco.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(primeiroEspaco).toHaveFocus()
+
+    fireEvent.click(within(espacoRapido).getByRole('button', { name: /voltar à série/i }))
+    await waitFor(() => expect(abrirEspaco).toHaveFocus())
   })
 
   it('deve mostrar espaço histórico inativo e exigir substituição antes de editar a série', async () => {
@@ -300,6 +528,11 @@ describe('SeriesView', () => {
     fireEvent.click(screen.getByText('Editar'))
 
     const dialog = await screen.findByRole('dialog', { name: 'Editar Série de Recorrência' })
+
+    await waitFor(() => {
+      expect(within(dialog).getByLabelText(/Local \*/i)).toHaveValue(localId)
+    })
+
     const seletorEspaco = within(dialog).getByLabelText('Espaço')
 
     await waitFor(() => {
@@ -531,11 +764,14 @@ describe('SeriesView', () => {
     fireEvent.click(screen.getByText('Editar'))
     await screen.findByRole('dialog', { name: 'Editar Série de Recorrência' })
 
+    fireEvent.change(screen.getByLabelText(/Título \*/i), {
+      target: { value: 'Reunião com erro no PATCH' }
+    })
     fireEvent.click(screen.getByText('Salvar Série'))
     await screen.findByRole('dialog', { name: 'Confirmar Edição de Série' })
 
     vi.mocked(apiClient.patchWithAuth).mockRejectedValueOnce(new apiClient.ApiError(400, 'Erro teste', { error: 'Mensagem de erro de API' }))
-    fireEvent.click(screen.getByText('Confirmar e Reconstruir'))
+    fireEvent.click(screen.getByText('Confirmar alterações'))
 
     // Dialog fecha e mostra erro na tela principal ou volta pro form
     await waitFor(() => {

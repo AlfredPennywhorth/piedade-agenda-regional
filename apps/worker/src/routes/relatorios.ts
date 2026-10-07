@@ -3,6 +3,7 @@ import { eq, and, gte, lt, lte, inArray } from 'drizzle-orm'
 import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, membros, casas, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo } from '../security/permissoes'
+import { condicaoEventosVisiveis } from '../security/eventos'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
 
 export const relatoriosRouter = new Hono<{ Variables: Variables }>()
@@ -580,7 +581,7 @@ relatoriosRouter.get('/agregado', async (c) => {
     return c.json({ error: 'Acesso não autorizado para visualizar relatório agregado do escopo informado' }, 403)
   }
 
-  const conditions = [eq(eventos.ativo, true)]
+  const conditions = [eq(eventos.ativo, true), await condicaoEventosVisiveis(db, c.get('contextoPermissoes'))]
 
   switch (escopoTipo) {
     case 'REGIONAL': conditions.push(eq(eventos.regionalId, escopoId)); break

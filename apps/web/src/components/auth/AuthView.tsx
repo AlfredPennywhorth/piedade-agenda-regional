@@ -22,6 +22,7 @@ export function AuthView({
   const ativando = Boolean(tokenAtivacao)
   const [recuperando, setRecuperando] = useState(false)
   const [celular, setCelular] = useState('')
+  const [codigoCarteirinha, setCodigoCarteirinha] = useState('')
   const [pin, setPin] = useState('')
   const [confirmacaoPin, setConfirmacaoPin] = useState('')
   const [erro, setErro] = useState<string | null>(null)
@@ -63,6 +64,7 @@ export function AuthView({
     const validacao = ativando
       ? ativacaoSchema.safeParse({
           token: tokenAtivacao,
+          codigoCarteirinha,
           celular,
           pin,
           confirmacaoPin,
@@ -100,6 +102,13 @@ export function AuthView({
   if (recuperando && !ativando) {
     return (
       <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <span
+          className="fixed bottom-2 right-2 z-50 rounded bg-white/90 px-2 py-1 text-[10px] font-medium tracking-wide text-slate-400 shadow-sm"
+          data-screen-code="AGD-SHR-004"
+          aria-label="Código da tela AGD-SHR-004"
+        >
+          Tela AGD-SHR-004
+        </span>
         <section className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-lg p-6 space-y-6">
           <header className="space-y-2 text-center">
             <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">
@@ -175,8 +184,17 @@ export function AuthView({
     )
   }
 
+  const screenCode = ativando ? 'AGD-SHR-003' : 'AGD-SHR-002'
+
   return (
     <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <span
+        className="fixed bottom-2 right-2 z-50 rounded bg-white/90 px-2 py-1 text-[10px] font-medium tracking-wide text-slate-400 shadow-sm"
+        data-screen-code={screenCode}
+        aria-label={`Código da tela ${screenCode}`}
+      >
+        Tela {screenCode}
+      </span>
       <section className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-lg p-6 space-y-6">
         <header className="space-y-2 text-center">
           <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">
@@ -187,7 +205,7 @@ export function AuthView({
           </h1>
           <p className="text-sm text-slate-600">
             {ativando
-              ? 'Confirme seu celular cadastrado e escolha um PIN pessoal de seis dígitos.'
+              ? 'Confirme sua carteirinha e seu celular cadastrado, depois escolha um PIN pessoal de seis dígitos.'
               : 'Use o celular cadastrado e seu PIN pessoal.'}
           </p>
         </header>
@@ -199,6 +217,23 @@ export function AuthView({
         )}
 
         <form onSubmit={submit} className="space-y-4">
+          {ativando && (
+            <div>
+              <label htmlFor="auth-carteirinha" className="block text-sm font-semibold text-slate-700 mb-1">
+                Código da carteirinha
+              </label>
+              <input
+                id="auth-carteirinha"
+                type="text"
+                autoComplete="off"
+                value={codigoCarteirinha}
+                onChange={event => setCodigoCarteirinha(event.target.value)}
+                disabled={enviando}
+                className="w-full rounded-lg border border-slate-300 px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand-300"
+              />
+            </div>
+          )}
+
           <div>
             <label htmlFor="auth-celular" className="block text-sm font-semibold text-slate-700 mb-1">
               Celular

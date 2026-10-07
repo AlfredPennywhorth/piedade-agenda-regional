@@ -67,14 +67,36 @@ describe('Series Recorrencia API (S05)', () => {
     return id
   }
 
+  function adicionarDias(data: Date, quantidade: number) {
+    const resultado = new Date(data)
+    resultado.setUTCDate(resultado.getUTCDate() + quantidade)
+    return resultado
+  }
+
+  function formatarData(data: Date) {
+    return data.toISOString().slice(0, 10)
+  }
+
+  const dataInicioSerie = adicionarDias(new Date(), 30)
+  const dataFimSerie = adicionarDias(dataInicioSerie, 4)
+  const dataInicioSemanal = new Date(dataInicioSerie)
+  dataInicioSemanal.setUTCDate(
+    dataInicioSemanal.getUTCDate() + ((2 - dataInicioSemanal.getUTCDay() + 7) % 7)
+  )
+  const dataFimSemanal = adicionarDias(dataInicioSemanal, 28)
+  const dataInicioMensal = new Date(dataInicioSerie)
+  dataInicioMensal.setUTCDate(1)
+  const dataFimMensal = new Date(dataInicioMensal)
+  dataFimMensal.setUTCMonth(dataFimMensal.getUTCMonth() + 3, 0)
+
   const basePayload = {
     titulo: 'Reunião Diária',
     modalidade: 'ONLINE',
     urlOnline: 'https://meet.google.com/abc',
     horarioInicio: '09:00',
     horarioFim: '10:00',
-    dataInicio: '2026-09-01',
-    dataFim: '2026-09-05',
+    dataInicio: formatarData(dataInicioSerie),
+    dataFim: formatarData(dataFimSerie),
     frequencia: 'DIARIA',
     intervalo: 1
   }
@@ -110,8 +132,9 @@ describe('Series Recorrencia API (S05)', () => {
       body: JSON.stringify({
         ...basePayload,
         frequencia: 'SEMANAL',
-        diaSemana: 2, // Terça-feira (2026-09-01 é Terça)
-        dataFim: '2026-09-30',
+        dataInicio: formatarData(dataInicioSemanal),
+        diaSemana: 2,
+        dataFim: formatarData(dataFimSemanal),
         regionalId
       })
     })
@@ -129,7 +152,8 @@ describe('Series Recorrencia API (S05)', () => {
         ...basePayload,
         frequencia: 'QUINZENAL',
         diaSemana: 2,
-        dataFim: '2026-09-30',
+        dataInicio: formatarData(dataInicioSemanal),
+        dataFim: formatarData(dataFimSemanal),
         regionalId
       })
     })
@@ -147,7 +171,8 @@ describe('Series Recorrencia API (S05)', () => {
         ...basePayload,
         frequencia: 'MENSAL_DIA_FIXO',
         diaMes: 15,
-        dataFim: '2026-11-30',
+        dataInicio: formatarData(dataInicioMensal),
+        dataFim: formatarData(dataFimMensal),
         regionalId
       })
     })
@@ -166,7 +191,8 @@ describe('Series Recorrencia API (S05)', () => {
         frequencia: 'MENSAL_POSICAO_SEMANA',
         diaSemana: 0, // Domingo
         posicaoSemanaMes: 1, // Primeiro
-        dataFim: '2026-11-30',
+        dataInicio: formatarData(dataInicioMensal),
+        dataFim: formatarData(dataFimMensal),
         regionalId
       })
     })
@@ -231,8 +257,8 @@ describe('Series Recorrencia API (S05)', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...basePayload,
-        dataInicio: '2026-09-10',
-        dataFim: '2026-09-01',
+        dataInicio: formatarData(dataInicioSerie),
+        dataFim: formatarData(adicionarDias(dataInicioSerie, -1)),
         regionalId
       })
     })
@@ -244,7 +270,7 @@ describe('Series Recorrencia API (S05)', () => {
     const res = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...basePayload, regionalId, dataFim: '2026-09-10' }) // 1 to 10
+      body: JSON.stringify({ ...basePayload, regionalId, dataFim: formatarData(adicionarDias(dataInicioSerie, 9)) }) // 1 to 10
     })
     const json = await res.json()
     expect(json.generatedOccurrences).toBe(10)
@@ -404,12 +430,12 @@ describe('Series Recorrencia API (S05)', () => {
     const postRes = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2026-09-01', dataFim: '2026-09-10' })
+      body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2099-09-01', dataFim: '2099-09-10' })
     })
     const serieId = (await postRes.json()).serie.id
     
     const evs = db.select().from(eventos).all()
-    const evTarget = evs.find((e: any) => e.inicioEm.includes('2026-09-06')) // Ocorrência do dia 06
+    const evTarget = evs.find((e: any) => e.inicioEm.includes('2099-09-06')) // Ocorrência do dia 06
     
     const patchRes = await req(`/api/v1/series-recorrencia/${serieId}`, {
       method: 'PATCH',
@@ -442,6 +468,44 @@ describe('Series Recorrencia API (S05)', () => {
     expect(velhasInativas.length).toBe(5) // não apagou fisicamente
   })
 
+  it('19.1 THIS_AND_FUTURE rejeita ocorrência pivô já encerrada', async () => {
+    const regionalId = await createRegional()
+    const postRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        regionalId,
+        dataInicio: '2020-09-01',
+        dataFim: '2020-09-03',
+      })
+    })
+    const { serie } = await postRes.json()
+    const ocorrencias = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    const pivot = ocorrencias[1]
+
+    const res = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'THIS_AND_FUTURE',
+        fromEventId: pivot.id,
+        changes: { titulo: 'Não deve reescrever histórico' }
+      })
+    })
+
+    expect(res.status).toBe(409)
+    expect(await res.json()).toMatchObject({ code: 'EVENTO_PASSADO_IMUTAVEL' })
+
+    const persistidas = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    expect(persistidas.every((item: any) => item.ativo)).toBe(true)
+    expect(db.select().from(seriesRecorrencia).all()).toHaveLength(1)
+  })
+
   describe('Regressivos THIS (via /api/v1/series-recorrencia)', () => {
     let regionalId: string
     let serieId: string
@@ -452,7 +516,7 @@ describe('Series Recorrencia API (S05)', () => {
       const postRes = await req('/api/v1/series-recorrencia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2026-09-01', dataFim: '2026-09-01' })
+        body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2099-09-01', dataFim: '2099-09-01' })
       })
       const json = await postRes.json()
       serieId = json.serie.id
@@ -473,7 +537,7 @@ describe('Series Recorrencia API (S05)', () => {
       const res = await req(`/api/v1/series-recorrencia/${serieId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { fimEm: '2026-09-01T08:00:00Z' } })
+        body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { fimEm: '2099-09-01T08:00:00Z' } })
       })
       expect(res.status).toBe(400)
     })
@@ -488,6 +552,34 @@ describe('Series Recorrencia API (S05)', () => {
         body: JSON.stringify({ updateMode: 'THIS', fromEventId: evId, changes: { administracaoId: adminId } })
       })
       expect(res.status).toBe(400) // Regra do Zod do EventoCreate veta dois escopos
+    })
+
+    it('22.1 THIS: ocorrência encerrada é imutável', async () => {
+      const passadoId = crypto.randomUUID()
+      await db.insert(eventos).values({
+        id: passadoId,
+        titulo: 'Ocorrência histórica',
+        modalidade: 'ONLINE',
+        inicioEm: '2020-01-01T10:00:00.000Z',
+        fimEm: '2020-01-01T11:00:00.000Z',
+        urlOnline: 'https://meet.google.com/historico',
+        regionalId,
+        serieRecorrenciaId: serieId,
+        ativo: true,
+      })
+
+      const res = await req(`/api/v1/series-recorrencia/${serieId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          updateMode: 'THIS',
+          fromEventId: passadoId,
+          changes: { titulo: 'Não deve alterar' },
+        }),
+      })
+
+      expect(res.status).toBe(409)
+      expect(await res.json()).toMatchObject({ code: 'EVENTO_PASSADO_IMUTAVEL' })
     })
 
     it('23. THIS: ONLINE com local falha', async () => {
@@ -700,6 +792,330 @@ describe('Series Recorrencia API (S05)', () => {
     const persistido = db.select().from(eventos).where(eq(eventos.id, original.id)).get()
     expect(persistido.ativo).toBe(true)
     expect(persistido.titulo).toBe(original.titulo)
+  })
+
+  it('24.5a ALL altera Local sem regenerar ocorrência com convocação PUBLICADA', async () => {
+    const regionalId = await createRegional()
+    const localAnteriorId = crypto.randomUUID()
+    const localNovoId = crypto.randomUUID()
+
+    await db.insert(locais).values({
+      id: localAnteriorId,
+      nome: 'Local Anterior',
+      endereco: 'Rua A',
+      numero: '10',
+      cidade: 'São Paulo',
+      uf: 'SP',
+      ativo: true,
+    }).run()
+    await db.insert(locais).values({
+      id: localNovoId,
+      nome: 'Local Novo',
+      endereco: 'Rua B',
+      numero: '20',
+      cidade: 'São Paulo',
+      uf: 'SP',
+      ativo: true,
+    }).run()
+
+    const createRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        titulo: 'Série operacional',
+        modalidade: 'PRESENCIAL',
+        urlOnline: null,
+        localId: localAnteriorId,
+        regionalId,
+        dataInicio: '2099-12-01',
+        dataFim: '2099-12-03',
+      }),
+    })
+    expect(createRes.status).toBe(201)
+    const { serie } = await createRes.json()
+
+    const antes = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    const idsAntes = antes.map((item: any) => item.id).sort()
+    const original = antes[0]
+
+    await db.insert(convocacoes).values({
+      id: crypto.randomUUID(),
+      eventoId: original.id,
+      status: 'PUBLICADA',
+      publicadaEm: new Date().toISOString(),
+      ativo: true,
+    })
+
+    const atualizar = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'ALL',
+        changes: { localId: localNovoId },
+      }),
+    })
+
+    expect(atualizar.status).toBe(200)
+    expect(await atualizar.json()).toMatchObject({ reconfirmacaoSolicitada: true })
+
+    const depois = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    expect(depois.map((item: any) => item.id).sort()).toEqual(idsAntes)
+    expect(depois.filter((item: any) => item.ativo)).toHaveLength(3)
+
+    const persistido = depois.find((item: any) => item.id === original.id)
+    expect(persistido.localId).toBe(localNovoId)
+    expect(persistido.agendaAviso).toContain('Local Anterior')
+    expect(persistido.agendaAviso).toContain('Local Novo')
+
+    const convocacaoPersistida = db.select().from(convocacoes)
+      .where(eq(convocacoes.eventoId, original.id))
+      .get()
+    expect(convocacaoPersistida.status).toBe('PUBLICADA')
+  })
+
+  it('24.5b THIS_AND_FUTURE altera Local sem recriar eventos com convocação PUBLICADA', async () => {
+    const regionalId = await createRegional()
+    const localAnteriorId = crypto.randomUUID()
+    const localNovoId = crypto.randomUUID()
+
+    await db.insert(locais).values({
+      id: localAnteriorId,
+      nome: 'Local TF Anterior',
+      endereco: 'Rua A',
+      numero: '10',
+      cidade: 'São Paulo',
+      uf: 'SP',
+      ativo: true,
+    }).run()
+    await db.insert(locais).values({
+      id: localNovoId,
+      nome: 'Local TF Novo',
+      endereco: 'Rua B',
+      numero: '20',
+      cidade: 'São Paulo',
+      uf: 'SP',
+      ativo: true,
+    }).run()
+
+    const createRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        titulo: 'Série este e próximos',
+        modalidade: 'PRESENCIAL',
+        urlOnline: null,
+        localId: localAnteriorId,
+        regionalId,
+        dataInicio: '2099-12-10',
+        dataFim: '2099-12-14',
+      }),
+    })
+    expect(createRes.status).toBe(201)
+    const { serie } = await createRes.json()
+
+    const antes = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    const pivot = antes[2]
+    const idsFuturos = antes
+      .filter((item: any) => item.inicioEm >= pivot.inicioEm)
+      .map((item: any) => item.id)
+      .sort()
+
+    await db.insert(convocacoes).values({
+      id: crypto.randomUUID(),
+      eventoId: pivot.id,
+      status: 'PUBLICADA',
+      publicadaEm: new Date().toISOString(),
+      ativo: true,
+    })
+
+    const atualizar = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'THIS_AND_FUTURE',
+        fromEventId: pivot.id,
+        changes: { localId: localNovoId },
+      }),
+    })
+
+    expect(atualizar.status).toBe(200)
+    const resposta = await atualizar.json()
+    expect(resposta).toMatchObject({ reconfirmacaoSolicitada: true })
+    expect(resposta.novaSerieId).toBeTruthy()
+
+    const futurosDepois = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, resposta.novaSerieId))
+      .all()
+      .filter((item: any) => item.ativo)
+
+    expect(futurosDepois.map((item: any) => item.id).sort()).toEqual(idsFuturos)
+    expect(futurosDepois.every((item: any) => item.localId === localNovoId)).toBe(true)
+    expect(futurosDepois.every((item: any) => item.agendaAviso?.includes('Local TF Novo'))).toBe(true)
+
+    const convocacaoPersistida = db.select().from(convocacoes)
+      .where(eq(convocacoes.eventoId, pivot.id))
+      .get()
+    expect(convocacaoPersistida).toMatchObject({ status: 'PUBLICADA', ativo: true })
+  })
+
+  it('24.5b.1 THIS_AND_FUTURE operacional preserva intervalo legado diferente de 1', async () => {
+    const regionalId = await createRegional()
+    const localAnteriorId = crypto.randomUUID()
+    const localNovoId = crypto.randomUUID()
+
+    await db.insert(locais).values({
+      id: localAnteriorId,
+      nome: 'Local Legado Anterior',
+      endereco: 'Rua A',
+      numero: '10',
+      cidade: 'São Paulo',
+      uf: 'SP',
+      ativo: true,
+    }).run()
+    await db.insert(locais).values({
+      id: localNovoId,
+      nome: 'Local Legado Novo',
+      endereco: 'Rua B',
+      numero: '20',
+      cidade: 'São Paulo',
+      uf: 'SP',
+      ativo: true,
+    }).run()
+
+    const createRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        titulo: 'Série legado operacional',
+        modalidade: 'PRESENCIAL',
+        urlOnline: null,
+        localId: localAnteriorId,
+        regionalId,
+        dataInicio: '2099-12-15',
+        dataFim: '2099-12-19',
+      }),
+    })
+    expect(createRes.status).toBe(201)
+    const { serie } = await createRes.json()
+
+    // Simula série histórica criada antes do contrato atual intervalo=1.
+    await db.update(seriesRecorrencia)
+      .set({ intervalo: 2 })
+      .where(eq(seriesRecorrencia.id, serie.id))
+      .run()
+
+    const antes = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    const pivot = antes[1]
+
+    await db.insert(convocacoes).values({
+      id: crypto.randomUUID(),
+      eventoId: pivot.id,
+      status: 'PUBLICADA',
+      publicadaEm: new Date().toISOString(),
+      ativo: true,
+    })
+
+    const atualizar = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'THIS_AND_FUTURE',
+        fromEventId: pivot.id,
+        changes: { localId: localNovoId },
+      }),
+    })
+
+    expect(atualizar.status).toBe(200)
+    const resposta = await atualizar.json()
+    expect(resposta).toMatchObject({ reconfirmacaoSolicitada: true })
+    expect(resposta.novaSerieId).toBeTruthy()
+
+    const novaSerie = db.select().from(seriesRecorrencia)
+      .where(eq(seriesRecorrencia.id, resposta.novaSerieId))
+      .get()
+    expect(novaSerie.intervalo).toBe(2)
+
+    const convocacaoPersistida = db.select().from(convocacoes)
+      .where(eq(convocacoes.eventoId, pivot.id))
+      .get()
+    expect(convocacaoPersistida).toMatchObject({ status: 'PUBLICADA', ativo: true })
+  })
+
+  it('24.5c THIS_AND_FUTURE no-op operacional não divide série nem força reconfirmação', async () => {
+    const regionalId = await createRegional()
+    const localId = crypto.randomUUID()
+
+    await db.insert(locais).values({
+      id: localId,
+      nome: 'Local sem mudança',
+      endereco: 'Rua A',
+      numero: '10',
+      cidade: 'São Paulo',
+      uf: 'SP',
+      ativo: true,
+    }).run()
+
+    const createRes = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        titulo: 'Série no-op',
+        modalidade: 'PRESENCIAL',
+        urlOnline: null,
+        localId,
+        regionalId,
+        dataInicio: '2099-12-20',
+        dataFim: '2099-12-22',
+      }),
+    })
+    expect(createRes.status).toBe(201)
+    const { serie } = await createRes.json()
+
+    const antes = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    const pivot = antes[1]
+    const idsAntes = antes.map((item: any) => item.id).sort()
+    const revisoesAntes = Object.fromEntries(
+      antes.map((item: any) => [item.id, item.agendaRevisao])
+    )
+
+    const atualizar = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'THIS_AND_FUTURE',
+        fromEventId: pivot.id,
+        changes: { localId },
+      }),
+    })
+
+    expect(atualizar.status).toBe(200)
+    expect(await atualizar.json()).toMatchObject({
+      novaSerieId: null,
+      reconfirmacaoSolicitada: false,
+    })
+
+    expect(db.select().from(seriesRecorrencia).all()).toHaveLength(1)
+    const depois = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id))
+      .all()
+    expect(depois.map((item: any) => item.id).sort()).toEqual(idsAntes)
+    expect(
+      Object.fromEntries(depois.map((item: any) => [item.id, item.agendaRevisao]))
+    ).toEqual(revisoesAntes)
   })
 
   it('24.5.1 impede criar convocação ativa para ocorrência inativada', async () => {

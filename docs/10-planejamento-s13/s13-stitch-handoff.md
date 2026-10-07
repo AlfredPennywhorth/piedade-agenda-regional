@@ -4,104 +4,171 @@
 
 Este documento fornece ao Google Stitch um inventario enxuto do frontend atual da Agenda Regional Sao Paulo e orienta uma proposta visual/UX para as superficies prioritarias. O objetivo e apoiar a aprovacao do PO sem alterar a arquitetura, as permissoes ou o codigo existente.
 
+A nova rodada de UX deve ser tratada como um redesenho do zero. Artefatos, mockups ou propostas anteriores do Stitch nao devem ser considerados como referencia visual obrigatoria. O ponto de partida e o produto funcional atual, seus fluxos consolidados, as regras de negocio existentes e as dividas UX registradas.
+
 O frontend atual usa React, Vite e Tailwind. O produto atende usuarios com diferentes niveis de familiaridade tecnologica, com foco em acesso por celular e em consultas e acoes recorrentes de agenda.
 
-## 2. Estado atual do frontend
+## 2. Fonte canonica do estado atual
 
-### Telas e fluxos presentes
+Para este handoff, o estado atual do produto deve ser lido a partir de duas fontes de codigo:
 
-- Minha Agenda: lista eventos futuros, abre detalhe, permite RSVP, justificativa de ausencia, escolha de periodos, QR Code e compartilhamento por WhatsApp.
-- Calendario: calendario mensal, navegacao entre meses, selecao de dia e abertura de eventos.
-- Avisos: controle de notificacoes push e estados de suporte, permissao e ativacao; a tela ainda exibe aviso de modulo em desenvolvimento.
-- Portaria: selecao de evento, leitura de token QR, busca de participante, check-in manual e feedback de sucesso, aviso e erro.
-- Relatorios: relatorio por evento, lista nominal filtravel e relatorio agregado por escopo e periodo.
-- Auditoria: filtros, tabela paginada, atualizacao e modal de contexto JSON.
-- Meu Cadastro: rota de navegacao presente, mas somente com placeholder de modulo em desenvolvimento.
+- `apps/web/src/App.tsx`: define as superficies renderizadas, fluxos publicos, autenticacao, componentes e gates de acesso;
+- `apps/web/src/components/layout/MainLayout.tsx`: define a navegacao autenticada, os agrupamentos visuais e a exibicao condicional por capability.
 
-### Componentes estruturais e reutilizaveis
+Quando houver divergencia entre este documento e essas fontes, prevalece o codigo. O Stitch nao deve inferir novas rotas, menus, capabilities ou agrupamentos.
 
-- `MainLayout`: cabecalho, area principal, navegacao inferior e exibicao condicional por capability.
-- `EventCard`: resumo reutilizavel de evento em Minha Agenda e Calendario.
-- `EventoDetalhe`: dialogo de detalhes, RSVP, QR Code, links de local/transmissao e compartilhamento.
-- `QrCodeModal`: abertura do QR Code do destinatario.
-- `NotificacoesControl`: leitura e alteracao do estado de notificacoes push.
-- Controles nativos reutilizados: botoes, inputs, selects, tabelas, dialogs e mensagens de feedback.
+## 3. Matriz canonica de superficies
 
-Nao existe ainda um catalogo de componentes ou uma camada visual independente do Tailwind.
+Cada superficie possui uma classificacao primaria unica de UX. Essa classificacao define o prefixo do identificador de QA: `MOB` para `MOBILE_FIRST`, `ADM` para `DESKTOP_FIRST` e `SHR` para `RESPONSIVO_DUAL`.
 
-## 3. Matriz de superficies
+| Superficie | Componente / rota | Navegacao / contexto atual | Capability de acesso | Capability interna relevante | Classificacao UX | Estado atual |
+| --- | --- | --- | --- | --- | --- | --- |
+| Minha Agenda | `AgendaView` | Barra inferior | nenhuma adicional | — | MOBILE_FIRST | EXISTENTE |
+| Eventos | `EventosView` | Barra inferior | `podeGerirAgenda` | — | DESKTOP_FIRST | EXISTENTE |
+| Calendario | `CalendarioView` | Barra inferior | nenhuma adicional | — | MOBILE_FIRST | EXISTENTE |
+| Convocacoes | `ConvocacoesView` | Barra inferior | `podeGerirAgenda` | — | DESKTOP_FIRST | EXISTENTE |
+| Series | `SeriesView` | Mais > Agenda e gestao | `podeGerirAgenda` | — | DESKTOP_FIRST | EXISTENTE |
+| Relatorios | `RelatoriosView` | Mais > Agenda e gestao | `podeVisualizarRelatorios` | — | DESKTOP_FIRST | EXISTENTE |
+| Avisos | `NotificacoesControl` | Mais > Agenda e gestao | nenhuma adicional | — | MOBILE_FIRST | PARCIAL |
+| Portaria autenticada | `PortariaView` | Mais > Agenda e gestao | `podeOperarPortaria || podeGerirAgenda` | — | MOBILE_FIRST | EXISTENTE |
+| Auditoria | `AuditoriaView` | Mais > Agenda e gestao | `podeVisualizarAuditoria` | — | DESKTOP_FIRST | EXISTENTE |
+| Regionais | `RegionaisView` | Mais > Administracao | `podeAdministrarEstrutura` | `podeAdministrarRegionais` controla criacao/edicao | DESKTOP_FIRST | EXISTENTE |
+| Administracoes | `AdministracoesView` | Mais > Administracao | `podeAdministrarEstrutura` | — | DESKTOP_FIRST | EXISTENTE |
+| Setores | `SetoresView` | Mais > Administracao | `podeAdministrarEstrutura` | — | DESKTOP_FIRST | EXISTENTE |
+| Casas | `CasasView` | Mais > Administracao | `podeAdministrarEstrutura` | — | DESKTOP_FIRST | EXISTENTE |
+| Grupos de Trabalho | `GruposTrabalhoView` | Mais > Administracao | `podeAdministrarEstrutura` | — | DESKTOP_FIRST | EXISTENTE |
+| Locais | `LocaisView` | Mais > Administracao | `podeGerirAgenda` | — | DESKTOP_FIRST | EXISTENTE |
+| Membros | `MembrosView` | Mais > Pessoas e acessos | `podeAdministrarPessoas` | — | DESKTOP_FIRST | EXISTENTE |
+| Funcoes | `FuncoesView` | Mais > Pessoas e acessos | `podeAdministrarFuncoes` | — | DESKTOP_FIRST | EXISTENTE |
+| Vinculos | `VinculosFuncionaisView` | Mais > Pessoas e acessos | `podeAdministrarPessoas` | — | DESKTOP_FIRST | EXISTENTE |
+| Acessos | `ContasAcessoView` | Mais > Pessoas e acessos | `podeAdministrarAcessos` | `podeGerenciarSessoes` controla consulta/revogacao de sessoes | DESKTOP_FIRST | EXISTENTE |
+| Meu Cadastro | `PerfilView` | Mais > Conta | nenhuma adicional | — | RESPONSIVO_DUAL | EXISTENTE |
+| Login | `AuthView` | Fluxo anonimo | sessao anonima | — | RESPONSIVO_DUAL | EXISTENTE |
+| Ativacao de conta | `AuthView` com token | Fluxo anonimo | token de ativacao | — | RESPONSIVO_DUAL | EXISTENTE |
+| Recuperacao de PIN | `AuthView` | Fluxo anonimo | sessao anonima | — | RESPONSIVO_DUAL | EXISTENTE |
+| Portaria temporaria | `PortariaOperadorTemporarioView` — `/o/` ou `/portaria-operador` | Fluxo publico por token | token de operador | — | MOBILE_FIRST | EXISTENTE |
+| Cadastro de convidado | `CadastroConvidadoView` — `/c` ou `/convidado` | Fluxo publico por token | token de portaria | — | MOBILE_FIRST | EXISTENTE |
+| Ciencia de responsabilidade regional | `ResponsabilidadeRegionalGate` | Gate obrigatorio antes da area autenticada quando houver ciencia pendente | usuario autenticado com responsabilidade pendente | confirma um acesso regional por vez; apos cada registro consulta novamente e repete o gate ate nao restar pendencia. Se a consulta inicial falhar por erro diferente de 403, registra o erro e libera a aplicacao; se a reconsulta apos uma ciencia falhar por erro diferente de 403, preserva a responsabilidade anterior e mantem o gate exibido ate nova verificacao. Em 403, a responsabilidade e limpa e a aplicacao e liberada | RESPONSIVO_DUAL | EXISTENTE |
+| Alerta global de recuperacao de PIN | `MainLayout` + contagem carregada em `App.tsx` | Banner global fora da tela Acessos, quando ha solicitacoes pendentes | `podeAdministrarAcessos` | acao `Ver solicitacoes` direciona para Acessos; oculto dentro da propria tela Acessos | DESKTOP_FIRST | EXISTENTE |
 
-| Superficie                    | Classificacao | Evidencia atual                                                                                |
-| ----------------------------- | ------------- | ---------------------------------------------------------------------------------------------- |
-| Minha Agenda                  | EXISTENTE     | Lista, loading, erro, estado vazio, detalhe e RSVP.                                            |
-| Calendario                    | EXISTENTE     | Grade mensal, navegacao, eventos por dia e estado vazio do dia.                                |
-| Avisos                        | PARCIAL       | Notificacoes push funcionais, mas modulo ainda marcado como em desenvolvimento.                |
-| Meu Cadastro                  | PARCIAL       | Navegacao existe; conteudo e placeholder.                                                      |
-| Portaria                      | EXISTENTE     | Check-in QR/manual, busca, participantes e feedback operacional.                               |
-| Relatorios                    | EXISTENTE     | Relatorio por evento, agregado, filtros, loading e erros.                                      |
-| Auditoria                     | EXISTENTE     | Filtros, tabela, paginacao, loading, erro e detalhes.                                          |
-| Login                         | AUSENTE       | Nao ha tela de login no frontend atual.                                                        |
-| Ativacao / redefinicao de PIN | AUSENTE       | Nao ha tela ou fluxo visual correspondente.                                                    |
-| Estados de erro               | PARCIAL       | Existem mensagens por view; falta tratamento visual transversal e consistente.                 |
-| Estados vazios                | EXISTENTE     | Agenda, calendario, portaria e auditoria possuem estados vazios locais.                        |
-| Loading                       | EXISTENTE     | Ha spinners, textos e botoes desabilitados em varias views.                                    |
-| Acesso negado                 | PARCIAL       | Capabilities ocultam Portaria, Relatorios e Auditoria; nao ha tela explicita de acesso negado. |
+Os estados transversais — loading, erro, vazio, acesso negado, sessao expirada, sucesso e conflitos — pertencem a essas superficies e devem ser harmonizados visualmente, sem criar telas funcionais novas.
 
 ## 4. Navegacao canonica
 
-A navegacao principal definida no projeto e:
+A navegacao autenticada atual deve ser preservada como referencia funcional:
 
-- Minha Agenda
-- Calendario
-- Avisos
-- Meu Cadastro
+- barra inferior:
+  - Minha Agenda;
+  - Eventos, quando `podeGerirAgenda`;
+  - Calendario;
+  - Convocacoes, quando `podeGerirAgenda`;
+  - Mais.
+- Mais > Agenda e gestao:
+  - Series;
+  - Relatorios;
+  - Avisos;
+  - Portaria;
+  - Auditoria.
+- Mais > Administracao:
+  - Regionais;
+  - Administracoes;
+  - Setores;
+  - Casas;
+  - Grupos de Trabalho;
+  - Locais.
+- Mais > Pessoas e acessos:
+  - Membros;
+  - Funcoes;
+  - Vinculos;
+  - Acessos.
+- Mais > Conta:
+  - Meu Cadastro.
 
-A navegacao condicional conforme capability e:
+O Stitch pode propor uma composicao visual melhor para desktop e mobile, mas nao deve alterar o significado dos destinos, as permissoes ou os fluxos sem aprovacao explicita do PO.
 
-- Portaria
-- Relatorios
-- Auditoria
+## 5. Capabilities e controles internos
 
-O Stitch deve preservar esses nomes e essa organizacao. Nao devem ser inventados novos menus, agrupamentos ou perfis de acesso.
+As capabilities retornadas por `auth/me` devem ser preservadas. Elas podem liberar uma superficie inteira ou apenas acoes internas:
 
-## 5. Perfis e capabilities relevantes
+- `podeOperarPortaria` ou `podeGerirAgenda`: acesso a Portaria autenticada;
+- `podeVisualizarRelatorios`: acesso a Relatorios;
+- `podeVisualizarAuditoria`: acesso a Auditoria;
+- `podeAdministrarAcessos`: acesso a Acessos;
+- `podeAdministrarEstrutura`: acesso a Regionais, Administracoes, Setores, Casas e Grupos de Trabalho;
+- `podeAdministrarPessoas`: acesso a Membros e Vinculos;
+- `podeAdministrarFuncoes`: acesso a Funcoes;
+- `podeGerirAgenda`: acesso a Eventos, Series, Convocacoes e Locais;
+- `podeAdministrarRegionais`: dentro de Regionais, controla criacao/edicao;
+- `podeGerenciarSessoes`: dentro de Acessos, controla consulta/revogacao de sessoes;
+- `ResponsabilidadeRegionalGate`: quando existe ciencia pendente, substitui temporariamente toda a area autenticada; a confirmacao ocorre sequencialmente por acesso regional pendente, com nova consulta apos cada registro, e a aplicacao so e liberada quando nao restam pendencias. Em erro diferente de 403 na consulta inicial, o componente registra a falha e libera a aplicacao; em erro equivalente na reconsulta apos uma ciencia, preserva a responsabilidade anterior e mantem o gate exibido ate nova verificacao;
+- recuperacoes de PIN pendentes: com `podeAdministrarAcessos`, `App.tsx` carrega a contagem e `MainLayout` exibe um alerta global com acesso direto a Acessos, exceto quando o usuario ja esta nessa tela.
 
-O frontend consulta as capabilities retornadas por `auth/me` e usa somente estas regras de exibicao:
+Uma superficie visivel nao implica permissao para todas as suas acoes. O redesenho deve preservar essas diferencas.
 
-- `podeOperarPortaria`: exibe Portaria.
-- `podeVisualizarRelatorios`: exibe Relatorios.
-- `podeVisualizarAuditoria`: exibe Auditoria.
+## 6. Diretrizes UX por classificacao
 
-Minha Agenda, Calendario, Avisos e Meu Cadastro formam a navegacao principal. A proposta visual deve manter a diferenca entre navegacao principal e ferramentas condicionais, sem criar novas capabilities ou presumir permissoes nao definidas.
+- `MOBILE_FIRST`: Minha Agenda, Calendario, Avisos, Portaria autenticada, Portaria temporaria e Cadastro de convidado. Priorizar cards, fluxo sequencial, alvos de toque grandes, QR/check-in e poucos passos.
+- `DESKTOP_FIRST`: Eventos, Convocacoes, Series, Relatorios, Auditoria, Regionais, Administracoes, Setores, Casas, Grupos de Trabalho, Locais, Membros, Funcoes, Vinculos, Acessos e o alerta global de recuperacoes de PIN. Priorizar tabelas, filtros persistentes, contexto simultaneo, formularios amplos e uso eficiente da largura.
+- `RESPONSIVO_DUAL`: Login, Ativacao de conta, Recuperacao de PIN, Meu Cadastro e Ciencia de responsabilidade regional. Manter equivalencia funcional entre mobile e desktop, com composicao apropriada para cada breakpoint.
 
-## 6. Requisitos UX para o handoff
+Cada superficie tem uma unica classificacao primaria. Adaptacoes para outro dispositivo nao criam uma segunda classificacao nem outro identificador para a mesma superficie.
 
-A proposta deve considerar:
+## 7. Requisitos UX para o handoff
 
-- mobile-first, com boa operacao em telas pequenas;
-- usuarios com diferentes niveis de familiaridade tecnologica;
-- navegacao simples e previsivel;
-- textos legiveis e linguagem direta;
-- contraste adequado e hierarquia visual clara;
-- alvos de toque grandes, especialmente em navegacao, RSVP e check-in;
-- poucos passos para consultar agenda, responder convocacao e apresentar QR Code;
-- consistencia entre cards, formularios, tabelas, dialogs e mensagens;
-- feedback explicito para sucesso, aviso, erro, carregamento e ausencia de dados;
-- layout responsivo para tabelas e relatorios sem perda de contexto;
-- base visual que permita a futura implementacao de acessibilidade em S13.03 e S13.04.
+A proposta deve:
+
+- usar a matriz canonica como inventario do produto atual;
+- diferenciar claramente estado atual do produto e proposta futura de UX;
+- nao tratar desktop como mero estiramento do mobile nem mobile como simples reducao do desktop;
+- em desktop, aproveitar largura para tabelas, filtros persistentes, paineis laterais, multiplas colunas e contexto simultaneo;
+- em mobile/PWA, preferir cards, etapas sequenciais, navegacao compacta e acoes focadas;
+- considerar usuarios com diferentes niveis de familiaridade tecnologica;
+- usar textos legiveis, linguagem direta, contraste adequado e hierarquia visual clara;
+- manter alvos de toque grandes em navegacao, RSVP, QR e check-in;
+- reduzir passos para consultar agenda, responder convocacao e apresentar QR Code;
+- harmonizar cards, formularios, tabelas, dialogs e mensagens;
+- explicitar sucesso, aviso, erro, carregamento, ausencia de dados e acesso negado;
+- preservar contratos, regras de negocio, rotas publicas, capabilities, gates bloqueantes e controles internos/transversais;
+- preparar base visual para acessibilidade nas sub-sprints seguintes sem antecipar definicoes tecnicas de WCAG.
 
 Este documento nao define detalhes tecnicos de WCAG. A implementacao de acessibilidade sera tratada nas sub-sprints apropriadas.
 
-## 7. Telas prioritarias
+## 8. Convencao de identificacao de telas
+
+Toda tela ou superficie desenhada deve possuir um codigo unico e estavel no inventario de UX/QA, para permitir identificacao objetiva em suporte, homologacao, manutencao e relatos de erro. A exibicao desse codigo na interface do produto e opcional e depende de aprovacao explicita do PO.
+
+Regras:
+
+- o codigo deve existir obrigatoriamente no inventario de telas e artefatos de QA;
+- quando o PO aprovar sua exibicao na interface, deve aparecer discretamente, preferencialmente no rodape, canto inferior ou area de metadados, sem competir visualmente com o conteudo principal;
+- o identificador deve permanecer estavel mesmo que o layout evolua;
+- modal, dialogo ou subfluxo relevante pode receber codigo proprio quando for tratado como superficie independente;
+- relatos de suporte e QA devem poder referenciar diretamente o codigo da tela;
+- a convencao deve ser simples e legivel, por exemplo: `AGD-MOB-001`, `AGD-ADM-001`, `AGD-SHR-001`;
+- `MOB` identifica superficies mobile-first, `ADM` superficies administrativas/desktop-first e `SHR` fluxos responsivos compartilhados;
+- o inventario de telas deve manter a correspondencia entre codigo, nome funcional, perfil de uso e rota/componente quando houver.
+
+## 9. Dividas UX incorporadas ao redesenho
+
+As dividas abaixo devem ser tratadas como requisitos do Stitch, evitando implementacao isolada antes do redesenho:
+
+- #241: melhorar navegacao horizontal em telas largas do Master, preservando contexto de linha e reduzindo dependencia da barra de rolagem no fim da pagina;
+- #242: incluir filtro de Setor antes de Casa de Oracao e ordenar alfabeticamente Locais fisicos;
+- #226: adicionar busca e filtros em Contas e Acessos, incluindo nome, celular, carteirinha, escopo territorial, status e perfil;
+- #231/#232: incorporar no redesenho os filtros remanescentes de ativos/inativos/cancelados e refinamentos do fluxo Evento -> Convocacao -> Funcoes.
+
+Essas dividas nao sao pre-condicao para iniciar o trabalho com o Stitch; elas fazem parte do briefing do proprio redesenho.
+
+## 10. Telas prioritarias
 
 1. Minha Agenda e detalhe do evento, incluindo RSVP, periodos, justificativa e QR Code.
 2. Calendario, com selecao de dia e visualizacao dos eventos.
 3. Avisos, evoluindo o controle de notificacoes para uma tela compreensivel de preferencias.
-4. Meu Cadastro, substituindo o placeholder por um fluxo de consulta e manutencao definido pelo PO.
-5. Login e ativacao/redefinicao de PIN, ausentes no frontend atual e necessarios para completar a entrada do usuario.
-6. Portaria, Relatorios e Auditoria, preservando os acessos condicionais e priorizando fluxos operacionais.
+4. Meu Cadastro, classificado como RESPONSIVO_DUAL, preservando consulta de dados institucionais, atualizacao de celular e alteracao de PIN.
+5. Login e ativacao/redefinicao de PIN, classificados como RESPONSIVO_DUAL, preservando os fluxos existentes de autenticacao, ativacao e solicitacao de redefinicao.
+6. Portaria, classificada como MOBILE_FIRST, e Relatorios/Auditoria, classificados integralmente como DESKTOP_FIRST, preservando os acessos condicionais e priorizando os respectivos contextos operacionais.
 
-## 8. Estados especiais
+## 11. Estados especiais
 
 A proposta deve apresentar estados visuais para:
 
@@ -118,7 +185,7 @@ A proposta deve apresentar estados visuais para:
 
 Os estados existentes devem ser preservados como comportamento funcional e harmonizados visualmente na proposta.
 
-## 9. Restricoes tecnicas
+## 12. Restricoes tecnicas
 
 - Preservar a arquitetura React/Vite/Tailwind existente.
 - Preservar a navegacao e os nomes canonicamente definidos.
@@ -128,7 +195,7 @@ Os estados existentes devem ser preservados como comportamento funcional e harmo
 - Considerar a base visual atual: Tailwind, paleta `brand` azul e tipografia Inter.
 - Nao introduzir backend, novas rotas de API ou novo modelo de permissao como parte do handoff.
 
-## 10. Itens fora de escopo
+## 13. Itens fora de escopo
 
 - Implementacao de qualquer tela ou componente nesta etapa.
 - Inicio da S13.03.
@@ -140,12 +207,13 @@ Os estados existentes devem ser preservados como comportamento funcional e harmo
 
 O Stitch fornecera uma proposta visual/UX. O codigo gerado nao sera incorporado cegamente. O Copilot adaptara posteriormente o design aprovado a arquitetura real, preservando React/Vite/Tailwind e as permissoes existentes.
 
-## 11. Criterios para aprovacao do PO
+## 14. Criterios para aprovacao do PO
 
 A proposta visual sera considerada pronta para aprovacao quando:
 
 - cobrir a navegacao principal e as telas condicionais sem criar menus novos;
-- representar desktop e mobile, com prioridade para mobile;
+- representar desktop e mobile conforme a classificacao de cada fluxo: mobile-first para usuario comum, desktop-first para Master/administracao e responsivo dual quando aplicavel;
+- atribuir codigo unico a cada tela/superficie aprovada e manter inventario de rastreabilidade; a exibicao do codigo na interface depende de aprovacao explicita do PO;
 - mostrar os fluxos prioritarios e seus estados especiais;
 - deixar claras as acoes principais e seus resultados;
 - manter linguagem, hierarquia, contraste e alvos de toque adequados ao publico;
@@ -154,7 +222,7 @@ A proposta visual sera considerada pronta para aprovacao quando:
 - nao exigir mudanca de arquitetura ou de contratos para ser adaptada;
 - receber aprovacao explicita do PO antes de qualquer implementacao da S13.03.
 
-## 12. Relacao com S13.03 e S13.04
+## 15. Relacao com S13.03 e S13.04
 
 Este documento e um handoff de UX, nao uma implementacao. A S13.03 so deve comecar depois da aprovacao visual/UX do PO e da definicao das telas prioritarias. A S13.04 e as demais atividades de acessibilidade devem usar a proposta aprovada como referencia, sem antecipar neste documento detalhes tecnicos de WCAG.
 

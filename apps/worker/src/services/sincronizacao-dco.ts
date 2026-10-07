@@ -54,6 +54,22 @@ export function queriesSincronizacaoDcoAtual(
         convocacaoDestinatarioId: convocacaoDestinatarios.id,
         funcaoId: funcoes.id,
         vinculoFuncionalId: vinculosFuncionais.id,
+        funcaoNomeSnapshot: funcoes.nome,
+        escopoTipoSnapshot: sql<string>`CASE
+          WHEN ${vinculosFuncionais.regionalId} IS NOT NULL THEN 'REGIONAL'
+          WHEN ${vinculosFuncionais.grupoTrabalhoId} IS NOT NULL THEN 'GRUPO_TRABALHO'
+          WHEN ${vinculosFuncionais.administracaoId} IS NOT NULL THEN 'ADMINISTRACAO'
+          WHEN ${vinculosFuncionais.setorId} IS NOT NULL THEN 'SETOR'
+          WHEN ${vinculosFuncionais.casaId} IS NOT NULL THEN 'CASA'
+          ELSE NULL
+        END`,
+        escopoIdSnapshot: sql<string>`COALESCE(
+          ${vinculosFuncionais.regionalId},
+          ${vinculosFuncionais.grupoTrabalhoId},
+          ${vinculosFuncionais.administracaoId},
+          ${vinculosFuncionais.setorId},
+          ${vinculosFuncionais.casaId}
+        )`,
         createdAt: sql`${agoraIso}`,
       }).innerJoin(convocacaoDestinatarios, and(
         eq(convocacaoDestinatarios.convocacaoId, convocacoes.id),

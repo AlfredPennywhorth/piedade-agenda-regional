@@ -1,8 +1,21 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fetchWithAuth } from '../../api/apiClient'
 import { AgendaItem } from '../agenda/types'
 import { EventCard } from '../agenda/EventCard'
 import { EventoDetalhe } from '../agenda/EventoDetalhe'
+
+function chaveDiaSaoPaulo(iso: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(new Date(iso))
+  const valores = Object.fromEntries(
+    parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value])
+  )
+  return `${valores.year}-${Number(valores.month) - 1}-${Number(valores.day)}`
+}
 
 export function CalendarioView() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -11,19 +24,53 @@ export function CalendarioView() {
   const [selectedDayEvents, setSelectedDayEvents] = useState<AgendaItem[] | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<AgendaItem | null>(null)
+  const [erroAtualizacaoConflitos, setErroAtualizacaoConflitos] = useState<string | null>(null)
+  const geracaoCargaAgenda = useRef(0)
+  const selectedDateRef = useRef<Date | null>(null)
+
+  const carregarAgenda = async (
+    rsvpRecemSalvo?: { destinatarioId: string; rsvp: AgendaItem['rsvp'] }
+  ) => {
+    const geracao = ++geracaoCargaAgenda.current
+    let data: AgendaItem[]
+    try {
+      data = await fetchWithAuth<AgendaItem[]>('/minha-agenda')
+    } catch (err) {
+      if (geracao !== geracaoCargaAgenda.current) return
+      throw err
+    }
+    if (geracao !== geracaoCargaAgenda.current) return
+    const atualizados = data.map(item =>
+      rsvpRecemSalvo && item.destinatarioId === rsvpRecemSalvo.destinatarioId
+        ? { ...item, rsvp: rsvpRecemSalvo.rsvp }
+        : item
+    )
+
+    setErroAtualizacaoConflitos(null)
+    setItems(atualizados)
+    setSelectedDayEvents(current => {
+      const dataSelecionada = selectedDateRef.current
+      if (!current || !dataSelecionada) return current
+      const chaveSelecionada = `${dataSelecionada.getFullYear()}-${dataSelecionada.getMonth()}-${dataSelecionada.getDate()}`
+      return atualizados.filter(item => chaveDiaSaoPaulo(item.evento.inicioEm) === chaveSelecionada)
+    })
+    setSelectedEvent(current => {
+      if (!current) return null
+      return atualizados.find(item => item.evento.id === current.evento.id) ?? null
+    })
+  }
 
   useEffect(() => {
     async function load() {
       try {
-        const data = await fetchWithAuth('/minha-agenda')
-        setItems(data)
+        await carregarAgenda()
       } catch (err) {
         console.error(err)
       } finally {
         setLoading(false)
       }
     }
-    load()
+    void load()
   }, [])
 
   const handleRsvpUpdated = (destinatarioId: string, rsvp: any) => {
@@ -36,6 +83,22 @@ export function CalendarioView() {
     if (selectedEvent?.destinatarioId === destinatarioId) {
       setSelectedEvent({ ...selectedEvent, rsvp })
     }
+
+    void carregarAgenda({ destinatarioId, rsvp }).catch(err => {
+      console.error(err)
+      const invalidarConflitos = (item: AgendaItem) => ({
+        ...item,
+        rsvp: item.destinatarioId === destinatarioId ? rsvp : item.rsvp,
+        conflito: null,
+      })
+
+      setItems(current => current.map(invalidarConflitos))
+      setSelectedDayEvents(current => current ? current.map(invalidarConflitos) : current)
+      setSelectedEvent(current => current ? invalidarConflitos(current) : current)
+      setErroAtualizacaoConflitos(
+        'A resposta foi salva, mas não foi possível atualizar os conflitos da agenda. Recarregue o calendário.'
+      )
+    })
   }
 
   const year = currentDate.getFullYear()
@@ -55,19 +118,6 @@ export function CalendarioView() {
 
   const today = new Date()
 
-  const chaveDiaSaoPaulo = (iso: string) => {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Sao_Paulo',
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-    }).formatToParts(new Date(iso))
-    const valores = Object.fromEntries(
-      parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value])
-    )
-    return `${valores.year}-${Number(valores.month) - 1}-${Number(valores.day)}`
-  }
-
   // Get events mapped by São Paulo operational day.
   const eventsByDay = items.reduce((acc, item) => {
     const key = chaveDiaSaoPaulo(item.evento.inicioEm)
@@ -77,12 +127,22 @@ export function CalendarioView() {
   }, {} as Record<string, AgendaItem[]>)
 
   const handleDayClick = (day: number, dayEvents: AgendaItem[]) => {
-    setSelectedDate(new Date(year, month, day))
+    const novaData = new Date(year, month, day)
+    selectedDateRef.current = novaData
+    setSelectedDate(novaData)
     setSelectedDayEvents(dayEvents)
   }
 
   return (
     <div className="p-4">
+      {erroAtualizacaoConflitos && (
+        <div
+          role="alert"
+          className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+        >
+          {erroAtualizacaoConflitos}
+        </div>
+      )}
       
       <div className="flex items-center justify-between mb-4 bg-white p-3 rounded-xl shadow-sm border border-slate-100">
         <button onClick={prevMonth} className="p-2 text-slate-500 hover:bg-slate-50 rounded-full">

@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
-import { eq, and, gte, lte, desc, count, inArray, or } from 'drizzle-orm'
-import { auditoriaLogs, membros } from '../db/schema'
+import { eq, and, gte, lte, desc, count, inArray, or, sql } from 'drizzle-orm'
+import { auditoriaLogs, eventos, membros } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
-import { obterEscoposAutorizadosDoAuditor } from '../security/permissoes'
+import { carregarContextoPermissoes, eMasterSistema, obterEscoposAutorizadosDoAuditor } from '../security/permissoes'
 
 export const auditoriaRouter = new Hono<{ Variables: Variables }>()
 
@@ -71,7 +71,26 @@ auditoriaRouter.get('/', async (c) => {
   const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '50', 10)))
   const offset = (page - 1) * limit
 
+  const contextoPermissoes = await carregarContextoPermissoes(db, membroId)
+  const master = eMasterSistema(contextoPermissoes)
+
   const conditions = escoposAutorizados.global ? [] : [or(...autorizacaoConditions)!]
+
+  // Eventos pessoais são "somente para mim": nem auditorias territoriais nem
+  // perfis globais de auditoria podem revelar sua existência, título ou autor.
+  // Apenas o próprio autor e o Master enxergam esses registros.
+  if (!master) {
+    conditions.push(sql`NOT (
+      ${auditoriaLogs.recursoTipo} = 'EVENTO'
+      AND EXISTS (
+        SELECT 1
+        FROM ${eventos}
+        WHERE ${eventos.id} = ${auditoriaLogs.recursoId}
+          AND ${eventos.pessoal} = 1
+          AND ${eventos.criadorMembroId} <> ${membroId}
+      )
+    )`)
+  }
 
   if (acao) conditions.push(eq(auditoriaLogs.acao, acao))
   if (atorMembroId) conditions.push(eq(auditoriaLogs.atorMembroId, atorMembroId))

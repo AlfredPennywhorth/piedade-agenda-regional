@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { ContasAcessoView } from '../components/acessos/ContasAcessoView'
 import * as apiClient from '../api/apiClient'
 
@@ -25,6 +25,7 @@ const contaAtiva = {
   codigoCarteirinha: 'CARTEIRA-1',
   dataOrdenacao: '2000-01-01',
   regionalId: 'regional-1',
+  casaId: 'casa-1',
   contaAcessoId: 'conta-1',
   status: 'ATIVA',
   ativadoEm: '2026-01-01T00:00:00.000Z',
@@ -47,8 +48,12 @@ const contaAtiva = {
 describe('ContasAcessoView — PR-ACC-05', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([contaAtiva])
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva] as any
+      return [] as any
+    })
     vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.spyOn(window, 'open').mockImplementation(() => null)
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText: vi.fn().mockResolvedValue(undefined) },
@@ -61,8 +66,248 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(await screen.findByText('Pessoa Teste')).toBeDefined()
     expect(screen.getByText('11999990000')).toBeDefined()
     expect(screen.getByText(/CARTEIRA-1/)).toBeDefined()
-    expect(screen.getByText(/USUARIO_COMUM/)).toBeDefined()
+    expect(within(screen.getByLabelText('Perfis ativos')).getByText(/USUARIO_COMUM/)).toBeDefined()
     expect(apiClient.fetchWithAuth).toHaveBeenCalledWith('/admin/acessos')
+  })
+
+  it('filtra contas por hierarquia geográfica e status', async () => {
+    const outraConta = {
+      ...contaAtiva,
+      membroId: 'membro-2',
+      nome: 'Pessoa Bloqueada',
+      contaAcessoId: 'conta-2',
+      status: 'BLOQUEADA',
+      casaId: 'casa-2',
+      acessos: [],
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva, outraConta] as any
+      if (endpoint === '/regionais') return [
+        { id: 'regional-1', nome: 'Regional 1' },
+        { id: 'regional-2', nome: 'Regional 2' },
+      ] as any
+      if (endpoint === '/administracoes') return [
+        { id: 'adm-1', nome: 'Administração 1', regionalId: 'regional-1' },
+        { id: 'adm-2', nome: 'Administração 2', regionalId: 'regional-2' },
+      ] as any
+      if (endpoint === '/setores') return [
+        { id: 'setor-1', nome: 'Setor 1', administracaoId: 'adm-1' },
+        { id: 'setor-2', nome: 'Setor 2', administracaoId: 'adm-2' },
+      ] as any
+      if (endpoint === '/casas') return [
+        { id: 'casa-1', nome: 'Casa 1', setorId: 'setor-1' },
+        { id: 'casa-2', nome: 'Casa 2', setorId: 'setor-2' },
+      ] as any
+      return [] as any
+    })
+
+    render(<ContasAcessoView />)
+    expect(await screen.findByText('Pessoa Teste')).toBeDefined()
+    expect(screen.getByText('Pessoa Bloqueada')).toBeDefined()
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Regional'), {
+      target: { value: 'regional-1' },
+    })
+    expect(screen.getByText('Pessoa Teste')).toBeDefined()
+    expect(screen.queryByText('Pessoa Bloqueada')).toBeNull()
+
+    const setorSelect = screen.getByLabelText('Filtrar por Setor')
+    expect(within(setorSelect).queryByRole('option', { name: 'Setor 2' })).toBeNull()
+    const casaSelect = screen.getByLabelText('Filtrar por Casa de Oração')
+    expect(within(casaSelect).queryByRole('option', { name: 'Casa 2' })).toBeNull()
+
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Status'), {
+      target: { value: 'BLOQUEADA' },
+    })
+    expect(screen.queryByText('Pessoa Teste')).toBeNull()
+    expect(screen.getByText('Nenhuma conta corresponde aos filtros selecionados.')).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    expect(screen.getByText('Pessoa Bloqueada')).toBeDefined()
+  })
+
+  it('busca por nome, celular e carteirinha e filtra por perfil ativo', async () => {
+    const outraConta = {
+      ...contaAtiva,
+      membroId: 'membro-2',
+      nome: 'Maria Exemplo',
+      celular: '11912345678',
+      codigoCarteirinha: 'ABC-987',
+      contaAcessoId: 'conta-2',
+      acessos: [{
+        id: 'acesso-auditor',
+        perfilCodigo: 'AUDITOR',
+        escopoTipo: 'REGIONAL',
+        escopoId: 'regional-1',
+      }],
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva, outraConta] as any
+      return [] as any
+    })
+
+    render(<ContasAcessoView />)
+    const busca = await screen.findByLabelText('Buscar por nome, celular ou carteirinha')
+
+    fireEvent.change(busca, { target: { value: 'Maria' } })
+    expect(screen.getByText('Maria Exemplo')).toBeDefined()
+    expect(screen.queryByText('Pessoa Teste')).toBeNull()
+
+    fireEvent.change(busca, { target: { value: '912345678' } })
+    expect(screen.getByText('Maria Exemplo')).toBeDefined()
+
+    fireEvent.change(busca, { target: { value: 'ABC-987' } })
+    expect(screen.getByText('Maria Exemplo')).toBeDefined()
+
+    fireEvent.change(busca, { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText('Filtrar por Perfil ou acesso'), {
+      target: { value: 'AUDITOR' },
+    })
+    expect(screen.getByText('Maria Exemplo')).toBeDefined()
+    expect(screen.queryByText('Pessoa Teste')).toBeNull()
+  })
+
+  it('não usa dígitos de busca alfanumérica para combinar telefone', async () => {
+    const outraConta = {
+      ...contaAtiva,
+      membroId: 'membro-2',
+      nome: 'Maria Exemplo',
+      celular: '11912345678',
+      codigoCarteirinha: 'ABC-987',
+      contaAcessoId: 'conta-2',
+      acessos: [],
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva, outraConta] as any
+      return [] as any
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.change(await screen.findByLabelText('Buscar por nome, celular ou carteirinha'), {
+      target: { value: 'CARTEIRA-1' },
+    })
+
+    expect(screen.getByText('Pessoa Teste')).toBeDefined()
+    expect(screen.queryByText('Maria Exemplo')).toBeNull()
+  })
+
+  it('mantém confirmação de status visível mesmo se o filtro excluir a conta após a ação', async () => {
+    let chamadasAdmin = 0
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') {
+        chamadasAdmin += 1
+        return (chamadasAdmin === 1
+          ? [contaAtiva]
+          : [{ ...contaAtiva, status: 'BLOQUEADA' }]) as any
+      }
+      return [] as any
+    })
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValue({
+      membroId: 'membro-1',
+      contaAcessoId: 'conta-1',
+      status: 'BLOQUEADA',
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.change(await screen.findByLabelText('Filtrar por Status'), {
+      target: { value: 'ATIVA' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Bloquear' }))
+
+    expect(await screen.findByText('Conta bloqueada e sessões revogadas.')).toBeDefined()
+    expect(screen.getByText('Pessoa Teste')).toBeDefined()
+  })
+
+  it('preserva simultaneamente link temporário e feedback de outra conta filtrada', async () => {
+    const contaSemConta = {
+      ...contaAtiva,
+      membroId: 'membro-2',
+      nome: 'Pessoa Sem Conta',
+      contaAcessoId: null,
+      status: null,
+      acessos: [],
+    }
+    let chamadasAdmin = 0
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') {
+        chamadasAdmin += 1
+        if (chamadasAdmin === 1) return [contaAtiva, contaSemConta] as any
+        if (chamadasAdmin === 2) {
+          return [
+            contaAtiva,
+            { ...contaSemConta, contaAcessoId: 'conta-2', status: 'PENDENTE_ATIVACAO' },
+          ] as any
+        }
+        return [
+          { ...contaAtiva, status: 'BLOQUEADA' },
+          { ...contaSemConta, contaAcessoId: 'conta-2', status: 'PENDENTE_ATIVACAO' },
+        ] as any
+      }
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-a',
+      expiraEm: '2099-01-01T00:00:00.000Z',
+      membroId: 'membro-2',
+    })
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValue({
+      membroId: 'membro-1',
+      contaAcessoId: 'conta-1',
+      status: 'BLOQUEADA',
+    })
+
+    render(<ContasAcessoView />)
+    await screen.findByText('Pessoa Sem Conta')
+
+    fireEvent.change(screen.getByLabelText('Filtrar por Status'), {
+      target: { value: 'SEM_CONTA' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Gerar ativação/i }))
+    const linkTemporarioInicial = await screen.findByLabelText('Link temporário de Pessoa Sem Conta')
+    expect((linkTemporarioInicial as HTMLInputElement).value).toContain('ativacao=token-a')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    fireEvent.change(screen.getByLabelText('Filtrar por Status'), {
+      target: { value: 'ATIVA' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Bloquear' }))
+
+    expect(await screen.findByText('Conta bloqueada e sessões revogadas.')).toBeDefined()
+    const linkTemporarioMantido = screen.getByLabelText('Link temporário de Pessoa Sem Conta')
+    expect((linkTemporarioMantido as HTMLInputElement).value).toContain('ativacao=token-a')
+  })
+
+  it('preserva filtro de perfil e painel após revogar o último acesso correspondente', async () => {
+    let chamadasAdmin = 0
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string, options?: RequestInit) => {
+      if (endpoint === '/admin/acessos') {
+        chamadasAdmin += 1
+        return (chamadasAdmin === 1
+          ? [contaAtiva]
+          : [{ ...contaAtiva, acessos: contaAtiva.acessos.filter(acesso => acesso.id !== 'acesso-2') }]) as any
+      }
+      if (endpoint === '/regionais') return [{ id: 'regional-1', nome: 'Regional 1' }] as any
+      if (endpoint === '/admin/acessos/acesso-2' && options?.method === 'DELETE') return {} as any
+      return [] as any
+    })
+
+    render(<ContasAcessoView />)
+
+    fireEvent.change(await screen.findByLabelText('Filtrar por Perfil ou acesso'), {
+      target: { value: 'GESTOR_AGENDA' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Gerenciar acessos' }))
+    const revogar = await screen.findByRole('button', { name: 'Revogar' })
+    await waitFor(() => expect(revogar).not.toBeDisabled())
+    fireEvent.click(revogar)
+
+    expect(await screen.findByText('Acesso revogado com sucesso.')).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Gerenciar acessos' })).toBeDefined()
+    const filtroPerfil = screen.getByLabelText('Filtrar por Perfil ou acesso') as HTMLSelectElement
+    expect(filtroPerfil.value).toBe('GESTOR_AGENDA')
+    expect(within(filtroPerfil).getByRole('option', { name: 'GESTOR_AGENDA' })).toBeDefined()
+    expect(screen.getByText('Pessoa Teste')).toBeDefined()
   })
 
   it('confirma o bloqueio e atualiza a listagem', async () => {
@@ -85,6 +330,39 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(await screen.findByText('Conta bloqueada e sessões revogadas.')).toBeDefined()
   })
 
+  it('mantém link gerado visível mesmo quando o novo status deixa de atender ao filtro', async () => {
+    const contaSemAcesso = {
+      ...contaAtiva,
+      contaAcessoId: null,
+      status: null,
+      acessos: [],
+    }
+    let chamadasAdmin = 0
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') {
+        chamadasAdmin += 1
+        return (chamadasAdmin === 1
+          ? [contaSemAcesso]
+          : [{ ...contaSemAcesso, contaAcessoId: 'conta-nova', status: 'PENDENTE_ATIVACAO' }]) as any
+      }
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-filtrado',
+      expiraEm: '2099-01-01T00:00:00.000Z',
+      membroId: 'membro-1',
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.change(await screen.findByLabelText('Filtrar por Status'), {
+      target: { value: 'SEM_CONTA' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Gerar ativação' }))
+
+    const campo = await screen.findByLabelText('Link temporário de Pessoa Teste')
+    expect((campo as HTMLInputElement).value).toContain('ativacao=token-filtrado')
+  })
+
   it('gera link temporário de redefinição sem persistir o token no cliente', async () => {
     vi.mocked(apiClient.postWithAuth).mockResolvedValue({
       token: 'token-temporario',
@@ -101,9 +379,195 @@ describe('ContasAcessoView — PR-ACC-05', () => {
         {}
       )
     })
-    const campo = await screen.findByLabelText('Link temporário')
+    const campo = await screen.findByLabelText('Link temporário de Pessoa Teste')
     expect((campo as HTMLInputElement).value).toContain('ativacao=token-temporario')
     expect(localStorage.getItem('token-temporario')).toBeNull()
+  })
+
+  it('exibe o link e o feedback junto da conta em que a ação foi executada', async () => {
+    const outraConta = {
+      ...contaAtiva,
+      membroId: 'membro-2',
+      nome: 'Outra Pessoa',
+      codigoCarteirinha: 'CARTEIRA-2',
+      contaAcessoId: 'conta-2',
+      acessos: [],
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva, outraConta] as any
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-contextual',
+      expiraEm: '2099-01-01T00:00:00.000Z',
+      membroId: 'membro-2',
+    })
+
+    render(<ContasAcessoView podeGerenciarSessoes />)
+
+    const artigoOutraPessoa = (await screen.findByText('Outra Pessoa')).closest('article')
+    expect(artigoOutraPessoa).not.toBeNull()
+    fireEvent.click(within(artigoOutraPessoa!).getByRole('button', { name: 'Redefinir PIN' }))
+
+    const campo = await within(artigoOutraPessoa!).findByLabelText('Link temporário de Outra Pessoa')
+    expect((campo as HTMLInputElement).value).toContain('ativacao=token-contextual')
+
+    const artigoPessoaTeste = screen.getByText('Pessoa Teste').closest('article')
+    expect(artigoPessoaTeste).not.toBeNull()
+    expect(within(artigoPessoaTeste!).queryByText('Link temporário gerado')).toBeNull()
+  })
+
+  it('preserva link temporário ao executar ação não relacionada em outra conta', async () => {
+    const outraConta = {
+      ...contaAtiva,
+      membroId: 'membro-2',
+      nome: 'Outra Pessoa',
+      codigoCarteirinha: 'CARTEIRA-2',
+      contaAcessoId: 'conta-2',
+      acessos: [],
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva, outraConta] as any
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-preservado',
+      expiraEm: '2099-01-01T00:00:00.000Z',
+      membroId: 'membro-1',
+    })
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValue({
+      membroId: 'membro-2',
+      contaAcessoId: 'conta-2',
+      status: 'BLOQUEADA',
+    })
+
+    render(<ContasAcessoView />)
+
+    const artigoPessoaTeste = (await screen.findByText('Pessoa Teste')).closest('article')
+    const artigoOutraPessoa = screen.getByText('Outra Pessoa').closest('article')
+    expect(artigoPessoaTeste).not.toBeNull()
+    expect(artigoOutraPessoa).not.toBeNull()
+
+    fireEvent.click(within(artigoPessoaTeste!).getByRole('button', { name: 'Redefinir PIN' }))
+    const campo = await within(artigoPessoaTeste!).findByLabelText('Link temporário de Pessoa Teste')
+    expect((campo as HTMLInputElement).value).toContain('ativacao=token-preservado')
+
+    fireEvent.click(within(artigoOutraPessoa!).getByRole('button', { name: 'Bloquear' }))
+
+    expect(
+      await within(artigoOutraPessoa!).findByText('Conta bloqueada e sessões revogadas.')
+    ).toBeDefined()
+    expect(
+      within(artigoPessoaTeste!).getByLabelText('Link temporário de Pessoa Teste')
+    ).toBeDefined()
+  })
+
+  it('abre o WhatsApp Web com telefone, link, validade e orientação de segurança', async () => {
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-whatsapp',
+      expiraEm: '2099-01-01T12:30:00.000Z',
+      membroId: 'membro-1',
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Redefinir PIN' }))
+
+    await screen.findByLabelText('Link temporário de Pessoa Teste')
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar pelo WhatsApp' }))
+
+    expect(window.open).toHaveBeenCalledTimes(1)
+    const [url, alvo, recursos] = vi.mocked(window.open).mock.calls[0]
+    expect(alvo).toBe('_blank')
+    expect(recursos).toBe('noopener,noreferrer')
+
+    const destino = new URL(String(url))
+    expect(destino.origin).toBe('https://web.whatsapp.com')
+    expect(destino.pathname).toBe('/send')
+    expect(destino.searchParams.get('phone')).toBe('5511999990000')
+
+    const mensagem = destino.searchParams.get('text') || ''
+    expect(mensagem).toContain('Caro irmão Pessoa Teste.')
+    expect(mensagem).toContain('A paz de Deus!')
+    expect(mensagem).toContain('ativacao=token-whatsapp')
+    expect(mensagem).toContain('válido até')
+    expect(mensagem).toContain('horário de São Paulo')
+    expect(mensagem).toContain('não compartilhe')
+  })
+
+  it('distingue ativação de conta na mensagem do WhatsApp', async () => {
+    const contaSemAcesso = {
+      ...contaAtiva,
+      contaAcessoId: null,
+      status: null,
+      acessos: [],
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaSemAcesso] as any
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-ativacao',
+      expiraEm: '2099-01-01T12:30:00.000Z',
+      membroId: 'membro-1',
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Gerar ativação' }))
+
+    await screen.findByLabelText('Link temporário de Pessoa Teste')
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar pelo WhatsApp' }))
+
+    const [url] = vi.mocked(window.open).mock.calls[0]
+    const destino = new URL(String(url))
+    const mensagem = destino.searchParams.get('text') || ''
+
+    expect(mensagem).toContain('ativação da sua conta')
+    expect(mensagem).toContain('criar seu PIN')
+    expect(mensagem).not.toContain('redefinição do seu PIN')
+  })
+
+  it('bloqueia envio pelo WhatsApp quando o celular é malformado', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [{ ...contaAtiva, celular: '123' }] as any
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-celular-invalido',
+      expiraEm: '2099-01-01T12:30:00.000Z',
+      membroId: 'membro-1',
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Redefinir PIN' }))
+    await screen.findByLabelText('Link temporário de Pessoa Teste')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar pelo WhatsApp' }))
+
+    expect(window.open).not.toHaveBeenCalled()
+    expect(await screen.findByText('O celular informado não é válido para envio pelo WhatsApp.')).toBeDefined()
+    expect(screen.getByLabelText('Link temporário de Pessoa Teste')).toBeDefined()
+  })
+
+  it('não oferece envio pelo WhatsApp sem celular válido e mantém o link disponível', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [{ ...contaAtiva, celular: null }] as any
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-sem-celular',
+      expiraEm: '2099-01-01T12:30:00.000Z',
+      membroId: 'membro-1',
+    })
+
+    render(<ContasAcessoView />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Redefinir PIN' }))
+    await screen.findByLabelText('Link temporário de Pessoa Teste')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar pelo WhatsApp' }))
+
+    expect(window.open).not.toHaveBeenCalled()
+    expect(await screen.findByText('Cadastre um celular antes de enviar o link pelo WhatsApp.')).toBeDefined()
+    expect(screen.getByLabelText('Link temporário de Pessoa Teste')).toBeDefined()
   })
 
   it('não redefine PIN quando a confirmação é cancelada', async () => {
@@ -118,6 +582,62 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     )
   })
 
+
+  it('oculta gestão de sessões quando o operador não é Master', async () => {
+    render(<ContasAcessoView />)
+
+    await screen.findByText('Pessoa Teste')
+    expect(screen.queryByRole('button', { name: 'Sessões ativas' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Revogar todas' })).toBeNull()
+  })
+
+  it('lista sessões ativas e revoga somente a sessão escolhida', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva] as any
+      if (endpoint === '/admin/acessos/membros/membro-1/sessoes') {
+        return [
+          {
+            id: 'sessao-1',
+            criadoEm: '2026-09-30T12:00:00.000Z',
+            ultimoAcessoEm: '2026-09-30T15:00:00.000Z',
+            expiraEm: '2026-10-30T12:00:00.000Z',
+            dispositivo: 'Chrome em Windows',
+          },
+          {
+            id: 'sessao-2',
+            criadoEm: '2026-09-30T13:00:00.000Z',
+            ultimoAcessoEm: null,
+            expiraEm: '2026-10-30T13:00:00.000Z',
+            dispositivo: null,
+          },
+        ] as any
+      }
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      message: 'Sessão revogada',
+      membroId: 'membro-1',
+      contaAcessoId: 'conta-1',
+      sessaoId: 'sessao-1',
+    })
+
+    render(<ContasAcessoView podeGerenciarSessoes />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Sessões ativas' }))
+
+    expect(await screen.findByText('Chrome em Windows')).toBeDefined()
+    expect(screen.getByText('Dispositivo não identificado')).toBeDefined()
+
+    const botoesRevogar = screen.getAllByRole('button', { name: 'Revogar esta sessão' })
+    fireEvent.click(botoesRevogar[0])
+
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith(
+        '/admin/acessos/membros/membro-1/sessoes/sessao-1/revogar',
+        {}
+      )
+    })
+  })
+
   it('revoga sessões após confirmação explícita', async () => {
     vi.mocked(apiClient.postWithAuth).mockResolvedValue({
       message: 'Sessões revogadas',
@@ -125,8 +645,8 @@ describe('ContasAcessoView — PR-ACC-05', () => {
       contaAcessoId: 'conta-1',
     })
 
-    render(<ContasAcessoView />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Revogar sessões' }))
+    render(<ContasAcessoView podeGerenciarSessoes />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Revogar todas' }))
 
     await waitFor(() => {
       expect(apiClient.postWithAuth).toHaveBeenCalledWith(
@@ -135,6 +655,42 @@ describe('ContasAcessoView — PR-ACC-05', () => {
       )
     })
     expect(await screen.findByText('Todas as sessões da conta foram revogadas.')).toBeDefined()
+  })
+
+  it('exibe o sucesso de revogação no cartão da conta correspondente', async () => {
+    const outraConta = {
+      ...contaAtiva,
+      membroId: 'membro-2',
+      nome: 'Outra Pessoa',
+      codigoCarteirinha: 'CARTEIRA-2',
+      contaAcessoId: 'conta-2',
+      acessos: [],
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva, outraConta] as any
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      message: 'Sessões revogadas',
+      membroId: 'membro-2',
+      contaAcessoId: 'conta-2',
+    })
+
+    render(<ContasAcessoView podeGerenciarSessoes />)
+
+    const artigoOutraPessoa = (await screen.findByText('Outra Pessoa')).closest('article')
+    expect(artigoOutraPessoa).not.toBeNull()
+    fireEvent.click(within(artigoOutraPessoa!).getByRole('button', { name: 'Revogar todas' }))
+
+    expect(
+      await within(artigoOutraPessoa!).findByText('Todas as sessões da conta foram revogadas.')
+    ).toBeDefined()
+
+    const artigoPessoaTeste = screen.getByText('Pessoa Teste').closest('article')
+    expect(artigoPessoaTeste).not.toBeNull()
+    expect(
+      within(artigoPessoaTeste!).queryByText('Todas as sessões da conta foram revogadas.')
+    ).toBeNull()
   })
 
   it('atribui Administrador do Sistema a uma Regional', async () => {
@@ -216,7 +772,50 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     await waitFor(() => {
       expect(nivel.value).toBe('ADMINISTRACAO')
     })
-    expect(await screen.findByText('Administração Centro')).toBeDefined()
+    expect(
+      await within(screen.getByLabelText('Unidade territorial')).findByRole('option', {
+        name: 'Administração Centro',
+      })
+    ).toBeDefined()
+  })
+
+
+  it('informa a quantidade de recuperações pendentes e prioriza essas contas', async () => {
+    const onPendenciasAtualizadas = vi.fn()
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValueOnce([
+      {
+        membroId: 'membro-1',
+        nome: 'Sem pendência',
+        celular: '11911111111',
+        codigoCarteirinha: 'C1',
+        casaId: 'casa-1',
+        contaAcessoId: 'conta-1',
+        status: 'ATIVA',
+        ativadoEm: null,
+        recuperacaoPinPendente: false,
+        recuperacaoPinSolicitadaEm: null,
+        acessos: [],
+      },
+      {
+        membroId: 'membro-2',
+        nome: 'Com pendência',
+        celular: '11922222222',
+        codigoCarteirinha: 'C2',
+        casaId: 'casa-1',
+        contaAcessoId: 'conta-2',
+        status: 'ATIVA',
+        ativadoEm: null,
+        recuperacaoPinPendente: true,
+        recuperacaoPinSolicitadaEm: '2026-09-30T15:00:00.000Z',
+        acessos: [],
+      },
+    ])
+
+    render(<ContasAcessoView onPendenciasAtualizadas={onPendenciasAtualizadas} />)
+
+    await waitFor(() => expect(onPendenciasAtualizadas).toHaveBeenCalledWith(1))
+    const titulos = screen.getAllByRole('heading', { level: 3 }).map(item => item.textContent)
+    expect(titulos.slice(0, 2)).toEqual(['Com pendência', 'Sem pendência'])
   })
 
 })

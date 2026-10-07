@@ -12,6 +12,7 @@ const celularSchema = z.string().min(1, 'Celular é obrigatório').superRefine((
 
 export const ativacaoSchema = z.object({
   token: z.string().min(1, 'Token é obrigatório'),
+  codigoCarteirinha: z.string().trim().min(1, 'Código da carteirinha é obrigatório').max(100),
   celular: celularSchema,
   pin: pinSchema,
   confirmacaoPin: z.string()

@@ -1,114 +1,179 @@
 import { Hono } from 'hono'
-import { eq, and } from 'drizzle-orm'
-import { eventos, funcoes, vinculosFuncionais } from '../db/schema'
+import { eq, and, or, sql, inArray } from 'drizzle-orm'
+import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal, membros, casas, setores, administracoes, gruposTrabalho } from '../db/schema'
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
-import { executarOperacaoComAudit, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
+import { executarOperacaoComAudit, executarOperacaoComAudits, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
-import { obterEscoposTerritoriaisVisiveis, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
+import { podeGerenciarAgendaNoEscopo, eMasterSistema } from '../security/permissoes'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
+
+import { carregarEscoposOperacionaisLegados, condicaoEventosVisiveis, condicaoEventosGerenciaveis, podeLerEvento, podeGerenciarEvento } from '../security/eventos'
 
 export const eventosRouter = new Hono<any>()
 
-function eventoVisivelNoEscopo(evento: any, escopos: any): boolean {
-  if (escopos.tudo) return true
-  if (evento.regionalId && escopos.regionaisIds.has(evento.regionalId)) return true
-  if (evento.administracaoId && escopos.administracoesIds.has(evento.administracaoId)) return true
-  if (evento.setorId && escopos.setoresIds.has(evento.setorId)) return true
-  if (evento.casaId && escopos.casasIds.has(evento.casaId)) return true
-  if (evento.grupoTrabalhoId && escopos.gruposTrabalhoIds.has(evento.grupoTrabalhoId)) return true
-  return false
-}
+const D1_IN_BATCH = 80
 
-type EscoposRelatorios = {
-  regionaisIds: Set<string>
-  administracoesIds: Set<string>
-  setoresIds: Set<string>
-  casasIds: Set<string>
-  gruposTrabalhoIds: Set<string>
-}
-
-async function carregarEscoposRelatorios(
-  db: any,
-  contexto: any,
-  membroId: string
-): Promise<EscoposRelatorios> {
-  const resultado: EscoposRelatorios = {
-    regionaisIds: new Set<string>(),
-    administracoesIds: new Set<string>(),
-    setoresIds: new Set<string>(),
-    casasIds: new Set<string>(),
-    gruposTrabalhoIds: new Set<string>(),
+async function carregarEmLotes<T>(
+  ids: string[],
+  carregar: (lote: string[]) => Promise<T[]>
+): Promise<T[]> {
+  const resultado: T[] = []
+  for (let i = 0; i < ids.length; i += D1_IN_BATCH) {
+    resultado.push(...await carregar(ids.slice(i, i + D1_IN_BATCH)))
   }
-
-  for (const acesso of contexto.acessosAtivos) {
-    if (
-      acesso.perfilCodigo !== 'GESTOR_RELATORIOS' ||
-      acesso.escopoTipo === 'GLOBAL' ||
-      !acesso.escopoId
-    ) continue
-
-    if (acesso.escopoTipo === 'REGIONAL') resultado.regionaisIds.add(acesso.escopoId)
-    if (acesso.escopoTipo === 'ADMINISTRACAO') resultado.administracoesIds.add(acesso.escopoId)
-    if (acesso.escopoTipo === 'SETOR') resultado.setoresIds.add(acesso.escopoId)
-    if (acesso.escopoTipo === 'CASA') resultado.casasIds.add(acesso.escopoId)
-    if (acesso.escopoTipo === 'GRUPO_TRABALHO') resultado.gruposTrabalhoIds.add(acesso.escopoId)
-  }
-
-  const vinculos = await db
-    .select({ vinculo: vinculosFuncionais })
-    .from(vinculosFuncionais)
-    .innerJoin(funcoes, eq(vinculosFuncionais.funcaoId, funcoes.id))
-    .where(
-      and(
-        eq(vinculosFuncionais.membroId, membroId),
-        eq(vinculosFuncionais.ativo, true),
-        eq(funcoes.ativo, true),
-        eq(funcoes.codigo, 'GESTOR_RELATORIOS')
-      )
-    )
-    .all()
-
-  for (const { vinculo } of vinculos) {
-    if (vinculo.regionalId) resultado.regionaisIds.add(vinculo.regionalId)
-    if (vinculo.administracaoId) resultado.administracoesIds.add(vinculo.administracaoId)
-    if (vinculo.setorId) resultado.setoresIds.add(vinculo.setorId)
-    if (vinculo.casaId) resultado.casasIds.add(vinculo.casaId)
-    if (vinculo.grupoTrabalhoId) resultado.gruposTrabalhoIds.add(vinculo.grupoTrabalhoId)
-  }
-
   return resultado
 }
 
-function eventoAutorizadoParaRelatorios(
-  evento: any,
-  membroId: string,
-  escoposRelatorios: EscoposRelatorios
-): boolean {
-  if (evento.organizadorMembroId === membroId) return true
-  if (evento.regionalId && escoposRelatorios.regionaisIds.has(evento.regionalId)) return true
-  if (evento.administracaoId && escoposRelatorios.administracoesIds.has(evento.administracaoId)) return true
-  if (evento.setorId && escoposRelatorios.setoresIds.has(evento.setorId)) return true
-  if (evento.casaId && escoposRelatorios.casasIds.has(evento.casaId)) return true
-  if (
-    evento.grupoTrabalhoId &&
-    escoposRelatorios.gruposTrabalhoIds.has(evento.grupoTrabalhoId)
-  ) return true
-  return false
+async function enriquecerAncestralidadeEventos(db: any, itens: any[]) {
+  if (itens.length === 0) return itens
+
+  const idsUnicos = (valores: Array<string | null | undefined>) =>
+    Array.from(new Set(valores.filter((valor): valor is string => Boolean(valor))))
+
+  const casaIds = idsUnicos(itens.map(item => item.evento.casaId))
+  const gtIds = idsUnicos(itens.map(item => item.evento.grupoTrabalhoId))
+
+  const [casasRows, gtsRows] = await Promise.all([
+    carregarEmLotes(casaIds, lote =>
+      db.select({ id: casas.id, setorId: casas.setorId })
+        .from(casas).where(inArray(casas.id, lote)).all()
+    ),
+    carregarEmLotes(gtIds, lote =>
+      db.select({
+        id: gruposTrabalho.id,
+        regionalId: gruposTrabalho.regionalId,
+        administracaoId: gruposTrabalho.administracaoId,
+        setorId: gruposTrabalho.setorId,
+      }).from(gruposTrabalho).where(inArray(gruposTrabalho.id, lote)).all()
+    ),
+  ])
+
+  const casaPorId = new Map(casasRows.map((item: any) => [item.id, item]))
+  const gtPorId = new Map(gtsRows.map((item: any) => [item.id, item]))
+  const setorIds = idsUnicos([
+    ...itens.map(item => item.evento.setorId),
+    ...casasRows.map((item: any) => item.setorId),
+    ...gtsRows.map((item: any) => item.setorId),
+  ])
+  const setoresRows = await carregarEmLotes(setorIds, lote =>
+    db.select({ id: setores.id, administracaoId: setores.administracaoId })
+      .from(setores).where(inArray(setores.id, lote)).all()
+  )
+  const setorPorId = new Map(setoresRows.map((item: any) => [item.id, item]))
+
+  const administracaoIds = idsUnicos([
+    ...itens.map(item => item.evento.administracaoId),
+    ...setoresRows.map((item: any) => item.administracaoId),
+    ...gtsRows.map((item: any) => item.administracaoId),
+  ])
+  const administracoesRows = await carregarEmLotes(administracaoIds, lote =>
+    db.select({ id: administracoes.id, regionalId: administracoes.regionalId })
+      .from(administracoes).where(inArray(administracoes.id, lote)).all()
+  )
+  const administracaoPorId = new Map(administracoesRows.map((item: any) => [item.id, item]))
+
+  return itens.map((item: any) => {
+    const evento = item.evento
+    const gt = evento.grupoTrabalhoId ? gtPorId.get(evento.grupoTrabalhoId) as any : null
+    const casa = evento.casaId ? casaPorId.get(evento.casaId) as any : null
+    const filtroSetorId = evento.setorId ?? casa?.setorId ?? gt?.setorId ?? null
+    const setor = filtroSetorId ? setorPorId.get(filtroSetorId) as any : null
+    const filtroAdministracaoId = evento.administracaoId ?? setor?.administracaoId ?? gt?.administracaoId ?? null
+    const administracao = filtroAdministracaoId
+      ? administracaoPorId.get(filtroAdministracaoId) as any
+      : null
+    const gtSetor = gt?.setorId ? setorPorId.get(gt.setorId) as any : null
+    const gtAdministracaoId = gt?.administracaoId ?? gtSetor?.administracaoId ?? null
+    const gtAdministracao = gtAdministracaoId
+      ? administracaoPorId.get(gtAdministracaoId) as any
+      : null
+    const filtroRegionalId =
+      evento.regionalId ?? administracao?.regionalId ?? gt?.regionalId ?? gtAdministracao?.regionalId ?? null
+
+    return {
+      ...evento,
+      podeGerenciar: item.podeGerenciar === 1,
+      filtroRegionalId,
+      filtroAdministracaoId,
+      filtroSetorId,
+    }
+  })
 }
 
-function eventoVisivelParaLeitura(
-  evento: any,
-  membroId: string,
-  escopos: any,
-  escoposRelatorios: EscoposRelatorios
-): boolean {
+function mesmoInstante(a: string, b: string) {
+  return new Date(a).getTime() === new Date(b).getTime()
+}
+
+function formatarDataHoraAgenda(valor: string) {
+  return new Date(valor).toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+async function criarAvisoAlteracaoMaterial(db: any, anterior: any, atual: any) {
+  const partes: string[] = []
+
+  if (!mesmoInstante(anterior.inicioEm, atual.inicioEm) || !mesmoInstante(anterior.fimEm, atual.fimEm)) {
+    partes.push(
+      `Horário: ${formatarDataHoraAgenda(anterior.inicioEm)}–${formatarDataHoraAgenda(anterior.fimEm)} → ${formatarDataHoraAgenda(atual.inicioEm)}–${formatarDataHoraAgenda(atual.fimEm)}`
+    )
+  }
+
+  if (anterior.modalidade !== atual.modalidade) {
+    partes.push(`Modalidade: ${anterior.modalidade} → ${atual.modalidade}`)
+  }
+
+  if (anterior.localId !== atual.localId) {
+    const [localAnterior, localAtual] = await Promise.all([
+      anterior.localId ? db.select({ nome: locais.nome }).from(locais).where(eq(locais.id, anterior.localId)).get() : null,
+      atual.localId ? db.select({ nome: locais.nome }).from(locais).where(eq(locais.id, atual.localId)).get() : null,
+    ])
+    partes.push(`Local: ${localAnterior?.nome ?? 'sem local'} → ${localAtual?.nome ?? 'sem local'}`)
+  }
+
+  if (anterior.espacoId !== atual.espacoId) {
+    const [espacoAnterior, espacoAtual] = await Promise.all([
+      anterior.espacoId ? db.select({ nome: espacosLocal.nome }).from(espacosLocal).where(eq(espacosLocal.id, anterior.espacoId)).get() : null,
+      atual.espacoId ? db.select({ nome: espacosLocal.nome }).from(espacosLocal).where(eq(espacosLocal.id, atual.espacoId)).get() : null,
+    ])
+    partes.push(`Espaço: ${espacoAnterior?.nome ?? 'sem espaço'} → ${espacoAtual?.nome ?? 'sem espaço'}`)
+  }
+
+  if (anterior.urlOnline !== atual.urlOnline) {
+    partes.push(`Acesso online: ${anterior.urlOnline ? 'link anterior' : 'sem link'} → ${atual.urlOnline ? 'novo link disponível' : 'removido'}`)
+  }
+
+  if (partes.length === 0) return null
+  return `Atenção! O evento "${anterior.titulo}" foi alterado. ${partes.join('; ')}. Favor reconfirmar sua presença.`
+}
+
+function houveAlteracaoMaterial(anterior: any, atual: any) {
   return (
-    eventoVisivelNoEscopo(evento, escopos) ||
-    eventoAutorizadoParaRelatorios(evento, membroId, escoposRelatorios)
+    !mesmoInstante(anterior.inicioEm, atual.inicioEm) ||
+    !mesmoInstante(anterior.fimEm, atual.fimEm) ||
+    anterior.modalidade !== atual.modalidade ||
+    anterior.localId !== atual.localId ||
+    anterior.espacoId !== atual.espacoId ||
+    anterior.urlOnline !== atual.urlOnline
   )
 }
 
 eventosRouter.use('*', authMiddleware)
+
+// Metadados de filtro não concedem acesso a eventos fora da autorização.
+eventosRouter.get('/filtros', async c => {
+  const master = eMasterSistema(c.get('contextoPermissoes'))
+  const pessoas = master ? await c.get('db').select({ id: membros.id, nome: membros.nome })
+    .from(membros).orderBy(membros.nome).all() : []
+  const filtrarEscopo = master || c.get('contextoPermissoes').acessosAtivos.some((acesso: any) => ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA', 'GESTOR_RELATORIOS', 'AUDITOR', 'OPERADOR_PORTARIA_PERMANENTE'].includes(acesso.perfilCodigo)) ||
+    (await carregarEscoposOperacionaisLegados(c.get('db'), c.get('membroId'))).length > 0
+  return c.json({ master, filtrarEscopo, pessoas })
+})
 
 eventosRouter.get('/', async (c) => {
   const db = c.get('db')
@@ -124,23 +189,19 @@ eventosRouter.get('/', async (c) => {
     conditions.push(eq(eventos.modalidade, modalidade))
   }
 
-  const query = db.select().from(eventos)
-  const data = conditions.length > 0 
-    ? await query.where(and(...conditions)).all()
-    : await query.all()
+  const pessoaId = c.req.query('pessoaId')
+  if (pessoaId) {
+    if (!eMasterSistema(c.get('contextoPermissoes'))) {
+      return c.json({ error: 'Filtro por pessoa exclusivo do Master', code: 'FORBIDDEN' }, 403)
+    }
+    conditions.push(or(eq(eventos.criadorMembroId, pessoaId), eq(eventos.organizadorMembroId, pessoaId),
+      sql`EXISTS (SELECT 1 FROM convocacoes c JOIN convocacao_destinatarios d ON d.convocacao_id = c.id WHERE c.evento_id = ${eventos.id} AND c.status = 'PUBLICADA' AND c.ativo = 1 AND d.membro_id = ${pessoaId})`))
+  }
+  conditions.push(await condicaoEventosVisiveis(db, c.get('contextoPermissoes')))
+  const gerenciavel = condicaoEventosGerenciaveis(c.get('contextoPermissoes'))
+  const data = await db.select({ evento: eventos, podeGerenciar: sql<number>`CASE WHEN ${gerenciavel} THEN 1 ELSE 0 END` }).from(eventos).where(and(...conditions)).all()
+  return c.json(await enriquecerAncestralidadeEventos(db, data))
 
-  const contexto = c.get('contextoPermissoes')
-  const membroId = c.get('membroId')
-  const [escopos, escoposRelatorios] = await Promise.all([
-    obterEscoposTerritoriaisVisiveis(db, contexto),
-    carregarEscoposRelatorios(db, contexto, membroId),
-  ])
-
-  return c.json(
-    data.filter((evento: any) =>
-      eventoVisivelParaLeitura(evento, membroId, escopos, escoposRelatorios)
-    )
-  )
 })
 
 eventosRouter.get('/:id', async (c) => {
@@ -150,18 +211,11 @@ eventosRouter.get('/:id', async (c) => {
   
   if (!data) return c.json({ error: 'Evento não encontrado' }, 404)
 
-  const contexto = c.get('contextoPermissoes')
-  const membroId = c.get('membroId')
-  const [escopos, escoposRelatorios] = await Promise.all([
-    obterEscoposTerritoriaisVisiveis(db, contexto),
-    carregarEscoposRelatorios(db, contexto, membroId),
-  ])
-
-  if (!eventoVisivelParaLeitura(data, membroId, escopos, escoposRelatorios)) {
+  if (!(await podeLerEvento(db, c.get('contextoPermissoes'), id))) {
     return c.json({ error: 'Acesso não autorizado para este evento', code: 'FORBIDDEN' }, 403)
   }
 
-  return c.json(data)
+  return c.json({ ...data, podeGerenciar: await podeGerenciarEvento(db, c.get('membroId'), data) })
 })
 
 eventosRouter.post('/', async (c) => {
@@ -195,6 +249,13 @@ eventosRouter.post('/', async (c) => {
       return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
     }
 
+    if (parsed.pessoal) {
+      if (parsed.organizadorMembroId && parsed.organizadorMembroId !== atorMembroId) {
+        return c.json({ error: 'Evento Próprio pertence ao usuário conectado', code: 'FORBIDDEN' }, 403)
+      }
+      parsed.organizadorMembroId = atorMembroId
+    }
+
     const auditData: AuditLogData = {
       acao: 'EVENTO_CRIADO',
       atorMembroId,
@@ -205,6 +266,7 @@ eventosRouter.post('/', async (c) => {
       contexto: {
         titulo: parsed.titulo,
         modalidade: parsed.modalidade,
+        pessoal: parsed.pessoal ?? false,
         escopoTipo: escopoTipo || '',
         escopoId: escopoId || '',
       },
@@ -212,7 +274,7 @@ eventosRouter.post('/', async (c) => {
 
     await executarOperacaoComAudit(
       db,
-      (qdb) => [qdb.insert(eventos).values({ id, ...parsed })],
+      (qdb) => [qdb.insert(eventos).values({ id, ...parsed, criadorMembroId: atorMembroId })],
       auditData
     )
 
@@ -229,6 +291,116 @@ eventosRouter.post('/', async (c) => {
   }
 })
 
+eventosRouter.post('/:id/cancelar', async (c) => {
+  const db = c.get('db')
+  const id = c.req.param('id')
+
+  const evento = await db.select().from(eventos).where(eq(eventos.id, id)).get()
+  if (!evento) return c.json({ error: 'Evento não encontrado' }, 404)
+  if (!(await podeGerenciarEvento(db, c.get('membroId'), evento))) return c.json({ error: 'Acesso não autorizado para este evento', code: 'FORBIDDEN' }, 403)
+  if (!evento.ativo) return c.json({ error: 'Evento já está cancelado', code: 'EVENTO_JA_CANCELADO' }, 409)
+
+  if (new Date(evento.fimEm).getTime() <= Date.now()) {
+    return c.json({
+      error: 'Eventos já encerrados não podem ser alterados. O registro deve preservar o que efetivamente ocorreu.',
+      code: 'EVENTO_PASSADO_IMUTAVEL'
+    }, 409)
+  }
+
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+  const atorMembroId = c.get('membroId') || null
+  if (!atorMembroId || !escopoTipo || !escopoId) {
+    return c.json({ error: 'Escopo da Agenda indisponível', code: 'FORBIDDEN' }, 403)
+  }
+
+  const convocacao = await db
+    .select()
+    .from(convocacoes)
+    .where(eq(convocacoes.eventoId, id))
+    .get()
+
+  if (convocacao?.status === 'PUBLICADA') {
+    return c.json({
+      error: 'O evento possui convocação PUBLICADA. Cancele primeiro a convocação antes de cancelar o evento.',
+      code: 'EVENTO_COM_CONVOCACAO_PUBLICADA'
+    }, 409)
+  }
+
+  const agoraIso = new Date().toISOString()
+  const audits: AuditLogData[] = []
+
+  if (convocacao && convocacao.status === 'RASCUNHO') {
+    audits.push({
+      acao: 'CONVOCACAO_CANCELADA',
+      atorMembroId,
+      recursoTipo: 'CONVOCACAO',
+      recursoId: convocacao.id,
+      escopoTipo,
+      escopoId,
+      contexto: {
+        eventoId: id,
+        motivo: 'CANCELAMENTO_EVENTO'
+      }
+    })
+  }
+
+  audits.push({
+    acao: 'EVENTO_CANCELADO',
+    atorMembroId,
+    recursoTipo: 'EVENTO',
+    recursoId: id,
+    escopoTipo,
+    escopoId,
+    contexto: {
+      titulo: evento.titulo,
+      convocacaoId: convocacao?.id ?? null,
+      convocacaoStatusAnterior: convocacao?.status ?? null
+    }
+  })
+
+  await executarOperacaoComAudits(
+    db,
+    qdb => {
+      const queries: any[] = []
+
+      if (convocacao?.status === 'RASCUNHO') {
+        queries.push(
+          qdb.delete(convocacaoFuncoes).where(eq(convocacaoFuncoes.convocacaoId, convocacao.id)),
+          qdb.update(convocacoes)
+            .set({
+              status: 'CANCELADA',
+              ativo: false,
+              canceladaEm: agoraIso,
+              updatedAt: agoraIso
+            })
+            .where(eq(convocacoes.id, convocacao.id))
+        )
+      }
+
+      queries.push(
+        qdb.update(eventos)
+          .set({
+            ativo: false,
+            recorrenciaExcecao: evento.serieRecorrenciaId ? true : evento.recorrenciaExcecao,
+            agendaRevisao: agoraIso,
+            updatedAt: agoraIso
+          })
+          .where(eq(eventos.id, id))
+      )
+
+      return queries
+    },
+    audits
+  )
+
+  return c.json({
+    success: true,
+    eventoId: id,
+    convocacaoId: convocacao?.id ?? null,
+    convocacaoCancelada: convocacao?.status === 'RASCUNHO'
+  })
+})
+
 eventosRouter.patch('/:id', async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')
@@ -238,6 +410,15 @@ eventosRouter.patch('/:id', async (c) => {
     
     const existing = await db.select().from(eventos).where(eq(eventos.id, id)).get()
     if (!existing) return c.json({ error: 'Evento não encontrado' }, 404)
+
+    if (!(await podeGerenciarEvento(db, c.get('membroId'), existing))) return c.json({ error: 'Acesso não autorizado para este evento', code: 'FORBIDDEN' }, 403)
+
+    if (new Date(existing.fimEm).getTime() <= Date.now()) {
+      return c.json({
+        error: 'Eventos já encerrados não podem ser alterados. O registro deve preservar o que efetivamente ocorreu.',
+        code: 'EVENTO_PASSADO_IMUTAVEL'
+      }, 409)
+    }
 
     // Validar estado final mesclado (existente + patch) com EventoCreate
     const merged = { ...existing, ...parsed }
@@ -267,28 +448,31 @@ eventosRouter.patch('/:id', async (c) => {
       return c.json({ error: 'Escopo da Agenda indisponível', code: 'FORBIDDEN' }, 403)
     }
 
-    const [autorizadoOriginal, autorizadoFinal] = await Promise.all([
-      podeGerenciarAgendaNoEscopo(
-        db,
-        membroId,
-        escopoOriginal.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-        escopoOriginal.escopoId
-      ),
-      podeGerenciarAgendaNoEscopo(
-        db,
-        membroId,
-        escopoFinal.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-        escopoFinal.escopoId
-      ),
-    ])
+    const autorizadoFinal = await podeGerenciarAgendaNoEscopo(
+      db, membroId,
+      escopoFinal.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+      escopoFinal.escopoId,
+      existing.criadorMembroId === membroId || existing.organizadorMembroId === membroId
+    )
+    const preservaCasaPessoal = existing.pessoal && merged.casaId === existing.casaId
+    if (!autorizadoFinal && !preservaCasaPessoal) return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
 
-    if (!autorizadoOriginal || !autorizadoFinal) {
-      return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
+    if ((existing.pessoal ?? false) !== (merged.pessoal ?? false)) {
+      return c.json({ error: 'O público do evento não pode ser alterado depois da criação', code: 'PUBLICO_EVENTO_IMUTAVEL' }, 409)
+    }
+    if (merged.pessoal && merged.organizadorMembroId !== existing.criadorMembroId) {
+      return c.json({ error: 'Evento Próprio não pode ser transferido a outro usuário', code: 'FORBIDDEN' }, 403)
     }
 
     // PMO Rule: Ao alterar uma ocorrência individual, preservar serie_recorrencia_id e marcar recorrencia_excecao = true.
     const isExcecao = existing.serieRecorrenciaId !== null ? true : existing.recorrenciaExcecao
     const nowIso = new Date().toISOString()
+    const ativacaoAlterada =
+      parsed.ativo !== undefined && parsed.ativo !== existing.ativo
+    const alteracaoMaterial = houveAlteracaoMaterial(existing, merged)
+    const agendaAviso = alteracaoMaterial
+      ? await criarAvisoAlteracaoMaterial(db, existing, merged)
+      : existing.agendaAviso
 
     const atorMembroId = c.get('membroId') || null
 
@@ -303,6 +487,8 @@ eventosRouter.patch('/:id', async (c) => {
         titulo: existing.titulo,
         modalidade: existing.modalidade,
         camposAlterados: Object.keys(parsed),
+        alteracaoMaterial,
+        agendaAviso: alteracaoMaterial ? agendaAviso : null,
       },
     }
 
@@ -310,7 +496,13 @@ eventosRouter.patch('/:id', async (c) => {
       db,
       (qdb) => [
         qdb.update(eventos)
-          .set({ ...parsed, recorrenciaExcecao: isExcecao, updatedAt: nowIso })
+          .set({
+            ...parsed,
+            recorrenciaExcecao: isExcecao,
+            agendaRevisao: alteracaoMaterial || ativacaoAlterada ? nowIso : existing.agendaRevisao,
+            agendaAviso,
+            updatedAt: nowIso,
+          })
           .where(eq(eventos.id, id))
       ],
       auditData

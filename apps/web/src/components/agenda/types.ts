@@ -1,6 +1,7 @@
 export interface AgendaItem {
   evento: {
     id: string
+    pessoal?: boolean
     titulo: string
     inicioEm: string
     fimEm: string
@@ -12,11 +13,12 @@ export interface AgendaItem {
     possuiTarde?: boolean
     possuiNoite?: boolean
     refeicoesOferecidas?: string[]
+    agendaAviso?: string | null
   }
   convocacao: {
     id: string
     observacoes: string | null
-  }
+  } | null
   local: {
     nome: string
     endereco: string
@@ -27,10 +29,30 @@ export interface AgendaItem {
     id: string
     nome: string
   } | null
-  destinatarioId: string
+  destinatarioId: string | null
+  vinculo?: {
+    funcaoId: string
+    funcaoNome: string
+    vinculoFuncionalId: string
+  } | null
   rsvp: {
     resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI'
     justificativa?: string | null
     periodosParticipacao?: string[] | null
+    reconfirmacaoPendente?: boolean
+  } | null
+  conflito?: {
+    tipo: 'SOBREPOSICAO' | 'PROXIMIDADE'
+    janelaTransicaoMinutos: number
+    priorizado: boolean
+    conflitosResolvidos: boolean
+    atenuado: boolean
+    eventos: Array<{
+      eventoId: string
+      titulo: string
+      inicioEm: string
+      fimEm: string
+      tipo: 'SOBREPOSICAO' | 'PROXIMIDADE'
+    }>
   } | null
 }
