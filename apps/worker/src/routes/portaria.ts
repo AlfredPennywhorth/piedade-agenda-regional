@@ -15,6 +15,7 @@ portariaRouter.use('*', authMiddleware)
 
 
 async function podeGerarCredencialOperador(db: any, membroId: string, contexto: any, evento: any) {
+  if (evento.pessoal) return false
   if (eMasterSistema(contexto)) return true
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
   if (!escopoTipo || !escopoId) return false

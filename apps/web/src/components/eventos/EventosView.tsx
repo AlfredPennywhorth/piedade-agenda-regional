@@ -51,6 +51,9 @@ interface SerieResponse {
 }
 
 export interface Evento {
+  pessoal?: boolean
+  podeGerenciar?: boolean
+  criadorMembroId?: string | null
   id: string
   titulo: string
   descricao: string | null
@@ -75,7 +78,7 @@ export interface Evento {
   recorrenciaExcecao?: boolean
 }
 
-export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: string) => void }) {
+export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEventoCriado?: (eventoId: string) => void; onEventoPessoalCriado?: () => void }) {
   const [eventos, setEventos] = useState<Evento[]>([])
   
   // Lookups
@@ -112,6 +115,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
   const [eventoDetalhe, setEventoDetalhe] = useState<Evento | null>(null)
 
   const [formData, setFormData] = useState<Partial<EventoCreateInput>>({
+    pessoal: false,
     titulo: '',
     descricao: '',
     pauta: '',
@@ -308,6 +312,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     setTipoEscopo(tipo)
     setFormData(prev => ({
       ...prev,
+      pessoal: false,
       regionalId: '',
       administracaoId: '',
       setorId: '',
@@ -343,6 +348,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     setEventoEditandoSerieId(null)
     setCarregandoDetalhes(false)
     setFormData({
+      pessoal: false,
       titulo: '',
       descricao: '',
       pauta: '',
@@ -451,6 +457,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       
       setTipoEscopo(tipo)
       setFormData({
+        pessoal: item.pessoal ?? false,
         titulo: item.titulo || '',
         descricao: item.descricao || '',
         pauta: item.pauta || '',
@@ -554,7 +561,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       localId: formData.localId || null,
       espacoId: formData.espacoId || null,
       urlOnline: formData.urlOnline || null,
-      organizadorMembroId: formData.organizadorMembroId || null,
+      organizadorMembroId: formData.pessoal && !eventoEditandoId ? null : formData.organizadorMembroId || null,
       regionalId: formData.regionalId || null,
       administracaoId: formData.administracaoId || null,
       setorId: formData.setorId || null,
@@ -605,7 +612,11 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       } else {
         const criado = await postWithAuth<Evento>('/eventos', parsed.data)
         fecharFormularioEvento()
-        if (onEventoCriado) {
+        if (criado.pessoal && onEventoPessoalCriado) {
+          onEventoPessoalCriado()
+          return
+        }
+        if (onEventoCriado && !criado.pessoal) {
           onEventoCriado(criado.id)
           return
         }
@@ -977,7 +988,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
               <tbody className="divide-y divide-slate-100">
                 {eventos.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900">{item.titulo}</td>
+                    <td className="px-6 py-4 font-medium text-slate-900">{item.titulo}{item.pessoal && <span className="ml-2 text-xs text-brand-700">Próprio</span>}</td>
                     <td className="px-6 py-4 text-slate-600">
                       {new Date(item.inicioEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                     </td>
@@ -998,21 +1009,21 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                         >
                           Ver
                         </button>
-                        <button
+                        {item.podeGerenciar !== false && !item.pessoal && <button
                           type="button"
                           onClick={() => void gerarAcessoPortaria(item.id)}
                           className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-green-800 hover:bg-green-50 hover:text-green-950 font-medium"
                         >
                           Gerar acesso de Portaria
-                        </button>
-                        <button
+                        </button>}
+                        {item.podeGerenciar !== false && <button
                           type="button"
                           onClick={() => handleClickEditar(item)}
                           className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-amber-700 hover:bg-amber-50 hover:text-amber-900 font-medium"
                         >
                           Editar
-                        </button>
-                        {item.ativo && (
+                        </button>}
+                        {item.ativo && item.podeGerenciar !== false && (
                           <button
                             type="button"
                             onClick={() => void handleCancelarEvento(item)}
@@ -1203,6 +1214,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                           <select
                             id="tipoEscopo"
                             value={tipoEscopo}
+                            disabled={!!eventoEditandoId && !!formData.pessoal}
                             onChange={e => handleTipoEscopoChange(e.target.value as any)}
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                           >
@@ -1288,10 +1300,23 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                           )}
                         </div>
                       </div>
+                      {tipoEscopo === 'casa' && !eventoEditandoSerieId && (
+                        <div className="mt-4">
+                          <label htmlFor="publicoEvento" className="block text-sm font-medium text-slate-700 mb-1">Público do evento</label>
+                          <select id="publicoEvento" value={formData.pessoal ? 'PROPRIO' : 'INSTITUCIONAL'} disabled={!!eventoEditandoId}
+                            onChange={e => setFormData({ ...formData, pessoal: e.target.value === 'PROPRIO' })}
+                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm">
+                            <option value="INSTITUCIONAL">Institucional — com convocação</option>
+                            <option value="PROPRIO">Próprio — somente para mim</option>
+                          </select>
+                          {formData.pessoal && <p className="mt-2 text-sm text-brand-700">Ao salvar, o evento entra diretamente na sua agenda, sem convocação.</p>}
+                        </div>
+                      )}
+                      {errosForm.pessoal && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.pessoal}</p>}
                       {errosForm.escopo && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.escopo}</p>}
                     </div>
 
-                    <div className="border-t pt-4">
+                    {!formData.pessoal && <div className="border-t pt-4">
                       <label htmlFor="organizadorMembroId" className="block text-sm font-medium text-slate-700 mb-1">Organizador (Membro)</label>
                       <select
                         id="organizadorMembroId"
@@ -1303,7 +1328,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                         {membros.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
                       </select>
                       {errosForm.organizadorMembroId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.organizadorMembroId}</p>}
-                    </div>
+                    </div>}
 
                     <div>
                       <label htmlFor="descricao" className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>

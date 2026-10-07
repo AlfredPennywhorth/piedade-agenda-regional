@@ -332,6 +332,8 @@ export function setupDb(sqlite: any) {
 
     CREATE TABLE IF NOT EXISTS eventos (
       id text PRIMARY KEY NOT NULL,
+      pessoal integer DEFAULT 0 NOT NULL,
+      criador_membro_id text REFERENCES membros(id),
       titulo text NOT NULL,
       descricao text,
       pauta text,

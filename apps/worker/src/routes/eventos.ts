@@ -1,11 +1,13 @@
 import { Hono } from 'hono'
-import { eq, and } from 'drizzle-orm'
-import { eventos, funcoes, vinculosFuncionais, convocacoes, convocacaoFuncoes, locais, espacosLocal } from '../db/schema'
+import { eq, and, sql } from 'drizzle-orm'
+import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal } from '../db/schema'
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, executarOperacaoComAudits, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
-import { obterEscoposTerritoriaisVisiveis, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
+import { podeGerenciarAgendaNoEscopo } from '../security/permissoes'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
+
+import { condicaoEventosVisiveis, condicaoEventosGerenciaveis, podeLerEvento, podeGerenciarEvento } from '../security/eventos'
 
 export const eventosRouter = new Hono<any>()
 
@@ -72,105 +74,6 @@ function houveAlteracaoMaterial(anterior: any, atual: any) {
   )
 }
 
-function eventoVisivelNoEscopo(evento: any, escopos: any): boolean {
-  if (escopos.tudo) return true
-  if (evento.regionalId && escopos.regionaisIds.has(evento.regionalId)) return true
-  if (evento.administracaoId && escopos.administracoesIds.has(evento.administracaoId)) return true
-  if (evento.setorId && escopos.setoresIds.has(evento.setorId)) return true
-  if (evento.casaId && escopos.casasIds.has(evento.casaId)) return true
-  if (evento.grupoTrabalhoId && escopos.gruposTrabalhoIds.has(evento.grupoTrabalhoId)) return true
-  return false
-}
-
-type EscoposRelatorios = {
-  regionaisIds: Set<string>
-  administracoesIds: Set<string>
-  setoresIds: Set<string>
-  casasIds: Set<string>
-  gruposTrabalhoIds: Set<string>
-}
-
-async function carregarEscoposRelatorios(
-  db: any,
-  contexto: any,
-  membroId: string
-): Promise<EscoposRelatorios> {
-  const resultado: EscoposRelatorios = {
-    regionaisIds: new Set<string>(),
-    administracoesIds: new Set<string>(),
-    setoresIds: new Set<string>(),
-    casasIds: new Set<string>(),
-    gruposTrabalhoIds: new Set<string>(),
-  }
-
-  for (const acesso of contexto.acessosAtivos) {
-    if (
-      acesso.perfilCodigo !== 'GESTOR_RELATORIOS' ||
-      acesso.escopoTipo === 'GLOBAL' ||
-      !acesso.escopoId
-    ) continue
-
-    if (acesso.escopoTipo === 'REGIONAL') resultado.regionaisIds.add(acesso.escopoId)
-    if (acesso.escopoTipo === 'ADMINISTRACAO') resultado.administracoesIds.add(acesso.escopoId)
-    if (acesso.escopoTipo === 'SETOR') resultado.setoresIds.add(acesso.escopoId)
-    if (acesso.escopoTipo === 'CASA') resultado.casasIds.add(acesso.escopoId)
-    if (acesso.escopoTipo === 'GRUPO_TRABALHO') resultado.gruposTrabalhoIds.add(acesso.escopoId)
-  }
-
-  const vinculos = await db
-    .select({ vinculo: vinculosFuncionais })
-    .from(vinculosFuncionais)
-    .innerJoin(funcoes, eq(vinculosFuncionais.funcaoId, funcoes.id))
-    .where(
-      and(
-        eq(vinculosFuncionais.membroId, membroId),
-        eq(vinculosFuncionais.ativo, true),
-        eq(funcoes.ativo, true),
-        eq(funcoes.codigo, 'GESTOR_RELATORIOS')
-      )
-    )
-    .all()
-
-  for (const { vinculo } of vinculos) {
-    if (vinculo.regionalId) resultado.regionaisIds.add(vinculo.regionalId)
-    if (vinculo.administracaoId) resultado.administracoesIds.add(vinculo.administracaoId)
-    if (vinculo.setorId) resultado.setoresIds.add(vinculo.setorId)
-    if (vinculo.casaId) resultado.casasIds.add(vinculo.casaId)
-    if (vinculo.grupoTrabalhoId) resultado.gruposTrabalhoIds.add(vinculo.grupoTrabalhoId)
-  }
-
-  return resultado
-}
-
-function eventoAutorizadoParaRelatorios(
-  evento: any,
-  membroId: string,
-  escoposRelatorios: EscoposRelatorios
-): boolean {
-  if (evento.organizadorMembroId === membroId) return true
-  if (evento.regionalId && escoposRelatorios.regionaisIds.has(evento.regionalId)) return true
-  if (evento.administracaoId && escoposRelatorios.administracoesIds.has(evento.administracaoId)) return true
-  if (evento.setorId && escoposRelatorios.setoresIds.has(evento.setorId)) return true
-  if (evento.casaId && escoposRelatorios.casasIds.has(evento.casaId)) return true
-  if (
-    evento.grupoTrabalhoId &&
-    escoposRelatorios.gruposTrabalhoIds.has(evento.grupoTrabalhoId)
-  ) return true
-  return false
-}
-
-function eventoVisivelParaLeitura(
-  evento: any,
-  membroId: string,
-  escopos: any,
-  escoposRelatorios: EscoposRelatorios
-): boolean {
-  return (
-    eventoVisivelNoEscopo(evento, escopos) ||
-    eventoAutorizadoParaRelatorios(evento, membroId, escoposRelatorios)
-  )
-}
-
 eventosRouter.use('*', authMiddleware)
 
 eventosRouter.get('/', async (c) => {
@@ -187,23 +90,11 @@ eventosRouter.get('/', async (c) => {
     conditions.push(eq(eventos.modalidade, modalidade))
   }
 
-  const query = db.select().from(eventos)
-  const data = conditions.length > 0 
-    ? await query.where(and(...conditions)).all()
-    : await query.all()
+  conditions.push(await condicaoEventosVisiveis(db, c.get('contextoPermissoes')))
+  const gerenciavel = condicaoEventosGerenciaveis(c.get('contextoPermissoes'))
+  const data = await db.select({ evento: eventos, podeGerenciar: sql<number>`CASE WHEN ${gerenciavel} THEN 1 ELSE 0 END` }).from(eventos).where(and(...conditions)).all()
+  return c.json(data.map((item: any) => ({ ...item.evento, podeGerenciar: item.podeGerenciar === 1 })))
 
-  const contexto = c.get('contextoPermissoes')
-  const membroId = c.get('membroId')
-  const [escopos, escoposRelatorios] = await Promise.all([
-    obterEscoposTerritoriaisVisiveis(db, contexto),
-    carregarEscoposRelatorios(db, contexto, membroId),
-  ])
-
-  return c.json(
-    data.filter((evento: any) =>
-      eventoVisivelParaLeitura(evento, membroId, escopos, escoposRelatorios)
-    )
-  )
 })
 
 eventosRouter.get('/:id', async (c) => {
@@ -213,18 +104,11 @@ eventosRouter.get('/:id', async (c) => {
   
   if (!data) return c.json({ error: 'Evento não encontrado' }, 404)
 
-  const contexto = c.get('contextoPermissoes')
-  const membroId = c.get('membroId')
-  const [escopos, escoposRelatorios] = await Promise.all([
-    obterEscoposTerritoriaisVisiveis(db, contexto),
-    carregarEscoposRelatorios(db, contexto, membroId),
-  ])
-
-  if (!eventoVisivelParaLeitura(data, membroId, escopos, escoposRelatorios)) {
+  if (!(await podeLerEvento(db, c.get('contextoPermissoes'), id))) {
     return c.json({ error: 'Acesso não autorizado para este evento', code: 'FORBIDDEN' }, 403)
   }
 
-  return c.json(data)
+  return c.json({ ...data, podeGerenciar: await podeGerenciarEvento(db, c.get('membroId'), data) })
 })
 
 eventosRouter.post('/', async (c) => {
@@ -258,6 +142,13 @@ eventosRouter.post('/', async (c) => {
       return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
     }
 
+    if (parsed.pessoal) {
+      if (parsed.organizadorMembroId && parsed.organizadorMembroId !== atorMembroId) {
+        return c.json({ error: 'Evento Próprio pertence ao usuário conectado', code: 'FORBIDDEN' }, 403)
+      }
+      parsed.organizadorMembroId = atorMembroId
+    }
+
     const auditData: AuditLogData = {
       acao: 'EVENTO_CRIADO',
       atorMembroId,
@@ -268,6 +159,7 @@ eventosRouter.post('/', async (c) => {
       contexto: {
         titulo: parsed.titulo,
         modalidade: parsed.modalidade,
+        pessoal: parsed.pessoal ?? false,
         escopoTipo: escopoTipo || '',
         escopoId: escopoId || '',
       },
@@ -275,7 +167,7 @@ eventosRouter.post('/', async (c) => {
 
     await executarOperacaoComAudit(
       db,
-      (qdb) => [qdb.insert(eventos).values({ id, ...parsed })],
+      (qdb) => [qdb.insert(eventos).values({ id, ...parsed, criadorMembroId: atorMembroId })],
       auditData
     )
 
@@ -298,6 +190,7 @@ eventosRouter.post('/:id/cancelar', async (c) => {
 
   const evento = await db.select().from(eventos).where(eq(eventos.id, id)).get()
   if (!evento) return c.json({ error: 'Evento não encontrado' }, 404)
+  if (!(await podeGerenciarEvento(db, c.get('membroId'), evento))) return c.json({ error: 'Acesso não autorizado para este evento', code: 'FORBIDDEN' }, 403)
   if (!evento.ativo) return c.json({ error: 'Evento já está cancelado', code: 'EVENTO_JA_CANCELADO' }, 409)
 
   if (new Date(evento.fimEm).getTime() <= Date.now()) {
@@ -311,16 +204,6 @@ eventosRouter.post('/:id/cancelar', async (c) => {
   const atorMembroId = c.get('membroId') || null
   if (!atorMembroId || !escopoTipo || !escopoId) {
     return c.json({ error: 'Escopo da Agenda indisponível', code: 'FORBIDDEN' }, 403)
-  }
-
-  const autorizado = await podeGerenciarAgendaNoEscopo(
-    db,
-    atorMembroId,
-    escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-    escopoId
-  )
-  if (!autorizado) {
-    return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
   }
 
   const convocacao = await db
@@ -421,6 +304,8 @@ eventosRouter.patch('/:id', async (c) => {
     const existing = await db.select().from(eventos).where(eq(eventos.id, id)).get()
     if (!existing) return c.json({ error: 'Evento não encontrado' }, 404)
 
+    if (!(await podeGerenciarEvento(db, c.get('membroId'), existing))) return c.json({ error: 'Acesso não autorizado para este evento', code: 'FORBIDDEN' }, 403)
+
     if (new Date(existing.fimEm).getTime() <= Date.now()) {
       return c.json({
         error: 'Eventos já encerrados não podem ser alterados. O registro deve preservar o que efetivamente ocorreu.',
@@ -456,23 +341,18 @@ eventosRouter.patch('/:id', async (c) => {
       return c.json({ error: 'Escopo da Agenda indisponível', code: 'FORBIDDEN' }, 403)
     }
 
-    const [autorizadoOriginal, autorizadoFinal] = await Promise.all([
-      podeGerenciarAgendaNoEscopo(
-        db,
-        membroId,
-        escopoOriginal.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-        escopoOriginal.escopoId
-      ),
-      podeGerenciarAgendaNoEscopo(
-        db,
-        membroId,
-        escopoFinal.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-        escopoFinal.escopoId
-      ),
-    ])
+    const autorizadoFinal = await podeGerenciarAgendaNoEscopo(
+      db, membroId,
+      escopoFinal.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+      escopoFinal.escopoId
+    )
+    if (!autorizadoFinal) return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
 
-    if (!autorizadoOriginal || !autorizadoFinal) {
-      return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
+    if ((existing.pessoal ?? false) !== (merged.pessoal ?? false)) {
+      return c.json({ error: 'O público do evento não pode ser alterado depois da criação', code: 'PUBLICO_EVENTO_IMUTAVEL' }, 409)
+    }
+    if (merged.pessoal && merged.organizadorMembroId !== existing.criadorMembroId) {
+      return c.json({ error: 'Evento Próprio não pode ser transferido a outro usuário', code: 'FORBIDDEN' }, 403)
     }
 
     // PMO Rule: Ao alterar uma ocorrência individual, preservar serie_recorrencia_id e marcar recorrencia_excecao = true.

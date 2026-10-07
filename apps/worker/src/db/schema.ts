@@ -578,6 +578,8 @@ export const eventos = sqliteTable(
   'eventos',
   {
     id: text('id').primaryKey(), // UUID
+    pessoal: integer('pessoal', { mode: 'boolean' }).notNull().default(false),
+    criadorMembroId: text('criador_membro_id').references(() => membros.id),
     titulo: text('titulo').notNull(),
     descricao: text('descricao'),
     pauta: text('pauta'),
@@ -628,6 +630,7 @@ export const eventos = sqliteTable(
       (CASE WHEN ${table.grupoTrabalhoId} IS NOT NULL THEN 1 ELSE 0 END) = 1
     `
     ),
+    idxCriadorPessoal: index('idx_eventos_criador_pessoal').on(table.criadorMembroId, table.pessoal, table.ativo),
     idxInicioEm: index('idx_eventos_inicio_em').on(table.inicioEm),
     idxAtivo: index('idx_eventos_ativo').on(table.ativo),
     idxLocalId: index('idx_eventos_local_id').on(table.localId),

@@ -590,6 +590,7 @@ export async function eOperadorPortariaAutorizado(
   contextoPermissoes?: ContextoPermissoes
 ): Promise<boolean> {
   if (!db || !membroId || !evento) return false
+  if (evento.pessoal) return false
 
   const estadoPortaria = await db
     .select({ status: schema.portariasEvento.status })
@@ -662,6 +663,7 @@ export async function eGestorRelatoriosAutorizadoParaEvento(db: any, membroId: s
 
   const contexto = await carregarContextoPermissoes(db, membroId)
   if (eMasterSistema(contexto)) return true
+  if (evento.pessoal) return evento.criadorMembroId === membroId
 
   const escopoEvento =
     evento.regionalId ? { tipo: 'REGIONAL', id: evento.regionalId } :

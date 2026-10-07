@@ -186,6 +186,10 @@ function App() {
       {currentTab === 'agenda' && <AgendaView />}
       {currentTab === 'eventos' && capacidades.podeGerirAgenda === true && (
         <EventosView
+          onEventoPessoalCriado={() => {
+            setFluxoEventoId(null)
+            setCurrentTab('agenda')
+          }}
           onEventoCriado={eventoId => {
             setFluxoEventoId(eventoId)
             setCurrentTab('convocacoes')
