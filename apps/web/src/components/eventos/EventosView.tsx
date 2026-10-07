@@ -243,7 +243,6 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   const montarUrlEventos = (pessoaId = pessoaFiltro) => {
     const params = new URLSearchParams()
     if (pessoaId) params.set('pessoaId', pessoaId)
-    if (statusEventoFiltro === 'ATIVOS') params.set('ativo', 'true')
     if (statusEventoFiltro === 'CANCELADOS') params.set('ativo', 'false')
     const query = params.toString()
     return query ? `/eventos?${query}` : '/eventos'
@@ -322,6 +321,8 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     ...gruposTrabalho.map(item => ({ valor: `grupoTrabalhoId:${item.id}`, nome: `GT: ${item.nome}` })),
   ]
   const eventosFiltrados = eventos.filter(evento => {
+    if (statusEventoFiltro === 'ATIVOS' && !evento.ativo) return false
+    if (statusEventoFiltro === 'CANCELADOS' && evento.ativo) return false
     if (!escopoFiltro) return true
     const [campo, id] = escopoFiltro.split(':')
     if (evento[campo as keyof Evento] === id) return true
