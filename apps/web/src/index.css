@@ -59,3 +59,39 @@
     break-after: auto;
   }
 }
+
+
+@layer components {
+  .master-table-scroll {
+    max-height: min(70vh, 48rem);
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable both-edges;
+  }
+
+  .master-table-scroll table {
+    min-width: max-content;
+    width: 100%;
+  }
+
+  .master-table-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #f8fafc;
+  }
+
+  .master-table-scroll th:first-child,
+  .master-table-scroll td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background: #ffffff;
+    box-shadow: 1px 0 0 #e2e8f0;
+  }
+
+  .master-table-scroll thead th:first-child {
+    z-index: 30;
+    background: #f8fafc;
+  }
+}
