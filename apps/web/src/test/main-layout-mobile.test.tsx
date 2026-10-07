@@ -21,6 +21,22 @@ describe('MainLayout — navegação móvel', () => {
     expect(screen.getByLabelText('Código da tela AGD-ADM-010')).toHaveTextContent('Tela AGD-ADM-010')
   })
 
+  it('aplica safe areas no cabeçalho, conteúdo e navegação móvel', () => {
+    const { container } = render(
+      <MainLayout currentTab="agenda" onTabChange={vi.fn()} capacidades={{}}>
+        <div>Conteúdo</div>
+      </MainLayout>
+    )
+
+    const root = container.firstElementChild as HTMLElement
+    const header = container.querySelector('header') as HTMLElement
+    const nav = screen.getByRole('navigation', { name: /navegação móvel principal/i })
+
+    expect(root.style.paddingBottom).toContain('env(safe-area-inset-bottom)')
+    expect(header.style.paddingTop).toContain('env(safe-area-inset-top)')
+    expect(nav.getAttribute('style')).toContain('safe-area-inset-bottom')
+  })
+
   it('abre o menu Mais e permite acessar módulos administrativos', () => {
     const onTabChange = vi.fn()
 
