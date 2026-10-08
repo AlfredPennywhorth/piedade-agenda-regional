@@ -20,6 +20,7 @@ interface EventoDetalheProps {
 export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalheProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   
+  const [statusExterno, setStatusExterno] = useState(item.participacaoExterna?.status ?? null)
   const [respostaLocal, setRespostaLocal] = useState<string | null>(item.rsvp?.resposta ?? null)
   const reconfirmacaoPendente = item.rsvp?.reconfirmacaoPendente ?? false
   const [ausenciaSelecionada, setAusenciaSelecionada] = useState(false)
@@ -172,6 +173,20 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
       setIsEditingParticipacao(false)
     } catch (err: any) {
       setRsvpError(err.message || 'Erro ao registrar resposta.')
+    } finally {
+      setIsLoadingRsvp(false)
+    }
+  }
+
+  const responderConviteExterno = async (resposta: 'CONFIRMADO' | 'RECUSADO') => {
+    setRsvpError('')
+    setIsLoadingRsvp(true)
+    try {
+      await apiClient.patchWithAuth(`/eventos/${item.evento.id}/participantes-externos/resposta`, { resposta })
+      setStatusExterno(resposta)
+      onClose()
+    } catch (err: any) {
+      setRsvpError(err.message || 'Erro ao registrar resposta ao convite.')
     } finally {
       setIsLoadingRsvp(false)
     }
@@ -380,6 +395,20 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
             tituloEvento={item.evento.titulo}
             onClose={() => setShowQrModal(false)}
           />
+        )}
+
+        {item.participacaoExterna && (
+          <div className="border-t border-slate-100 pt-6 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase">Participação individual</h3>
+            <p className="text-sm text-slate-700">Situação: {statusExterno === 'CONVIDADO' ? 'Convite pendente' : statusExterno === 'ATRIBUIDO' ? 'Atribuição individual' : statusExterno === 'CONFIRMADO' ? 'Confirmado' : 'Recusado'}</p>
+            {statusExterno === 'CONVIDADO' && dateObjInicio > new Date() && (
+              <div className="flex gap-2">
+                <button disabled={isLoadingRsvp} onClick={() => void responderConviteExterno('CONFIRMADO')} className="flex-1 rounded-lg bg-green-700 text-white px-3 py-2 text-sm">Confirmar</button>
+                <button disabled={isLoadingRsvp} onClick={() => void responderConviteExterno('RECUSADO')} className="flex-1 rounded-lg border border-red-300 text-red-700 px-3 py-2 text-sm">Recusar</button>
+              </div>
+            )}
+            {rsvpError && <p role="alert" className="text-sm text-red-700">{rsvpError}</p>}
+          </div>
         )}
 
         {!item.evento.pessoal && item.destinatarioId && <div className="border-t border-slate-100 pt-6 pb-2">
