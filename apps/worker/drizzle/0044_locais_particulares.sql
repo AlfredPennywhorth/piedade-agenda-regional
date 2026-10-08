@@ -14,3 +14,21 @@ CREATE TRIGGER trg_espaco_particular_proprietario_update
 BEFORE UPDATE ON espacos_local
 WHEN (SELECT proprietario_membro_id FROM locais WHERE id=NEW.local_id) IS NOT NEW.proprietario_membro_id
 BEGIN SELECT RAISE(ABORT,'ESPACO_PRIVACIDADE_INVALIDA'); END;
+
+-- Local privado não pode ser utilizado em eventos institucionais ou de terceiros.
+CREATE TRIGGER trg_evento_local_particular_insert
+BEFORE INSERT ON eventos
+WHEN NEW.local_id IS NOT NULL AND EXISTS (
+  SELECT 1 FROM locais l WHERE l.id=NEW.local_id
+  AND l.proprietario_membro_id IS NOT NULL
+  AND (NEW.pessoal <> 1 OR NEW.criador_membro_id IS NOT l.proprietario_membro_id)
+)
+BEGIN SELECT RAISE(ABORT,'LOCAL_PARTICULAR_SEM_AUTORIZACAO'); END;
+CREATE TRIGGER trg_evento_local_particular_update
+BEFORE UPDATE ON eventos
+WHEN NEW.local_id IS NOT NULL AND EXISTS (
+  SELECT 1 FROM locais l WHERE l.id=NEW.local_id
+  AND l.proprietario_membro_id IS NOT NULL
+  AND (NEW.pessoal <> 1 OR NEW.criador_membro_id IS NOT l.proprietario_membro_id)
+)
+BEGIN SELECT RAISE(ABORT,'LOCAL_PARTICULAR_SEM_AUTORIZACAO'); END;
