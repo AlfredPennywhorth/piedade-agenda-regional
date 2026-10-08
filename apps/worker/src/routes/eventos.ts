@@ -569,7 +569,7 @@ eventosRouter.patch('/:id', async (c) => {
           .set({
             ...parsed,
             regionalGestaoId: regionalGestaoFinal,
-            regionalId: externoFinal ? regionalGestaoFinal : merged.regionalId,
+            regionalId: externoFinal ? null : merged.regionalId,
             administracaoId: externoFinal ? null : merged.administracaoId,
             setorId: externoFinal ? null : merged.setorId,
             casaId: externoFinal ? null : merged.casaId,
