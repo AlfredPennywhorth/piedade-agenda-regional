@@ -36,7 +36,11 @@ WHEN NEW.abrangencia NOT IN ('TERRITORIAL','NACIONAL','INTERNACIONAL')
 BEGIN SELECT RAISE(ABORT, 'EVENTO_ABRANGENCIA_DESTINO_INVALIDO'); END;
 
 CREATE TRIGGER trg_eventos_externos_validar_update BEFORE UPDATE ON eventos
-WHEN NEW.abrangencia NOT IN ('TERRITORIAL','NACIONAL','INTERNACIONAL')
+WHEN (OLD.abrangencia IN ('NACIONAL','INTERNACIONAL') AND NEW.abrangencia = 'TERRITORIAL'
+      AND EXISTS (SELECT 1 FROM eventos_participantes_externos WHERE evento_id = OLD.id))
+  OR (OLD.abrangencia = 'TERRITORIAL' AND NEW.abrangencia IN ('NACIONAL','INTERNACIONAL')
+      AND EXISTS (SELECT 1 FROM convocacoes WHERE evento_id = OLD.id AND status IN ('RASCUNHO','PUBLICADA')))
+  OR NEW.abrangencia NOT IN ('TERRITORIAL','NACIONAL','INTERNACIONAL')
   OR (NEW.abrangencia = 'TERRITORIAL' AND (NEW.destino_uf IS NOT NULL OR NEW.destino_pais_codigo IS NOT NULL OR NEW.destino_cidade_local IS NOT NULL))
   OR (NEW.abrangencia IN ('NACIONAL','INTERNACIONAL') AND (
     NEW.regional_id IS NULL OR NEW.regional_gestao_id IS NULL OR NEW.regional_id <> NEW.regional_gestao_id
