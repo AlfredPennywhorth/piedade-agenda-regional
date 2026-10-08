@@ -144,6 +144,16 @@ describe('migration 0043 — eventos externos', () => {
     expect((sqlite.prepare(
       "SELECT status FROM eventos_participantes_externos WHERE evento_id='ev-externo-apos-migracao' AND membro_id='membro-convidado'"
     ).get() as any).status).toBe('CONVIDADO')
+    // A resposta concorrente/obsoleta deve abortar sem gravar status inválido.
+    sqlite.prepare(`UPDATE eventos_participantes_externos SET status = 'CONFIRMADO'
+      WHERE evento_id = 'ev-externo-apos-migracao' AND membro_id = 'membro-convidado'`).run()
+    expect(() => sqlite.prepare(`UPDATE eventos_participantes_externos
+      SET status = CASE WHEN status = 'CONVIDADO' THEN 'RECUSADO' ELSE 'RESPOSTA_OBSOLETA' END
+      WHERE evento_id = 'ev-externo-apos-migracao' AND membro_id = 'membro-convidado'`).run()).toThrow()
+    expect((sqlite.prepare(`SELECT status FROM eventos_participantes_externos
+      WHERE evento_id='ev-externo-apos-migracao' AND membro_id='membro-convidado'`)
+      .get() as any).status).toBe('CONFIRMADO')
+
     expect(() => sqlite.prepare(`
       INSERT INTO eventos_participantes_externos(evento_id,membro_id,status,criado_por_membro_id)
       VALUES ('ev-legado','membro-convidado','CONVIDADO','membro-criador')
