@@ -325,7 +325,7 @@ eventosRouter.post('/', async (c) => {
         ...parsed,
         criadorMembroId: atorMembroId,
         regionalGestaoId,
-        regionalId: externo ? null : parsed.regionalId,
+        regionalId: externo ? regionalGestaoId : parsed.regionalId,
       })],
       auditData
     )
@@ -571,7 +571,7 @@ eventosRouter.patch('/:id', async (c) => {
           .set({
             ...parsed,
             regionalGestaoId: regionalGestaoFinal,
-            regionalId: externoFinal ? null : merged.regionalId,
+            regionalId: externoFinal ? regionalGestaoFinal : merged.regionalId,
             administracaoId: externoFinal ? null : merged.administracaoId,
             setorId: externoFinal ? null : merged.setorId,
             casaId: externoFinal ? null : merged.casaId,
