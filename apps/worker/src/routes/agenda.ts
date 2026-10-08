@@ -98,7 +98,7 @@ function tipoConflito(a: RegistroAgenda, b: RegistroAgenda): 'SOBREPOSICAO' | 'P
 }
 
 function montarMapaConflitos(records: RegistroAgenda[]) {
-  const ativos = records.filter(record => record.rsvp?.resposta !== 'NAO_PARTICIPAREI')
+  const ativos = records.filter(record => record.rsvp?.resposta !== 'NAO_PARTICIPAREI' && record.participacao?.status !== 'RECUSADO')
   const mapa = new Map<string, Array<{ eventoId: string; tipo: 'SOBREPOSICAO' | 'PROXIMIDADE' }>>()
 
   for (let i = 0; i < ativos.length; i++) {
