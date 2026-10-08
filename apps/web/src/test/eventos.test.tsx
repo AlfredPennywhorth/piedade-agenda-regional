@@ -1273,6 +1273,48 @@ describe('EventosView', () => {
     expect(within(detalhe).getByText(/Diácono Convidado — Aguardando resposta/)).toBeInTheDocument()
   })
 
+  it('gestor de relatórios visualiza lista externa sem poder convocar', async () => {
+    const evento = {
+      ...mockEventos[0], abrangencia: 'NACIONAL', destinoUf: 'MG',
+      destinoCidadeLocal: 'Belo Horizonte', podeGerenciar: false,
+    }
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos') return [evento]
+      if (url === `/eventos/${evento.id}`) return evento
+      if (url === `/eventos/${evento.id}/participantes-externos`) return [
+        { eventoId: evento.id, membroId: 'membro-externo', status: 'CONFIRMADO' },
+      ]
+      return original(url)
+    })
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    expect(await within(detalhe).findByText(/membro-externo — Confirmado/)).toBeInTheDocument()
+    expect(within(detalhe).queryByLabelText('Diácono ou Membro')).not.toBeInTheDocument()
+  })
+
+  it('não permite adicionar participantes a evento externo cancelado', async () => {
+    const evento = {
+      ...mockEventos[0], abrangencia: 'INTERNACIONAL', destinoPaisCodigo: 'PT',
+      destinoCidadeLocal: 'Lisboa', ativo: false, podeGerenciar: true,
+    }
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos') return [evento]
+      if (url === `/eventos/${evento.id}`) return evento
+      if (url === `/eventos/${evento.id}/participantes-externos`) return []
+      return original(url)
+    })
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    expect(await within(detalhe).findByText(/Evento cancelado: participantes disponíveis somente para consulta/)).toBeInTheDocument()
+    expect(within(detalhe).queryByRole('button', { name: /incluir participante/i })).not.toBeInTheDocument()
+  })
+
   it('troca o destino externo para País em escopo Internacional', async () => {
     render(<EventosView />)
     await screen.findByText('Reunião Presencial')
