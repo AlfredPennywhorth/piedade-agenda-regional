@@ -323,7 +323,7 @@ eventosRouter.post('/', async (c) => {
         ...parsed,
         criadorMembroId: atorMembroId,
         regionalGestaoId,
-        regionalId: externo ? regionalGestaoId : parsed.regionalId,
+        regionalId: externo ? null : parsed.regionalId,
       })],
       auditData
     )
