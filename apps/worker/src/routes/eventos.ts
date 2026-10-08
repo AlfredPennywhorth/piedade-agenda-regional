@@ -655,6 +655,9 @@ eventosRouter.patch('/:id/participantes-externos/resposta', async c => {
   if (!convite || convite.status !== 'CONVIDADO') return c.json({error:'Convite pendente não encontrado'},404)
   const evento = await db.select().from(eventos).where(eq(eventos.id,id)).get()
   if (!evento || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia)) return c.json({error:'Evento externo não encontrado'},404)
+  if (!evento.ativo || new Date(evento.inicioEm).getTime() <= Date.now()) {
+    return c.json({ error: 'Respostas indisponíveis após o início ou cancelamento do evento', code: 'EVENTO_INICIADO_OU_CANCELADO' }, 409)
+  }
   try {
     await executarOperacaoComAudit(db, qdb => [qdb.update(eventosParticipantesExternos).set({
       // Fail closed: a stale response writes an invalid CHECK value, aborting the whole
