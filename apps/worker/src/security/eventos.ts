@@ -181,6 +181,7 @@ export async function condicaoEventosVisiveis(db: any, contexto: ContextoPermiss
           sql`${e.abrangencia} IN ('NACIONAL','INTERNACIONAL')`,
           escopoExternoTecnico
         ),
+        sql`EXISTS (SELECT 1 FROM eventos_participantes_externos pe WHERE pe.evento_id = ${e.id} AND pe.membro_id = ${membroId} AND pe.status IN ('CONVIDADO','ATRIBUIDO','CONFIRMADO'))`,
         sql`EXISTS (SELECT 1 FROM convocacoes c JOIN convocacao_destinatarios d ON d.convocacao_id = c.id WHERE c.evento_id = ${e.id} AND c.status = 'PUBLICADA' AND c.ativo = 1 AND d.membro_id = ${membroId})`
       )
     )
