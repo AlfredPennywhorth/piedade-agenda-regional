@@ -752,6 +752,8 @@ export async function eGestorRelatoriosAutorizadoParaEvento(db: any, membroId: s
       eq(schema.vinculosFuncionais.ativo, true), eq(schema.funcoes.ativo, true),
       eq(schema.funcoes.codigo, 'GESTOR_RELATORIOS'))).all()
   for (const { v } of legados) {
+    if ((evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') &&
+      evento.regionalGestaoId && v.regionalId === evento.regionalGestaoId) return true
     const campos = [ ['REGIONAL', v.regionalId], ['ADMINISTRACAO', v.administracaoId],
       ['SETOR', v.setorId], ['CASA', v.casaId], ['GRUPO_TRABALHO', v.grupoTrabalhoId] ] as const
     for (const [escopoTipo, escopoId] of campos) {
