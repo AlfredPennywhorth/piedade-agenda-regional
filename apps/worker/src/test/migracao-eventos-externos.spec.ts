@@ -102,17 +102,39 @@ describe('migration 0043 — eventos externos', () => {
 
     sqlite.prepare(`
       INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em,
-        abrangencia, destino_uf, destino_cidade_local, regional_gestao_id)
+        abrangencia, destino_uf, destino_cidade_local, regional_gestao_id, regional_id)
       VALUES ('ev-externo-apos-migracao', 'Atendimento MG', 'PRESENCIAL',
         '2030-02-01T10:00:00Z', '2030-02-01T11:00:00Z',
-        'NACIONAL', 'MG', 'Belo Horizonte', 'reg-1')
+        'NACIONAL', 'MG', 'Belo Horizonte', 'reg-1', 'reg-1')
     `).run()
     const externo = sqlite.prepare(
       "SELECT regional_id, regional_gestao_id, abrangencia FROM eventos WHERE id = 'ev-externo-apos-migracao'"
     ).get() as any
     expect(externo).toEqual({
-      regional_id: null, regional_gestao_id: 'reg-1', abrangencia: 'NACIONAL'
+      regional_id: 'reg-1', regional_gestao_id: 'reg-1', abrangencia: 'NACIONAL'
     })
+
+    expect(sqlite.prepare(
+      "SELECT regional_id, abrangencia, uf, municipio FROM eventos_destinos_externos WHERE evento_id = 'ev-externo-apos-migracao'"
+    ).get()).toEqual({ regional_id: 'reg-1', abrangencia: 'NACIONAL', uf: 'MG', municipio: 'Belo Horizonte' })
+
+    sqlite.prepare("UPDATE eventos SET destino_cidade_local = 'Uberlândia' WHERE id = 'ev-externo-apos-migracao'").run()
+    expect((sqlite.prepare("SELECT municipio FROM eventos_destinos_externos WHERE evento_id = 'ev-externo-apos-migracao'").get() as any).municipio).toBe('Uberlândia')
+
+    sqlite.prepare(`
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em,
+        abrangencia, destino_pais_codigo, destino_cidade_local, regional_gestao_id, regional_id)
+      VALUES ('ev-int', 'Atendimento Portugal', 'PRESENCIAL',
+        '2030-02-02T10:00:00Z', '2030-02-02T11:00:00Z',
+        'INTERNACIONAL', 'PT', 'Lisboa', 'reg-1', 'reg-1')
+    `).run()
+    expect((sqlite.prepare("SELECT pais_codigo, cidade FROM eventos_destinos_externos WHERE evento_id = 'ev-int'").get() as any)).toEqual({pais_codigo:'PT', cidade:'Lisboa'})
+    expect(() => sqlite.prepare(`
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, abrangencia,
+        destino_uf, destino_cidade_local, regional_gestao_id)
+      VALUES ('invalid', 'Sem regional', 'PRESENCIAL', '2030-02-03T10:00:00Z',
+        '2030-02-03T11:00:00Z', 'NACIONAL', 'MG', 'Belo Horizonte', 'reg-1')
+    `).run()).toThrow()
 
     const evento = sqlite.prepare(`
       SELECT abrangencia, regional_gestao_id, regional_id,
