@@ -40,6 +40,18 @@ describe('Locais API (S04)', () => {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: 'Tentativa institucional' }),
     }))
     expect(edicaoInstitucional.status).toBe(404)
+    expect(() => sqlite.prepare(`
+      INSERT INTO eventos(id,titulo,modalidade,inicio_em,fim_em,local_id,regional_id,pessoal,criador_membro_id)
+      VALUES('evento-institucional-privado','Teste','PRESENCIAL','2030-10-10T10:00:00Z','2030-10-10T11:00:00Z', ?, ?, 0, ?)
+    `).run(criado.id, 'locais-auth-regional', 'locais-auth-membro')).toThrow()
+    expect(() => sqlite.prepare(`
+      INSERT INTO eventos(id,titulo,modalidade,inicio_em,fim_em,local_id,casa_id,pessoal,criador_membro_id)
+      VALUES('evento-pessoal-terceiro','Teste','PRESENCIAL','2030-10-10T10:00:00Z','2030-10-10T11:00:00Z', ?, ?, 1, ?)
+    `).run(criado.id, 'locais-outra-conta-casa', 'locais-outra-conta-membro')).toThrow()
+    sqlite.prepare(`
+      INSERT INTO eventos(id,titulo,modalidade,inicio_em,fim_em,local_id,casa_id,pessoal,criador_membro_id)
+      VALUES('evento-pessoal-dono','Teste','PRESENCIAL','2030-10-10T10:00:00Z','2030-10-10T11:00:00Z', ?, ?, 1, ?)
+    `).run(criado.id, 'locais-auth-casa', 'locais-auth-membro')
   })
 
   it('1. criar local válido', async () => {
