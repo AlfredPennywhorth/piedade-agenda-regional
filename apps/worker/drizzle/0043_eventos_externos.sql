@@ -80,3 +80,21 @@ BEGIN SELECT RAISE(ABORT,'EVENTO_PESSOAL_INVALIDO'); END;
 CREATE TRIGGER trg_evento_pessoal_update BEFORE UPDATE ON eventos
 WHEN NEW.pessoal=1 AND (NEW.criador_membro_id IS NULL OR NEW.serie_recorrencia_id IS NOT NULL OR (NEW.abrangencia='TERRITORIAL' AND NEW.casa_id IS NULL))
 BEGIN SELECT RAISE(ABORT,'EVENTO_PESSOAL_INVALIDO'); END;
+
+-- Participação individual: eventos externos jamais derivam participantes de funções.
+CREATE TABLE eventos_participantes_externos (
+ evento_id text NOT NULL REFERENCES eventos(id),
+ membro_id text NOT NULL REFERENCES membros(id),
+ status text NOT NULL CHECK(status IN ('CONVIDADO','ATRIBUIDO','CONFIRMADO','RECUSADO')),
+ criado_por_membro_id text NOT NULL REFERENCES membros(id),
+ created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+ PRIMARY KEY(evento_id,membro_id)
+);
+CREATE INDEX idx_eventos_participantes_externos_membro ON eventos_participantes_externos(membro_id,status);
+CREATE TRIGGER trg_externo_participantes_validar_insert BEFORE INSERT ON eventos_participantes_externos
+WHEN NOT EXISTS(SELECT 1 FROM eventos WHERE id=NEW.evento_id AND abrangencia IN ('NACIONAL','INTERNACIONAL'))
+BEGIN SELECT RAISE(ABORT,'PARTICIPANTE_REQUER_EVENTO_EXTERNO'); END;
+CREATE TRIGGER trg_externo_participantes_validar_update BEFORE UPDATE ON eventos_participantes_externos
+WHEN NOT EXISTS(SELECT 1 FROM eventos WHERE id=NEW.evento_id AND abrangencia IN ('NACIONAL','INTERNACIONAL'))
+BEGIN SELECT RAISE(ABORT,'PARTICIPANTE_REQUER_EVENTO_EXTERNO'); END;
