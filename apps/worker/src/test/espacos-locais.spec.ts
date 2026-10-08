@@ -26,6 +26,30 @@ describe('Espaços de Local', () => {
     `)
   })
 
+  it('permite espaço privado apenas no local do próprio usuário', async () => {
+    const outro = await criarSessaoAutenticadaTeste(sqlite, 'espacos-outro')
+    const local = await app.request('/api/v1/locais/particulares', mesclarAutorizacao(token, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nome: 'Local privado', endereco: 'Rua Privada', numero: '7', cidade: 'São Paulo', uf: 'SP' }),
+    }))
+    expect(local.status).toBe(201)
+    const { id: localId } = await local.json() as any
+    const outroPost = await app.request('/api/v1/espacos-locais/particulares', mesclarAutorizacao(outro.token, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ localId, nome: 'Tentativa indevida' }),
+    }))
+    expect(outroPost.status).toBe(404)
+    const meuPost = await app.request('/api/v1/espacos-locais/particulares', mesclarAutorizacao(token, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ localId, nome: 'Sala de visita' }),
+    }))
+    expect(meuPost.status).toBe(201)
+    const espaco = await meuPost.json() as any
+    expect(espaco.proprietarioMembroId).toBe('espacos-local-membro')
+    const listaOutro = await app.request('/api/v1/espacos-locais', mesclarAutorizacao(outro.token))
+    expect((await listaOutro.json() as any[]).some(e => e.id === espaco.id)).toBe(false)
+  })
+
   it('cria, lista e edita um espaço vinculado ao Local', async () => {
     const create = await app.request('/api/v1/espacos-locais', mesclarAutorizacao(token, {
       method: 'POST',

@@ -19,6 +19,7 @@ interface ParticipanteExterno {
 interface Local {
   id: string
   nome: string
+  proprietarioMembroId?: string | null
 }
 
 interface EspacoLocal {
@@ -947,7 +948,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     setSalvandoLocalRapido(true)
     setLocalRapidoErro(null)
     try {
-      const criado = await postWithAuth<Local>('/locais', parsed.data)
+      const criado = await postWithAuth<Local>(formData.pessoal ? '/locais/particulares' : '/locais', parsed.data)
       setLocais(atuais => [...atuais.filter(item => item.id !== criado.id), criado]
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
       setFormData(atual => ({ ...atual, localId: criado.id, espacoId: '' }))
@@ -978,7 +979,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     setSalvandoEspacoRapido(true)
     setEspacoRapidoErro(null)
     try {
-      const criado = await postWithAuth<EspacoLocal>('/espacos-locais', parsed.data)
+      const criado = await postWithAuth<EspacoLocal>(formData.pessoal ? '/espacos-locais/particulares' : '/espacos-locais', parsed.data)
       setEspacos(atuais => [...atuais.filter(item => item.id !== criado.id), criado]
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
       setFormData(atual => ({ ...atual, espacoId: criado.id }))
@@ -1542,7 +1543,16 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                         <div className="mt-4">
                           <label htmlFor="publicoEvento" className="block text-sm font-medium text-slate-700 mb-1">Público do evento</label>
                           <select id="publicoEvento" value={formData.pessoal ? 'PROPRIO' : 'INSTITUCIONAL'} disabled={!!eventoEditandoId}
-                            onChange={e => setFormData({ ...formData, pessoal: e.target.value === 'PROPRIO' })}
+                            onChange={e => {
+                              const pessoal = e.target.value === 'PROPRIO'
+                              const localPrivado = locais.some(local => local.id === formData.localId && !!local.proprietarioMembroId)
+                              setFormData(prev => ({
+                                ...prev,
+                                pessoal,
+                                localId: !pessoal && localPrivado ? '' : prev.localId,
+                                espacoId: !pessoal && localPrivado ? '' : prev.espacoId,
+                              }))
+                            }}
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm">
                             <option value="INSTITUCIONAL">{tipoEscopo === 'nacional' || tipoEscopo === 'internacional' ? 'Institucional — convites nominais' : 'Institucional — com convocação'}</option>
                             <option value="PROPRIO">Próprio — somente para mim</option>
@@ -1594,7 +1604,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         >
                           <option value="">Selecione...</option>
-                          {[...locais].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(l => (
+                          {[...locais].filter(l => formData.pessoal || !l.proprietarioMembroId).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(l => (
                             <option key={l.id} value={l.id}>{l.nome}</option>
                           ))}
                         </select>

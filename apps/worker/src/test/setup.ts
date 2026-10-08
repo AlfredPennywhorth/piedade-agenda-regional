@@ -251,6 +251,7 @@ export function setupDb(sqlite: any) {
     CREATE TABLE IF NOT EXISTS locais (
       id text PRIMARY KEY NOT NULL,
       nome text NOT NULL,
+      proprietario_membro_id text REFERENCES membros(id),
       endereco text NOT NULL,
       numero text NOT NULL,
       complemento text,
@@ -271,6 +272,7 @@ export function setupDb(sqlite: any) {
     CREATE TABLE IF NOT EXISTS espacos_local (
       id text PRIMARY KEY NOT NULL,
       local_id text NOT NULL,
+      proprietario_membro_id text REFERENCES membros(id),
       nome text NOT NULL,
       descricao text,
       capacidade integer,
@@ -279,6 +281,8 @@ export function setupDb(sqlite: any) {
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       FOREIGN KEY (local_id) REFERENCES locais(id)
     );
+    CREATE INDEX IF NOT EXISTS idx_locais_proprietario ON locais(proprietario_membro_id, ativo);
+    CREATE INDEX IF NOT EXISTS idx_espacos_local_proprietario ON espacos_local(proprietario_membro_id, ativo);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_espacos_local_nome_ativo ON espacos_local(local_id, nome) WHERE ativo = 1;
 
     CREATE TABLE IF NOT EXISTS series_recorrencia (
@@ -942,6 +946,29 @@ export function setupDb(sqlite: any) {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_ciencia_responsabilidade_unica
       ON ciencias_responsabilidade
       (conta_acesso_id, acesso_conta_id, tipo, versao_texto);
+
+    CREATE TRIGGER IF NOT EXISTS trg_espaco_particular_proprietario_insert
+      BEFORE INSERT ON espacos_local
+      WHEN (SELECT proprietario_membro_id FROM locais WHERE id=NEW.local_id) IS NOT NEW.proprietario_membro_id
+      BEGIN SELECT RAISE(ABORT,'ESPACO_PRIVACIDADE_INVALIDA'); END;
+    CREATE TRIGGER IF NOT EXISTS trg_espaco_particular_proprietario_update
+      BEFORE UPDATE ON espacos_local
+      WHEN (SELECT proprietario_membro_id FROM locais WHERE id=NEW.local_id) IS NOT NEW.proprietario_membro_id
+      BEGIN SELECT RAISE(ABORT,'ESPACO_PRIVACIDADE_INVALIDA'); END;
+    CREATE TRIGGER IF NOT EXISTS trg_evento_local_particular_insert
+      BEFORE INSERT ON eventos
+      WHEN NEW.local_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM locais l WHERE l.id=NEW.local_id
+          AND l.proprietario_membro_id IS NOT NULL
+          AND (NEW.pessoal <> 1 OR NEW.criador_membro_id IS NOT l.proprietario_membro_id))
+      BEGIN SELECT RAISE(ABORT,'LOCAL_PARTICULAR_SEM_AUTORIZACAO'); END;
+    CREATE TRIGGER IF NOT EXISTS trg_evento_local_particular_update
+      BEFORE UPDATE ON eventos
+      WHEN NEW.local_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM locais l WHERE l.id=NEW.local_id
+          AND l.proprietario_membro_id IS NOT NULL
+          AND (NEW.pessoal <> 1 OR NEW.criador_membro_id IS NOT l.proprietario_membro_id))
+      BEGIN SELECT RAISE(ABORT,'LOCAL_PARTICULAR_SEM_AUTORIZACAO'); END;
 
     CREATE TABLE IF NOT EXISTS bootstrap_master (
       id text PRIMARY KEY NOT NULL CHECK (id = 'PRIMEIRO_MASTER'),

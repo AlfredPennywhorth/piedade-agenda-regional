@@ -487,6 +487,7 @@ export const rateLimitsAutenticacao = sqliteTable('rate_limits_autenticacao', {
 export const locais = sqliteTable('locais', {
   id: text('id').primaryKey(), // UUID
   nome: text('nome').notNull(),
+  proprietarioMembroId: text('proprietario_membro_id').references(() => membros.id),
   endereco: text('endereco').notNull(),
   numero: text('numero').notNull(),
   complemento: text('complemento'),
@@ -508,6 +509,7 @@ export const espacosLocal = sqliteTable(
   {
     id: text('id').primaryKey(),
     localId: text('local_id').notNull().references(() => locais.id),
+    proprietarioMembroId: text('proprietario_membro_id').references(() => membros.id),
     nome: text('nome').notNull(),
     descricao: text('descricao'),
     capacidade: integer('capacidade'),
