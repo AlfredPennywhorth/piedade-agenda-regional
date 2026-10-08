@@ -65,6 +65,21 @@ describe('migration 0043 — eventos externos', () => {
         ativo integer DEFAULT 1 NOT NULL
       );
 
+      CREATE TRIGGER trg_convocacao_nao_ativar_em_evento_inativo_insert
+      BEFORE INSERT ON convocacoes WHEN EXISTS (SELECT 1 FROM eventos WHERE id = NEW.evento_id AND ativo = 0)
+      BEGIN SELECT RAISE(ABORT, 'CONVOCACAO_EM_EVENTO_INATIVO'); END;
+      CREATE TRIGGER trg_convocacao_nao_ativar_em_evento_inativo_update
+      BEFORE UPDATE OF evento_id, ativo, status ON convocacoes
+      WHEN EXISTS (SELECT 1 FROM eventos WHERE id = NEW.evento_id AND ativo = 0)
+      BEGIN SELECT RAISE(ABORT, 'CONVOCACAO_EM_EVENTO_INATIVO'); END;
+      CREATE TRIGGER trg_convocacao_evento_pessoal
+      BEFORE INSERT ON convocacoes WHEN EXISTS (SELECT 1 FROM eventos WHERE id = NEW.evento_id AND pessoal = 1)
+      BEGIN SELECT RAISE(ABORT, 'EVENTO_PESSOAL_SEM_CONVOCACAO'); END;
+      CREATE TRIGGER trg_convocacao_evento_pessoal_update
+      BEFORE UPDATE OF evento_id ON convocacoes
+      WHEN EXISTS (SELECT 1 FROM eventos WHERE id = NEW.evento_id AND pessoal = 1)
+      BEGIN SELECT RAISE(ABORT, 'EVENTO_PESSOAL_SEM_CONVOCACAO'); END;
+
       INSERT INTO regionais (id, nome) VALUES ('reg-1', 'Regional SP');
       INSERT INTO eventos (
         id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo
