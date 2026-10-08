@@ -646,6 +646,7 @@ export const eventos = sqliteTable(
       (
         ${table.abrangencia} = 'NACIONAL'
         AND ${table.regionalGestaoId} IS NOT NULL
+        AND ${table.regionalId} IS NOT NULL
         AND ${table.regionalId} = ${table.regionalGestaoId}
         AND ${table.administracaoId} IS NULL
         AND ${table.setorId} IS NULL AND ${table.casaId} IS NULL
@@ -659,6 +660,7 @@ export const eventos = sqliteTable(
       (
         ${table.abrangencia} = 'INTERNACIONAL'
         AND ${table.regionalGestaoId} IS NOT NULL
+        AND ${table.regionalId} IS NOT NULL
         AND ${table.regionalId} = ${table.regionalGestaoId}
         AND ${table.administracaoId} IS NULL
         AND ${table.setorId} IS NULL AND ${table.casaId} IS NULL
