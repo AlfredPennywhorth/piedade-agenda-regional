@@ -57,7 +57,7 @@ describe('EventosView', () => {
     vi.mocked(apiClient.postWithAuth).mockReset()
     vi.mocked(apiClient.patchWithAuth).mockReset()
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
-      if (url === '/auth/me') return { id: 'usuario-logado', nome: 'Gestor Logado' }
+      if (url === '/auth/me') return { id: 'a7777777-7777-4777-8777-777777777777', nome: 'Gestor Logado' }
       if (url === '/eventos') return mockEventos
       if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
       if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
@@ -1262,7 +1262,7 @@ describe('EventosView', () => {
     const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
     expect(onEventoCriado).not.toHaveBeenCalled()
     expect(apiClient.postWithAuth).toHaveBeenCalledWith('/eventos', expect.objectContaining({
-      abrangencia: 'NACIONAL', organizadorMembroId: 'usuario-logado', localId: null,
+      abrangencia: 'NACIONAL', organizadorMembroId: 'a7777777-7777-4777-8777-777777777777', localId: null,
     }))
     fireEvent.change(within(detalhe).getByLabelText('Diácono ou Membro'), { target: { value: 'membro-convidado' } })
     fireEvent.click(within(detalhe).getByRole('button', { name: 'Incluir participante' }))
