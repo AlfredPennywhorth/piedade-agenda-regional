@@ -628,7 +628,12 @@ eventosRouter.post('/:id/participantes-externos', async c => {
   const membro = await db.select({id:membros.id,ativo:membros.ativo}).from(membros).where(eq(membros.id,membroId)).get()
   if (!membro || !membro.ativo) return c.json({error:'Membro não encontrado ou inativo'},404)
   try {
-    await db.insert(eventosParticipantesExternos).values({eventoId:id,membroId,status:tipo,criadoPorMembroId:ator})
+    await executarOperacaoComAudit(db, qdb => [qdb.insert(eventosParticipantesExternos).values({eventoId:id,membroId,status:tipo,criadoPorMembroId:ator})], {
+      acao: tipo === 'CONVIDADO' ? 'EVENTO_EXTERNO_CONVITE' : 'EVENTO_EXTERNO_ATRIBUICAO',
+      atorMembroId: ator, recursoTipo: 'EVENTO', recursoId: id,
+      escopoTipo: 'REGIONAL', escopoId: evento.regionalGestaoId ?? evento.regionalId,
+      contexto: { membroId, tipo },
+    })
     return c.json({eventoId:id,membroId,status:tipo},201)
   } catch(err:any) {
     if (String(err?.message).includes('UNIQUE constraint')) return c.json({error:'Membro já incluído neste evento'},409)
@@ -648,7 +653,14 @@ eventosRouter.patch('/:id/participantes-externos/resposta', async c => {
   const convite = await db.select().from(eventosParticipantesExternos)
     .where(and(eq(eventosParticipantesExternos.eventoId,id),eq(eventosParticipantesExternos.membroId,membroId))).get()
   if (!convite || convite.status !== 'CONVIDADO') return c.json({error:'Convite pendente não encontrado'},404)
-  await db.update(eventosParticipantesExternos).set({status:resposta,updatedAt:new Date().toISOString()})
-    .where(and(eq(eventosParticipantesExternos.eventoId,id),eq(eventosParticipantesExternos.membroId,membroId)))
+  const evento = await db.select().from(eventos).where(eq(eventos.id,id)).get()
+  if (!evento || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia)) return c.json({error:'Evento externo não encontrado'},404)
+  await executarOperacaoComAudit(db, qdb => [qdb.update(eventosParticipantesExternos).set({status:resposta,updatedAt:new Date().toISOString()})
+    .where(and(eq(eventosParticipantesExternos.eventoId,id),eq(eventosParticipantesExternos.membroId,membroId),eq(eventosParticipantesExternos.status,'CONVIDADO')))], {
+      acao: 'EVENTO_EXTERNO_RESPOSTA', atorMembroId: membroId,
+      recursoTipo: 'EVENTO', recursoId: id,
+      escopoTipo: 'REGIONAL', escopoId: evento.regionalGestaoId ?? evento.regionalId,
+      contexto: { membroId, resposta },
+  })
   return c.json({eventoId:id,membroId,status:resposta})
 })
