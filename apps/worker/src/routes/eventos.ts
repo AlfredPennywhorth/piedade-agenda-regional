@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and, or, sql, inArray } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal, membros, casas, setores, administracoes, gruposTrabalho } from '../db/schema'
+import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal, membros, casas, setores, administracoes, gruposTrabalho, eventosParticipantesExternos } from '../db/schema'
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, executarOperacaoComAudits, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
@@ -599,3 +599,54 @@ eventosRouter.patch('/:id', async (c) => {
   }
 })
 
+
+// Participação externa é nominal, nunca uma função institucional.
+eventosRouter.get('/:id/participantes-externos', async c => {
+  const db = c.get('db')
+  const id = c.req.param('id')
+  const membroId = c.get('membroId')
+  const evento = await db.select().from(eventos).where(eq(eventos.id,id)).get()
+  if (!evento || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia)) return c.json({error:'Evento externo não encontrado'},404)
+  if (!membroId || !(await podeLerEvento(db,c.get('contextoPermissoes'),id))) return c.json({error:'Acesso não autorizado'},403)
+  const itens = await db.select().from(eventosParticipantesExternos).where(eq(eventosParticipantesExternos.eventoId,id)).all()
+  return c.json(itens)
+})
+
+eventosRouter.post('/:id/participantes-externos', async c => {
+  const db = c.get('db')
+  const id = c.req.param('id')
+  const ator = c.get('membroId')
+  const evento = await db.select().from(eventos).where(eq(eventos.id,id)).get()
+  if (!evento || !evento.ativo || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia)) return c.json({error:'Evento externo não encontrado'},404)
+  if (!ator || !(await podeGerenciarEvento(db,ator,evento))) return c.json({error:'Acesso não autorizado'},403)
+  const payload: unknown = await c.req.json().catch(() => null)
+  if (!payload || typeof payload !== 'object') return c.json({error:'Dados inválidos'},400)
+  const { membroId, tipo } = payload as Record<string,unknown>
+  if (typeof membroId !== 'string' || !membroId || (tipo !== 'CONVIDADO' && tipo !== 'ATRIBUIDO')) return c.json({error:'Membro e tipo de participação inválidos'},400)
+  const membro = await db.select({id:membros.id,ativo:membros.ativo}).from(membros).where(eq(membros.id,membroId)).get()
+  if (!membro || !membro.ativo) return c.json({error:'Membro não encontrado ou inativo'},404)
+  try {
+    await db.insert(eventosParticipantesExternos).values({eventoId:id,membroId,status:tipo,criadoPorMembroId:ator})
+    return c.json({eventoId:id,membroId,status:tipo},201)
+  } catch(err:any) {
+    if (String(err?.message).includes('UNIQUE constraint')) return c.json({error:'Membro já incluído neste evento'},409)
+    return c.json({error:'Falha ao incluir participante'},400)
+  }
+})
+
+eventosRouter.patch('/:id/participantes-externos/resposta', async c => {
+  const db = c.get('db')
+  const id = c.req.param('id')
+  const membroId = c.get('membroId')
+  if (!membroId) return c.json({error:'Sem identificação do membro'},403)
+  const payload: unknown = await c.req.json().catch(() => null)
+  if (!payload || typeof payload !== 'object') return c.json({error:'Dados inválidos'},400)
+  const { resposta } = payload as Record<string,unknown>
+  if (resposta !== 'CONFIRMADO' && resposta !== 'RECUSADO') return c.json({error:'Resposta inválida'},400)
+  const convite = await db.select().from(eventosParticipantesExternos)
+    .where(and(eq(eventosParticipantesExternos.eventoId,id),eq(eventosParticipantesExternos.membroId,membroId))).get()
+  if (!convite || convite.status !== 'CONVIDADO') return c.json({error:'Convite pendente não encontrado'},404)
+  await db.update(eventosParticipantesExternos).set({status:resposta,updatedAt:new Date().toISOString()})
+    .where(and(eq(eventosParticipantesExternos.eventoId,id),eq(eventosParticipantesExternos.membroId,membroId)))
+  return c.json({eventoId:id,membroId,status:resposta})
+})
