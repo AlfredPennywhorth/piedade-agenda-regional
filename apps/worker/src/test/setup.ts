@@ -392,7 +392,7 @@ export function setupDb(sqlite: any) {
         (
           abrangencia = 'NACIONAL'
           AND regional_gestao_id IS NOT NULL
-          AND regional_id IS NULL
+          AND regional_id = regional_gestao_id
           AND administracao_id IS NULL AND setor_id IS NULL AND casa_id IS NULL AND grupo_trabalho_id IS NULL
           AND destino_uf IS NOT NULL AND destino_pais_codigo IS NULL AND destino_cidade_local IS NOT NULL
         )
@@ -400,7 +400,7 @@ export function setupDb(sqlite: any) {
         (
           abrangencia = 'INTERNACIONAL'
           AND regional_gestao_id IS NOT NULL
-          AND regional_id IS NULL
+          AND regional_id = regional_gestao_id
           AND administracao_id IS NULL AND setor_id IS NULL AND casa_id IS NULL AND grupo_trabalho_id IS NULL
           AND destino_uf IS NULL AND destino_pais_codigo IS NOT NULL AND destino_cidade_local IS NOT NULL
         )
