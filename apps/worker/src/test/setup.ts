@@ -426,7 +426,7 @@ export function setupDb(sqlite: any) {
     CREATE TABLE IF NOT EXISTS eventos_participantes_externos (
       evento_id text NOT NULL REFERENCES eventos(id),
       membro_id text NOT NULL REFERENCES membros(id),
-      status text NOT NULL,
+      status text NOT NULL CHECK(status IN ('CONVIDADO', 'ATRIBUIDO', 'CONFIRMADO', 'RECUSADO')),
       criado_por_membro_id text NOT NULL REFERENCES membros(id),
       created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
