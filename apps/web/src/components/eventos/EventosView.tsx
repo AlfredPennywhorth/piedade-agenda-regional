@@ -1306,108 +1306,6 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                       </div>
                     </div>
 
-                    <div>
-                      <label htmlFor="modalidade" className="block text-sm font-medium text-slate-700 mb-1">Modalidade *</label>
-                      <select
-                        id="modalidade"
-                        value={formData.modalidade}
-                        onChange={e => handleModalidadeChange(e.target.value as 'PRESENCIAL'|'ONLINE'|'HIBRIDO')}
-                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                      >
-                        <option value="PRESENCIAL">Presencial</option>
-                        <option value="ONLINE">Online</option>
-                        <option value="HIBRIDO">Híbrido</option>
-                      </select>
-                      {errosForm.modalidade && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.modalidade}</p>}
-                    </div>
-
-                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.abrangencia !== 'NACIONAL' && formData.abrangencia !== 'INTERNACIONAL' && (
-                      <div>
-                        <div className="mb-1 flex items-center justify-between gap-3">
-                          <label htmlFor="localId" className="block text-sm font-medium text-slate-700">Local *</label>
-                          <button
-                              type="button"
-                              onClick={event => {
-                                localRapidoTriggerRef.current = event.currentTarget
-                                setLocalRapidoErro(null)
-                                setCepRapidoMensagem(null)
-                                setCepRapidoErro(false)
-                                setLocalRapidoOpen(true)
-                              }}
-                              className="text-xs font-semibold text-brand-700 hover:text-brand-900"
-                            >
-                              + Criar local sem sair
-                            </button>
-                        </div>
-                        <select
-                          id="localId"
-                          value={formData.localId || ''}
-                          onChange={e => setFormData({ ...formData, localId: e.target.value, espacoId: '' })}
-                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                        >
-                          <option value="">Selecione...</option>
-                          {[...locais].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(l => (
-                            <option key={l.id} value={l.id}>{l.nome}</option>
-                          ))}
-                        </select>
-                        {errosForm.localId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.localId}</p>}
-                      </div>
-                    )}
-
-                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.abrangencia !== 'NACIONAL' && formData.abrangencia !== 'INTERNACIONAL' && formData.localId && (
-                      <div>
-                        <div className="mb-1 flex items-center justify-between gap-3">
-                          <label htmlFor="espacoId" className="block text-sm font-medium text-slate-700">Espaço</label>
-                          <button
-                              type="button"
-                              onClick={event => {
-                                espacoRapidoTriggerRef.current = event.currentTarget
-                                setEspacoRapidoErro(null)
-                                setEspacoRapidoNome('')
-                                setEspacoRapidoOpen(true)
-                              }}
-                              className="text-xs font-semibold text-brand-700 hover:text-brand-900"
-                            >
-                              + Criar espaço sem sair
-                            </button>
-                        </div>
-                        <select
-                          id="espacoId"
-                          value={formData.espacoId || ''}
-                          onChange={e => setFormData({ ...formData, espacoId: e.target.value })}
-                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                        >
-                          <option value="">Local inteiro / não especificado</option>
-                          {espacos
-                            .filter(espaco =>
-                              espaco.localId === formData.localId &&
-                              (espaco.ativo || (Boolean(eventoEditandoId) && espaco.id === formData.espacoId))
-                            )
-                            .map(espaco => (
-                              <option key={espaco.id} value={espaco.id}>
-                                {espaco.nome}{espaco.ativo ? '' : ' (inativo)'}
-                              </option>
-                            ))}
-                        </select>
-                        {errosForm.espacoId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.espacoId}</p>}
-                      </div>
-                    )}
-
-                    {(formData.modalidade === 'ONLINE' || formData.modalidade === 'HIBRIDO') && (
-                      <div>
-                        <label htmlFor="urlOnline" className="block text-sm font-medium text-slate-700 mb-1">URL Online *</label>
-                        <input
-                          id="urlOnline"
-                          type="url"
-                          value={formData.urlOnline || ''}
-                          onChange={e => setFormData({ ...formData, urlOnline: e.target.value })}
-                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                          placeholder="https://..."
-                        />
-                        {errosForm.urlOnline && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.urlOnline}</p>}
-                      </div>
-                    )}
-
                     <div className="border-t pt-4">
                       <h4 className="font-medium text-sm text-slate-900 mb-3">Escopo / Destino do Evento</h4>
                       
@@ -1592,6 +1490,108 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                       {errosForm.pessoal && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.pessoal}</p>}
                       {errosForm.escopo && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.escopo}</p>}
                     </div>
+
+                    <div>
+                      <label htmlFor="modalidade" className="block text-sm font-medium text-slate-700 mb-1">Modalidade *</label>
+                      <select
+                        id="modalidade"
+                        value={formData.modalidade}
+                        onChange={e => handleModalidadeChange(e.target.value as 'PRESENCIAL'|'ONLINE'|'HIBRIDO')}
+                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                      >
+                        <option value="PRESENCIAL">Presencial</option>
+                        <option value="ONLINE">Online</option>
+                        <option value="HIBRIDO">Híbrido</option>
+                      </select>
+                      {errosForm.modalidade && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.modalidade}</p>}
+                    </div>
+
+                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.abrangencia !== 'NACIONAL' && formData.abrangencia !== 'INTERNACIONAL' && (
+                      <div>
+                        <div className="mb-1 flex items-center justify-between gap-3">
+                          <label htmlFor="localId" className="block text-sm font-medium text-slate-700">Local *</label>
+                          <button
+                              type="button"
+                              onClick={event => {
+                                localRapidoTriggerRef.current = event.currentTarget
+                                setLocalRapidoErro(null)
+                                setCepRapidoMensagem(null)
+                                setCepRapidoErro(false)
+                                setLocalRapidoOpen(true)
+                              }}
+                              className="text-xs font-semibold text-brand-700 hover:text-brand-900"
+                            >
+                              + Criar local sem sair
+                            </button>
+                        </div>
+                        <select
+                          id="localId"
+                          value={formData.localId || ''}
+                          onChange={e => setFormData({ ...formData, localId: e.target.value, espacoId: '' })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                        >
+                          <option value="">Selecione...</option>
+                          {[...locais].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(l => (
+                            <option key={l.id} value={l.id}>{l.nome}</option>
+                          ))}
+                        </select>
+                        {errosForm.localId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.localId}</p>}
+                      </div>
+                    )}
+
+                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.abrangencia !== 'NACIONAL' && formData.abrangencia !== 'INTERNACIONAL' && formData.localId && (
+                      <div>
+                        <div className="mb-1 flex items-center justify-between gap-3">
+                          <label htmlFor="espacoId" className="block text-sm font-medium text-slate-700">Espaço</label>
+                          <button
+                              type="button"
+                              onClick={event => {
+                                espacoRapidoTriggerRef.current = event.currentTarget
+                                setEspacoRapidoErro(null)
+                                setEspacoRapidoNome('')
+                                setEspacoRapidoOpen(true)
+                              }}
+                              className="text-xs font-semibold text-brand-700 hover:text-brand-900"
+                            >
+                              + Criar espaço sem sair
+                            </button>
+                        </div>
+                        <select
+                          id="espacoId"
+                          value={formData.espacoId || ''}
+                          onChange={e => setFormData({ ...formData, espacoId: e.target.value })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                        >
+                          <option value="">Local inteiro / não especificado</option>
+                          {espacos
+                            .filter(espaco =>
+                              espaco.localId === formData.localId &&
+                              (espaco.ativo || (Boolean(eventoEditandoId) && espaco.id === formData.espacoId))
+                            )
+                            .map(espaco => (
+                              <option key={espaco.id} value={espaco.id}>
+                                {espaco.nome}{espaco.ativo ? '' : ' (inativo)'}
+                              </option>
+                            ))}
+                        </select>
+                        {errosForm.espacoId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.espacoId}</p>}
+                      </div>
+                    )}
+
+                    {(formData.modalidade === 'ONLINE' || formData.modalidade === 'HIBRIDO') && (
+                      <div>
+                        <label htmlFor="urlOnline" className="block text-sm font-medium text-slate-700 mb-1">URL Online *</label>
+                        <input
+                          id="urlOnline"
+                          type="url"
+                          value={formData.urlOnline || ''}
+                          onChange={e => setFormData({ ...formData, urlOnline: e.target.value })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                          placeholder="https://..."
+                        />
+                        {errosForm.urlOnline && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.urlOnline}</p>}
+                      </div>
+                    )}
 
                     {!formData.pessoal && <div className="border-t pt-4">
                       <label htmlFor="organizadorMembroId" className="block text-sm font-medium text-slate-700 mb-1">Organizador (Membro)</label>
