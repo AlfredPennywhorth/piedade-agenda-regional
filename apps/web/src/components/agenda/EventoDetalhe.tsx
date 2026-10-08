@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AgendaItem } from './types'
 import { PAISES_ISO } from '@piedade/shared'
-import { PAISES_ISO } from '@piedade/shared'
 import * as apiClient from '../../api/apiClient'
 import { QrCodeModal } from './QrCodeModal'
 
