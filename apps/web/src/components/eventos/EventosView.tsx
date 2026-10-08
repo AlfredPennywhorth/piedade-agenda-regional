@@ -107,6 +107,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   const [locais, setLocais] = useState<Local[]>([])
   const [espacos, setEspacos] = useState<EspacoLocal[]>([])
   const [membros, setMembros] = useState<Membro[]>([])
+  const [identidade, setIdentidade] = useState<{ id: string; nome: string } | null>(null)
   const [regionais, setRegionais] = useState<Regional[]>([])
   const [administracoes, setAdministracoes] = useState<Administracao[]>([])
   const [setores, setSetores] = useState<Setor[]>([])
@@ -274,7 +275,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     try {
       const [
         eventosData, locaisData, espacosData, membrosData, regionaisData,
-        administracoesData, setoresData, casasData, gruposData
+        administracoesData, setoresData, casasData, gruposData, identidadeData
       ] = await Promise.all([
         fetchWithAuth<Evento[]>(montarUrlEventos()),
         fetchWithAuth<Local[]>('/locais'),
@@ -285,12 +286,14 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         fetchWithAuth<Setor[]>('/setores'),
         fetchWithAuth<Casa[]>('/casas'),
         fetchWithAuth<GrupoTrabalho[]>('/grupos-trabalho'),
+        fetchWithAuth<{ id: string; nome: string }>('/auth/me'),
       ])
       
       if (seq === pessoaConsultaSeq.current) setEventos(eventosData || [])
       setLocais(locaisData || [])
       setEspacos(espacosData || [])
       setMembros(membrosData || [])
+      setIdentidade(identidadeData)
       setRegionais(regionaisData || [])
       setAdministracoes(administracoesData || [])
       setSetores(setoresData || [])
@@ -467,7 +470,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       localId: '',
       espacoId: '',
       urlOnline: '',
-      organizadorMembroId: '',
+      organizadorMembroId: identidade?.id || '',
       regionalId: '',
       administracaoId: '',
       setorId: '',
@@ -678,7 +681,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       localId: formData.localId || null,
       espacoId: formData.espacoId || null,
       urlOnline: formData.urlOnline || null,
-      organizadorMembroId: formData.pessoal && !eventoEditandoId ? null : formData.organizadorMembroId || null,
+      organizadorMembroId: formData.pessoal && !eventoEditandoId ? null : (eventoEditandoId ? formData.organizadorMembroId : identidade?.id) || null,
       abrangencia: formData.abrangencia || 'TERRITORIAL',
       destinoUf: formData.destinoUf || null,
       destinoPaisCodigo: formData.destinoPaisCodigo || null,
@@ -1595,15 +1598,12 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
 
                     {!formData.pessoal && <div className="border-t pt-4">
                       <label htmlFor="organizadorMembroId" className="block text-sm font-medium text-slate-700 mb-1">Organizador (Membro)</label>
-                      <select
-                        id="organizadorMembroId"
-                        value={formData.organizadorMembroId || ''}
-                        onChange={e => setFormData({ ...formData, organizadorMembroId: e.target.value })}
-                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                      >
-                        <option value="">Selecione...</option>
-                        {membros.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
-                      </select>
+                      <p id="organizadorMembroId" className="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-lg text-sm">
+                        {eventoEditandoId
+                          ? (membros.find(m => m.id === formData.organizadorMembroId)?.nome || 'Organizador não informado')
+                          : (identidade?.nome || 'Identificando usuário...')}
+                      </p>
+                      {!eventoEditandoId && <p className="text-xs text-slate-500 mt-1">Vinculado automaticamente ao usuário logado.</p>}
                       {errosForm.organizadorMembroId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.organizadorMembroId}</p>}
                     </div>}
 
