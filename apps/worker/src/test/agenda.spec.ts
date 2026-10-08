@@ -734,13 +734,28 @@ describe('S07 - Minha Agenda', () => {
   it('EXT-05 Evento Próprio externo entra na agenda e conflita com compromisso local', async () => {
     sqlite.exec(`
       INSERT INTO eventos (
+        id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo
+      )
+      VALUES (
+        'ev-local-externo-teste', 'Compromisso local isolado', 'ONLINE',
+        '2026-02-10T10:00:00Z', '2026-02-10T11:00:00Z', 'reg-1', 1
+      );
+
+      INSERT INTO convocacoes (id, evento_id, status, ativo)
+      VALUES ('conv-local-externo-teste', 'ev-local-externo-teste', 'PUBLICADA', 1);
+
+      INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id)
+      VALUES ('dest-local-externo-teste', 'conv-local-externo-teste', '${membroId}');
+
+      INSERT INTO eventos (
         id, pessoal, criador_membro_id, titulo, modalidade, inicio_em, fim_em,
-        abrangencia, destino_uf, destino_cidade_local, regional_gestao_id, ativo
+        abrangencia, destino_uf, destino_cidade_local, regional_gestao_id,
+        regional_id, ativo
       )
       VALUES (
         'ev-externo-pessoal', 1, '${membroId}', 'Atendimento em Minas', 'PRESENCIAL',
-        '2026-01-01T10:15:00Z', '2026-01-01T10:45:00Z',
-        'NACIONAL', 'MG', 'Belo Horizonte — atendimento', 'reg-1', 1
+        '2026-02-10T10:15:00Z', '2026-02-10T10:45:00Z',
+        'NACIONAL', 'MG', 'Belo Horizonte — atendimento', 'reg-1', 'reg-1', 1
       );
     `)
 
@@ -751,13 +766,13 @@ describe('S07 - Minha Agenda', () => {
 
     const agenda = await res.json() as any[]
     const externo = agenda.find(item => item.evento.id === 'ev-externo-pessoal')
-    const local = agenda.find(item => item.evento.id === 'ev-1')
+    const local = agenda.find(item => item.evento.id === 'ev-local-externo-teste')
 
     expect(externo).toBeDefined()
     expect(externo.evento.abrangencia).toBe('NACIONAL')
     expect(externo.conflito.eventos).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ eventoId: 'ev-1', tipo: 'SOBREPOSICAO' }),
+        expect.objectContaining({ eventoId: 'ev-local-externo-teste', tipo: 'SOBREPOSICAO' }),
       ])
     )
     expect(local.conflito.eventos).toEqual(
