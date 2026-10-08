@@ -287,7 +287,7 @@ eventosRouter.post('/', async (c) => {
     if (!autorizado) {
       return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
     }
-    if (externo && !parsed.pessoal && !regionalGestaoId) {
+    if (externo && !regionalGestaoId) {
       return c.json({
         error: 'Não foi possível determinar uma única Regional responsável pelo atendimento externo',
         code: 'REGIONAL_GESTAO_AMBIGUA'
