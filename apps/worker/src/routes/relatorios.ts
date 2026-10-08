@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and, or, gte, lt, lte, inArray } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, membros, casas, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo } from '../security/permissoes'
 import { condicaoEventosVisiveis } from '../security/eventos'
@@ -636,6 +636,14 @@ relatoriosRouter.get('/agregado', async (c) => {
       const consolidados = consolidarDestinatariosPorMembro(dests, rsvps)
       evConvocados = consolidados.length
       evConfirmados = consolidados.filter(item => item.rsvp?.resposta === 'PARTICIPAREI').length
+    }
+
+    if (ev.abrangencia === 'NACIONAL' || ev.abrangencia === 'INTERNACIONAL') {
+      const participantes = await db.select({ status: eventosParticipantesExternos.status })
+        .from(eventosParticipantesExternos)
+        .where(eq(eventosParticipantesExternos.eventoId, ev.id)).all()
+      evConvocados = participantes.length
+      evConfirmados = participantes.filter((p: { status: string }) => p.status === 'CONFIRMADO').length
     }
 
     const evCheckins = await db.select().from(checkins).where(and(eq(checkins.eventoId, ev.id), eq(checkins.status, 'ATIVO'))).all()
