@@ -1162,3 +1162,27 @@ export const auditoriaLogs = sqliteTable(
     idxCriadoEm: index('idx_auditoria_criado_em').on(table.criadoEm),
   })
 )
+
+// Destino externo gerido por uma Regional, independente da hierarquia geográfica interna.
+export const eventosDestinosExternos = sqliteTable('eventos_destinos_externos', {
+  eventoId: text('evento_id').primaryKey().references(() => eventos.id),
+  regionalId: text('regional_id').notNull().references(() => regionais.id),
+  abrangencia: text('abrangencia').notNull(),
+  uf: text('uf'),
+  municipio: text('municipio'),
+  paisCodigo: text('pais_codigo'),
+  cidade: text('cidade'),
+})
+
+// Convidados/atribuídos por pessoa. Nenhum identificador de função.
+export const eventosParticipantesExternos = sqliteTable('eventos_participantes_externos', {
+  eventoId: text('evento_id').notNull().references(() => eventos.id),
+  membroId: text('membro_id').notNull().references(() => membros.id),
+  status: text('status').notNull(),
+  criadoPorMembroId: text('criado_por_membro_id').notNull().references(() => membros.id),
+  createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+}, table => ({
+  pk: uniqueIndex('idx_eventos_participantes_externos_unico').on(table.eventoId,table.membroId),
+  idxMembro: index('idx_eventos_participantes_externos_membro').on(table.membroId,table.status),
+}))
