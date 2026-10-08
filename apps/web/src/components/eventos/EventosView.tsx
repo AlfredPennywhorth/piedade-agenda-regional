@@ -947,7 +947,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     setSalvandoLocalRapido(true)
     setLocalRapidoErro(null)
     try {
-      const criado = await postWithAuth<Local>('/locais', parsed.data)
+      const criado = await postWithAuth<Local>(formData.pessoal ? '/locais/particulares' : '/locais', parsed.data)
       setLocais(atuais => [...atuais.filter(item => item.id !== criado.id), criado]
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
       setFormData(atual => ({ ...atual, localId: criado.id, espacoId: '' }))
@@ -978,7 +978,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     setSalvandoEspacoRapido(true)
     setEspacoRapidoErro(null)
     try {
-      const criado = await postWithAuth<EspacoLocal>('/espacos-locais', parsed.data)
+      const criado = await postWithAuth<EspacoLocal>(formData.pessoal ? '/espacos-locais/particulares' : '/espacos-locais', parsed.data)
       setEspacos(atuais => [...atuais.filter(item => item.id !== criado.id), criado]
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
       setFormData(atual => ({ ...atual, espacoId: criado.id }))
