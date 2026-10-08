@@ -10,6 +10,12 @@ import type { Regional } from '../regionais/RegionaisView'
 import type { GrupoTrabalho } from '../grupos-trabalho/GruposTrabalhoView'
 import type { Membro } from '../membros/MembrosView'
 
+interface ParticipanteExterno {
+  eventoId: string
+  membroId: string
+  status: 'CONVIDADO' | 'ATRIBUIDO' | 'CONFIRMADO' | 'RECUSADO'
+}
+
 interface Local {
   id: string
   nome: string
@@ -137,6 +143,11 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
 
   // Modal Details
   const [eventoDetalhe, setEventoDetalhe] = useState<Evento | null>(null)
+  const [participantesExternos, setParticipantesExternos] = useState<ParticipanteExterno[]>([])
+  const [membroConviteId, setMembroConviteId] = useState('')
+  const [tipoConviteExterno, setTipoConviteExterno] = useState<'CONVIDADO' | 'ATRIBUIDO'>('CONVIDADO')
+  const [erroConviteExterno, setErroConviteExterno] = useState<string | null>(null)
+  const [salvandoConviteExterno, setSalvandoConviteExterno] = useState(false)
 
   const [formData, setFormData] = useState<EventoFormData>({
     pessoal: false,
@@ -499,6 +510,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     setErro(null)
     eventoDetalheIdRef.current = item.id
     setEventoDetalhe(item)
+    setParticipantesExternos([])
+    setMembroConviteId('')
+    setErroConviteExterno(null)
     let itemCompleto = item
 
     try {
@@ -509,6 +523,16 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
 
     if (consultaAtual !== eventoDetalheConsultaSeq.current) return
     setEventoDetalhe(itemCompleto)
+    if ((itemCompleto.abrangencia === 'NACIONAL' || itemCompleto.abrangencia === 'INTERNACIONAL') && !itemCompleto.pessoal && itemCompleto.podeGerenciar !== false) {
+      try {
+        const lista = await fetchWithAuth<ParticipanteExterno[]>(`/eventos/${itemCompleto.id}/participantes-externos`)
+        if (consultaAtual !== eventoDetalheConsultaSeq.current) return
+        setParticipantesExternos(lista)
+      } catch (err: any) {
+        if (consultaAtual !== eventoDetalheConsultaSeq.current) return
+        setErroConviteExterno(err.message || 'Não foi possível carregar os participantes.')
+      }
+    }
 
     if (!itemCompleto.espacoId || !itemCompleto.localId || espacos.some(espaco => espaco.id === itemCompleto.espacoId)) {
       return
@@ -523,6 +547,24 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       }
     } catch {
       // O detalhe continua disponível mesmo se o lookup histórico falhar.
+    }
+  }
+
+  const incluirParticipanteExterno = async () => {
+    if (!eventoDetalhe || !membroConviteId || salvandoConviteExterno) return
+    setSalvandoConviteExterno(true)
+    setErroConviteExterno(null)
+    try {
+      const novo = await postWithAuth<ParticipanteExterno>(
+        `/eventos/${eventoDetalhe.id}/participantes-externos`,
+        { membroId: membroConviteId, tipo: tipoConviteExterno },
+      )
+      setParticipantesExternos(atuais => [...atuais, novo])
+      setMembroConviteId('')
+    } catch (err: any) {
+      setErroConviteExterno(err.message || 'Não foi possível incluir o participante.')
+    } finally {
+      setSalvandoConviteExterno(false)
     }
   }
 
@@ -738,6 +780,11 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         fecharFormularioEvento()
         if (criado.pessoal && onEventoPessoalCriado) {
           onEventoPessoalCriado()
+          return
+        }
+        if (!criado.pessoal && (criado.abrangencia === 'NACIONAL' || criado.abrangencia === 'INTERNACIONAL')) {
+          void carregarDados()
+          void abrirDetalheEvento(criado)
           return
         }
         if (onEventoCriado && !criado.pessoal) {
@@ -1757,7 +1804,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       {/* Modal Detalhe */}
       {eventoDetalhe && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-          <div role="dialog" aria-modal="true" aria-labelledby="modal-detalhe-title" className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
+          <div role="dialog" aria-modal="true" aria-labelledby="modal-detalhe-title" className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-detalhe-title" className="text-lg font-semibold text-slate-900">
                 Detalhes do Evento
@@ -1812,6 +1859,34 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                       : ''}
                   </p>
                 </div>
+              )}
+              {(eventoDetalhe.abrangencia === 'NACIONAL' || eventoDetalhe.abrangencia === 'INTERNACIONAL') && !eventoDetalhe.pessoal && eventoDetalhe.podeGerenciar !== false && (
+                <section className="rounded-xl border border-brand-200 bg-brand-50 p-4 space-y-3" aria-label="Convocação nominal externa">
+                  <h4 className="font-semibold text-brand-900">Convocação nominal de Diáconos e Membros</h4>
+                  <p className="text-xs text-slate-600">Para eventos externos, selecione pessoas diretamente. Não há seleção de cargos ou funções.</p>
+                  <ul className="text-sm space-y-1">
+                    {participantesExternos.map(part => (
+                      <li key={part.membroId}>
+                        {membros.find(m => m.id === part.membroId)?.nome || part.membroId} — {part.status === 'CONVIDADO' ? 'Aguardando resposta' : part.status === 'ATRIBUIDO' ? 'Atribuído' : part.status === 'CONFIRMADO' ? 'Confirmado' : 'Recusado'}
+                      </li>
+                    ))}
+                    {participantesExternos.length === 0 && <li className="text-slate-500">Nenhum participante incluído ainda.</li>}
+                  </ul>
+                  <label htmlFor="membroConviteId" className="block text-sm font-medium">Diácono ou Membro</label>
+                  <select id="membroConviteId" value={membroConviteId} onChange={e => setMembroConviteId(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2 text-sm">
+                    <option value="">Selecione uma pessoa</option>
+                    {[...membros].filter(m => !participantesExternos.some(p => p.membroId === m.id)).sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                  </select>
+                  <label htmlFor="tipoConviteExterno" className="block text-sm font-medium">Tipo de participação</label>
+                  <select id="tipoConviteExterno" value={tipoConviteExterno} onChange={e => setTipoConviteExterno(e.target.value as 'CONVIDADO' | 'ATRIBUIDO')} className="w-full rounded-lg border border-slate-300 p-2 text-sm">
+                    <option value="CONVIDADO">Convidar — solicita confirmação</option>
+                    <option value="ATRIBUIDO">Atribuir — participação direta</option>
+                  </select>
+                  <button type="button" disabled={!membroConviteId || salvandoConviteExterno} onClick={() => void incluirParticipanteExterno()} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                    {salvandoConviteExterno ? 'Incluindo...' : 'Incluir participante'}
+                  </button>
+                  {erroConviteExterno && <p role="alert" className="text-sm text-red-700">{erroConviteExterno}</p>}
+                </section>
               )}
               {(eventoDetalhe.modalidade === 'PRESENCIAL' || eventoDetalhe.modalidade === 'HIBRIDO') && eventoDetalhe.abrangencia !== 'NACIONAL' && eventoDetalhe.abrangencia !== 'INTERNACIONAL' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
