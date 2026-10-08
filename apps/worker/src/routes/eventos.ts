@@ -323,6 +323,7 @@ eventosRouter.post('/', async (c) => {
         ...parsed,
         criadorMembroId: atorMembroId,
         regionalGestaoId,
+        regionalId: externo ? regionalGestaoId : parsed.regionalId,
       })],
       auditData
     )
@@ -469,9 +470,14 @@ eventosRouter.patch('/:id', async (c) => {
       }, 409)
     }
 
-    // Validar estado final mesclado (existente + patch) com EventoCreate
+    // Validar estado final mesclado (existente + patch) com EventoCreate.
+    // Em eventos externos, regionalId é interno (Regional de gestão) e não faz parte do destino público.
     const merged = { ...existing, ...parsed }
-    EventoCreate.parse(merged)
+    EventoCreate.parse(
+      merged.abrangencia === 'NACIONAL' || merged.abrangencia === 'INTERNACIONAL'
+        ? { ...merged, regionalId: null, administracaoId: null, setorId: null, casaId: null, grupoTrabalhoId: null }
+        : merged
+    )
     const espacoFoiAlterado = parsed.espacoId !== undefined && parsed.espacoId !== existing.espacoId
     const espacoValido = espacoFoiAlterado
       ? await espacoAtivoPertenceAoLocal(db, merged.localId, merged.espacoId)
@@ -563,6 +569,11 @@ eventosRouter.patch('/:id', async (c) => {
           .set({
             ...parsed,
             regionalGestaoId: regionalGestaoFinal,
+            regionalId: externoFinal ? regionalGestaoFinal : merged.regionalId,
+            administracaoId: externoFinal ? null : merged.administracaoId,
+            setorId: externoFinal ? null : merged.setorId,
+            casaId: externoFinal ? null : merged.casaId,
+            grupoTrabalhoId: externoFinal ? null : merged.grupoTrabalhoId,
             recorrenciaExcecao: isExcecao,
             agendaRevisao: alteracaoMaterial || ativacaoAlterada ? nowIso : existing.agendaRevisao,
             agendaAviso,
