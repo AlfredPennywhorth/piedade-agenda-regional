@@ -1235,7 +1235,16 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
               <tbody className="divide-y divide-slate-100">
                 {eventosFiltrados.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900">{item.titulo}{item.pessoal && <span className="ml-2 text-xs text-brand-700">Próprio</span>}</td>
+                    <td className="px-6 py-4 font-medium text-slate-900">
+                      {item.titulo}{item.pessoal && <span className="ml-2 text-xs text-brand-700">Próprio</span>}
+                      {(item.abrangencia === 'NACIONAL' || item.abrangencia === 'INTERNACIONAL') && (
+                        <p className="mt-1 text-xs font-normal text-slate-600">
+                          {item.abrangencia === 'NACIONAL'
+                            ? [item.destinoCidadeLocal, item.destinoUf].filter(Boolean).join(' — ')
+                            : [item.destinoCidadeLocal, PAISES_ISO.find(([codigo]) => codigo === item.destinoPaisCodigo)?.[1] || item.destinoPaisCodigo].filter(Boolean).join(' — ')}
+                        </p>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-slate-600">
                       {new Date(item.inicioEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                     </td>
