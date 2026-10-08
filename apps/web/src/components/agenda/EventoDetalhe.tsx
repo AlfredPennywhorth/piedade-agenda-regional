@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AgendaItem } from './types'
+import { PAISES_ISO } from '@piedade/shared'
 import * as apiClient from '../../api/apiClient'
 import { QrCodeModal } from './QrCodeModal'
 
@@ -22,6 +23,17 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
   const dialogRef = useRef<HTMLDialogElement>(null)
   
   const [statusExterno, setStatusExterno] = useState(item.participacaoExterna?.status ?? null)
+  const destinoExterno = item.evento.abrangencia === 'NACIONAL'
+    ? [item.evento.destinoCidadeLocal, item.evento.destinoUf].filter(Boolean).join(' — ')
+    : item.evento.abrangencia === 'INTERNACIONAL'
+      ? [
+          item.evento.destinoCidadeLocal,
+          item.evento.destinoPaisCodigo
+            ? (PAISES_ISO.find(([codigo]) => codigo === item.evento.destinoPaisCodigo)?.[1] || item.evento.destinoPaisCodigo)
+            : null,
+        ].filter(Boolean).join(' — ')
+      : ''
+
   const [respostaLocal, setRespostaLocal] = useState<string | null>(item.rsvp?.resposta ?? null)
   const reconfirmacaoPendente = item.rsvp?.reconfirmacaoPendente ?? false
   const [ausenciaSelecionada, setAusenciaSelecionada] = useState(false)
@@ -220,7 +232,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
   const isPresentialOrHybrid = item.evento.modalidade === 'PRESENCIAL' || item.evento.modalidade === 'HIBRIDO'
 
   const handleShareWhatsApp = () => {
-    const texto = `*[Agenda Regional]* ${item.evento.titulo}\nData: ${dateStr} às ${timeInicio}${item.local?.nome ? `\nLocal: ${item.local.nome}` : ''}${item.espaco?.nome ? `\nEspaço: ${item.espaco.nome}` : ''}\n\nAcesse a agenda para confirmar sua presença.`
+    const texto = `*[Agenda Regional]* ${item.evento.titulo}\nData: ${dateStr} às ${timeInicio}${destinoExterno ? `\nDestino: ${destinoExterno}` : ''}${item.local?.nome ? `\nLocal: ${item.local.nome}` : ''}${item.espaco?.nome ? `\nEspaço: ${item.espaco.nome}` : ''}\n\nAcesse a agenda para confirmar sua presença.`
     const url = `https://wa.me/?text=${encodeURIComponent(texto)}`
     window.open(url, '_blank', 'noopener,noreferrer')
   }
@@ -287,6 +299,13 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
             </span>
           </div>
         </div>
+
+        {isPresentialOrHybrid && destinoExterno && (
+          <div className="border-t border-slate-100 pt-6">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Destino da reunião</h3>
+            <p className="font-semibold text-slate-900">{destinoExterno}</p>
+          </div>
+        )}
 
         {isPresentialOrHybrid && item.local && (
           <div className="border-t border-slate-100 pt-6">
