@@ -493,8 +493,10 @@ eventosRouter.patch('/:id', async (c) => {
     }
 
     const escopoOriginal = extrairEscopoDoEvento(existing)
-    const escopoFinal = extrairEscopoDoEvento(merged)
     const membroId = c.get('membroId')
+    const escopoFinal = merged.abrangencia === 'NACIONAL' || merged.abrangencia === 'INTERNACIONAL'
+      ? { escopoTipo: 'REGIONAL', escopoId: existing.regionalGestaoId || (membroId ? await obterRegionalGestaoAgendaExterna(db, membroId) : null) }
+      : extrairEscopoDoEvento(merged)
     if (
       !membroId ||
       !escopoOriginal.escopoTipo ||
