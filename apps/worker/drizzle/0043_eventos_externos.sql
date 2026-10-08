@@ -27,8 +27,7 @@ WHEN
     NEW.abrangencia = 'NACIONAL'
     AND (
       NEW.regional_gestao_id IS NULL
-      OR NEW.regional_id IS NULL
-      OR NEW.regional_id <> NEW.regional_gestao_id
+      OR NEW.regional_id IS NOT NULL
       OR NEW.administracao_id IS NOT NULL
       OR NEW.setor_id IS NOT NULL
       OR NEW.casa_id IS NOT NULL
@@ -44,8 +43,7 @@ WHEN
     NEW.abrangencia = 'INTERNACIONAL'
     AND (
       NEW.regional_gestao_id IS NULL
-      OR NEW.regional_id IS NULL
-      OR NEW.regional_id <> NEW.regional_gestao_id
+      OR NEW.regional_id IS NOT NULL
       OR NEW.administracao_id IS NOT NULL
       OR NEW.setor_id IS NOT NULL
       OR NEW.casa_id IS NOT NULL
@@ -81,8 +79,7 @@ WHEN
     NEW.abrangencia = 'NACIONAL'
     AND (
       NEW.regional_gestao_id IS NULL
-      OR NEW.regional_id IS NULL
-      OR NEW.regional_id <> NEW.regional_gestao_id
+      OR NEW.regional_id IS NOT NULL
       OR NEW.administracao_id IS NOT NULL
       OR NEW.setor_id IS NOT NULL
       OR NEW.casa_id IS NOT NULL
@@ -98,8 +95,7 @@ WHEN
     NEW.abrangencia = 'INTERNACIONAL'
     AND (
       NEW.regional_gestao_id IS NULL
-      OR NEW.regional_id IS NULL
-      OR NEW.regional_id <> NEW.regional_gestao_id
+      OR NEW.regional_id IS NOT NULL
       OR NEW.administracao_id IS NOT NULL
       OR NEW.setor_id IS NOT NULL
       OR NEW.casa_id IS NOT NULL
