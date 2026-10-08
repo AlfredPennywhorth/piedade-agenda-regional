@@ -73,6 +73,17 @@ export function CalendarioView() {
     void load()
   }, [])
 
+  const handleExternalResponseUpdated = (eventoId: string, status: 'CONFIRMADO' | 'RECUSADO') => {
+    const atualizar = (item: AgendaItem): AgendaItem => ({
+      ...item,
+      participacaoExterna: item.evento.id === eventoId && item.participacaoExterna
+        ? { ...item.participacaoExterna, status }
+        : item.participacaoExterna,
+    })
+    setSelectedDayEvents(current => current?.map(atualizar) ?? null)
+    setItems(current => current.map(atualizar))
+  }
+
   const handleRsvpUpdated = (destinatarioId: string, rsvp: any) => {
     const atualizarItem = (item: AgendaItem) =>
       item.destinatarioId === destinatarioId ? { ...item, rsvp } : item
@@ -234,6 +245,7 @@ export function CalendarioView() {
           item={selectedEvent} 
           onClose={() => setSelectedEvent(null)} 
           onRsvpUpdated={handleRsvpUpdated}
+          onExternalResponseUpdated={handleExternalResponseUpdated}
         />
       )}
       
