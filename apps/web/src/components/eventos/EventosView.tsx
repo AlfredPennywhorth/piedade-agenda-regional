@@ -10,6 +10,12 @@ import type { Regional } from '../regionais/RegionaisView'
 import type { GrupoTrabalho } from '../grupos-trabalho/GruposTrabalhoView'
 import type { Membro } from '../membros/MembrosView'
 
+interface ParticipanteExterno {
+  eventoId: string
+  membroId: string
+  status: 'CONVIDADO' | 'ATRIBUIDO' | 'CONFIRMADO' | 'RECUSADO'
+}
+
 interface Local {
   id: string
   nome: string
@@ -107,6 +113,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   const [locais, setLocais] = useState<Local[]>([])
   const [espacos, setEspacos] = useState<EspacoLocal[]>([])
   const [membros, setMembros] = useState<Membro[]>([])
+  const [identidade, setIdentidade] = useState<{ id: string; nome: string } | null>(null)
   const [regionais, setRegionais] = useState<Regional[]>([])
   const [administracoes, setAdministracoes] = useState<Administracao[]>([])
   const [setores, setSetores] = useState<Setor[]>([])
@@ -136,6 +143,12 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
 
   // Modal Details
   const [eventoDetalhe, setEventoDetalhe] = useState<Evento | null>(null)
+  const [participantesExternos, setParticipantesExternos] = useState<ParticipanteExterno[]>([])
+  const [podeVerParticipantesExternos, setPodeVerParticipantesExternos] = useState(false)
+  const [membroConviteId, setMembroConviteId] = useState('')
+  const [tipoConviteExterno, setTipoConviteExterno] = useState<'CONVIDADO' | 'ATRIBUIDO'>('CONVIDADO')
+  const [erroConviteExterno, setErroConviteExterno] = useState<string | null>(null)
+  const [salvandoConviteExterno, setSalvandoConviteExterno] = useState(false)
 
   const [formData, setFormData] = useState<EventoFormData>({
     pessoal: false,
@@ -274,7 +287,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     try {
       const [
         eventosData, locaisData, espacosData, membrosData, regionaisData,
-        administracoesData, setoresData, casasData, gruposData
+        administracoesData, setoresData, casasData, gruposData, identidadeData
       ] = await Promise.all([
         fetchWithAuth<Evento[]>(montarUrlEventos()),
         fetchWithAuth<Local[]>('/locais'),
@@ -285,12 +298,14 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         fetchWithAuth<Setor[]>('/setores'),
         fetchWithAuth<Casa[]>('/casas'),
         fetchWithAuth<GrupoTrabalho[]>('/grupos-trabalho'),
+        fetchWithAuth<{ id: string; nome: string }>('/auth/me'),
       ])
       
       if (seq === pessoaConsultaSeq.current) setEventos(eventosData || [])
       setLocais(locaisData || [])
       setEspacos(espacosData || [])
       setMembros(membrosData || [])
+      setIdentidade(identidadeData)
       setRegionais(regionaisData || [])
       setAdministracoes(administracoesData || [])
       setSetores(setoresData || [])
@@ -467,7 +482,11 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       localId: '',
       espacoId: '',
       urlOnline: '',
-      organizadorMembroId: '',
+      organizadorMembroId: identidade?.id || '',
+      abrangencia: 'TERRITORIAL',
+      destinoUf: '',
+      destinoPaisCodigo: '',
+      destinoCidadeLocal: '',
       regionalId: '',
       administracaoId: '',
       setorId: '',
@@ -496,6 +515,11 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     setErro(null)
     eventoDetalheIdRef.current = item.id
     setEventoDetalhe(item)
+    setParticipantesExternos([])
+    setPodeVerParticipantesExternos(false)
+    setSalvandoConviteExterno(false)
+    setMembroConviteId('')
+    setErroConviteExterno(null)
     let itemCompleto = item
 
     try {
@@ -506,6 +530,17 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
 
     if (consultaAtual !== eventoDetalheConsultaSeq.current) return
     setEventoDetalhe(itemCompleto)
+    if ((itemCompleto.abrangencia === 'NACIONAL' || itemCompleto.abrangencia === 'INTERNACIONAL') && !itemCompleto.pessoal) {
+      try {
+        const lista = await fetchWithAuth<ParticipanteExterno[]>(`/eventos/${itemCompleto.id}/participantes-externos`)
+        if (consultaAtual !== eventoDetalheConsultaSeq.current) return
+        setParticipantesExternos(lista)
+        setPodeVerParticipantesExternos(true)
+      } catch (err: any) {
+        if (consultaAtual !== eventoDetalheConsultaSeq.current) return
+        if (itemCompleto.podeGerenciar !== false) setErroConviteExterno(err.message || 'Não foi possível carregar os participantes.')
+      }
+    }
 
     if (!itemCompleto.espacoId || !itemCompleto.localId || espacos.some(espaco => espaco.id === itemCompleto.espacoId)) {
       return
@@ -520,6 +555,29 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       }
     } catch {
       // O detalhe continua disponível mesmo se o lookup histórico falhar.
+    }
+  }
+
+  const incluirParticipanteExterno = async () => {
+    if (!eventoDetalhe || !eventoDetalhe.ativo || !membroConviteId || salvandoConviteExterno) return
+    const eventoId = eventoDetalhe.id
+    const geracaoDetalhe = eventoDetalheConsultaSeq.current
+    const aindaNoMesmoEvento = () =>
+      geracaoDetalhe === eventoDetalheConsultaSeq.current && eventoDetalheIdRef.current === eventoId
+    setSalvandoConviteExterno(true)
+    setErroConviteExterno(null)
+    try {
+      const novo = await postWithAuth<ParticipanteExterno>(
+        `/eventos/${eventoId}/participantes-externos`,
+        { membroId: membroConviteId, tipo: tipoConviteExterno },
+      )
+      if (!aindaNoMesmoEvento()) return
+      setParticipantesExternos(atuais => [...atuais, novo])
+      setMembroConviteId('')
+    } catch (err: any) {
+      if (aindaNoMesmoEvento()) setErroConviteExterno(err.message || 'Não foi possível incluir o participante.')
+    } finally {
+      if (aindaNoMesmoEvento()) setSalvandoConviteExterno(false)
     }
   }
 
@@ -678,7 +736,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       localId: formData.localId || null,
       espacoId: formData.espacoId || null,
       urlOnline: formData.urlOnline || null,
-      organizadorMembroId: formData.pessoal && !eventoEditandoId ? null : formData.organizadorMembroId || null,
+      organizadorMembroId: formData.pessoal && !eventoEditandoId ? null : (eventoEditandoId ? formData.organizadorMembroId : identidade?.id) || null,
       abrangencia: formData.abrangencia || 'TERRITORIAL',
       destinoUf: formData.destinoUf || null,
       destinoPaisCodigo: formData.destinoPaisCodigo || null,
@@ -735,6 +793,11 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         fecharFormularioEvento()
         if (criado.pessoal && onEventoPessoalCriado) {
           onEventoPessoalCriado()
+          return
+        }
+        if (!criado.pessoal && (criado.abrangencia === 'NACIONAL' || criado.abrangencia === 'INTERNACIONAL')) {
+          void carregarDados()
+          void abrirDetalheEvento(criado)
           return
         }
         if (onEventoCriado && !criado.pessoal) {
@@ -1306,108 +1369,6 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                       </div>
                     </div>
 
-                    <div>
-                      <label htmlFor="modalidade" className="block text-sm font-medium text-slate-700 mb-1">Modalidade *</label>
-                      <select
-                        id="modalidade"
-                        value={formData.modalidade}
-                        onChange={e => handleModalidadeChange(e.target.value as 'PRESENCIAL'|'ONLINE'|'HIBRIDO')}
-                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                      >
-                        <option value="PRESENCIAL">Presencial</option>
-                        <option value="ONLINE">Online</option>
-                        <option value="HIBRIDO">Híbrido</option>
-                      </select>
-                      {errosForm.modalidade && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.modalidade}</p>}
-                    </div>
-
-                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.abrangencia !== 'NACIONAL' && formData.abrangencia !== 'INTERNACIONAL' && (
-                      <div>
-                        <div className="mb-1 flex items-center justify-between gap-3">
-                          <label htmlFor="localId" className="block text-sm font-medium text-slate-700">Local *</label>
-                          <button
-                              type="button"
-                              onClick={event => {
-                                localRapidoTriggerRef.current = event.currentTarget
-                                setLocalRapidoErro(null)
-                                setCepRapidoMensagem(null)
-                                setCepRapidoErro(false)
-                                setLocalRapidoOpen(true)
-                              }}
-                              className="text-xs font-semibold text-brand-700 hover:text-brand-900"
-                            >
-                              + Criar local sem sair
-                            </button>
-                        </div>
-                        <select
-                          id="localId"
-                          value={formData.localId || ''}
-                          onChange={e => setFormData({ ...formData, localId: e.target.value, espacoId: '' })}
-                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                        >
-                          <option value="">Selecione...</option>
-                          {[...locais].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(l => (
-                            <option key={l.id} value={l.id}>{l.nome}</option>
-                          ))}
-                        </select>
-                        {errosForm.localId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.localId}</p>}
-                      </div>
-                    )}
-
-                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.abrangencia !== 'NACIONAL' && formData.abrangencia !== 'INTERNACIONAL' && formData.localId && (
-                      <div>
-                        <div className="mb-1 flex items-center justify-between gap-3">
-                          <label htmlFor="espacoId" className="block text-sm font-medium text-slate-700">Espaço</label>
-                          <button
-                              type="button"
-                              onClick={event => {
-                                espacoRapidoTriggerRef.current = event.currentTarget
-                                setEspacoRapidoErro(null)
-                                setEspacoRapidoNome('')
-                                setEspacoRapidoOpen(true)
-                              }}
-                              className="text-xs font-semibold text-brand-700 hover:text-brand-900"
-                            >
-                              + Criar espaço sem sair
-                            </button>
-                        </div>
-                        <select
-                          id="espacoId"
-                          value={formData.espacoId || ''}
-                          onChange={e => setFormData({ ...formData, espacoId: e.target.value })}
-                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                        >
-                          <option value="">Local inteiro / não especificado</option>
-                          {espacos
-                            .filter(espaco =>
-                              espaco.localId === formData.localId &&
-                              (espaco.ativo || (Boolean(eventoEditandoId) && espaco.id === formData.espacoId))
-                            )
-                            .map(espaco => (
-                              <option key={espaco.id} value={espaco.id}>
-                                {espaco.nome}{espaco.ativo ? '' : ' (inativo)'}
-                              </option>
-                            ))}
-                        </select>
-                        {errosForm.espacoId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.espacoId}</p>}
-                      </div>
-                    )}
-
-                    {(formData.modalidade === 'ONLINE' || formData.modalidade === 'HIBRIDO') && (
-                      <div>
-                        <label htmlFor="urlOnline" className="block text-sm font-medium text-slate-700 mb-1">URL Online *</label>
-                        <input
-                          id="urlOnline"
-                          type="url"
-                          value={formData.urlOnline || ''}
-                          onChange={e => setFormData({ ...formData, urlOnline: e.target.value })}
-                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                          placeholder="https://..."
-                        />
-                        {errosForm.urlOnline && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.urlOnline}</p>}
-                      </div>
-                    )}
-
                     <div className="border-t pt-4">
                       <h4 className="font-medium text-sm text-slate-900 mb-3">Escopo / Destino do Evento</h4>
                       
@@ -1583,7 +1544,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                           <select id="publicoEvento" value={formData.pessoal ? 'PROPRIO' : 'INSTITUCIONAL'} disabled={!!eventoEditandoId}
                             onChange={e => setFormData({ ...formData, pessoal: e.target.value === 'PROPRIO' })}
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm">
-                            <option value="INSTITUCIONAL">Institucional — com convocação</option>
+                            <option value="INSTITUCIONAL">{tipoEscopo === 'nacional' || tipoEscopo === 'internacional' ? 'Institucional — convites nominais' : 'Institucional — com convocação'}</option>
                             <option value="PROPRIO">Próprio — somente para mim</option>
                           </select>
                           {formData.pessoal && <p className="mt-2 text-sm text-brand-700">Ao salvar, o evento entra diretamente na sua agenda, sem convocação.</p>}
@@ -1593,17 +1554,116 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                       {errosForm.escopo && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.escopo}</p>}
                     </div>
 
-                    {!formData.pessoal && <div className="border-t pt-4">
-                      <label htmlFor="organizadorMembroId" className="block text-sm font-medium text-slate-700 mb-1">Organizador (Membro)</label>
+                    <div>
+                      <label htmlFor="modalidade" className="block text-sm font-medium text-slate-700 mb-1">Modalidade *</label>
                       <select
-                        id="organizadorMembroId"
-                        value={formData.organizadorMembroId || ''}
-                        onChange={e => setFormData({ ...formData, organizadorMembroId: e.target.value })}
+                        id="modalidade"
+                        value={formData.modalidade}
+                        onChange={e => handleModalidadeChange(e.target.value as 'PRESENCIAL'|'ONLINE'|'HIBRIDO')}
                         className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                       >
-                        <option value="">Selecione...</option>
-                        {membros.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                        <option value="PRESENCIAL">Presencial</option>
+                        <option value="ONLINE">Online</option>
+                        <option value="HIBRIDO">Híbrido</option>
                       </select>
+                      {errosForm.modalidade && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.modalidade}</p>}
+                    </div>
+
+                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.abrangencia !== 'NACIONAL' && formData.abrangencia !== 'INTERNACIONAL' && (
+                      <div>
+                        <div className="mb-1 flex items-center justify-between gap-3">
+                          <label htmlFor="localId" className="block text-sm font-medium text-slate-700">Local *</label>
+                          <button
+                              type="button"
+                              onClick={event => {
+                                localRapidoTriggerRef.current = event.currentTarget
+                                setLocalRapidoErro(null)
+                                setCepRapidoMensagem(null)
+                                setCepRapidoErro(false)
+                                setLocalRapidoOpen(true)
+                              }}
+                              className="text-xs font-semibold text-brand-700 hover:text-brand-900"
+                            >
+                              + Criar local sem sair
+                            </button>
+                        </div>
+                        <select
+                          id="localId"
+                          value={formData.localId || ''}
+                          onChange={e => setFormData({ ...formData, localId: e.target.value, espacoId: '' })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                        >
+                          <option value="">Selecione...</option>
+                          {[...locais].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(l => (
+                            <option key={l.id} value={l.id}>{l.nome}</option>
+                          ))}
+                        </select>
+                        {errosForm.localId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.localId}</p>}
+                      </div>
+                    )}
+
+                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.abrangencia !== 'NACIONAL' && formData.abrangencia !== 'INTERNACIONAL' && formData.localId && (
+                      <div>
+                        <div className="mb-1 flex items-center justify-between gap-3">
+                          <label htmlFor="espacoId" className="block text-sm font-medium text-slate-700">Espaço</label>
+                          <button
+                              type="button"
+                              onClick={event => {
+                                espacoRapidoTriggerRef.current = event.currentTarget
+                                setEspacoRapidoErro(null)
+                                setEspacoRapidoNome('')
+                                setEspacoRapidoOpen(true)
+                              }}
+                              className="text-xs font-semibold text-brand-700 hover:text-brand-900"
+                            >
+                              + Criar espaço sem sair
+                            </button>
+                        </div>
+                        <select
+                          id="espacoId"
+                          value={formData.espacoId || ''}
+                          onChange={e => setFormData({ ...formData, espacoId: e.target.value })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                        >
+                          <option value="">Local inteiro / não especificado</option>
+                          {espacos
+                            .filter(espaco =>
+                              espaco.localId === formData.localId &&
+                              (espaco.ativo || (Boolean(eventoEditandoId) && espaco.id === formData.espacoId))
+                            )
+                            .map(espaco => (
+                              <option key={espaco.id} value={espaco.id}>
+                                {espaco.nome}{espaco.ativo ? '' : ' (inativo)'}
+                              </option>
+                            ))}
+                        </select>
+                        {errosForm.espacoId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.espacoId}</p>}
+                      </div>
+                    )}
+
+                    {(formData.modalidade === 'ONLINE' || formData.modalidade === 'HIBRIDO') && (
+                      <div>
+                        <label htmlFor="urlOnline" className="block text-sm font-medium text-slate-700 mb-1">URL Online *</label>
+                        <input
+                          id="urlOnline"
+                          type="url"
+                          value={formData.urlOnline || ''}
+                          onChange={e => setFormData({ ...formData, urlOnline: e.target.value })}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                          placeholder="https://..."
+                        />
+                        {errosForm.urlOnline && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.urlOnline}</p>}
+                      </div>
+                    )}
+
+                    {!formData.pessoal && <div className="border-t pt-4">
+                      <label htmlFor="organizadorMembroId" className="block text-sm font-medium text-slate-700 mb-1">Organizador (Membro)</label>
+                      <p id="organizadorMembroId" className="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-lg text-sm">
+                        {eventoEditandoId
+                          ? (membros.find(m => m.id === formData.organizadorMembroId)?.nome || 'Organizador não informado')
+                          : (identidade?.nome || 'Identificando usuário...')}
+                      </p>
+                      {!eventoEditandoId && <p className="text-xs text-slate-500 mt-1">Vinculado automaticamente ao usuário logado.</p>}
                       {errosForm.organizadorMembroId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.organizadorMembroId}</p>}
                     </div>}
 
@@ -1757,7 +1817,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       {/* Modal Detalhe */}
       {eventoDetalhe && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-          <div role="dialog" aria-modal="true" aria-labelledby="modal-detalhe-title" className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
+          <div role="dialog" aria-modal="true" aria-labelledby="modal-detalhe-title" className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-detalhe-title" className="text-lg font-semibold text-slate-900">
                 Detalhes do Evento
@@ -1812,6 +1872,37 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                       : ''}
                   </p>
                 </div>
+              )}
+              {(eventoDetalhe.abrangencia === 'NACIONAL' || eventoDetalhe.abrangencia === 'INTERNACIONAL') && !eventoDetalhe.pessoal && podeVerParticipantesExternos && (
+                <section className="rounded-xl border border-brand-200 bg-brand-50 p-4 space-y-3" aria-label="Convocação nominal externa">
+                  <h4 className="font-semibold text-brand-900">Convocação nominal de Diáconos e Membros</h4>
+                  <p className="text-xs text-slate-600">Para eventos externos, selecione pessoas diretamente. Não há seleção de cargos ou funções.</p>
+                  <ul className="text-sm space-y-1">
+                    {participantesExternos.map(part => (
+                      <li key={part.membroId}>
+                        {membros.find(m => m.id === part.membroId)?.nome || part.membroId} — {part.status === 'CONVIDADO' ? 'Aguardando resposta' : part.status === 'ATRIBUIDO' ? 'Atribuído' : part.status === 'CONFIRMADO' ? 'Confirmado' : 'Recusado'}
+                      </li>
+                    ))}
+                    {participantesExternos.length === 0 && <li className="text-slate-500">Nenhum participante incluído ainda.</li>}
+                  </ul>
+                  {eventoDetalhe.ativo && eventoDetalhe.podeGerenciar !== false && (<>
+                  <label htmlFor="membroConviteId" className="block text-sm font-medium">Diácono ou Membro</label>
+                  <select id="membroConviteId" value={membroConviteId} onChange={e => setMembroConviteId(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2 text-sm">
+                    <option value="">Selecione uma pessoa</option>
+                    {[...membros].filter(m => !participantesExternos.some(p => p.membroId === m.id)).sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                  </select>
+                  <label htmlFor="tipoConviteExterno" className="block text-sm font-medium">Tipo de participação</label>
+                  <select id="tipoConviteExterno" value={tipoConviteExterno} onChange={e => setTipoConviteExterno(e.target.value as 'CONVIDADO' | 'ATRIBUIDO')} className="w-full rounded-lg border border-slate-300 p-2 text-sm">
+                    <option value="CONVIDADO">Convidar — solicita confirmação</option>
+                    <option value="ATRIBUIDO">Atribuir — participação direta</option>
+                  </select>
+                  <button type="button" disabled={!membroConviteId || salvandoConviteExterno} onClick={() => void incluirParticipanteExterno()} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                    {salvandoConviteExterno ? 'Incluindo...' : 'Incluir participante'}
+                  </button>
+                  </>)}
+                  {!eventoDetalhe.ativo && <p className="text-sm text-slate-500">Evento cancelado: participantes disponíveis somente para consulta.</p>}
+                  {erroConviteExterno && <p role="alert" className="text-sm text-red-700">{erroConviteExterno}</p>}
+                </section>
               )}
               {(eventoDetalhe.modalidade === 'PRESENCIAL' || eventoDetalhe.modalidade === 'HIBRIDO') && eventoDetalhe.abrangencia !== 'NACIONAL' && eventoDetalhe.abrangencia !== 'INTERNACIONAL' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

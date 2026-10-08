@@ -5,6 +5,7 @@ import { ConvocacaoFuncoesModal } from './ConvocacaoFuncoesModal'
 import { AcompanhamentoRsvpModal } from './AcompanhamentoRsvpModal'
 interface EventoLookup {
   pessoal?: boolean
+  abrangencia?: 'TERRITORIAL' | 'NACIONAL' | 'INTERNACIONAL'
   podeGerenciar?: boolean
   id: string
   titulo: string
@@ -322,7 +323,8 @@ export function ConvocacoesView({
 
   const eventosDisponiveis = eventosLookup
     .filter(ev => {
-      if (ev.pessoal || ev.podeGerenciar === false) return false
+      // Eventos externos recebem convites nominais diretamente em Gestão de Eventos.
+      if (ev.pessoal || ev.podeGerenciar === false || ev.abrangencia === 'NACIONAL' || ev.abrangencia === 'INTERNACIONAL') return false
       if (editandoId && ev.id === formData.eventoId) return true
       if (ev.ativo === false) return false
       if (new Date(ev.fimEm).getTime() < Date.now()) return false
@@ -660,6 +662,7 @@ export function ConvocacoesView({
                       <option key={ev.id} value={ev.id}>{formatarEvento(ev)}</option>
                     ))}
                   </select>
+                  <p className="text-xs text-slate-500 mt-1">Eventos nacionais e internacionais utilizam convites nominais em Gestão de Eventos; não exigem funções institucionais.</p>
                   {errosForm.eventoId && (
                     <p className="text-red-500 text-sm mt-1">{errosForm.eventoId}</p>
                   )}
