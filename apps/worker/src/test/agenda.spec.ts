@@ -755,7 +755,7 @@ describe('S07 - Minha Agenda', () => {
       VALUES (
         'ev-externo-pessoal', 1, '${membroId}', 'Atendimento em Minas', 'PRESENCIAL',
         '2026-02-10T10:15:00Z', '2026-02-10T10:45:00Z',
-        'NACIONAL', 'MG', 'Belo Horizonte — atendimento', 'reg-1', NULL, 1
+        'NACIONAL', 'MG', 'Belo Horizonte — atendimento', 'reg-1', 'reg-1', 1
       );
     `)
 
