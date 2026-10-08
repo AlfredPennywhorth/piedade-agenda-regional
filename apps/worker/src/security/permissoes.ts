@@ -732,6 +732,14 @@ export async function eGestorRelatoriosAutorizadoParaEvento(db: any, membroId: s
 
   if (evento.organizadorMembroId === membroId) return true
   const { condicaoEscopo } = await import('./eventos')
+  if ((evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') && evento.regionalGestaoId) {
+    const gestorRegional = contexto.acessosAtivos.some(acesso =>
+      acesso.perfilCodigo === 'GESTOR_RELATORIOS' &&
+      acesso.escopoTipo === 'REGIONAL' &&
+      acesso.escopoId === evento.regionalGestaoId
+    )
+    if (gestorRegional) return true
+  }
   const condicoes = contexto.acessosAtivos
     .filter(acesso => acesso.perfilCodigo === 'GESTOR_RELATORIOS')
     .map(condicaoEscopo)
