@@ -1531,7 +1531,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                           <select id="publicoEvento" value={formData.pessoal ? 'PROPRIO' : 'INSTITUCIONAL'} disabled={!!eventoEditandoId}
                             onChange={e => setFormData({ ...formData, pessoal: e.target.value === 'PROPRIO' })}
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm">
-                            <option value="INSTITUCIONAL">Institucional — com convocação</option>
+                            <option value="INSTITUCIONAL">{tipoEscopo === 'nacional' || tipoEscopo === 'internacional' ? 'Institucional — convites nominais' : 'Institucional — com convocação'}</option>
                             <option value="PROPRIO">Próprio — somente para mim</option>
                           </select>
                           {formData.pessoal && <p className="mt-2 text-sm text-brand-700">Ao salvar, o evento entra diretamente na sua agenda, sem convocação.</p>}
