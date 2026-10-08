@@ -609,7 +609,7 @@ eventosRouter.get('/:id/participantes-externos', async c => {
   const membroId = c.get('membroId')
   const evento = await db.select().from(eventos).where(eq(eventos.id,id)).get()
   if (!evento || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia)) return c.json({error:'Evento externo não encontrado'},404)
-  if (!membroId || !(await podeLerEvento(db,c.get('contextoPermissoes'),id))) return c.json({error:'Acesso não autorizado'},403)
+  if (!membroId || !(await podeGerenciarEvento(db, membroId, evento))) return c.json({error:'Acesso não autorizado para consultar os participantes'},403)
   const itens = await db.select().from(eventosParticipantesExternos).where(eq(eventosParticipantesExternos.eventoId,id)).all()
   return c.json(itens)
 })
