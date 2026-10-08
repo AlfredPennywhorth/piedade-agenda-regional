@@ -1185,6 +1185,7 @@ export const eventosParticipantesExternos = sqliteTable('eventos_participantes_e
   createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
 }, table => ({
+  statusValido: check('eventos_participantes_externos_status_check', sql`${table.status} IN ('CONVIDADO', 'ATRIBUIDO', 'CONFIRMADO', 'RECUSADO')`),
   pk: uniqueIndex('idx_eventos_participantes_externos_unico').on(table.eventoId,table.membroId),
   idxMembro: index('idx_eventos_participantes_externos_membro').on(table.membroId,table.status),
 }))
