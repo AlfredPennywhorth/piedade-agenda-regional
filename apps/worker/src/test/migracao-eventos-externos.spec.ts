@@ -81,6 +81,7 @@ describe('migration 0043 — eventos externos', () => {
       BEGIN SELECT RAISE(ABORT, 'EVENTO_PESSOAL_SEM_CONVOCACAO'); END;
 
       INSERT INTO regionais (id, nome) VALUES ('reg-1', 'Regional SP');
+      INSERT INTO membros (id) VALUES ('membro-criador'), ('membro-convidado');
       INSERT INTO eventos (
         id, titulo, modalidade, inicio_em, fim_em, regional_id, ativo
       ) VALUES (
@@ -134,6 +135,18 @@ describe('migration 0043 — eventos externos', () => {
         destino_uf, destino_cidade_local, regional_gestao_id)
       VALUES ('invalid', 'Sem regional', 'PRESENCIAL', '2030-02-03T10:00:00Z',
         '2030-02-03T11:00:00Z', 'NACIONAL', 'MG', 'Belo Horizonte', 'reg-1')
+    `).run()).toThrow()
+
+    sqlite.prepare(`
+      INSERT INTO eventos_participantes_externos(evento_id,membro_id,status,criado_por_membro_id)
+      VALUES ('ev-externo-apos-migracao','membro-convidado','CONVIDADO','membro-criador')
+    `).run()
+    expect((sqlite.prepare(
+      "SELECT status FROM eventos_participantes_externos WHERE evento_id='ev-externo-apos-migracao' AND membro_id='membro-convidado'"
+    ).get() as any).status).toBe('CONVIDADO')
+    expect(() => sqlite.prepare(`
+      INSERT INTO eventos_participantes_externos(evento_id,membro_id,status,criado_por_membro_id)
+      VALUES ('ev-legado','membro-convidado','CONVIDADO','membro-criador')
     `).run()).toThrow()
 
     const evento = sqlite.prepare(`
