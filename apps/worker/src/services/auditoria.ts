@@ -13,8 +13,10 @@ export interface AuditLogData {
 
 export function extrairEscopoDoEvento(evento: any): { escopoTipo: string | null; escopoId: string | null } {
   if (!evento) return { escopoTipo: null, escopoId: null }
-  if (evento.abrangencia === 'NACIONAL') return { escopoTipo: 'NACIONAL', escopoId: evento.destinoUf ?? null }
-  if (evento.abrangencia === 'INTERNACIONAL') return { escopoTipo: 'INTERNACIONAL', escopoId: evento.destinoPaisCodigo ?? null }
+  if (evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') {
+    const regionalId = evento.regionalGestaoId ?? evento.regionalId
+    return { escopoTipo: regionalId ? 'REGIONAL' : null, escopoId: regionalId ?? null }
+  }
   if (evento.regionalId) return { escopoTipo: 'REGIONAL', escopoId: evento.regionalId }
   if (evento.administracaoId) return { escopoTipo: 'ADMINISTRACAO', escopoId: evento.administracaoId }
   if (evento.setorId) return { escopoTipo: 'SETOR', escopoId: evento.setorId }
