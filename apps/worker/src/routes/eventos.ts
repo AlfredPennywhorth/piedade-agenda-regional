@@ -4,7 +4,7 @@ import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal, membros,
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, executarOperacaoComAudits, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
-import { podeGerenciarAgendaNoEscopo, podeGerenciarAgendaExterna, obterRegionalGestaoAgendaExterna, eMasterSistema } from '../security/permissoes'
+import { podeGerenciarAgendaNoEscopo, podeGerenciarAgendaExterna, obterRegionalGestaoAgendaExterna, eMasterSistema, eGestorRelatoriosAutorizadoParaEvento } from '../security/permissoes'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
 import { carregarEscoposOperacionaisLegados, condicaoEventosVisiveis, condicaoEventosGerenciaveis, podeLerEvento, podeGerenciarEvento } from '../security/eventos'
@@ -609,7 +609,7 @@ eventosRouter.get('/:id/participantes-externos', async c => {
   const membroId = c.get('membroId')
   const evento = await db.select().from(eventos).where(eq(eventos.id,id)).get()
   if (!evento || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia)) return c.json({error:'Evento externo não encontrado'},404)
-  if (!membroId || !(await podeGerenciarEvento(db, membroId, evento))) return c.json({error:'Acesso não autorizado para consultar os participantes'},403)
+  if (!membroId || !((await podeGerenciarEvento(db, membroId, evento)) || (await eGestorRelatoriosAutorizadoParaEvento(db, membroId, evento)))) return c.json({error:'Acesso não autorizado para consultar os participantes'},403)
   const itens = await db.select().from(eventosParticipantesExternos).where(eq(eventosParticipantesExternos.eventoId,id)).all()
   return c.json(itens)
 })
@@ -663,7 +663,7 @@ eventosRouter.patch('/:id/participantes-externos/resposta', async c => {
       // Fail closed: a stale response writes an invalid CHECK value, aborting the whole
       // atomic batch, including the audit record. A conditional UPDATE alone would
       // silently affect zero rows while still recording a misleading audit entry.
-      status: sql`CASE WHEN ${eventosParticipantesExternos.status} = 'CONVIDADO' THEN ${resposta} ELSE 'RESPOSTA_OBSOLETA' END`,
+      status: sql`CASE WHEN ${eventosParticipantesExternos.status} = 'CONVIDADO' AND EXISTS (SELECT 1 FROM eventos e WHERE e.id = ${id} AND e.ativo = 1 AND julianday(e.inicio_em) > julianday('now')) THEN ${resposta} ELSE 'RESPOSTA_OBSOLETA' END`,
       updatedAt: new Date().toISOString(),
     }).where(and(eq(eventosParticipantesExternos.eventoId,id),eq(eventosParticipantesExternos.membroId,membroId)))], {
       acao: 'EVENTO_EXTERNO_RESPOSTA', atorMembroId: membroId,
