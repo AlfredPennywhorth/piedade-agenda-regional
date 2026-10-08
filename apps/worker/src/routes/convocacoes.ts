@@ -284,6 +284,9 @@ convocacoesRouter.post('/:id/funcoes', async c => {
     if (!evento || !membroId || !(await podeGerirConvocacao(db, membroId, evento))) {
       return c.json({ error: 'Acesso não autorizado para gerir a convocação', code: 'FORBIDDEN' }, 403)
     }
+    if (evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') {
+      return c.json({ error: 'Atendimento externo aceita somente convites pessoais, nunca atribuição por função', code: 'EVENTO_EXTERNO_SEM_FUNCOES' }, 409)
+    }
     if (convocacao.status !== 'RASCUNHO')
       return c.json({ error: 'Não é possível alterar funções fora do status RASCUNHO' }, 400)
 
@@ -388,6 +391,10 @@ convocacoesRouter.post('/:id/publicar', async c => {
   const membroId = c.get('membroId')
   if (!membroId || !(await podeGerirConvocacao(db, membroId, evento))) {
     return c.json({ error: 'Acesso não autorizado para gerir a convocação', code: 'FORBIDDEN' }, 403)
+  }
+
+  if (evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') {
+    return c.json({ error: 'Publicação de evento externo requer atribuições pessoais; fluxo de funções não permitido', code: 'EVENTO_EXTERNO_CONVITE_PESSOAL_PENDENTE' }, 409)
   }
 
   const funcoesConvocadas = await db
