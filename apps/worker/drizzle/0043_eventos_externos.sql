@@ -2,6 +2,13 @@
 -- defer_foreign_keys mantém referências de convocacoes e demais tabelas até a
 -- conclusão da transação de migração gerenciada pelo Wrangler/D1.
 PRAGMA defer_foreign_keys = ON;
+-- Os gatilhos de convocacoes referenciam eventos e precisam ser removidos
+-- antes da reconstrução, evitando definições temporariamente inválidas.
+DROP TRIGGER IF EXISTS trg_convocacao_nao_ativar_em_evento_inativo_insert;
+DROP TRIGGER IF EXISTS trg_convocacao_nao_ativar_em_evento_inativo_update;
+DROP TRIGGER IF EXISTS trg_convocacao_evento_pessoal;
+DROP TRIGGER IF EXISTS trg_convocacao_evento_pessoal_update;
+
 CREATE TABLE eventos_0043_nova (
   id text PRIMARY KEY NOT NULL,
   titulo text NOT NULL,
@@ -193,3 +200,24 @@ WHEN NEW.pessoal = 1 AND (
   OR (NEW.abrangencia = 'TERRITORIAL' AND NEW.casa_id IS NULL)
 )
 BEGIN SELECT RAISE(ABORT, 'EVENTO_PESSOAL_INVALIDO'); END;
+
+-- Restaurar integralmente os gatilhos associados à tabela convocacoes.
+CREATE TRIGGER trg_convocacao_nao_ativar_em_evento_inativo_insert
+BEFORE INSERT ON convocacoes
+WHEN NEW.ativo = 1 AND NEW.status IN ('RASCUNHO','PUBLICADA') AND
+  EXISTS (SELECT 1 FROM eventos WHERE id = NEW.evento_id AND ativo = 0)
+BEGIN SELECT RAISE(ABORT, 'CONVOCACAO_EM_EVENTO_INATIVO'); END;
+
+CREATE TRIGGER trg_convocacao_nao_ativar_em_evento_inativo_update
+BEFORE UPDATE OF evento_id, ativo, status ON convocacoes
+WHEN NEW.ativo = 1 AND NEW.status IN ('RASCUNHO','PUBLICADA') AND
+  EXISTS (SELECT 1 FROM eventos WHERE id = NEW.evento_id AND ativo = 0)
+BEGIN SELECT RAISE(ABORT, 'CONVOCACAO_EM_EVENTO_INATIVO'); END;
+
+CREATE TRIGGER trg_convocacao_evento_pessoal BEFORE INSERT ON convocacoes
+WHEN EXISTS (SELECT 1 FROM eventos WHERE id = NEW.evento_id AND pessoal = 1)
+BEGIN SELECT RAISE(ABORT, 'EVENTO_PESSOAL_SEM_CONVOCACAO'); END;
+
+CREATE TRIGGER trg_convocacao_evento_pessoal_update BEFORE UPDATE OF evento_id ON convocacoes
+WHEN EXISTS (SELECT 1 FROM eventos WHERE id = NEW.evento_id AND pessoal = 1)
+BEGIN SELECT RAISE(ABORT, 'EVENTO_PESSOAL_SEM_CONVOCACAO'); END;
