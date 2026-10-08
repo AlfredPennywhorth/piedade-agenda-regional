@@ -1246,7 +1246,7 @@ describe('EventosView', () => {
     const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
 
     const scope = within(dialog).getByLabelText(/tipo de escopo/i)
-    const scopePosition = Array.from(dialog.querySelectorAll('select')).indexOf(scope)
+    const scopePosition = Array.from(dialog.querySelectorAll('select')).findIndex(el => el.id === 'tipoEscopo')
     expect(scopePosition).toBeLessThan(Array.from(dialog.querySelectorAll('select')).findIndex(el => el.id === 'modalidade'))
     expect(within(dialog).getByText('Gestor Logado')).toBeInTheDocument()
     fireEvent.change(within(dialog).getByLabelText(/título/i), { target: { value: novoEvento.titulo } })
