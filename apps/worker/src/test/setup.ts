@@ -251,6 +251,7 @@ export function setupDb(sqlite: any) {
     CREATE TABLE IF NOT EXISTS locais (
       id text PRIMARY KEY NOT NULL,
       nome text NOT NULL,
+      proprietario_membro_id text REFERENCES membros(id),
       endereco text NOT NULL,
       numero text NOT NULL,
       complemento text,
@@ -271,6 +272,7 @@ export function setupDb(sqlite: any) {
     CREATE TABLE IF NOT EXISTS espacos_local (
       id text PRIMARY KEY NOT NULL,
       local_id text NOT NULL,
+      proprietario_membro_id text REFERENCES membros(id),
       nome text NOT NULL,
       descricao text,
       capacidade integer,
@@ -279,6 +281,8 @@ export function setupDb(sqlite: any) {
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       FOREIGN KEY (local_id) REFERENCES locais(id)
     );
+    CREATE INDEX IF NOT EXISTS idx_locais_proprietario ON locais(proprietario_membro_id, ativo);
+    CREATE INDEX IF NOT EXISTS idx_espacos_local_proprietario ON espacos_local(proprietario_membro_id, ativo);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_espacos_local_nome_ativo ON espacos_local(local_id, nome) WHERE ativo = 1;
 
     CREATE TABLE IF NOT EXISTS series_recorrencia (
