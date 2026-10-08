@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, gte, lt, lte, inArray } from 'drizzle-orm'
+import { eq, and, or, gte, lt, lte, inArray } from 'drizzle-orm'
 import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, membros, casas, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo } from '../security/permissoes'
