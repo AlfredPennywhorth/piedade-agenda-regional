@@ -1,4 +1,5 @@
 import { AgendaItem } from './types'
+import { PAISES_ISO } from '@piedade/shared'
 
 interface EventCardProps {
   item: AgendaItem
@@ -57,7 +58,7 @@ export function EventCard({ item, onClick }: EventCardProps) {
   const destino = item.evento.abrangencia === 'NACIONAL'
     ? [item.evento.destinoCidadeLocal, item.evento.destinoUf].filter(Boolean).join(' — ')
     : item.evento.abrangencia === 'INTERNACIONAL'
-      ? [item.evento.destinoCidadeLocal, item.evento.destinoEstado, item.evento.destinoPaisNome || item.evento.destinoPaisCodigo].filter(Boolean).join(' — ')
+      ? [item.evento.destinoCidadeLocal, item.evento.destinoPaisCodigo ? (PAISES_ISO.find(([codigo]) => codigo === item.evento.destinoPaisCodigo)?.[1] || item.evento.destinoPaisCodigo) : null].filter(Boolean).join(' — ')
       : null
 
   return (
