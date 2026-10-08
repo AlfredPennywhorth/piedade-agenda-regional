@@ -255,9 +255,11 @@ eventosRouter.post('/', async (c) => {
 
     const id = crypto.randomUUID()
 
-    const { escopoTipo, escopoId } = extrairEscopoDoEvento(parsed)
     const atorMembroId = c.get('membroId') || null
     const externo = parsed.abrangencia === 'NACIONAL' || parsed.abrangencia === 'INTERNACIONAL'
+    const { escopoTipo, escopoId } = externo
+      ? { escopoTipo: parsed.abrangencia, escopoId: parsed.abrangencia === 'NACIONAL' ? parsed.destinoUf : parsed.destinoPaisCodigo }
+      : extrairEscopoDoEvento(parsed)
 
     if (!atorMembroId || !escopoTipo || !escopoId) {
       return c.json({ error: 'Escopo da Agenda indisponível', code: 'FORBIDDEN' }, 403)
@@ -304,8 +306,8 @@ eventosRouter.post('/', async (c) => {
       atorMembroId,
       recursoTipo: 'EVENTO',
       recursoId: id,
-      escopoTipo,
-      escopoId,
+      escopoTipo: externo ? 'REGIONAL' : escopoTipo,
+      escopoId: externo ? regionalGestaoId : escopoId,
       contexto: {
         titulo: parsed.titulo,
         modalidade: parsed.modalidade,
