@@ -655,12 +655,24 @@ eventosRouter.patch('/:id/participantes-externos/resposta', async c => {
   if (!convite || convite.status !== 'CONVIDADO') return c.json({error:'Convite pendente não encontrado'},404)
   const evento = await db.select().from(eventos).where(eq(eventos.id,id)).get()
   if (!evento || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia)) return c.json({error:'Evento externo não encontrado'},404)
-  await executarOperacaoComAudit(db, qdb => [qdb.update(eventosParticipantesExternos).set({status:resposta,updatedAt:new Date().toISOString()})
-    .where(and(eq(eventosParticipantesExternos.eventoId,id),eq(eventosParticipantesExternos.membroId,membroId),eq(eventosParticipantesExternos.status,'CONVIDADO')))], {
+  try {
+    await executarOperacaoComAudit(db, qdb => [qdb.update(eventosParticipantesExternos).set({
+      // Fail closed: a stale response writes an invalid CHECK value, aborting the whole
+      // atomic batch, including the audit record. A conditional UPDATE alone would
+      // silently affect zero rows while still recording a misleading audit entry.
+      status: sql`CASE WHEN ${eventosParticipantesExternos.status} = 'CONVIDADO' THEN ${resposta} ELSE 'RESPOSTA_OBSOLETA' END`,
+      updatedAt: new Date().toISOString(),
+    }).where(and(eq(eventosParticipantesExternos.eventoId,id),eq(eventosParticipantesExternos.membroId,membroId)))], {
       acao: 'EVENTO_EXTERNO_RESPOSTA', atorMembroId: membroId,
       recursoTipo: 'EVENTO', recursoId: id,
       escopoTipo: 'REGIONAL', escopoId: evento.regionalGestaoId ?? evento.regionalId,
       contexto: { membroId, resposta },
-  })
+    })
+  } catch (err: any) {
+    if (String(err?.message).includes('CHECK constraint failed')) {
+      return c.json({ error: 'Este convite já foi respondido', code: 'CONVITE_RESPOSTA_OBSOLETA' }, 409)
+    }
+    return c.json({ error: 'Não foi possível registrar a resposta', code: 'ERRO_RESPOSTA_CONVITE' }, 400)
+  }
   return c.json({eventoId:id,membroId,status:resposta})
 })
