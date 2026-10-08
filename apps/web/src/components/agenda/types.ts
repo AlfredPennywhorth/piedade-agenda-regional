@@ -29,6 +29,7 @@ export interface AgendaItem {
     id: string
     nome: string
   } | null
+  participacaoExterna?: { status: 'CONVIDADO' | 'ATRIBUIDO' | 'CONFIRMADO' | 'RECUSADO'; membroId: string } | null
   destinatarioId: string | null
   vinculo?: {
     funcaoId: string
