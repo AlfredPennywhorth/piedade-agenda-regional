@@ -1302,12 +1302,13 @@ describe('EventosView', () => {
     }
     const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
-      if (url === '/eventos') return [evento]
+      if (url === '/eventos' || url === '/eventos?ativo=false') return [evento]
       if (url === `/eventos/${evento.id}`) return evento
       if (url === `/eventos/${evento.id}/participantes-externos`) return []
       return original(url)
     })
     render(<EventosView />)
+    fireEvent.change(await screen.findByLabelText('Filtrar por status do evento'), { target: { value: 'CANCELADOS' } })
     await screen.findByText('Reunião Presencial')
     fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
     const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
