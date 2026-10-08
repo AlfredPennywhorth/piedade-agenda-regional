@@ -897,8 +897,9 @@ describe('Eventos API (S04)', () => {
       destinoPaisCodigo: 'PT',
       destinoCidadeLocal: 'Lisboa — atendimento',
       localId: null,
-      regionalId: null,
+      regionalId: expect.any(String),
     })
+    expect(evento.regionalGestaoId).toBe(evento.regionalId)
   })
 
   it('EXT-03 rejeita combinação externa com escopo territorial', async () => {
