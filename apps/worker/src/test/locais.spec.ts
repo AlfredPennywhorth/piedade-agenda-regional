@@ -21,6 +21,27 @@ describe('Locais API (S04)', () => {
     authToken = (await criarSessaoAutenticadaTeste(sqlite, 'locais-auth')).token
   })
 
+  it('local particular pertence ao criador e não é visível nem ao outro Master', async () => {
+    const segundo = await criarSessaoAutenticadaTeste(sqlite, 'locais-outra-conta')
+    const payload = { nome: 'Minha sala particular', endereco: 'Rua Particular', numero: '15', cidade: 'São Paulo', uf: 'SP' }
+    const criadoRes = await app.request('/api/v1/locais/particulares', mesclarAutorizacao(authToken, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    }))
+    expect(criadoRes.status).toBe(201)
+    const criado = await criadoRes.json() as any
+    expect(criado.proprietarioMembroId).toBe('locais-auth-membro')
+    const outrosRes = await app.request('/api/v1/locais', mesclarAutorizacao(segundo.token))
+    expect((await outrosRes.json() as any[]).some(l => l.id === criado.id)).toBe(false)
+    const detalhe = await app.request(`/api/v1/locais/${criado.id}`, mesclarAutorizacao(segundo.token))
+    expect(detalhe.status).toBe(404)
+    const meuDetalhe = await app.request(`/api/v1/locais/${criado.id}`, mesclarAutorizacao(authToken))
+    expect(meuDetalhe.status).toBe(200)
+    const edicaoInstitucional = await app.request(`/api/v1/locais/${criado.id}`, mesclarAutorizacao(authToken, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: 'Tentativa institucional' }),
+    }))
+    expect(edicaoInstitucional.status).toBe(404)
+  })
+
   it('1. criar local válido', async () => {
     const payload = {
       nome: 'Local Teste',
