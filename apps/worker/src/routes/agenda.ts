@@ -78,6 +78,7 @@ type RegistroAgenda = {
   destinatario: any
   rsvp: any
   checkin: any
+  participacao?: { status: string; membroId: string } | null
 }
 
 function tipoConflito(a: RegistroAgenda, b: RegistroAgenda): 'SOBREPOSICAO' | 'PROXIMIDADE' | null {
