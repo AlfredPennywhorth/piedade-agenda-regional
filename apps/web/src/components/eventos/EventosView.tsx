@@ -144,6 +144,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   // Modal Details
   const [eventoDetalhe, setEventoDetalhe] = useState<Evento | null>(null)
   const [participantesExternos, setParticipantesExternos] = useState<ParticipanteExterno[]>([])
+  const [podeVerParticipantesExternos, setPodeVerParticipantesExternos] = useState(false)
   const [membroConviteId, setMembroConviteId] = useState('')
   const [tipoConviteExterno, setTipoConviteExterno] = useState<'CONVIDADO' | 'ATRIBUIDO'>('CONVIDADO')
   const [erroConviteExterno, setErroConviteExterno] = useState<string | null>(null)
@@ -515,6 +516,8 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     eventoDetalheIdRef.current = item.id
     setEventoDetalhe(item)
     setParticipantesExternos([])
+    setPodeVerParticipantesExternos(false)
+    setSalvandoConviteExterno(false)
     setMembroConviteId('')
     setErroConviteExterno(null)
     let itemCompleto = item
@@ -527,14 +530,15 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
 
     if (consultaAtual !== eventoDetalheConsultaSeq.current) return
     setEventoDetalhe(itemCompleto)
-    if ((itemCompleto.abrangencia === 'NACIONAL' || itemCompleto.abrangencia === 'INTERNACIONAL') && !itemCompleto.pessoal && itemCompleto.podeGerenciar !== false) {
+    if ((itemCompleto.abrangencia === 'NACIONAL' || itemCompleto.abrangencia === 'INTERNACIONAL') && !itemCompleto.pessoal) {
       try {
         const lista = await fetchWithAuth<ParticipanteExterno[]>(`/eventos/${itemCompleto.id}/participantes-externos`)
         if (consultaAtual !== eventoDetalheConsultaSeq.current) return
         setParticipantesExternos(lista)
+        setPodeVerParticipantesExternos(true)
       } catch (err: any) {
         if (consultaAtual !== eventoDetalheConsultaSeq.current) return
-        setErroConviteExterno(err.message || 'Não foi possível carregar os participantes.')
+        if (itemCompleto.podeGerenciar !== false) setErroConviteExterno(err.message || 'Não foi possível carregar os participantes.')
       }
     }
 
@@ -555,20 +559,25 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   }
 
   const incluirParticipanteExterno = async () => {
-    if (!eventoDetalhe || !membroConviteId || salvandoConviteExterno) return
+    if (!eventoDetalhe || !eventoDetalhe.ativo || !membroConviteId || salvandoConviteExterno) return
+    const eventoId = eventoDetalhe.id
+    const geracaoDetalhe = eventoDetalheConsultaSeq.current
+    const aindaNoMesmoEvento = () =>
+      geracaoDetalhe === eventoDetalheConsultaSeq.current && eventoDetalheIdRef.current === eventoId
     setSalvandoConviteExterno(true)
     setErroConviteExterno(null)
     try {
       const novo = await postWithAuth<ParticipanteExterno>(
-        `/eventos/${eventoDetalhe.id}/participantes-externos`,
+        `/eventos/${eventoId}/participantes-externos`,
         { membroId: membroConviteId, tipo: tipoConviteExterno },
       )
+      if (!aindaNoMesmoEvento()) return
       setParticipantesExternos(atuais => [...atuais, novo])
       setMembroConviteId('')
     } catch (err: any) {
-      setErroConviteExterno(err.message || 'Não foi possível incluir o participante.')
+      if (aindaNoMesmoEvento()) setErroConviteExterno(err.message || 'Não foi possível incluir o participante.')
     } finally {
-      setSalvandoConviteExterno(false)
+      if (aindaNoMesmoEvento()) setSalvandoConviteExterno(false)
     }
   }
 
@@ -1864,7 +1873,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                   </p>
                 </div>
               )}
-              {(eventoDetalhe.abrangencia === 'NACIONAL' || eventoDetalhe.abrangencia === 'INTERNACIONAL') && !eventoDetalhe.pessoal && eventoDetalhe.podeGerenciar !== false && (
+              {(eventoDetalhe.abrangencia === 'NACIONAL' || eventoDetalhe.abrangencia === 'INTERNACIONAL') && !eventoDetalhe.pessoal && podeVerParticipantesExternos && (
                 <section className="rounded-xl border border-brand-200 bg-brand-50 p-4 space-y-3" aria-label="Convocação nominal externa">
                   <h4 className="font-semibold text-brand-900">Convocação nominal de Diáconos e Membros</h4>
                   <p className="text-xs text-slate-600">Para eventos externos, selecione pessoas diretamente. Não há seleção de cargos ou funções.</p>
@@ -1876,6 +1885,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                     ))}
                     {participantesExternos.length === 0 && <li className="text-slate-500">Nenhum participante incluído ainda.</li>}
                   </ul>
+                  {eventoDetalhe.ativo && eventoDetalhe.podeGerenciar !== false && (<>
                   <label htmlFor="membroConviteId" className="block text-sm font-medium">Diácono ou Membro</label>
                   <select id="membroConviteId" value={membroConviteId} onChange={e => setMembroConviteId(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2 text-sm">
                     <option value="">Selecione uma pessoa</option>
@@ -1889,6 +1899,8 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                   <button type="button" disabled={!membroConviteId || salvandoConviteExterno} onClick={() => void incluirParticipanteExterno()} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                     {salvandoConviteExterno ? 'Incluindo...' : 'Incluir participante'}
                   </button>
+                  </>)}
+                  {!eventoDetalhe.ativo && <p className="text-sm text-slate-500">Evento cancelado: participantes disponíveis somente para consulta.</p>}
                   {erroConviteExterno && <p role="alert" className="text-sm text-red-700">{erroConviteExterno}</p>}
                 </section>
               )}
