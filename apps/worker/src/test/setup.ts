@@ -414,6 +414,23 @@ export function setupDb(sqlite: any) {
     CREATE INDEX IF NOT EXISTS idx_eventos_abrangencia ON eventos (abrangencia, ativo);
     CREATE INDEX IF NOT EXISTS idx_eventos_abrangencia_gestao ON eventos (abrangencia, regional_gestao_id, ativo);
 
+    CREATE TABLE IF NOT EXISTS eventos_destinos_externos (
+      evento_id text PRIMARY KEY REFERENCES eventos(id),
+      regional_id text NOT NULL REFERENCES regionais(id),
+      abrangencia text NOT NULL,
+      uf text, municipio text, pais_codigo text, cidade text
+    );
+    CREATE INDEX IF NOT EXISTS idx_eventos_destinos_externos_regional ON eventos_destinos_externos(regional_id, abrangencia);
+    CREATE TABLE IF NOT EXISTS eventos_participantes_externos (
+      evento_id text NOT NULL REFERENCES eventos(id),
+      membro_id text NOT NULL REFERENCES membros(id),
+      status text NOT NULL,
+      criado_por_membro_id text NOT NULL REFERENCES membros(id),
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      PRIMARY KEY(evento_id,membro_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_eventos_participantes_externos_membro ON eventos_participantes_externos(membro_id,status);
     CREATE TABLE IF NOT EXISTS convocacoes (
       id text PRIMARY KEY NOT NULL,
       evento_id text NOT NULL,
