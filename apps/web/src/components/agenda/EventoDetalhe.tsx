@@ -6,6 +6,7 @@ import { QrCodeModal } from './QrCodeModal'
 interface EventoDetalheProps {
   item: AgendaItem
   onClose: () => void
+  onExternalResponseUpdated?: (eventoId: string, status: 'CONFIRMADO' | 'RECUSADO') => void
   onRsvpUpdated?: (
     destinatarioId: string,
     rsvp: {
@@ -17,7 +18,7 @@ interface EventoDetalheProps {
   ) => void
 }
 
-export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalheProps) {
+export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponseUpdated }: EventoDetalheProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   
   const [statusExterno, setStatusExterno] = useState(item.participacaoExterna?.status ?? null)
@@ -184,6 +185,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
     try {
       await apiClient.patchWithAuth(`/eventos/${item.evento.id}/participantes-externos/resposta`, { resposta })
       setStatusExterno(resposta)
+      onExternalResponseUpdated?.(item.evento.id, resposta)
       onClose()
     } catch (err: any) {
       setRsvpError(err.message || 'Erro ao registrar resposta ao convite.')
