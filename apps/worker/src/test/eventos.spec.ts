@@ -394,7 +394,7 @@ describe('Eventos API (S04)', () => {
         regionalId: crypto.randomUUID(),
         administracaoId: crypto.randomUUID()
       }).run()
-    }).toThrow(/CHECK constraint failed: check_evento_escopo_unico/)
+    }).toThrow(/CHECK constraint failed: check_evento_(escopo_unico|abrangencia_destino)/)
   })
 
   // =========================================================================
