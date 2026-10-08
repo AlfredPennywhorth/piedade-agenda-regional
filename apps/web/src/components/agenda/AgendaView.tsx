@@ -96,6 +96,21 @@ export function AgendaView() {
     })
   }
 
+  const handleExternalResponseUpdated = (eventoId: string, status: 'CONFIRMADO' | 'RECUSADO') => {
+    setError(null)
+    setItems(current => current.map(item => ({
+      ...item,
+      participacaoExterna: item.evento.id === eventoId && item.participacaoExterna
+        ? { ...item.participacaoExterna, status }
+        : item.participacaoExterna,
+      conflito: null,
+    })))
+    void carregarAgenda().catch((err: any) => {
+      setItems(current => current.map(item => ({ ...item, conflito: null })))
+      setError(err.message || 'Não foi possível atualizar os conflitos da agenda.')
+    })
+  }
+
   const priorizar = async (item: AgendaItem) => {
     setPriorizandoEventoId(item.evento.id)
     setError(null)
@@ -179,6 +194,7 @@ export function AgendaView() {
           item={selectedItem} 
           onClose={() => setSelectedItem(null)} 
           onRsvpUpdated={handleRsvpUpdated}
+          onExternalResponseUpdated={handleExternalResponseUpdated}
         />
       )}
     </div>

@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
 import { eq, and, or, sql, inArray } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal, membros, casas, setores, administracoes, gruposTrabalho } from '../db/schema'
+import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal, membros, casas, setores, administracoes, gruposTrabalho, eventosParticipantesExternos } from '../db/schema'
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, executarOperacaoComAudits, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
-import { podeGerenciarAgendaNoEscopo, eMasterSistema } from '../security/permissoes'
+import { podeGerenciarAgendaNoEscopo, podeGerenciarAgendaExterna, obterRegionalGestaoAgendaExterna, eMasterSistema, eGestorRelatoriosAutorizadoParaEvento } from '../security/permissoes'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
 import { carregarEscoposOperacionaisLegados, condicaoEventosVisiveis, condicaoEventosGerenciaveis, podeLerEvento, podeGerenciarEvento } from '../security/eventos'
@@ -148,6 +148,24 @@ async function criarAvisoAlteracaoMaterial(db: any, anterior: any, atual: any) {
     partes.push(`Acesso online: ${anterior.urlOnline ? 'link anterior' : 'sem link'} → ${atual.urlOnline ? 'novo link disponível' : 'removido'}`)
   }
 
+  if (
+    anterior.abrangencia !== atual.abrangencia ||
+    anterior.destinoUf !== atual.destinoUf ||
+    anterior.destinoPaisCodigo !== atual.destinoPaisCodigo ||
+    anterior.destinoCidadeLocal !== atual.destinoCidadeLocal
+  ) {
+    const formatarDestino = (evento: any) => {
+      if (evento.abrangencia === 'NACIONAL') {
+        return [evento.destinoCidadeLocal, evento.destinoUf].filter(Boolean).join(' — ') || 'destino nacional não informado'
+      }
+      if (evento.abrangencia === 'INTERNACIONAL') {
+        return [evento.destinoCidadeLocal, evento.destinoPaisCodigo].filter(Boolean).join(' — ') || 'destino internacional não informado'
+      }
+      return 'escopo territorial da Regional'
+    }
+    partes.push(`Destino: ${formatarDestino(anterior)} → ${formatarDestino(atual)}`)
+  }
+
   if (partes.length === 0) return null
   return `Atenção! O evento "${anterior.titulo}" foi alterado. ${partes.join('; ')}. Favor reconfirmar sua presença.`
 }
@@ -159,7 +177,11 @@ function houveAlteracaoMaterial(anterior: any, atual: any) {
     anterior.modalidade !== atual.modalidade ||
     anterior.localId !== atual.localId ||
     anterior.espacoId !== atual.espacoId ||
-    anterior.urlOnline !== atual.urlOnline
+    anterior.urlOnline !== atual.urlOnline ||
+    anterior.abrangencia !== atual.abrangencia ||
+    anterior.destinoUf !== atual.destinoUf ||
+    anterior.destinoPaisCodigo !== atual.destinoPaisCodigo ||
+    anterior.destinoCidadeLocal !== atual.destinoCidadeLocal
   )
 }
 
@@ -233,20 +255,43 @@ eventosRouter.post('/', async (c) => {
 
     const id = crypto.randomUUID()
 
-    const { escopoTipo, escopoId } = extrairEscopoDoEvento(parsed)
     const atorMembroId = c.get('membroId') || null
+    const externo = parsed.abrangencia === 'NACIONAL' || parsed.abrangencia === 'INTERNACIONAL'
+    const { escopoTipo, escopoId } = externo
+      ? { escopoTipo: parsed.abrangencia, escopoId: parsed.abrangencia === 'NACIONAL' ? parsed.destinoUf : parsed.destinoPaisCodigo }
+      : extrairEscopoDoEvento(parsed)
 
     if (!atorMembroId || !escopoTipo || !escopoId) {
       return c.json({ error: 'Escopo da Agenda indisponível', code: 'FORBIDDEN' }, 403)
     }
-    const autorizado = await podeGerenciarAgendaNoEscopo(
-      db,
-      atorMembroId,
-      escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-      escopoId
-    )
+
+    const regionalGestaoId = externo
+      ? await obterRegionalGestaoAgendaExterna(db, atorMembroId)
+      : null
+
+    const autorizado = externo
+      ? (
+          parsed.pessoal === true ||
+          (
+            !!regionalGestaoId &&
+            await podeGerenciarAgendaExterna(db, atorMembroId, regionalGestaoId)
+          )
+        )
+      : await podeGerenciarAgendaNoEscopo(
+          db,
+          atorMembroId,
+          escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+          escopoId
+        )
+
     if (!autorizado) {
       return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
+    }
+    if (externo && !regionalGestaoId) {
+      return c.json({
+        error: 'Não foi possível determinar uma única Regional responsável pelo atendimento externo',
+        code: 'REGIONAL_GESTAO_AMBIGUA'
+      }, 409)
     }
 
     if (parsed.pessoal) {
@@ -261,20 +306,27 @@ eventosRouter.post('/', async (c) => {
       atorMembroId,
       recursoTipo: 'EVENTO',
       recursoId: id,
-      escopoTipo,
-      escopoId,
+      escopoTipo: externo ? 'REGIONAL' : escopoTipo,
+      escopoId: externo ? regionalGestaoId : escopoId,
       contexto: {
         titulo: parsed.titulo,
         modalidade: parsed.modalidade,
         pessoal: parsed.pessoal ?? false,
         escopoTipo: escopoTipo || '',
         escopoId: escopoId || '',
+        regionalGestaoId,
       },
     }
 
     await executarOperacaoComAudit(
       db,
-      (qdb) => [qdb.insert(eventos).values({ id, ...parsed, criadorMembroId: atorMembroId })],
+      (qdb) => [qdb.insert(eventos).values({
+        id,
+        ...parsed,
+        criadorMembroId: atorMembroId,
+        regionalGestaoId,
+        regionalId: externo ? regionalGestaoId : parsed.regionalId,
+      })],
       auditData
     )
 
@@ -420,9 +472,14 @@ eventosRouter.patch('/:id', async (c) => {
       }, 409)
     }
 
-    // Validar estado final mesclado (existente + patch) com EventoCreate
+    // Validar estado final mesclado (existente + patch) com EventoCreate.
+    // Em eventos externos, regionalId é interno (Regional de gestão) e não faz parte do destino público.
     const merged = { ...existing, ...parsed }
-    EventoCreate.parse(merged)
+    EventoCreate.parse(
+      merged.abrangencia === 'NACIONAL' || merged.abrangencia === 'INTERNACIONAL'
+        ? { ...merged, regionalId: null, administracaoId: null, setorId: null, casaId: null, grupoTrabalhoId: null }
+        : merged
+    )
     const espacoFoiAlterado = parsed.espacoId !== undefined && parsed.espacoId !== existing.espacoId
     const espacoValido = espacoFoiAlterado
       ? await espacoAtivoPertenceAoLocal(db, merged.localId, merged.espacoId)
@@ -436,8 +493,10 @@ eventosRouter.patch('/:id', async (c) => {
     }
 
     const escopoOriginal = extrairEscopoDoEvento(existing)
-    const escopoFinal = extrairEscopoDoEvento(merged)
     const membroId = c.get('membroId')
+    const escopoFinal = merged.abrangencia === 'NACIONAL' || merged.abrangencia === 'INTERNACIONAL'
+      ? { escopoTipo: 'REGIONAL', escopoId: existing.regionalGestaoId || (membroId ? await obterRegionalGestaoAgendaExterna(db, membroId) : null) }
+      : extrairEscopoDoEvento(merged)
     if (
       !membroId ||
       !escopoOriginal.escopoTipo ||
@@ -448,13 +507,28 @@ eventosRouter.patch('/:id', async (c) => {
       return c.json({ error: 'Escopo da Agenda indisponível', code: 'FORBIDDEN' }, 403)
     }
 
-    const autorizadoFinal = await podeGerenciarAgendaNoEscopo(
-      db, membroId,
-      escopoFinal.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-      escopoFinal.escopoId,
-      existing.criadorMembroId === membroId || existing.organizadorMembroId === membroId
-    )
-    const preservaCasaPessoal = existing.pessoal && merged.casaId === existing.casaId
+    const externoFinal = merged.abrangencia === 'NACIONAL' || merged.abrangencia === 'INTERNACIONAL'
+    const regionalGestaoFinal = externoFinal
+      ? (existing.regionalGestaoId || await obterRegionalGestaoAgendaExterna(db, membroId))
+      : null
+    const autorizadoFinal = externoFinal
+      ? (
+          (merged.pessoal === true && existing.criadorMembroId === membroId) ||
+          (
+            !!regionalGestaoFinal &&
+            await podeGerenciarAgendaExterna(db, membroId, regionalGestaoFinal)
+          )
+        )
+      : await podeGerenciarAgendaNoEscopo(
+          db, membroId,
+          escopoFinal.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+          escopoFinal.escopoId,
+          existing.criadorMembroId === membroId || existing.organizadorMembroId === membroId
+        )
+    const preservaCasaPessoal =
+      !externoFinal &&
+      existing.pessoal &&
+      merged.casaId === existing.casaId
     if (!autorizadoFinal && !preservaCasaPessoal) return c.json({ error: 'Acesso não autorizado para gerir a Agenda neste escopo', code: 'FORBIDDEN' }, 403)
 
     if ((existing.pessoal ?? false) !== (merged.pessoal ?? false)) {
@@ -498,6 +572,12 @@ eventosRouter.patch('/:id', async (c) => {
         qdb.update(eventos)
           .set({
             ...parsed,
+            regionalGestaoId: regionalGestaoFinal,
+            regionalId: externoFinal ? regionalGestaoFinal : merged.regionalId,
+            administracaoId: externoFinal ? null : merged.administracaoId,
+            setorId: externoFinal ? null : merged.setorId,
+            casaId: externoFinal ? null : merged.casaId,
+            grupoTrabalhoId: externoFinal ? null : merged.grupoTrabalhoId,
             recorrenciaExcecao: isExcecao,
             agendaRevisao: alteracaoMaterial || ativacaoAlterada ? nowIso : existing.agendaRevisao,
             agendaAviso,
@@ -521,3 +601,81 @@ eventosRouter.patch('/:id', async (c) => {
   }
 })
 
+
+// Participação externa é nominal, nunca uma função institucional.
+eventosRouter.get('/:id/participantes-externos', async c => {
+  const db = c.get('db')
+  const id = c.req.param('id')
+  const membroId = c.get('membroId')
+  const evento = await db.select().from(eventos).where(eq(eventos.id,id)).get()
+  if (!evento || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia)) return c.json({error:'Evento externo não encontrado'},404)
+  if (!membroId || !((await podeGerenciarEvento(db, membroId, evento)) || (await eGestorRelatoriosAutorizadoParaEvento(db, membroId, evento)))) return c.json({error:'Acesso não autorizado para consultar os participantes'},403)
+  const itens = await db.select().from(eventosParticipantesExternos).where(eq(eventosParticipantesExternos.eventoId,id)).all()
+  return c.json(itens)
+})
+
+eventosRouter.post('/:id/participantes-externos', async c => {
+  const db = c.get('db')
+  const id = c.req.param('id')
+  const ator = c.get('membroId')
+  const evento = await db.select().from(eventos).where(eq(eventos.id,id)).get()
+  if (!evento || !evento.ativo || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia)) return c.json({error:'Evento externo não encontrado'},404)
+  if (!ator || !(await podeGerenciarEvento(db,ator,evento))) return c.json({error:'Acesso não autorizado'},403)
+  const payload: unknown = await c.req.json().catch(() => null)
+  if (!payload || typeof payload !== 'object') return c.json({error:'Dados inválidos'},400)
+  const { membroId, tipo } = payload as Record<string,unknown>
+  if (typeof membroId !== 'string' || !membroId || (tipo !== 'CONVIDADO' && tipo !== 'ATRIBUIDO')) return c.json({error:'Membro e tipo de participação inválidos'},400)
+  const membro = await db.select({id:membros.id,ativo:membros.ativo}).from(membros).where(eq(membros.id,membroId)).get()
+  if (!membro || !membro.ativo) return c.json({error:'Membro não encontrado ou inativo'},404)
+  try {
+    await executarOperacaoComAudit(db, qdb => [qdb.insert(eventosParticipantesExternos).values({eventoId:id,membroId,status:tipo,criadoPorMembroId:ator})], {
+      acao: tipo === 'CONVIDADO' ? 'EVENTO_EXTERNO_CONVITE' : 'EVENTO_EXTERNO_ATRIBUICAO',
+      atorMembroId: ator, recursoTipo: 'EVENTO', recursoId: id,
+      escopoTipo: 'REGIONAL', escopoId: evento.regionalGestaoId ?? evento.regionalId,
+      contexto: { membroId, tipo },
+    })
+    return c.json({eventoId:id,membroId,status:tipo},201)
+  } catch(err:any) {
+    if (String(err?.message).includes('UNIQUE constraint')) return c.json({error:'Membro já incluído neste evento'},409)
+    return c.json({error:'Falha ao incluir participante'},400)
+  }
+})
+
+eventosRouter.patch('/:id/participantes-externos/resposta', async c => {
+  const db = c.get('db')
+  const id = c.req.param('id')
+  const membroId = c.get('membroId')
+  if (!membroId) return c.json({error:'Sem identificação do membro'},403)
+  const payload: unknown = await c.req.json().catch(() => null)
+  if (!payload || typeof payload !== 'object') return c.json({error:'Dados inválidos'},400)
+  const { resposta } = payload as Record<string,unknown>
+  if (resposta !== 'CONFIRMADO' && resposta !== 'RECUSADO') return c.json({error:'Resposta inválida'},400)
+  const convite = await db.select().from(eventosParticipantesExternos)
+    .where(and(eq(eventosParticipantesExternos.eventoId,id),eq(eventosParticipantesExternos.membroId,membroId))).get()
+  if (!convite || convite.status !== 'CONVIDADO') return c.json({error:'Convite pendente não encontrado'},404)
+  const evento = await db.select().from(eventos).where(eq(eventos.id,id)).get()
+  if (!evento || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia)) return c.json({error:'Evento externo não encontrado'},404)
+  if (!evento.ativo || new Date(evento.inicioEm).getTime() <= Date.now()) {
+    return c.json({ error: 'Respostas indisponíveis após o início ou cancelamento do evento', code: 'EVENTO_INICIADO_OU_CANCELADO' }, 409)
+  }
+  try {
+    await executarOperacaoComAudit(db, qdb => [qdb.update(eventosParticipantesExternos).set({
+      // Fail closed: a stale response writes an invalid CHECK value, aborting the whole
+      // atomic batch, including the audit record. A conditional UPDATE alone would
+      // silently affect zero rows while still recording a misleading audit entry.
+      status: sql`CASE WHEN ${eventosParticipantesExternos.status} = 'CONVIDADO' AND EXISTS (SELECT 1 FROM eventos e WHERE e.id = ${id} AND e.ativo = 1 AND julianday(e.inicio_em) > julianday('now')) THEN ${resposta} ELSE 'RESPOSTA_OBSOLETA' END`,
+      updatedAt: new Date().toISOString(),
+    }).where(and(eq(eventosParticipantesExternos.eventoId,id),eq(eventosParticipantesExternos.membroId,membroId)))], {
+      acao: 'EVENTO_EXTERNO_RESPOSTA', atorMembroId: membroId,
+      recursoTipo: 'EVENTO', recursoId: id,
+      escopoTipo: 'REGIONAL', escopoId: evento.regionalGestaoId ?? evento.regionalId,
+      contexto: { membroId, resposta },
+    })
+  } catch (err: any) {
+    if (String(err?.message).includes('CHECK constraint failed')) {
+      return c.json({ error: 'Este convite já foi respondido', code: 'CONVITE_RESPOSTA_OBSOLETA' }, 409)
+    }
+    return c.json({ error: 'Não foi possível registrar a resposta', code: 'ERRO_RESPOSTA_CONVITE' }, 400)
+  }
+  return c.json({eventoId:id,membroId,status:resposta})
+})

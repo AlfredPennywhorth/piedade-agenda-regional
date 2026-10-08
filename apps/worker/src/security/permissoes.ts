@@ -439,6 +439,70 @@ export function temPerfilNoEscopo(
   )
 }
 
+async function obterRegionalDaCasaDoMembro(db: any, membroId: string): Promise<string | null> {
+  const row = await db
+    .select({ regionalId: schema.administracoes.regionalId })
+    .from(schema.membros)
+    .innerJoin(schema.casas, eq(schema.membros.casaId, schema.casas.id))
+    .innerJoin(schema.setores, eq(schema.casas.setorId, schema.setores.id))
+    .innerJoin(schema.administracoes, eq(schema.setores.administracaoId, schema.administracoes.id))
+    .where(and(eq(schema.membros.id, membroId), eq(schema.membros.ativo, true)))
+    .get()
+  return row?.regionalId ?? null
+}
+
+export async function obterRegionalGestaoAgendaExterna(
+  db: any,
+  membroId: string
+): Promise<string | null> {
+  if (!db || !membroId) return null
+  const contexto = await carregarContextoPermissoes(db, membroId)
+
+  if (eMasterSistema(contexto)) {
+    const regionalCasa = await obterRegionalDaCasaDoMembro(db, membroId)
+    if (regionalCasa) return regionalCasa
+    const regionalAtiva = await db
+      .select({ id: schema.regionais.id })
+      .from(schema.regionais)
+      .where(eq(schema.regionais.ativo, true))
+      .get()
+    return regionalAtiva?.id ?? null
+  }
+
+  const regionaisGestao = Array.from(new Set(
+    contexto.acessosAtivos
+      .filter(acesso =>
+        ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) &&
+        acesso.escopoTipo === 'REGIONAL' &&
+        acesso.escopoId !== null
+      )
+      .map(acesso => acesso.escopoId as string)
+  ))
+
+  if (regionaisGestao.length === 1) return regionaisGestao[0]
+  if (regionaisGestao.length > 1) return null
+
+  return obterRegionalDaCasaDoMembro(db, membroId)
+}
+
+export async function podeGerenciarAgendaExterna(
+  db: any,
+  membroId: string,
+  regionalGestaoId?: string | null
+): Promise<boolean> {
+  if (!db || !membroId) return false
+  const contexto = await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) return true
+
+  return contexto.acessosAtivos.some(
+    acesso =>
+      ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) &&
+      acesso.escopoTipo === 'REGIONAL' &&
+      acesso.escopoId !== null &&
+      (!regionalGestaoId || acesso.escopoId === regionalGestaoId)
+  )
+}
+
 export async function podeGerenciarAgendaNoEscopo(
   db: any,
   membroId: string,
@@ -668,6 +732,14 @@ export async function eGestorRelatoriosAutorizadoParaEvento(db: any, membroId: s
 
   if (evento.organizadorMembroId === membroId) return true
   const { condicaoEscopo } = await import('./eventos')
+  if ((evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') && evento.regionalGestaoId) {
+    const gestorRegional = contexto.acessosAtivos.some(acesso =>
+      acesso.perfilCodigo === 'GESTOR_RELATORIOS' &&
+      acesso.escopoTipo === 'REGIONAL' &&
+      acesso.escopoId === evento.regionalGestaoId
+    )
+    if (gestorRegional) return true
+  }
   const condicoes = contexto.acessosAtivos
     .filter(acesso => acesso.perfilCodigo === 'GESTOR_RELATORIOS')
     .map(condicaoEscopo)
@@ -680,6 +752,8 @@ export async function eGestorRelatoriosAutorizadoParaEvento(db: any, membroId: s
       eq(schema.vinculosFuncionais.ativo, true), eq(schema.funcoes.ativo, true),
       eq(schema.funcoes.codigo, 'GESTOR_RELATORIOS'))).all()
   for (const { v } of legados) {
+    if ((evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') &&
+      evento.regionalGestaoId && v.regionalId === evento.regionalGestaoId) return true
     const campos = [ ['REGIONAL', v.regionalId], ['ADMINISTRACAO', v.administracaoId],
       ['SETOR', v.setorId], ['CASA', v.casaId], ['GRUPO_TRABALHO', v.grupoTrabalhoId] ] as const
     for (const [escopoTipo, escopoId] of campos) {

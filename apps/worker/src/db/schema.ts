@@ -595,7 +595,13 @@ export const eventos = sqliteTable(
     urlOnline: text('url_online'),
     organizadorMembroId: text('organizador_membro_id').references(() => membros.id),
 
-    // Escopo Institucional (Exatamente UM preenchido)
+    abrangencia: text('abrangencia').notNull().default('TERRITORIAL'),
+    destinoUf: text('destino_uf'),
+    destinoPaisCodigo: text('destino_pais_codigo'),
+    destinoCidadeLocal: text('destino_cidade_local'),
+    regionalGestaoId: text('regional_gestao_id').references(() => regionais.id),
+
+    // Escopo Institucional territorial
     regionalId: text('regional_id').references(() => regionais.id),
     administracaoId: text('administracao_id').references(() => administracoes.id),
     setorId: text('setor_id').references(() => setores.id),
@@ -621,18 +627,55 @@ export const eventos = sqliteTable(
   },
   table => ({
     checkEscopo: check(
-      'check_evento_escopo_unico',
+      'check_evento_abrangencia_destino',
       sql`
-      (CASE WHEN ${table.regionalId} IS NOT NULL THEN 1 ELSE 0 END) +
-      (CASE WHEN ${table.administracaoId} IS NOT NULL THEN 1 ELSE 0 END) +
-      (CASE WHEN ${table.setorId} IS NOT NULL THEN 1 ELSE 0 END) +
-      (CASE WHEN ${table.casaId} IS NOT NULL THEN 1 ELSE 0 END) +
-      (CASE WHEN ${table.grupoTrabalhoId} IS NOT NULL THEN 1 ELSE 0 END) = 1
+      (
+        ${table.abrangencia} = 'TERRITORIAL'
+        AND (
+          (CASE WHEN ${table.regionalId} IS NOT NULL THEN 1 ELSE 0 END) +
+          (CASE WHEN ${table.administracaoId} IS NOT NULL THEN 1 ELSE 0 END) +
+          (CASE WHEN ${table.setorId} IS NOT NULL THEN 1 ELSE 0 END) +
+          (CASE WHEN ${table.casaId} IS NOT NULL THEN 1 ELSE 0 END) +
+          (CASE WHEN ${table.grupoTrabalhoId} IS NOT NULL THEN 1 ELSE 0 END)
+        ) = 1
+        AND ${table.destinoUf} IS NULL
+        AND ${table.destinoPaisCodigo} IS NULL
+        AND ${table.destinoCidadeLocal} IS NULL
+      )
+      OR
+      (
+        ${table.abrangencia} = 'NACIONAL'
+        AND ${table.regionalGestaoId} IS NOT NULL
+        AND ${table.regionalId} IS NOT NULL
+        AND ${table.regionalId} = ${table.regionalGestaoId}
+        AND ${table.administracaoId} IS NULL
+        AND ${table.setorId} IS NULL AND ${table.casaId} IS NULL
+        AND ${table.grupoTrabalhoId} IS NULL
+        AND ${table.destinoUf} IS NOT NULL
+        AND ${table.destinoPaisCodigo} IS NULL
+        AND ${table.destinoCidadeLocal} IS NOT NULL
+        AND (${table.pessoal} = 1 OR ${table.regionalGestaoId} IS NOT NULL)
+      )
+      OR
+      (
+        ${table.abrangencia} = 'INTERNACIONAL'
+        AND ${table.regionalGestaoId} IS NOT NULL
+        AND ${table.regionalId} IS NOT NULL
+        AND ${table.regionalId} = ${table.regionalGestaoId}
+        AND ${table.administracaoId} IS NULL
+        AND ${table.setorId} IS NULL AND ${table.casaId} IS NULL
+        AND ${table.grupoTrabalhoId} IS NULL
+        AND ${table.destinoUf} IS NULL
+        AND ${table.destinoPaisCodigo} IS NOT NULL
+        AND ${table.destinoCidadeLocal} IS NOT NULL
+        AND (${table.pessoal} = 1 OR ${table.regionalGestaoId} IS NOT NULL)
+      )
     `
     ),
     idxCriadorPessoal: index('idx_eventos_criador_pessoal').on(table.criadorMembroId, table.pessoal, table.ativo),
     idxInicioEm: index('idx_eventos_inicio_em').on(table.inicioEm),
     idxAtivo: index('idx_eventos_ativo').on(table.ativo),
+    idxAbrangenciaGestao: index('idx_eventos_abrangencia_gestao').on(table.abrangencia, table.regionalGestaoId, table.ativo),
     idxLocalId: index('idx_eventos_local_id').on(table.localId),
     idxSerieRecorrenciaId: index('idx_eventos_serie_recorrencia_id').on(table.serieRecorrenciaId),
   })
@@ -1121,3 +1164,28 @@ export const auditoriaLogs = sqliteTable(
     idxCriadoEm: index('idx_auditoria_criado_em').on(table.criadoEm),
   })
 )
+
+// Destino externo gerido por uma Regional, independente da hierarquia geográfica interna.
+export const eventosDestinosExternos = sqliteTable('eventos_destinos_externos', {
+  eventoId: text('evento_id').primaryKey().references(() => eventos.id),
+  regionalId: text('regional_id').notNull().references(() => regionais.id),
+  abrangencia: text('abrangencia').notNull(),
+  uf: text('uf'),
+  municipio: text('municipio'),
+  paisCodigo: text('pais_codigo'),
+  cidade: text('cidade'),
+})
+
+// Convidados/atribuídos por pessoa. Nenhum identificador de função.
+export const eventosParticipantesExternos = sqliteTable('eventos_participantes_externos', {
+  eventoId: text('evento_id').notNull().references(() => eventos.id),
+  membroId: text('membro_id').notNull().references(() => membros.id),
+  status: text('status').notNull(),
+  criadoPorMembroId: text('criado_por_membro_id').notNull().references(() => membros.id),
+  createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+}, table => ({
+  statusValido: check('eventos_participantes_externos_status_check', sql`${table.status} IN ('CONVIDADO', 'ATRIBUIDO', 'CONFIRMADO', 'RECUSADO')`),
+  pk: uniqueIndex('idx_eventos_participantes_externos_unico').on(table.eventoId,table.membroId),
+  idxMembro: index('idx_eventos_participantes_externos_membro').on(table.membroId,table.status),
+}))

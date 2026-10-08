@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { eq, and, gte, lt, lte, inArray } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, membros, casas, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
+import { eq, and, or, gte, lt, lte, inArray } from 'drizzle-orm'
+import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo } from '../security/permissoes'
 import { condicaoEventosVisiveis } from '../security/eventos'
@@ -265,7 +265,7 @@ relatoriosRouter.get('/presencas/periodo', async c => {
 
   switch (escopoTipo) {
     case 'REGIONAL':
-      condicoes.push(eq(eventos.regionalId, escopoId))
+      condicoes.push(or(eq(eventos.regionalId, escopoId), eq(eventos.regionalGestaoId, escopoId))!)
       break
     case 'ADMINISTRACAO':
       condicoes.push(eq(eventos.administracaoId, escopoId))
@@ -417,11 +417,16 @@ relatoriosRouter.get('/eventos/:eventoId', async (c) => {
     : []
 
   const consolidados = consolidarDestinatariosPorMembro(destinatarios, rsvpList)
-  const totalConvocados = consolidados.length
-  const totalConfirmados = consolidados.filter(item => item.rsvp?.resposta === 'PARTICIPAREI').length
-  const totalRecusados = consolidados.filter(item => item.rsvp?.resposta === 'NAO_PARTICIPAREI').length
-  const totalNaoSei = consolidados.filter(item => item.rsvp?.resposta === 'NAO_SEI').length
-  const totalSemResposta = consolidados.filter(item => !item.rsvp).length
+  const externo = evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL'
+  const nominais: Array<{ membroId: string; status: string }> = externo
+    ? await db.select({ membroId: eventosParticipantesExternos.membroId, status: eventosParticipantesExternos.status })
+      .from(eventosParticipantesExternos).where(eq(eventosParticipantesExternos.eventoId, eventoId)).all()
+    : []
+  const totalConvocados = externo ? nominais.length : consolidados.length
+  const totalConfirmados = externo ? nominais.filter(p => p.status === 'CONFIRMADO').length : consolidados.filter(item => item.rsvp?.resposta === 'PARTICIPAREI').length
+  const totalRecusados = externo ? nominais.filter(p => p.status === 'RECUSADO').length : consolidados.filter(item => item.rsvp?.resposta === 'NAO_PARTICIPAREI').length
+  const totalNaoSei = externo ? 0 : consolidados.filter(item => item.rsvp?.resposta === 'NAO_SEI').length
+  const totalSemResposta = externo ? nominais.filter(p => p.status === 'CONVIDADO' || p.status === 'ATRIBUIDO').length : consolidados.filter(item => !item.rsvp).length
 
   // Checkins records
   const checkinList = await db.select().from(checkins).where(and(eq(checkins.eventoId, eventoId), eq(checkins.status, 'ATIVO'))).all()
@@ -429,9 +434,9 @@ relatoriosRouter.get('/eventos/:eventoId', async (c) => {
 
   // Presenças dos confirmados
   const membrosConfirmados = new Set(
-    consolidados
-      .filter(item => item.rsvp?.resposta === 'PARTICIPAREI')
-      .map(item => item.destinatario.membroId)
+    externo
+      ? nominais.filter(p => p.status === 'CONFIRMADO').map(p => p.membroId)
+      : consolidados.filter(item => item.rsvp?.resposta === 'PARTICIPAREI').map(item => item.destinatario.membroId)
   )
   const presencasConfirmados = checkinList.filter((item: any) => membrosConfirmados.has(item.membroId)).length
 
@@ -491,6 +496,39 @@ relatoriosRouter.get('/eventos/:eventoId/presencas', async (c) => {
     .all()
 
   const convocacaoIds = convocacoesPublicadas.map((item: any) => item.id)
+  if (evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') {
+    const rows = await db.select({
+      membroId: membros.id,
+      membroNome: membros.nome,
+      membroCelular: membros.celular,
+      casaNome: casas.nome,
+      status: eventosParticipantesExternos.status,
+      checkinId: checkins.id,
+      formaCheckin: checkins.forma,
+      dataHoraCheckin: checkins.dataHoraCheckin,
+    }).from(eventosParticipantesExternos)
+      .innerJoin(membros, eq(eventosParticipantesExternos.membroId, membros.id))
+      .leftJoin(casas, eq(membros.casaId, casas.id))
+      .leftJoin(checkins, and(eq(checkins.eventoId, eventoId), eq(checkins.membroId, membros.id), eq(checkins.status, 'ATIVO')))
+      .where(eq(eventosParticipantesExternos.eventoId, eventoId)).all()
+    let result = rows.map((r: any) => ({
+      destinatarioId: null,
+      membroId: r.membroId,
+      membroNome: r.membroNome,
+      membroCelular: r.membroCelular || null,
+      casaNome: r.casaNome || 'N/A',
+      respostaRsvp: r.status === 'CONFIRMADO' ? 'PARTICIPAREI' : r.status === 'RECUSADO' ? 'NAO_PARTICIPAREI' : 'SEM_RESPOSTA',
+      statusParticipacaoExterna: r.status,
+      periodosParticipacao: [],
+      presente: r.checkinId !== null,
+      formaCheckin: r.formaCheckin || null,
+      dataHoraCheckin: r.dataHoraCheckin || null,
+    }))
+    if (statusRsvp) result = result.filter((r: any) => r.respostaRsvp === statusRsvp)
+    if (presenteParam !== undefined) result = result.filter((r: any) => r.presente === (presenteParam === 'true'))
+    if (busca && busca.trim()) result = result.filter((r: any) => r.membroNome.toLowerCase().includes(busca.trim().toLowerCase()))
+    return c.json(result)
+  }
   if (convocacaoIds.length === 0) {
     return c.json([])
   }
@@ -584,7 +622,7 @@ relatoriosRouter.get('/agregado', async (c) => {
   const conditions = [eq(eventos.ativo, true), await condicaoEventosVisiveis(db, c.get('contextoPermissoes'))]
 
   switch (escopoTipo) {
-    case 'REGIONAL': conditions.push(eq(eventos.regionalId, escopoId)); break
+    case 'REGIONAL': conditions.push(or(eq(eventos.regionalId, escopoId), eq(eventos.regionalGestaoId, escopoId))!); break
     case 'ADMINISTRACAO': conditions.push(eq(eventos.administracaoId, escopoId)); break
     case 'SETOR': conditions.push(eq(eventos.setorId, escopoId)); break
     case 'CASA': conditions.push(eq(eventos.casaId, escopoId)); break
@@ -636,6 +674,14 @@ relatoriosRouter.get('/agregado', async (c) => {
       const consolidados = consolidarDestinatariosPorMembro(dests, rsvps)
       evConvocados = consolidados.length
       evConfirmados = consolidados.filter(item => item.rsvp?.resposta === 'PARTICIPAREI').length
+    }
+
+    if (ev.abrangencia === 'NACIONAL' || ev.abrangencia === 'INTERNACIONAL') {
+      const participantes = await db.select({ status: eventosParticipantesExternos.status })
+        .from(eventosParticipantesExternos)
+        .where(eq(eventosParticipantesExternos.eventoId, ev.id)).all()
+      evConvocados = participantes.length
+      evConfirmados = participantes.filter((p: { status: string }) => p.status === 'CONFIRMADO').length
     }
 
     const evCheckins = await db.select().from(checkins).where(and(eq(checkins.eventoId, ev.id), eq(checkins.status, 'ATIVO'))).all()

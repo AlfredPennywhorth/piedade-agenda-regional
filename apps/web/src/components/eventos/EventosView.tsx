@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput, SerieCreateInput, LocalCreate, EspacoLocalCreate, createUtcDateFromSaoPaulo } from '@piedade/shared'
+import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput, SerieCreateInput, LocalCreate, EspacoLocalCreate, createUtcDateFromSaoPaulo, UF_BRASIL, PAISES_ISO } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import { SerieFormModal, TipoEscopo } from '../series/SerieFormModal'
 import { generateQrMatrix } from '../agenda/qrGenerator'
@@ -41,6 +41,10 @@ interface SerieResponse {
   espacoId: string | null
   urlOnline: string | null
   organizadorMembroId: string | null
+  abrangencia?: 'TERRITORIAL' | 'NACIONAL' | 'INTERNACIONAL'
+  destinoUf?: string | null
+  destinoPaisCodigo?: string | null
+  destinoCidadeLocal?: string | null
   regionalId: string | null
   administracaoId: string | null
   setorId: string | null
@@ -48,6 +52,10 @@ interface SerieResponse {
   grupoTrabalhoId: string | null
   observacoes: string | null
   ativo: boolean
+}
+
+type EventoFormData = Omit<Partial<EventoCreateInput>, 'destinoUf'> & {
+  destinoUf?: EventoCreateInput['destinoUf'] | ''
 }
 
 export interface Evento {
@@ -65,6 +73,11 @@ export interface Evento {
   espacoId: string | null
   urlOnline: string | null
   organizadorMembroId: string | null
+  abrangencia?: 'TERRITORIAL' | 'NACIONAL' | 'INTERNACIONAL'
+  destinoUf?: (typeof UF_BRASIL)[number] | null
+  destinoPaisCodigo?: string | null
+  destinoCidadeLocal?: string | null
+  regionalGestaoId?: string | null
   regionalId: string | null
   administracaoId: string | null
   setorId: string | null
@@ -124,7 +137,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   // Modal Details
   const [eventoDetalhe, setEventoDetalhe] = useState<Evento | null>(null)
 
-  const [formData, setFormData] = useState<Partial<EventoCreateInput>>({
+  const [formData, setFormData] = useState<EventoFormData>({
     pessoal: false,
     titulo: '',
     descricao: '',
@@ -136,6 +149,10 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     espacoId: '',
     urlOnline: '',
     organizadorMembroId: '',
+    abrangencia: 'TERRITORIAL',
+    destinoUf: '',
+    destinoPaisCodigo: '',
+    destinoCidadeLocal: '',
     regionalId: '',
     administracaoId: '',
     setorId: '',
@@ -145,7 +162,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     ativo: true,
   })
   
-  const [tipoEscopo, setTipoEscopo] = useState<'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | ''>('')
+  const [tipoEscopo, setTipoEscopo] = useState<'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | 'nacional' | 'internacional' | ''>('')
   const [casaSetorFiltro, setCasaSetorFiltro] = useState('')
   
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
@@ -321,6 +338,8 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     ...setores.map(item => ({ valor: `setorId:${item.id}`, nome: `Setor: ${item.nome}` })),
     ...casas.map(item => ({ valor: `casaId:${item.id}`, nome: `Casa: ${item.nome}` })),
     ...gruposTrabalho.map(item => ({ valor: `grupoTrabalhoId:${item.id}`, nome: `GT: ${item.nome}` })),
+    { valor: 'abrangencia:NACIONAL', nome: 'Abrangência: Nacional' },
+    { valor: 'abrangencia:INTERNACIONAL', nome: 'Abrangência: Internacional' },
   ]
   const eventosFiltrados = eventos.filter(evento => {
     if (statusEventoFiltro === 'ATIVOS' && !evento.ativo) return false
@@ -378,26 +397,36 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   }
 
   const handleModalidadeChange = (mod: 'PRESENCIAL' | 'ONLINE' | 'HIBRIDO') => {
-    setFormData(prev => ({
-      ...prev,
-      modalidade: mod,
-      localId: mod === 'ONLINE' ? '' : prev.localId,
-      espacoId: mod === 'ONLINE' ? '' : prev.espacoId,
-      urlOnline: mod === 'PRESENCIAL' ? '' : prev.urlOnline
-    }))
+    setFormData(prev => {
+      const externo = prev.abrangencia === 'NACIONAL' || prev.abrangencia === 'INTERNACIONAL'
+      return {
+        ...prev,
+        modalidade: mod,
+        localId: mod === 'ONLINE' || externo ? '' : prev.localId,
+        espacoId: mod === 'ONLINE' || externo ? '' : prev.espacoId,
+        urlOnline: mod === 'PRESENCIAL' ? '' : prev.urlOnline
+      }
+    })
   }
 
-  const handleTipoEscopoChange = (tipo: 'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | '') => {
+  const handleTipoEscopoChange = (tipo: 'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | 'nacional' | 'internacional' | '') => {
     setTipoEscopo(tipo)
     setCasaSetorFiltro('')
+    const externo = tipo === 'nacional' || tipo === 'internacional'
     setFormData(prev => ({
       ...prev,
-      pessoal: false,
+      pessoal: (tipo === 'casa' || externo) ? prev.pessoal : false,
+      abrangencia: tipo === 'nacional' ? 'NACIONAL' : tipo === 'internacional' ? 'INTERNACIONAL' : 'TERRITORIAL',
+      destinoUf: '',
+      destinoPaisCodigo: '',
+      destinoCidadeLocal: '',
       regionalId: '',
       administracaoId: '',
       setorId: '',
       casaId: '',
-      grupoTrabalhoId: ''
+      grupoTrabalhoId: '',
+      localId: externo ? '' : prev.localId,
+      espacoId: externo ? '' : prev.espacoId,
     }))
   }
 
@@ -530,7 +559,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       if (consultaAtual !== eventoFormConsultaSeq.current) return
       
       let tipo: any = ''
-      if (item.regionalId) tipo = 'regional'
+      if (item.abrangencia === 'NACIONAL') tipo = 'nacional'
+      else if (item.abrangencia === 'INTERNACIONAL') tipo = 'internacional'
+      else if (item.regionalId) tipo = 'regional'
       else if (item.administracaoId) tipo = 'administracao'
       else if (item.setorId) tipo = 'setor'
       else if (item.casaId) tipo = 'casa'
@@ -550,6 +581,10 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         espacoId: item.espacoId || '',
         urlOnline: item.urlOnline || '',
         organizadorMembroId: item.organizadorMembroId || '',
+        abrangencia: item.abrangencia || 'TERRITORIAL',
+        destinoUf: item.destinoUf || '',
+        destinoPaisCodigo: item.destinoPaisCodigo || '',
+        destinoCidadeLocal: item.destinoCidadeLocal || '',
         regionalId: item.regionalId || '',
         administracaoId: item.administracaoId || '',
         setorId: item.setorId || '',
@@ -644,6 +679,10 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       espacoId: formData.espacoId || null,
       urlOnline: formData.urlOnline || null,
       organizadorMembroId: formData.pessoal && !eventoEditandoId ? null : formData.organizadorMembroId || null,
+      abrangencia: formData.abrangencia || 'TERRITORIAL',
+      destinoUf: formData.destinoUf || null,
+      destinoPaisCodigo: formData.destinoPaisCodigo || null,
+      destinoCidadeLocal: formData.destinoCidadeLocal || null,
       regionalId: formData.regionalId || null,
       administracaoId: formData.administracaoId || null,
       setorId: formData.setorId || null,
@@ -1282,7 +1321,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                       {errosForm.modalidade && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.modalidade}</p>}
                     </div>
 
-                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && (
+                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.abrangencia !== 'NACIONAL' && formData.abrangencia !== 'INTERNACIONAL' && (
                       <div>
                         <div className="mb-1 flex items-center justify-between gap-3">
                           <label htmlFor="localId" className="block text-sm font-medium text-slate-700">Local *</label>
@@ -1315,7 +1354,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                       </div>
                     )}
 
-                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.localId && (
+                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.abrangencia !== 'NACIONAL' && formData.abrangencia !== 'INTERNACIONAL' && formData.localId && (
                       <div>
                         <div className="mb-1 flex items-center justify-between gap-3">
                           <label htmlFor="espacoId" className="block text-sm font-medium text-slate-700">Espaço</label>
@@ -1370,7 +1409,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                     )}
 
                     <div className="border-t pt-4">
-                      <h4 className="font-medium text-sm text-slate-900 mb-3">Escopo (Selecione exatamente um)</h4>
+                      <h4 className="font-medium text-sm text-slate-900 mb-3">Escopo / Destino do Evento</h4>
                       
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
@@ -1388,6 +1427,8 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                             <option value="setor">Setor</option>
                             <option value="casa">Casa de Oração</option>
                             <option value="grupoTrabalho">Grupo de Trabalho</option>
+                            <option value="nacional">Nacional</option>
+                            <option value="internacional">Internacional</option>
                           </select>
                         </div>
                         
@@ -1480,9 +1521,63 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                               </select>
                             </>
                           )}
+                          {tipoEscopo === 'nacional' && (
+                            <div className="space-y-3">
+                              <div>
+                                <label htmlFor="destinoUf" className="block text-xs font-medium text-slate-700 mb-1">UF *</label>
+                                <select
+                                  id="destinoUf"
+                                  value={formData.destinoUf || ''}
+                                  onChange={e => setFormData({ ...formData, destinoUf: e.target.value as (typeof UF_BRASIL)[number] })}
+                                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                                >
+                                  <option value="">Selecione...</option>
+                                  {UF_BRASIL.map(uf => <option key={uf} value={uf}>{uf}</option>)}
+                                </select>
+                                {errosForm.destinoUf && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.destinoUf}</p>}
+                              </div>
+                              <div>
+                                <label htmlFor="destinoCidadeLocal" className="block text-xs font-medium text-slate-700 mb-1">Cidade / Local de Atendimento *</label>
+                                <input
+                                  id="destinoCidadeLocal"
+                                  value={formData.destinoCidadeLocal || ''}
+                                  onChange={e => setFormData({ ...formData, destinoCidadeLocal: e.target.value })}
+                                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                                />
+                                {errosForm.destinoCidadeLocal && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.destinoCidadeLocal}</p>}
+                              </div>
+                            </div>
+                          )}
+                          {tipoEscopo === 'internacional' && (
+                            <div className="space-y-3">
+                              <div>
+                                <label htmlFor="destinoPaisCodigo" className="block text-xs font-medium text-slate-700 mb-1">País *</label>
+                                <select
+                                  id="destinoPaisCodigo"
+                                  value={formData.destinoPaisCodigo || ''}
+                                  onChange={e => setFormData({ ...formData, destinoPaisCodigo: e.target.value })}
+                                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                                >
+                                  <option value="">Selecione...</option>
+                                  {PAISES_ISO.map(([codigo, nome]) => <option key={codigo} value={codigo}>{nome}</option>)}
+                                </select>
+                                {errosForm.destinoPaisCodigo && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.destinoPaisCodigo}</p>}
+                              </div>
+                              <div>
+                                <label htmlFor="destinoCidadeLocal" className="block text-xs font-medium text-slate-700 mb-1">Cidade / Local de Atendimento *</label>
+                                <input
+                                  id="destinoCidadeLocal"
+                                  value={formData.destinoCidadeLocal || ''}
+                                  onChange={e => setFormData({ ...formData, destinoCidadeLocal: e.target.value })}
+                                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                                />
+                                {errosForm.destinoCidadeLocal && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.destinoCidadeLocal}</p>}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      {tipoEscopo === 'casa' && !eventoEditandoSerieId && (
+                      {(tipoEscopo === 'casa' || tipoEscopo === 'nacional' || tipoEscopo === 'internacional') && !eventoEditandoSerieId && (
                         <div className="mt-4">
                           <label htmlFor="publicoEvento" className="block text-sm font-medium text-slate-700 mb-1">Público do evento</label>
                           <select id="publicoEvento" value={formData.pessoal ? 'PROPRIO' : 'INSTITUCIONAL'} disabled={!!eventoEditandoId}
@@ -1704,7 +1799,21 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                   <p className="text-slate-900">{eventoDetalhe.ativo ? 'Ativo' : 'Inativo'}</p>
                 </div>
               </div>
-              {(eventoDetalhe.modalidade === 'PRESENCIAL' || eventoDetalhe.modalidade === 'HIBRIDO') && (
+              {(eventoDetalhe.abrangencia === 'NACIONAL' || eventoDetalhe.abrangencia === 'INTERNACIONAL') && (
+                <div>
+                  <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                    {eventoDetalhe.abrangencia === 'NACIONAL' ? 'Destino Nacional' : 'Destino Internacional'}
+                  </span>
+                  <p className="text-slate-900">
+                    {eventoDetalhe.destinoCidadeLocal}
+                    {eventoDetalhe.abrangencia === 'NACIONAL' && eventoDetalhe.destinoUf ? ` — ${eventoDetalhe.destinoUf}` : ''}
+                    {eventoDetalhe.abrangencia === 'INTERNACIONAL' && eventoDetalhe.destinoPaisCodigo
+                      ? ` — ${PAISES_ISO.find(([codigo]) => codigo === eventoDetalhe.destinoPaisCodigo)?.[1] || eventoDetalhe.destinoPaisCodigo}`
+                      : ''}
+                  </p>
+                </div>
+              )}
+              {(eventoDetalhe.modalidade === 'PRESENCIAL' || eventoDetalhe.modalidade === 'HIBRIDO') && eventoDetalhe.abrangencia !== 'NACIONAL' && eventoDetalhe.abrangencia !== 'INTERNACIONAL' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Local</span>
