@@ -85,6 +85,20 @@ describe('migration 0043 — eventos externos', () => {
     sqlite.exec(migration)
     sqlite.exec('COMMIT;')
 
+    sqlite.prepare(`
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em,
+        abrangencia, destino_uf, destino_cidade_local, regional_gestao_id)
+      VALUES ('ev-externo-apos-migracao', 'Atendimento MG', 'PRESENCIAL',
+        '2030-02-01T10:00:00Z', '2030-02-01T11:00:00Z',
+        'NACIONAL', 'MG', 'Belo Horizonte', 'reg-1')
+    `).run()
+    const externo = sqlite.prepare(
+      "SELECT regional_id, regional_gestao_id, abrangencia FROM eventos WHERE id = 'ev-externo-apos-migracao'"
+    ).get() as any
+    expect(externo).toEqual({
+      regional_id: null, regional_gestao_id: 'reg-1', abrangencia: 'NACIONAL'
+    })
+
     const evento = sqlite.prepare(`
       SELECT abrangencia, regional_gestao_id, regional_id,
              destino_uf, destino_pais_codigo, destino_cidade_local
