@@ -265,7 +265,7 @@ relatoriosRouter.get('/presencas/periodo', async c => {
 
   switch (escopoTipo) {
     case 'REGIONAL':
-      condicoes.push(eq(eventos.regionalId, escopoId))
+      condicoes.push(or(eq(eventos.regionalId, escopoId), eq(eventos.regionalGestaoId, escopoId))!)
       break
     case 'ADMINISTRACAO':
       condicoes.push(eq(eventos.administracaoId, escopoId))
@@ -584,7 +584,7 @@ relatoriosRouter.get('/agregado', async (c) => {
   const conditions = [eq(eventos.ativo, true), await condicaoEventosVisiveis(db, c.get('contextoPermissoes'))]
 
   switch (escopoTipo) {
-    case 'REGIONAL': conditions.push(eq(eventos.regionalId, escopoId)); break
+    case 'REGIONAL': conditions.push(or(eq(eventos.regionalId, escopoId), eq(eventos.regionalGestaoId, escopoId))!); break
     case 'ADMINISTRACAO': conditions.push(eq(eventos.administracaoId, escopoId)); break
     case 'SETOR': conditions.push(eq(eventos.setorId, escopoId)); break
     case 'CASA': conditions.push(eq(eventos.casaId, escopoId)); break
