@@ -435,7 +435,7 @@ seriesRecorrenciaRouter.get('/', async (c) => {
       serieId: eventos.serieRecorrenciaId,
       ultimaOcorrenciaFimEm: sql<string>`max(${eventos.fimEm})`,
     }).from(eventos)
-      .where(inArray(eventos.serieRecorrenciaId, lote))
+      .where(and(inArray(eventos.serieRecorrenciaId, lote), eq(eventos.ativo, true)))
       .groupBy(eventos.serieRecorrenciaId).all()
   )
   const ultimaPorSerie = new Map(finais.map(item => [item.serieId, item.ultimaOcorrenciaFimEm]))
