@@ -1319,10 +1319,13 @@ describe('EventosView', () => {
         `/eventos/${evento.id}/candidatos-externos?q=Maria%20Silva`
       )
     })
+    await waitFor(() => expect(within(seletor).getByRole('option', { name: 'Maria Silva' })).toBeInTheDocument())
     fireEvent.change(seletor, { target: { value: 'maria' } })
     expect(seletor).toHaveValue('maria')
 
     fireEvent.change(busca, { target: { value: 'Joao' } })
+    expect(seletor).toHaveValue('')
+    expect(within(seletor).queryByRole('option', { name: 'Maria Silva' })).not.toBeInTheDocument()
     fireEvent.click(within(detalhe).getByRole('button', { name: /^buscar$/i }))
     await waitFor(() => expect(seletor).toHaveValue(''))
   })
