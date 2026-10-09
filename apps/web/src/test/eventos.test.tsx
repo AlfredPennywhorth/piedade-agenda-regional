@@ -1331,16 +1331,23 @@ describe('EventosView', () => {
       if (url === '/eventos') return [evento]
       if (url === `/eventos/${evento.id}`) return evento
       if (url === `/eventos/${evento.id}/participantes-externos`) return [
-        { eventoId: evento.id, membroId: 'membro-externo', status: 'CONFIRMADO' },
+        { eventoId: evento.id, membroId: 'membro-externo', membroNome: 'Diácono Persistido', status: 'CONFIRMADO' },
       ]
       return original(url)
     })
     render(<EventosView />)
     await screen.findByText('Reunião Presencial')
     fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
-    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
-    expect(await within(detalhe).findByText(/membro-externo — Confirmado/)).toBeInTheDocument()
+    let detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    expect(await within(detalhe).findByText(/Diácono Persistido — Confirmado/)).toBeInTheDocument()
+    expect(within(detalhe).queryByText(/membro-externo — Confirmado/)).not.toBeInTheDocument()
     expect(within(detalhe).queryByLabelText('Diácono ou Membro')).not.toBeInTheDocument()
+
+    fireEvent.click(within(detalhe).getByRole('button', { name: '✕' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /detalhes do evento/i })).not.toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    expect(await within(detalhe).findByText(/Diácono Persistido — Confirmado/)).toBeInTheDocument()
   })
 
   it('não permite adicionar participantes a evento externo cancelado', async () => {
