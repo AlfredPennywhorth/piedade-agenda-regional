@@ -212,6 +212,20 @@ describe('Eventos pessoais e segregação', () => {
     master = await usuario(casa, 'MASTER_SISTEMA', 'GLOBAL', null)
   })
   afterEach(() => sqlite.close())
+  it('viajante tem gestão somente sobre eventos externos que criou', async () => {
+    const viajante = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
+    const outro = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
+    const externo = await evento({ regionalId: reg }, {
+      abrangencia: 'NACIONAL', regionalGestaoId: reg,
+      destinoUf: 'MG', destinoCidadeLocal: 'Belo Horizonte', criadorMembroId: viajante.id,
+    })
+    const territorial = await evento({ regionalId: reg })
+    expect((await req(viajante, '/eventos')).status).toBe(200)
+    expect((await req(viajante, `/eventos/${externo}`, 'PATCH', { titulo: 'Atualizado' })).status).toBe(200)
+    expect((await req(outro, `/eventos/${externo}`, 'PATCH', { titulo: 'Bloqueado' })).status).toBe(403)
+    expect((await req(viajante, `/eventos/${territorial}`, 'PATCH', { titulo: 'Bloqueado' })).status).toBe(403)
+  })
+
   it('cria Próprio com autor da sessão e agenda sem convocação ou RSVP', async () => {
     const res = await req(autor, '/eventos', 'POST', {
       titulo: 'Meu compromisso',
