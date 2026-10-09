@@ -516,7 +516,7 @@ eventosRouter.patch('/:id', async (c) => {
           (merged.pessoal === true && existing.criadorMembroId === membroId) ||
           (
             !!regionalGestaoFinal &&
-            await podeGerenciarAgendaExterna(db, membroId, regionalGestaoFinal)
+            await (existing.abrangencia === 'NACIONAL' || existing.abrangencia === 'INTERNACIONAL' ? podeGerenciarAgendaExterna(db, membroId, regionalGestaoFinal) : podeCriarAgendaExterna(db, membroId, regionalGestaoFinal))
           )
         )
       : await podeGerenciarAgendaNoEscopo(
@@ -655,8 +655,12 @@ eventosRouter.post('/:id/participantes-externos', async c => {
   if (!payload || typeof payload !== 'object') return c.json({error:'Dados inválidos'},400)
   const { membroId, tipo } = payload as Record<string,unknown>
   if (typeof membroId !== 'string' || !membroId || (tipo !== 'CONVIDADO' && tipo !== 'ATRIBUIDO')) return c.json({error:'Membro e tipo de participação inválidos'},400)
-  const membro = await db.select({id:membros.id,ativo:membros.ativo}).from(membros).where(eq(membros.id,membroId)).get()
-  if (!membro || !membro.ativo) return c.json({error:'Membro não encontrado ou inativo'},404)
+  const membro = await db.select({ id: membros.id, ativo: membros.ativo, regionalId: administracoes.regionalId }).from(membros)
+    .innerJoin(casas, eq(membros.casaId, casas.id))
+    .innerJoin(setores, eq(casas.setorId, setores.id))
+    .innerJoin(administracoes, eq(setores.administracaoId, administracoes.id))
+    .where(eq(membros.id, membroId)).get()
+  if (!membro || !membro.ativo || membro.regionalId !== (evento.regionalGestaoId || evento.regionalId)) return c.json({error:'Membro não encontrado ou fora da Regional do evento'},404)
   try {
     await executarOperacaoComAudit(db, qdb => [qdb.insert(eventosParticipantesExternos).values({eventoId:id,membroId,status:tipo,criadoPorMembroId:ator})], {
       acao: tipo === 'CONVIDADO' ? 'EVENTO_EXTERNO_CONVITE' : 'EVENTO_EXTERNO_ATRIBUICAO',
