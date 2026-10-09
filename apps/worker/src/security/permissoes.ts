@@ -469,10 +469,18 @@ export async function obterRegionalGestaoAgendaExterna(
     return regionalAtiva?.id ?? null
   }
 
+  // Preferir credenciais de viajante quando presentes, sem misturar gestão administrativa.
+  const regionaisViajante = Array.from(new Set(contexto.acessosAtivos
+    .filter(acesso => acesso.perfilCodigo === 'GESTOR_EVENTOS_EXTERNOS' &&
+      acesso.escopoTipo === 'REGIONAL' && acesso.escopoId !== null)
+    .map(acesso => acesso.escopoId as string)))
+  if (regionaisViajante.length === 1) return regionaisViajante[0]
+  if (regionaisViajante.length > 1) return null
+
   const regionaisGestao = Array.from(new Set(
     contexto.acessosAtivos
       .filter(acesso =>
-        ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) &&
+        ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA', 'GESTOR_EVENTOS_EXTERNOS'].includes(acesso.perfilCodigo) &&
         acesso.escopoTipo === 'REGIONAL' &&
         acesso.escopoId !== null
       )
@@ -483,6 +491,24 @@ export async function obterRegionalGestaoAgendaExterna(
   if (regionaisGestao.length > 1) return null
 
   return obterRegionalDaCasaDoMembro(db, membroId)
+}
+
+// Cadastro de atendimentos externos é atribuição nominal dos viajantes.
+// Administradores regionais preservam a supervisão dos eventos já existentes,
+// mas somente viajantes credenciados (ou Master) podem criar novos.
+export async function podeCriarAgendaExterna(
+  db: any,
+  membroId: string,
+  regionalGestaoId: string
+): Promise<boolean> {
+  if (!db || !membroId || !regionalGestaoId) return false
+  const contexto = await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) return true
+  return contexto.acessosAtivos.some(acesso =>
+    acesso.perfilCodigo === 'GESTOR_EVENTOS_EXTERNOS' &&
+    acesso.escopoTipo === 'REGIONAL' &&
+    acesso.escopoId === regionalGestaoId
+  )
 }
 
 export async function podeGerenciarAgendaExterna(
@@ -496,7 +522,7 @@ export async function podeGerenciarAgendaExterna(
 
   return contexto.acessosAtivos.some(
     acesso =>
-      ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) &&
+      ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA', 'GESTOR_EVENTOS_EXTERNOS'].includes(acesso.perfilCodigo) &&
       acesso.escopoTipo === 'REGIONAL' &&
       acesso.escopoId !== null &&
       (!regionalGestaoId || acesso.escopoId === regionalGestaoId)

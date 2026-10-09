@@ -212,6 +212,142 @@ describe('Eventos pessoais e segregação', () => {
     master = await usuario(casa, 'MASTER_SISTEMA', 'GLOBAL', null)
   })
   afterEach(() => sqlite.close())
+  it('viajante pode criar eventos institucionais nacionais, mas não regionais', async () => {
+    const viajante = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
+    const body = {
+      titulo: 'Atendimento viajante',
+      modalidade: 'ONLINE',
+      urlOnline: 'https://example.org/meeting',
+      ...horario,
+      abrangencia: 'NACIONAL',
+      destinoUf: 'RJ',
+      destinoCidadeLocal: 'Rio de Janeiro',
+      pessoal: false,
+    }
+    expect((await req(autor, '/eventos', 'POST', body)).status).toBe(403)
+    const gestorSemCredencial = await usuario(casa, 'GESTOR_AGENDA', 'REGIONAL', reg)
+    expect((await req(gestorSemCredencial, '/eventos', 'POST', body)).status).toBe(403)
+
+    const criado = await req(viajante, '/eventos', 'POST', body)
+    expect(criado.status).toBe(201)
+    const registro = await criado.json() as { id: string }
+    expect((await req(viajante, `/eventos/${registro.id}`)).status).toBe(200)
+    expect((await req(viajante, '/eventos', 'POST', {
+      ...body, abrangencia: 'TERRITORIAL', destinoUf: null, destinoCidadeLocal: null, casaId: irma,
+    })).status).toBe(403)
+  })
+
+  it('restringe organizador de evento externo institucional à Regional gestora no POST e PATCH', async () => {
+    const viajante = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
+    const organizadorLocal = await usuario(casa)
+    const organizadorFora = await usuario(casaOutraReg)
+    const body = {
+      titulo: 'Atendimento com organizador',
+      modalidade: 'ONLINE',
+      urlOnline: 'https://example.org/meeting',
+      ...horario,
+      abrangencia: 'NACIONAL',
+      destinoUf: 'RJ',
+      destinoCidadeLocal: 'Rio de Janeiro',
+      pessoal: false,
+    }
+
+    const postFora = await req(viajante, '/eventos', 'POST', {
+      ...body,
+      organizadorMembroId: organizadorFora.id,
+    })
+    expect(postFora.status).toBe(400)
+    expect(await postFora.json()).toMatchObject({ code: 'ORGANIZADOR_FORA_REGIONAL' })
+
+    const criado = await req(viajante, '/eventos', 'POST', {
+      ...body,
+      organizadorMembroId: organizadorLocal.id,
+    })
+    expect(criado.status).toBe(201)
+    const eventoCriado = await criado.json() as { id: string }
+
+    const patchFora = await req(viajante, `/eventos/${eventoCriado.id}`, 'PATCH', {
+      organizadorMembroId: organizadorFora.id,
+    })
+    expect(patchFora.status).toBe(400)
+    expect(await patchFora.json()).toMatchObject({ code: 'ORGANIZADOR_FORA_REGIONAL' })
+  })
+
+  it('busca nominal de viajante retorna apenas id/nome da própria Regional', async () => {
+    const viajante = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
+    const outro = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
+    const fora = await usuario(casaOutraReg)
+    await db.update(s.membros).set({ nome: 'Diacono Jose Regional' }).where(eq(s.membros.id, autor.id))
+    await db.update(s.membros).set({ nome: 'Diacono Jose Fora' }).where(eq(s.membros.id, fora.id))
+    const id = await evento({ regionalId: reg }, {
+      abrangencia: 'NACIONAL', regionalGestaoId: reg, destinoUf: 'RJ',
+      destinoCidadeLocal: 'Rio de Janeiro', criadorMembroId: viajante.id,
+    })
+    const busca = await req(viajante, `/eventos/${id}/candidatos-externos?q=Jose`)
+    expect(busca.status).toBe(200)
+    expect(await busca.json()).toEqual([{ id: autor.id, nome: 'Diacono Jose Regional' }])
+    expect((await req(outro, `/eventos/${id}/candidatos-externos?q=Jose`)).status).toBe(403)
+    expect((await req(viajante, `/eventos/${id}/candidatos-externos?q=Jo`)).status).toBe(400)
+  })
+
+  it('não permite conversão territorial para externo sem credencial de viajante', async () => {
+    const gestor = await usuario(casa, 'GESTOR_AGENDA', 'REGIONAL', reg)
+    const territorial = await evento({ regionalId: reg }, {
+      criadorMembroId: gestor.id, organizadorMembroId: gestor.id,
+    })
+    const resposta = await req(gestor, `/eventos/${territorial}`, 'PATCH', {
+      abrangencia: 'NACIONAL', destinoUf: 'RJ', destinoCidadeLocal: 'Rio de Janeiro',
+    })
+    expect(resposta.status).toBe(403)
+  })
+
+  it('rejeita convite e atribuição nominal fora da Regional mesmo com UUID conhecido', async () => {
+    const viajante = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
+    const fora = await usuario(casaOutraReg)
+    const externo = await evento({ regionalId: reg }, {
+      abrangencia: 'NACIONAL', regionalGestaoId: reg,
+      destinoUf: 'RJ', destinoCidadeLocal: 'Rio de Janeiro',
+      criadorMembroId: viajante.id,
+    })
+    for (const tipo of ['CONVIDADO', 'ATRIBUIDO']) {
+      const resposta = await req(viajante, `/eventos/${externo}/participantes-externos`, 'POST', { membroId: fora.id, tipo })
+      expect(resposta.status).toBe(404)
+    }
+    const valido = await req(viajante, `/eventos/${externo}/participantes-externos`, 'POST', { membroId: autor.id, tipo: 'CONVIDADO' })
+    expect(valido.status).toBe(201)
+    const lista = await req(viajante, `/eventos/${externo}/participantes-externos`)
+    expect(lista.status).toBe(200)
+    expect(await lista.json()).toEqual([
+      expect.objectContaining({ membroId: autor.id, membroNome: autor.id, status: 'CONVIDADO' }),
+    ])
+  })
+
+  it('eventos pessoais não disponibilizam pesquisa nem inclusão nominal', async () => {
+    const pessoal = await evento({ casaId: casa }, {
+      pessoal: true, criadorMembroId: autor.id,
+    })
+    expect((await req(autor, `/eventos/${pessoal}/candidatos-externos?q=Maria`)).status).toBe(404)
+    for (const tipo of ['CONVIDADO', 'ATRIBUIDO']) {
+      expect((await req(autor, `/eventos/${pessoal}/participantes-externos`, 'POST', {
+        membroId: colega.id, tipo,
+      })).status).toBe(404)
+    }
+  })
+
+  it('viajante tem gestão somente sobre eventos externos que criou', async () => {
+    const viajante = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
+    const outro = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
+    const externo = await evento({ regionalId: reg }, {
+      abrangencia: 'NACIONAL', regionalGestaoId: reg,
+      destinoUf: 'MG', destinoCidadeLocal: 'Belo Horizonte', criadorMembroId: viajante.id,
+    })
+    const territorial = await evento({ regionalId: reg })
+    expect((await req(viajante, '/eventos')).status).toBe(200)
+    expect((await req(viajante, `/eventos/${externo}`, 'PATCH', { titulo: 'Atualizado' })).status).toBe(200)
+    expect((await req(outro, `/eventos/${externo}`, 'PATCH', { titulo: 'Bloqueado' })).status).toBe(403)
+    expect((await req(viajante, `/eventos/${territorial}`, 'PATCH', { titulo: 'Bloqueado' })).status).toBe(403)
+  })
+
   it('cria Próprio com autor da sessão e agenda sem convocação ou RSVP', async () => {
     const res = await req(autor, '/eventos', 'POST', {
       titulo: 'Meu compromisso',

@@ -25,6 +25,7 @@ type Props = {
 const PERFIS = [
   ['ADMINISTRADOR_SISTEMA', 'Administrador do Sistema'],
   ['GESTOR_AGENDA', 'Gestor de Agenda'],
+  ['GESTOR_EVENTOS_EXTERNOS', 'Gestor de Eventos Externos (Viajante)'],
   ['OPERADOR_PORTARIA_PERMANENTE', 'Operador de Portaria'],
   ['GESTOR_RELATORIOS', 'Gestor de Relatórios'],
   ['AUDITOR', 'Auditor'],
@@ -50,7 +51,7 @@ function endpointDoNivel(nivel: string) {
 
 function niveisPermitidos(perfil: string) {
   if (perfil === 'MASTER_SISTEMA') return ['GLOBAL']
-  if (perfil === 'ADMINISTRADOR_SISTEMA') return ['REGIONAL']
+  if (perfil === 'ADMINISTRADOR_SISTEMA' || perfil === 'GESTOR_EVENTOS_EXTERNOS') return ['REGIONAL']
   if (perfil === 'AUDITOR') return ['REGIONAL', 'ADMINISTRACAO']
   return NIVEIS.map(([codigo]) => codigo)
 }

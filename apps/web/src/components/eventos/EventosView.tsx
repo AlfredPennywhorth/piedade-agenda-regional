@@ -13,6 +13,7 @@ import type { Membro } from '../membros/MembrosView'
 interface ParticipanteExterno {
   eventoId: string
   membroId: string
+  membroNome?: string
   status: 'CONVIDADO' | 'ATRIBUIDO' | 'CONFIRMADO' | 'RECUSADO'
 }
 
@@ -147,6 +148,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   const [participantesExternos, setParticipantesExternos] = useState<ParticipanteExterno[]>([])
   const [podeVerParticipantesExternos, setPodeVerParticipantesExternos] = useState(false)
   const [membroConviteId, setMembroConviteId] = useState('')
+  const [buscaConviteExterno, setBuscaConviteExterno] = useState('')
+  const [candidatosConviteExterno, setCandidatosConviteExterno] = useState<Array<{ id: string; nome: string }>>([])
+  const [buscandoConviteExterno, setBuscandoConviteExterno] = useState(false)
   const [tipoConviteExterno, setTipoConviteExterno] = useState<'CONVIDADO' | 'ATRIBUIDO'>('CONVIDADO')
   const [erroConviteExterno, setErroConviteExterno] = useState<string | null>(null)
   const [salvandoConviteExterno, setSalvandoConviteExterno] = useState(false)
@@ -520,6 +524,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     setPodeVerParticipantesExternos(false)
     setSalvandoConviteExterno(false)
     setMembroConviteId('')
+    setBuscaConviteExterno('')
+    setCandidatosConviteExterno([])
+    setBuscandoConviteExterno(false)
     setErroConviteExterno(null)
     let itemCompleto = item
 
@@ -556,6 +563,29 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       }
     } catch {
       // O detalhe continua disponível mesmo se o lookup histórico falhar.
+    }
+  }
+
+  const buscarParticipanteExterno = async () => {
+    const eventoId = eventoDetalhe?.id
+    const termo = buscaConviteExterno.trim().replace(/\s+/g, ' ')
+    if (!eventoId || termo.length < 3 || buscandoConviteExterno) return
+    const geracao = eventoDetalheConsultaSeq.current
+    setBuscandoConviteExterno(true)
+    setErroConviteExterno(null)
+    try {
+      const pessoas = await fetchWithAuth<Array<{ id: string; nome: string }>>(
+        `/eventos/${eventoId}/candidatos-externos?q=${encodeURIComponent(termo)}`
+      )
+      if (geracao !== eventoDetalheConsultaSeq.current || eventoDetalheIdRef.current !== eventoId) return
+      setMembroConviteId('')
+      setCandidatosConviteExterno(pessoas)
+    } catch (error: any) {
+      if (geracao === eventoDetalheConsultaSeq.current && eventoDetalheIdRef.current === eventoId)
+        setErroConviteExterno(error.message || 'Não foi possível buscar membros.')
+    } finally {
+      if (geracao === eventoDetalheConsultaSeq.current && eventoDetalheIdRef.current === eventoId)
+        setBuscandoConviteExterno(false)
     }
   }
 
@@ -1904,16 +1934,26 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                   <ul className="text-sm space-y-1">
                     {participantesExternos.map(part => (
                       <li key={part.membroId}>
-                        {membros.find(m => m.id === part.membroId)?.nome || part.membroId} — {part.status === 'CONVIDADO' ? 'Aguardando resposta' : part.status === 'ATRIBUIDO' ? 'Atribuído' : part.status === 'CONFIRMADO' ? 'Confirmado' : 'Recusado'}
+                        {part.membroNome || candidatosConviteExterno.find(m => m.id === part.membroId)?.nome || membros.find(m => m.id === part.membroId)?.nome || part.membroId} — {part.status === 'CONVIDADO' ? 'Aguardando resposta' : part.status === 'ATRIBUIDO' ? 'Atribuído' : part.status === 'CONFIRMADO' ? 'Confirmado' : 'Recusado'}
                       </li>
                     ))}
                     {participantesExternos.length === 0 && <li className="text-slate-500">Nenhum participante incluído ainda.</li>}
                   </ul>
                   {eventoDetalhe.ativo && eventoDetalhe.podeGerenciar !== false && (<>
-                  <label htmlFor="membroConviteId" className="block text-sm font-medium">Diácono ou Membro</label>
+                  <label htmlFor="buscaConviteExterno" className="block text-sm font-medium">Buscar membro cadastrado (mínimo três letras)</label>
+                   <div className="flex gap-2">
+                     <input id="buscaConviteExterno" type="search" value={buscaConviteExterno} onChange={e => setBuscaConviteExterno(e.target.value)}
+                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void buscarParticipanteExterno() } }}
+                       className="min-w-0 flex-1 rounded-lg border border-slate-300 p-2 text-sm" placeholder="Nome do convidado" />
+                     <button type="button" disabled={buscaConviteExterno.trim().length < 3 || buscandoConviteExterno}
+                       onClick={() => void buscarParticipanteExterno()} className="rounded-lg border border-brand-400 px-3 text-sm font-medium disabled:opacity-50">
+                       {buscandoConviteExterno ? 'Buscando...' : 'Buscar'}
+                     </button>
+                   </div>
+                   <label htmlFor="membroConviteId" className="block text-sm font-medium">Diácono ou Membro</label>
                   <select id="membroConviteId" value={membroConviteId} onChange={e => setMembroConviteId(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2 text-sm">
                     <option value="">Selecione uma pessoa</option>
-                    {[...membros].filter(m => !participantesExternos.some(p => p.membroId === m.id)).sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                    {Array.from(new Map([...membros, ...candidatosConviteExterno].map(m => [m.id, m] as const)).values()).filter(m => !participantesExternos.some(p => p.membroId === m.id)).sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
                   </select>
                   <label htmlFor="tipoConviteExterno" className="block text-sm font-medium">Tipo de participação</label>
                   <select id="tipoConviteExterno" value={tipoConviteExterno} onChange={e => setTipoConviteExterno(e.target.value as 'CONVIDADO' | 'ATRIBUIDO')} className="w-full rounded-lg border border-slate-300 p-2 text-sm">
