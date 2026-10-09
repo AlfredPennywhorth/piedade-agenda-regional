@@ -13,6 +13,17 @@ export const eventosRouter = new Hono<any>()
 
 const D1_IN_BATCH = 80
 
+async function obterRegionalMembroAtivo(db: any, membroId: string): Promise<string | null> {
+  const membro = await db.select({ regionalId: administracoes.regionalId })
+    .from(membros)
+    .innerJoin(casas, eq(membros.casaId, casas.id))
+    .innerJoin(setores, eq(casas.setorId, setores.id))
+    .innerJoin(administracoes, eq(setores.administracaoId, administracoes.id))
+    .where(and(eq(membros.id, membroId), eq(membros.ativo, true)))
+    .get()
+  return membro?.regionalId ?? null
+}
+
 async function carregarEmLotes<T>(
   ids: string[],
   carregar: (lote: string[]) => Promise<T[]>
@@ -299,6 +310,14 @@ eventosRouter.post('/', async (c) => {
         return c.json({ error: 'Evento Próprio pertence ao usuário conectado', code: 'FORBIDDEN' }, 403)
       }
       parsed.organizadorMembroId = atorMembroId
+    } else if (externo && parsed.organizadorMembroId) {
+      const regionalOrganizador = await obterRegionalMembroAtivo(db, parsed.organizadorMembroId)
+      if (!regionalGestaoId || regionalOrganizador !== regionalGestaoId) {
+        return c.json({
+          error: 'O organizador deve pertencer à Regional responsável pelo evento externo',
+          code: 'ORGANIZADOR_FORA_REGIONAL'
+        }, 400)
+      }
     }
 
     const auditData: AuditLogData = {
@@ -537,6 +556,15 @@ eventosRouter.patch('/:id', async (c) => {
     if (merged.pessoal && merged.organizadorMembroId !== existing.criadorMembroId) {
       return c.json({ error: 'Evento Próprio não pode ser transferido a outro usuário', code: 'FORBIDDEN' }, 403)
     }
+    if (externoFinal && !merged.pessoal && merged.organizadorMembroId) {
+      const regionalOrganizador = await obterRegionalMembroAtivo(db, merged.organizadorMembroId)
+      if (!regionalGestaoFinal || regionalOrganizador !== regionalGestaoFinal) {
+        return c.json({
+          error: 'O organizador deve pertencer à Regional responsável pelo evento externo',
+          code: 'ORGANIZADOR_FORA_REGIONAL'
+        }, 400)
+      }
+    }
 
     // PMO Rule: Ao alterar uma ocorrência individual, preservar serie_recorrencia_id e marcar recorrencia_excecao = true.
     const isExcecao = existing.serieRecorrenciaId !== null ? true : existing.recorrenciaExcecao
@@ -610,7 +638,17 @@ eventosRouter.get('/:id/participantes-externos', async c => {
   const evento = await db.select().from(eventos).where(eq(eventos.id,id)).get()
   if (!evento || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia)) return c.json({error:'Evento externo não encontrado'},404)
   if (!membroId || !((await podeGerenciarEvento(db, membroId, evento)) || (await eGestorRelatoriosAutorizadoParaEvento(db, membroId, evento)))) return c.json({error:'Acesso não autorizado para consultar os participantes'},403)
-  const itens = await db.select().from(eventosParticipantesExternos).where(eq(eventosParticipantesExternos.eventoId,id)).all()
+  const itens = await db.select({
+    eventoId: eventosParticipantesExternos.eventoId,
+    membroId: eventosParticipantesExternos.membroId,
+    membroNome: membros.nome,
+    status: eventosParticipantesExternos.status,
+    criadoPorMembroId: eventosParticipantesExternos.criadoPorMembroId,
+    createdAt: eventosParticipantesExternos.createdAt,
+    updatedAt: eventosParticipantesExternos.updatedAt,
+  }).from(eventosParticipantesExternos)
+    .innerJoin(membros, eq(eventosParticipantesExternos.membroId, membros.id))
+    .where(eq(eventosParticipantesExternos.eventoId,id)).all()
   return c.json(itens)
 })
 
@@ -655,12 +693,8 @@ eventosRouter.post('/:id/participantes-externos', async c => {
   if (!payload || typeof payload !== 'object') return c.json({error:'Dados inválidos'},400)
   const { membroId, tipo } = payload as Record<string,unknown>
   if (typeof membroId !== 'string' || !membroId || (tipo !== 'CONVIDADO' && tipo !== 'ATRIBUIDO')) return c.json({error:'Membro e tipo de participação inválidos'},400)
-  const membro = await db.select({ id: membros.id, ativo: membros.ativo, regionalId: administracoes.regionalId }).from(membros)
-    .innerJoin(casas, eq(membros.casaId, casas.id))
-    .innerJoin(setores, eq(casas.setorId, setores.id))
-    .innerJoin(administracoes, eq(setores.administracaoId, administracoes.id))
-    .where(eq(membros.id, membroId)).get()
-  if (!membro || !membro.ativo || membro.regionalId !== (evento.regionalGestaoId || evento.regionalId)) return c.json({error:'Membro não encontrado ou fora da Regional do evento'},404)
+  const regionalMembro = await obterRegionalMembroAtivo(db, membroId)
+  if (!regionalMembro || regionalMembro !== (evento.regionalGestaoId || evento.regionalId)) return c.json({error:'Membro não encontrado ou fora da Regional do evento'},404)
   try {
     await executarOperacaoComAudit(db, qdb => [qdb.insert(eventosParticipantesExternos).values({eventoId:id,membroId,status:tipo,criadoPorMembroId:ator})], {
       acao: tipo === 'CONVIDADO' ? 'EVENTO_EXTERNO_CONVITE' : 'EVENTO_EXTERNO_ATRIBUICAO',
