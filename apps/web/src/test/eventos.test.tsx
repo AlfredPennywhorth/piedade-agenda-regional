@@ -869,7 +869,10 @@ describe('EventosView', () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url.startsWith(`/series-recorrencia/${SERIE_ID}`)) return { ...mockEventoRecorrente, frequencia: 'DIARIA', intervalo: 1, dataInicio: '2026-10-10', dataFim: '2026-10-20', horarioInicio: '10:00', horarioFim: '12:00' }
       if (url === '/eventos') return [mockEventoRecorrente]
-      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/locais') return [
+        { id: LOCAL_ID, nome: 'Sede' },
+        { id: 'local-particular-serie', nome: 'Residência particular', proprietarioMembroId: 'membro-proprietario' },
+      ]
       if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
       return []
     })
@@ -892,6 +895,9 @@ describe('EventosView', () => {
     await waitFor(() => {
       expect(getByLabelText(/título/i)).toHaveValue('Reunião Recorrente')
     })
+    const seletorLocal = getByLabelText(/local \*/i)
+    expect(within(seletorLocal).getByRole('option', { name: 'Sede' })).toBeInTheDocument()
+    expect(within(seletorLocal).queryByRole('option', { name: 'Residência particular' })).not.toBeInTheDocument()
 
     fireEvent.change(getByLabelText(/título/i), { target: { value: 'Série Editada' } })
     fireEvent.click(getByRole('button', { name: /salvar série/i }))
