@@ -1946,7 +1946,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                    <label htmlFor="membroConviteId" className="block text-sm font-medium">Diácono ou Membro</label>
                   <select id="membroConviteId" value={membroConviteId} onChange={e => setMembroConviteId(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2 text-sm">
                     <option value="">Selecione uma pessoa</option>
-                    {Array.from(new Map([...membros, ...candidatosConviteExterno].map(m => [m.id, m])).values()).filter(m => !participantesExternos.some(p => p.membroId === m.id)).sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                    {Array.from(new Map([...membros, ...candidatosConviteExterno].map(m => [m.id, m] as const)).values()).filter(m => !participantesExternos.some(p => p.membroId === m.id)).sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
                   </select>
                   <label htmlFor="tipoConviteExterno" className="block text-sm font-medium">Tipo de participação</label>
                   <select id="tipoConviteExterno" value={tipoConviteExterno} onChange={e => setTipoConviteExterno(e.target.value as 'CONVIDADO' | 'ATRIBUIDO')} className="w-full rounded-lg border border-slate-300 p-2 text-sm">
