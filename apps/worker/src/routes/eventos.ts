@@ -482,6 +482,8 @@ eventosRouter.patch('/:id', async (c) => {
     const existing = await db.select().from(eventos).where(eq(eventos.id, id)).get()
     if (!existing) return c.json({ error: 'Evento não encontrado' }, 404)
 
+    if (!(await podeGerenciarEvento(db, c.get('membroId'), existing))) return c.json({ error: 'Acesso não autorizado para este evento', code: 'FORBIDDEN' }, 403)
+
     if (
       (existing.abrangencia === 'NACIONAL' || existing.abrangencia === 'INTERNACIONAL') &&
       parsed.abrangencia === 'TERRITORIAL'
@@ -492,7 +494,6 @@ eventosRouter.patch('/:id', async (c) => {
       }, 409)
     }
 
-    if (!(await podeGerenciarEvento(db, c.get('membroId'), existing))) return c.json({ error: 'Acesso não autorizado para este evento', code: 'FORBIDDEN' }, 403)
 
     if (new Date(existing.fimEm).getTime() <= Date.now()) {
       return c.json({
