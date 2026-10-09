@@ -542,7 +542,10 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
 
     if (consultaAtual !== eventoDetalheConsultaSeq.current) return
     setEventoDetalhe(itemCompleto)
+    // O acesso à gestão nominal não deve desaparecer por uma falha isolada na
+    // consulta dos participantes; a API continuará validando cada operação.
     if ((itemCompleto.abrangencia === 'NACIONAL' || itemCompleto.abrangencia === 'INTERNACIONAL') && !itemCompleto.pessoal) {
+      setPodeVerParticipantesExternos(itemCompleto.podeGerenciar !== false)
       try {
         const lista = await fetchWithAuth<ParticipanteExterno[]>(`/eventos/${itemCompleto.id}/participantes-externos`)
         if (consultaAtual !== eventoDetalheConsultaSeq.current) return
@@ -2029,14 +2032,17 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                 </div>
               )}
               {eventoDetalhe.ativo && (
-                <div className="flex justify-end border-t border-slate-100 pt-4">
-                  <button
+                <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-4">
+                  <button type="button" onClick={fecharDetalheEvento} className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Concluir e voltar aos Eventos
+                  </button>
+                  {eventoDetalhe.podeGerenciar !== false && <button
                     type="button"
                     onClick={() => void handleCancelarEvento(eventoDetalhe, 'detalhe')}
                     className="inline-flex min-h-10 items-center rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
                   >
                     Cancelar Evento
-                  </button>
+                  </button>}
                 </div>
               )}
               {!eventoDetalhe.ativo && eventoDetalhe.podeGerenciar !== false && new Date(eventoDetalhe.fimEm).getTime() > Date.now() && (
