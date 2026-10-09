@@ -212,6 +212,12 @@ export function condicaoEventosGerenciaveis(contexto: ContextoPermissoes): SQL {
     contexto,
     "'ADMINISTRADOR_SISTEMA','GESTOR_AGENDA'"
   )
+  // Viajante administra exclusivamente eventos externos criados por ele,
+  // sem obter acesso à agenda territorial ou a eventos de outros viajantes.
+  const escopoViajante = condicaoGestaoRegionalExternaDaConta(
+    contexto,
+    "'GESTOR_EVENTOS_EXTERNOS'"
+  )
   return or(
     and(eq(e.pessoal, true), eq(e.criadorMembroId, contexto.membroId)),
     and(
@@ -220,7 +226,9 @@ export function condicaoEventosGerenciaveis(contexto: ContextoPermissoes): SQL {
         escoposTecnicos,
         and(
           sql`${e.abrangencia} IN ('NACIONAL','INTERNACIONAL')`,
-          escopoExternoGerenciavel
+          or(escopoExternoGerenciavel,
+            and(eq(e.criadorMembroId, contexto.membroId), escopoViajante)
+          )
         ),
         and(
           or(

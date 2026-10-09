@@ -1273,6 +1273,54 @@ describe('EventosView', () => {
     expect(within(detalhe).getByText(/Diácono Convidado — Aguardando resposta/)).toBeInTheDocument()
   })
 
+  it('normaliza espaços na busca nominal e limpa seleção ao substituir resultados', async () => {
+    const evento = {
+      ...mockEventos[0],
+      id: '88888888-8888-4888-8888-888888888889',
+      titulo: 'Atendimento externo para busca',
+      abrangencia: 'NACIONAL',
+      destinoUf: 'MG',
+      destinoCidadeLocal: 'Belo Horizonte',
+      localId: null,
+      pessoal: false,
+      podeGerenciar: true,
+    }
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos') return [evento]
+      if (url === `/eventos/${evento.id}`) return evento
+      if (url === `/eventos/${evento.id}/participantes-externos`) return []
+      if (url === `/eventos/${evento.id}/candidatos-externos?q=Maria%20Silva`) {
+        return [{ id: 'maria', nome: 'Maria Silva' }]
+      }
+      if (url === `/eventos/${evento.id}/candidatos-externos?q=Joao`) {
+        return [{ id: 'joao', nome: 'Joao Souza' }]
+      }
+      return original(url)
+    })
+
+    render(<EventosView />)
+    await screen.findByText(evento.titulo)
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    const busca = within(detalhe).getByLabelText(/buscar membro cadastrado/i)
+    const seletor = within(detalhe).getByLabelText('Diácono ou Membro')
+
+    fireEvent.change(busca, { target: { value: '  Maria   Silva  ' } })
+    fireEvent.click(within(detalhe).getByRole('button', { name: /^buscar$/i }))
+    await waitFor(() => {
+      expect(apiClient.fetchWithAuth).toHaveBeenCalledWith(
+        `/eventos/${evento.id}/candidatos-externos?q=Maria%20Silva`
+      )
+    })
+    fireEvent.change(seletor, { target: { value: 'maria' } })
+    expect(seletor).toHaveValue('maria')
+
+    fireEvent.change(busca, { target: { value: 'Joao' } })
+    fireEvent.click(within(detalhe).getByRole('button', { name: /^buscar$/i }))
+    await waitFor(() => expect(seletor).toHaveValue(''))
+  })
+
   it('gestor de relatórios visualiza lista externa sem poder convocar', async () => {
     const evento = {
       ...mockEventos[0], abrangencia: 'NACIONAL', destinoUf: 'MG',
@@ -1283,16 +1331,23 @@ describe('EventosView', () => {
       if (url === '/eventos') return [evento]
       if (url === `/eventos/${evento.id}`) return evento
       if (url === `/eventos/${evento.id}/participantes-externos`) return [
-        { eventoId: evento.id, membroId: 'membro-externo', status: 'CONFIRMADO' },
+        { eventoId: evento.id, membroId: 'membro-externo', membroNome: 'Diácono Persistido', status: 'CONFIRMADO' },
       ]
       return original(url)
     })
     render(<EventosView />)
     await screen.findByText('Reunião Presencial')
     fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
-    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
-    expect(await within(detalhe).findByText(/membro-externo — Confirmado/)).toBeInTheDocument()
+    let detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    expect(await within(detalhe).findByText(/Diácono Persistido — Confirmado/)).toBeInTheDocument()
+    expect(within(detalhe).queryByText(/membro-externo — Confirmado/)).not.toBeInTheDocument()
     expect(within(detalhe).queryByLabelText('Diácono ou Membro')).not.toBeInTheDocument()
+
+    fireEvent.click(within(detalhe).getByRole('button', { name: '✕' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /detalhes do evento/i })).not.toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    expect(await within(detalhe).findByText(/Diácono Persistido — Confirmado/)).toBeInTheDocument()
   })
 
   it('não permite adicionar participantes a evento externo cancelado', async () => {
