@@ -225,6 +225,9 @@ describe('Eventos pessoais e segregação', () => {
       pessoal: false,
     }
     expect((await req(autor, '/eventos', 'POST', body)).status).toBe(403)
+    const gestorSemCredencial = await usuario(casa, 'GESTOR_AGENDA', 'REGIONAL', reg)
+    expect((await req(gestorSemCredencial, '/eventos', 'POST', body)).status).toBe(403)
+
     const criado = await req(viajante, '/eventos', 'POST', body)
     expect(criado.status).toBe(201)
     const registro = await criado.json() as { id: string }
