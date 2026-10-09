@@ -625,7 +625,7 @@ eventosRouter.get('/:id/candidatos-externos', async c => {
     return c.json({ error: 'Evento externo não encontrado' }, 404)
   if (!ator || !(await podeGerenciarEvento(db, ator, evento)))
     return c.json({ error: 'Acesso não autorizado' }, 403)
-  const termo = (c.req.query('q') || '').trim().replace(/\\s+/g, ' ')
+  const termo = (c.req.query('q') || '').trim().replace(/\s+/g, ' ')
   if (termo.length < 3 || termo.length > 80)
     return c.json({ error: 'Informe ao menos três caracteres do nome' }, 400)
   const regionalId = evento.regionalGestaoId || evento.regionalId
