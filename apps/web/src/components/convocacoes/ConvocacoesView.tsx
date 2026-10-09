@@ -368,6 +368,7 @@ export function ConvocacoesView({
 
   const convocacoesFiltradas = convocacoes.filter(conv => {
     const evento = getEvento(conv.eventoId)
+    if (periodoFiltro !== 'TODOS' && !evento) return false
     if (periodoFiltro !== 'TODOS' && evento) {
       const finalizado = new Date(evento.fimEm).getTime() <= Date.now()
       if (periodoFiltro === 'FUTUROS' && finalizado) return false
