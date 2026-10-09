@@ -485,6 +485,24 @@ export async function obterRegionalGestaoAgendaExterna(
   return obterRegionalDaCasaDoMembro(db, membroId)
 }
 
+// Cadastro de atendimentos externos é atribuição nominal dos viajantes.
+// Administradores regionais preservam a supervisão dos eventos já existentes,
+// mas somente viajantes credenciados (ou Master) podem criar novos.
+export async function podeCriarAgendaExterna(
+  db: any,
+  membroId: string,
+  regionalGestaoId: string
+): Promise<boolean> {
+  if (!db || !membroId || !regionalGestaoId) return false
+  const contexto = await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) return true
+  return contexto.acessosAtivos.some(acesso =>
+    acesso.perfilCodigo === 'GESTOR_EVENTOS_EXTERNOS' &&
+    acesso.escopoTipo === 'REGIONAL' &&
+    acesso.escopoId === regionalGestaoId
+  )
+}
+
 export async function podeGerenciarAgendaExterna(
   db: any,
   membroId: string,
