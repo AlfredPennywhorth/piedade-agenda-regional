@@ -149,6 +149,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   const [podeVerParticipantesExternos, setPodeVerParticipantesExternos] = useState(false)
   const [membroConviteId, setMembroConviteId] = useState('')
   const [buscaConviteExterno, setBuscaConviteExterno] = useState('')
+  const [buscaConviteExecutada, setBuscaConviteExecutada] = useState(false)
   const [candidatosConviteExterno, setCandidatosConviteExterno] = useState<Array<{ id: string; nome: string }>>([])
   const [buscandoConviteExterno, setBuscandoConviteExterno] = useState(false)
   const [tipoConviteExterno, setTipoConviteExterno] = useState<'CONVIDADO' | 'ATRIBUIDO'>('CONVIDADO')
@@ -572,6 +573,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     if (!eventoId || termo.length < 3 || buscandoConviteExterno) return
     const geracao = eventoDetalheConsultaSeq.current
     setBuscandoConviteExterno(true)
+    setBuscaConviteExecutada(false)
+    setCandidatosConviteExterno([])
+    setMembroConviteId('')
     setErroConviteExterno(null)
     try {
       const pessoas = await fetchWithAuth<Array<{ id: string; nome: string }>>(
@@ -580,6 +584,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       if (geracao !== eventoDetalheConsultaSeq.current || eventoDetalheIdRef.current !== eventoId) return
       setMembroConviteId('')
       setCandidatosConviteExterno(pessoas)
+      setBuscaConviteExecutada(true)
     } catch (error: any) {
       if (geracao === eventoDetalheConsultaSeq.current && eventoDetalheIdRef.current === eventoId)
         setErroConviteExterno(error.message || 'Não foi possível buscar membros.')
@@ -1942,7 +1947,12 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                   {eventoDetalhe.ativo && eventoDetalhe.podeGerenciar !== false && (<>
                   <label htmlFor="buscaConviteExterno" className="block text-sm font-medium">Buscar membro cadastrado (mínimo três letras)</label>
                    <div className="flex gap-2">
-                     <input id="buscaConviteExterno" type="search" value={buscaConviteExterno} onChange={e => setBuscaConviteExterno(e.target.value)}
+                     <input id="buscaConviteExterno" type="search" value={buscaConviteExterno} onChange={e => {
+                       setBuscaConviteExterno(e.target.value)
+                       setBuscaConviteExecutada(false)
+                       setCandidatosConviteExterno([])
+                       setMembroConviteId('')
+                     }}
                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void buscarParticipanteExterno() } }}
                        className="min-w-0 flex-1 rounded-lg border border-slate-300 p-2 text-sm" placeholder="Nome do convidado" />
                      <button type="button" disabled={buscaConviteExterno.trim().length < 3 || buscandoConviteExterno}
@@ -1953,8 +1963,11 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                    <label htmlFor="membroConviteId" className="block text-sm font-medium">Diácono ou Membro</label>
                   <select id="membroConviteId" value={membroConviteId} onChange={e => setMembroConviteId(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2 text-sm">
                     <option value="">Selecione uma pessoa</option>
-                    {Array.from(new Map([...membros, ...candidatosConviteExterno].map(m => [m.id, m] as const)).values()).filter(m => !participantesExternos.some(p => p.membroId === m.id)).sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                    {candidatosConviteExterno.filter(m => !participantesExternos.some(p => p.membroId === m.id)).sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
                   </select>
+                  {buscaConviteExecutada && candidatosConviteExterno.length === 0 && (
+                    <p role="status" className="text-sm text-slate-600">Nenhum membro ativo encontrado na Regional responsável por este evento. Confira o nome ou tente outra busca.</p>
+                  )}
                   <label htmlFor="tipoConviteExterno" className="block text-sm font-medium">Tipo de participação</label>
                   <select id="tipoConviteExterno" value={tipoConviteExterno} onChange={e => setTipoConviteExterno(e.target.value as 'CONVIDADO' | 'ATRIBUIDO')} className="w-full rounded-lg border border-slate-300 p-2 text-sm">
                     <option value="CONVIDADO">Convidar — solicita confirmação</option>
