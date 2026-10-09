@@ -4,7 +4,7 @@ import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal, membros,
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, executarOperacaoComAudits, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
-import { podeGerenciarAgendaNoEscopo, podeGerenciarAgendaExterna, obterRegionalGestaoAgendaExterna, eMasterSistema, eGestorRelatoriosAutorizadoParaEvento } from '../security/permissoes'
+import { podeGerenciarAgendaNoEscopo, podeGerenciarAgendaExterna, podeCriarAgendaExterna, obterRegionalGestaoAgendaExterna, eMasterSistema, eGestorRelatoriosAutorizadoParaEvento } from '../security/permissoes'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
 import { carregarEscoposOperacionaisLegados, condicaoEventosVisiveis, condicaoEventosGerenciaveis, podeLerEvento, podeGerenciarEvento } from '../security/eventos'
@@ -274,7 +274,7 @@ eventosRouter.post('/', async (c) => {
           parsed.pessoal === true ||
           (
             !!regionalGestaoId &&
-            await podeGerenciarAgendaExterna(db, atorMembroId, regionalGestaoId)
+            await podeCriarAgendaExterna(db, atorMembroId, regionalGestaoId)
           )
         )
       : await podeGerenciarAgendaNoEscopo(
