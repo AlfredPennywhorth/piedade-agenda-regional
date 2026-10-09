@@ -109,6 +109,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   const [pessoaFiltro, setPessoaFiltro] = useState('')
   const [escopoFiltro, setEscopoFiltro] = useState('')
   const [statusEventoFiltro, setStatusEventoFiltro] = useState<'ATIVOS' | 'CANCELADOS' | 'TODOS'>('ATIVOS')
+  const [periodoFiltro, setPeriodoFiltro] = useState<'FUTUROS' | 'PASSADOS' | 'TODOS'>('FUTUROS')
   const pessoaConsultaSeq = useRef(0)
 
   // Lookups
@@ -366,6 +367,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     { valor: 'abrangencia:INTERNACIONAL', nome: 'Abrangência: Internacional' },
   ]
   const eventosFiltrados = eventos.filter(evento => {
+    const fim = new Date(evento.fimEm).getTime()
+    if (periodoFiltro === 'FUTUROS' && fim <= Date.now()) return false
+    if (periodoFiltro === 'PASSADOS' && fim > Date.now()) return false
     if (statusEventoFiltro === 'ATIVOS' && !evento.ativo) return false
     if (statusEventoFiltro === 'CANCELADOS' && evento.ativo) return false
     if (!escopoFiltro) return true
@@ -1221,6 +1225,13 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
             <option value="ATIVOS">Ativos</option>
             <option value="CANCELADOS">Cancelados</option>
             <option value="TODOS">Todos</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-slate-700">Período
+          <select aria-label="Filtrar eventos por período" value={periodoFiltro} onChange={e => setPeriodoFiltro(e.target.value as typeof periodoFiltro)} className="rounded-lg border border-slate-300 p-2">
+            <option value="FUTUROS">Futuros e em andamento</option>
+            <option value="PASSADOS">Passados</option>
+            <option value="TODOS">Todos os períodos</option>
           </select>
         </label>
         <p className="self-end py-2 text-sm text-slate-500">{eventosFiltrados.length} evento(s)</p>
