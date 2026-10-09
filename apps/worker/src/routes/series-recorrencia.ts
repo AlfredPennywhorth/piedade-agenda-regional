@@ -425,7 +425,24 @@ seriesRecorrenciaRouter.get('/', async (c) => {
       serie.organizadorMembroId
     )
   })
-  return c.json(autorizadas)
+  // Classificação temporal deriva das ocorrências efetivamente geradas,
+  // incluindo exceções individuais, sem inferir datas pela regra nominal da série.
+  const finais = await carregarEmLotes<{
+    serieId: string | null
+    ultimaOcorrenciaFimEm: string | null
+  }>(autorizadas.map((serie: { id: string }) => serie.id), lote =>
+    db.select({
+      serieId: eventos.serieRecorrenciaId,
+      ultimaOcorrenciaFimEm: sql<string>`max(${eventos.fimEm})`,
+    }).from(eventos)
+      .where(and(inArray(eventos.serieRecorrenciaId, lote), eq(eventos.ativo, true)))
+      .groupBy(eventos.serieRecorrenciaId).all()
+  )
+  const ultimaPorSerie = new Map(finais.map(item => [item.serieId, item.ultimaOcorrenciaFimEm]))
+  return c.json(autorizadas.map((serie: { id: string; [campo: string]: unknown }) => ({
+    ...serie,
+    ultimaOcorrenciaFimEm: ultimaPorSerie.get(serie.id) ?? null,
+  })))
 })
 
 seriesRecorrenciaRouter.get('/:id', async (c) => {

@@ -47,6 +47,7 @@ export function ConvocacoesView({
   const [casas, setCasas] = useState<CasaLookup[]>([])
   const [gruposTrabalho, setGruposTrabalho] = useState<GrupoTrabalhoLookup[]>([])
   const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>('ATIVAS')
+  const [periodoFiltro, setPeriodoFiltro] = useState<'FUTUROS' | 'PASSADOS' | 'TODOS'>('FUTUROS')
   const [filtroRegionalId, setFiltroRegionalId] = useState('')
   const [filtroAdministracaoId, setFiltroAdministracaoId] = useState('')
   const [filtroSetorId, setFiltroSetorId] = useState('')
@@ -366,6 +367,13 @@ export function ConvocacoesView({
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
 
   const convocacoesFiltradas = convocacoes.filter(conv => {
+    const evento = getEvento(conv.eventoId)
+    if (periodoFiltro !== 'TODOS' && !evento) return false
+    if (periodoFiltro !== 'TODOS' && evento) {
+      const finalizado = new Date(evento.fimEm).getTime() <= Date.now()
+      if (periodoFiltro === 'FUTUROS' && finalizado) return false
+      if (periodoFiltro === 'PASSADOS' && !finalizado) return false
+    }
     if (filtroStatus === 'ATIVAS' && conv.status === 'CANCELADA') return false
     if (filtroStatus !== 'ATIVAS' && filtroStatus !== 'TODAS' && conv.status !== filtroStatus) return false
 
@@ -424,6 +432,14 @@ export function ConvocacoesView({
               </select>
             </label>
 
+            <label className="text-xs font-semibold text-slate-700">
+              Período
+              <select aria-label="Filtrar convocações por período" value={periodoFiltro} onChange={e => setPeriodoFiltro(e.target.value as typeof periodoFiltro)} className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-sm">
+                <option value="FUTUROS">Futuras e em andamento</option>
+                <option value="PASSADOS">Passadas</option>
+                <option value="TODOS">Todos os períodos</option>
+              </select>
+            </label>
             <label className="text-xs font-semibold text-slate-700">
               Regional
               <select
@@ -528,6 +544,7 @@ export function ConvocacoesView({
               type="button"
               onClick={() => {
                 setFiltroStatus('ATIVAS')
+                setPeriodoFiltro('FUTUROS')
                 setFiltroRegionalId('')
                 setFiltroAdministracaoId('')
                 setFiltroSetorId('')
