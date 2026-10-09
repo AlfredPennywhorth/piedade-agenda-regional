@@ -16,6 +16,14 @@ function dispositivoIos() {
   return iosClassico || ipadModoDesktop
 }
 
+function navegadorSafariIos() {
+  const userAgent = window.navigator.userAgent.toLocaleLowerCase('en-US')
+  return (
+    userAgent.includes('safari') &&
+    !/(crios|fxios|edgios|opios|duckduckgo|gsa|brave|yabrowser|focus|coast|mercury|vivaldi|whale|aloha)/.test(userAgent)
+  )
+}
+
 function emModoStandalone() {
   return (
     (window.navigator as NavigatorStandalone).standalone === true ||
@@ -74,6 +82,7 @@ function PlusIcon() {
 
 export function IosInstallPrompt() {
   const [visivel, setVisivel] = useState(false)
+  const safariIos = navegadorSafariIos()
 
   useEffect(() => {
     setVisivel(
@@ -117,35 +126,41 @@ export function IosInstallPrompt() {
         </button>
       </div>
 
-      <ol className="mt-4 space-y-3 text-sm text-slate-700">
-        <li className="flex items-start gap-3">
-          <span className="mt-0.5 text-brand-700">
-            <ShareIcon />
-          </span>
-          <span>
-            <strong>1.</strong> No navegador, toque em <strong>Compartilhar</strong>.
-          </span>
-        </li>
-        <li className="flex items-start gap-3">
-          <span className="mt-0.5 text-brand-700">
-            <PlusIcon />
-          </span>
-          <span>
-            <strong>2.</strong> Role a lista e escolha <strong>Adicionar à Tela de Início</strong>.
-          </span>
-        </li>
-        <li className="flex items-start gap-3">
-          <span
-            aria-hidden="true"
-            className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-slate-100 px-1 text-xs font-semibold text-slate-700"
-          >
-            3
-          </span>
-          <span>
-            Toque em <strong>Adicionar</strong> no canto superior direito.
-          </span>
-        </li>
-      </ol>
+      {safariIos ? (
+        <ol className="mt-4 space-y-3 text-sm text-slate-700">
+          <li className="flex items-start gap-3">
+            <span className="mt-0.5 text-brand-700">
+              <ShareIcon />
+            </span>
+            <span>
+              <strong>1.</strong> No navegador, toque em <strong>Compartilhar</strong>.
+            </span>
+          </li>
+          <li className="flex items-start gap-3">
+            <span className="mt-0.5 text-brand-700">
+              <PlusIcon />
+            </span>
+            <span>
+              <strong>2.</strong> Role a lista e escolha <strong>Adicionar à Tela de Início</strong>.
+            </span>
+          </li>
+          <li className="flex items-start gap-3">
+            <span
+              aria-hidden="true"
+              className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-slate-100 px-1 text-xs font-semibold text-slate-700"
+            >
+              3
+            </span>
+            <span>
+              Toque em <strong>Adicionar</strong> no canto superior direito.
+            </span>
+          </li>
+        </ol>
+      ) : (
+        <p className="mt-4 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
+          Para instalar pela Tela de Início, abra este endereço no Safari e continue a partir dele.
+        </p>
+      )}
 
       <button
         type="button"
