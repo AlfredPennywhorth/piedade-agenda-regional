@@ -577,6 +577,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         `/eventos/${eventoId}/candidatos-externos?q=${encodeURIComponent(termo)}`
       )
       if (geracao !== eventoDetalheConsultaSeq.current || eventoDetalheIdRef.current !== eventoId) return
+      setMembroConviteId('')
       setCandidatosConviteExterno(pessoas)
     } catch (error: any) {
       if (geracao === eventoDetalheConsultaSeq.current && eventoDetalheIdRef.current === eventoId)
