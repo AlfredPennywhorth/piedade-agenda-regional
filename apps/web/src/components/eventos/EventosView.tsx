@@ -147,6 +147,8 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   const [eventoDetalhe, setEventoDetalhe] = useState<Evento | null>(null)
   const [participantesExternos, setParticipantesExternos] = useState<ParticipanteExterno[]>([])
   const [podeVerParticipantesExternos, setPodeVerParticipantesExternos] = useState(false)
+  const [listaParticipantesCarregada, setListaParticipantesCarregada] = useState(false)
+  const [erroListaParticipantes, setErroListaParticipantes] = useState<string | null>(null)
   const [membroConviteId, setMembroConviteId] = useState('')
   const [buscaConviteExterno, setBuscaConviteExterno] = useState('')
   const [buscaConviteExecutada, setBuscaConviteExecutada] = useState(false)
@@ -524,6 +526,8 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     setEventoDetalhe(item)
     setParticipantesExternos([])
     setPodeVerParticipantesExternos(false)
+    setListaParticipantesCarregada(false)
+    setErroListaParticipantes(null)
     setSalvandoConviteExterno(false)
     setMembroConviteId('')
     setBuscaConviteExterno('')
@@ -550,10 +554,12 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         const lista = await fetchWithAuth<ParticipanteExterno[]>(`/eventos/${itemCompleto.id}/participantes-externos`)
         if (consultaAtual !== eventoDetalheConsultaSeq.current) return
         setParticipantesExternos(lista)
+        setListaParticipantesCarregada(true)
+        setErroListaParticipantes(null)
         setPodeVerParticipantesExternos(true)
       } catch (err: any) {
         if (consultaAtual !== eventoDetalheConsultaSeq.current) return
-        if (itemCompleto.podeGerenciar !== false) setErroConviteExterno(err.message || 'Não foi possível carregar os participantes.')
+        setErroListaParticipantes(err instanceof Error ? err.message : 'Não foi possível carregar os participantes.')
       }
     }
 
@@ -602,7 +608,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   }
 
   const incluirParticipanteExterno = async () => {
-    if (!eventoDetalhe || !eventoDetalhe.ativo || !membroConviteId || salvandoConviteExterno) return
+    if (!eventoDetalhe || !eventoDetalhe.ativo || !listaParticipantesCarregada || !membroConviteId || salvandoConviteExterno) return
     const eventoId = eventoDetalhe.id
     const geracaoDetalhe = eventoDetalheConsultaSeq.current
     const aindaNoMesmoEvento = () =>
@@ -1951,8 +1957,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                         {part.membroNome || candidatosConviteExterno.find(m => m.id === part.membroId)?.nome || membros.find(m => m.id === part.membroId)?.nome || part.membroId} — {part.status === 'CONVIDADO' ? 'Aguardando resposta' : part.status === 'ATRIBUIDO' ? 'Atribuído' : part.status === 'CONFIRMADO' ? 'Confirmado' : 'Recusado'}
                       </li>
                     ))}
-                    {participantesExternos.length === 0 && <li className="text-slate-500">Nenhum participante incluído ainda.</li>}
+                    {listaParticipantesCarregada && participantesExternos.length === 0 && <li className="text-slate-500">Nenhum participante incluído ainda.</li>}
                   </ul>
+                  {erroListaParticipantes && <p role="alert" className="text-sm text-red-700">Não foi possível consultar os participantes deste evento. A inclusão ficará indisponível até que a lista seja carregada. {erroListaParticipantes}</p>}
                   {eventoDetalhe.ativo && eventoDetalhe.podeGerenciar !== false && (<>
                   <label htmlFor="buscaConviteExterno" className="block text-sm font-medium">Buscar membro cadastrado (mínimo três letras)</label>
                    <div className="flex gap-2">
@@ -1972,7 +1979,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                      </button>
                    </div>
                    <label htmlFor="membroConviteId" className="block text-sm font-medium">Diácono ou Membro</label>
-                  <select id="membroConviteId" value={membroConviteId} onChange={e => setMembroConviteId(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2 text-sm">
+                  <select id="membroConviteId" disabled={!listaParticipantesCarregada} value={membroConviteId} onChange={e => setMembroConviteId(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2 text-sm">
                     <option value="">Selecione uma pessoa</option>
                     {candidatosConviteExterno.filter(m => !participantesExternos.some(p => p.membroId === m.id)).sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
                   </select>
@@ -1984,7 +1991,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                     <option value="CONVIDADO">Convidar — solicita confirmação</option>
                     <option value="ATRIBUIDO">Registrar participação — sem confirmação do convidado</option>
                   </select>
-                  <button type="button" disabled={!membroConviteId || salvandoConviteExterno} onClick={() => void incluirParticipanteExterno()} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                  <button type="button" disabled={!listaParticipantesCarregada || !membroConviteId || salvandoConviteExterno} onClick={() => void incluirParticipanteExterno()} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                     {salvandoConviteExterno ? 'Incluindo...' : 'Incluir participante'}
                   </button>
                   </>)}
