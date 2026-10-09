@@ -472,7 +472,7 @@ export async function obterRegionalGestaoAgendaExterna(
   const regionaisGestao = Array.from(new Set(
     contexto.acessosAtivos
       .filter(acesso =>
-        ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) &&
+        ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA', 'GESTOR_EVENTOS_EXTERNOS'].includes(acesso.perfilCodigo) &&
         acesso.escopoTipo === 'REGIONAL' &&
         acesso.escopoId !== null
       )
@@ -496,7 +496,7 @@ export async function podeGerenciarAgendaExterna(
 
   return contexto.acessosAtivos.some(
     acesso =>
-      ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) &&
+      ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA', 'GESTOR_EVENTOS_EXTERNOS'].includes(acesso.perfilCodigo) &&
       acesso.escopoTipo === 'REGIONAL' &&
       acesso.escopoId !== null &&
       (!regionalGestaoId || acesso.escopoId === regionalGestaoId)
