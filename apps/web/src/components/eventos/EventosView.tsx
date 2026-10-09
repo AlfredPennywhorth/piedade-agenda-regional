@@ -567,7 +567,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
 
   const buscarParticipanteExterno = async () => {
     const eventoId = eventoDetalhe?.id
-    const termo = buscaConviteExterno.trim()
+    const termo = buscaConviteExterno.trim().replace(/\s+/g, ' ')
     if (!eventoId || termo.length < 3 || buscandoConviteExterno) return
     const geracao = eventoDetalheConsultaSeq.current
     setBuscandoConviteExterno(true)
