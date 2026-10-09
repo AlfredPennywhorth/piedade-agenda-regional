@@ -614,6 +614,36 @@ eventosRouter.get('/:id/participantes-externos', async c => {
   return c.json(itens)
 })
 
+// Consulta nominal mínima para convidar: nunca disponibiliza dados cadastrais
+// completos aos viajantes, nem membros de outras Regionais.
+eventosRouter.get('/:id/candidatos-externos', async c => {
+  const db = c.get('db')
+  const id = c.req.param('id')
+  const ator = c.get('membroId')
+  const evento = await db.select().from(eventos).where(eq(eventos.id, id)).get()
+  if (!evento || !evento.ativo || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia))
+    return c.json({ error: 'Evento externo não encontrado' }, 404)
+  if (!ator || !(await podeGerenciarEvento(db, ator, evento)))
+    return c.json({ error: 'Acesso não autorizado' }, 403)
+  const termo = (c.req.query('q') || '').trim().replace(/\\s+/g, ' ')
+  if (termo.length < 3 || termo.length > 80)
+    return c.json({ error: 'Informe ao menos três caracteres do nome' }, 400)
+  const regionalId = evento.regionalGestaoId || evento.regionalId
+  if (!regionalId) return c.json([], 200)
+  const candidatos = await db.select({ id: membros.id, nome: membros.nome })
+    .from(membros)
+    .innerJoin(casas, eq(membros.casaId, casas.id))
+    .innerJoin(setores, eq(casas.setorId, setores.id))
+    .innerJoin(administracoes, eq(setores.administracaoId, administracoes.id))
+    .where(and(
+      eq(membros.ativo, true),
+      eq(administracoes.regionalId, regionalId),
+      sql`instr(lower(${membros.nome}), lower(${termo})) > 0`
+    ))
+    .limit(20).all()
+  return c.json(candidatos)
+})
+
 eventosRouter.post('/:id/participantes-externos', async c => {
   const db = c.get('db')
   const id = c.req.param('id')
