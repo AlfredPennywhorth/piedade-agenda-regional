@@ -29,7 +29,7 @@ const MOCK_SERIES = [
     frequencia: 'SEMANAL',
     intervalo: 1,
     dataInicio: '2025-01-01',
-    dataFim: '2025-12-31',
+    dataFim: '2099-12-31',
     horarioInicio: '20:00',
     horarioFim: '21:00',
     diaSemana: 1, // Segunda
