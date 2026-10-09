@@ -430,7 +430,7 @@ seriesRecorrenciaRouter.get('/', async (c) => {
   const finais = await carregarEmLotes<{
     serieId: string | null
     ultimaOcorrenciaFimEm: string | null
-  }>(autorizadas.map(serie => serie.id), lote =>
+  }>(autorizadas.map((serie: { id: string }) => serie.id), lote =>
     db.select({
       serieId: eventos.serieRecorrenciaId,
       ultimaOcorrenciaFimEm: sql<string>`max(${eventos.fimEm})`,
@@ -439,7 +439,7 @@ seriesRecorrenciaRouter.get('/', async (c) => {
       .groupBy(eventos.serieRecorrenciaId).all()
   )
   const ultimaPorSerie = new Map(finais.map(item => [item.serieId, item.ultimaOcorrenciaFimEm]))
-  return c.json(autorizadas.map(serie => ({
+  return c.json(autorizadas.map((serie: { id: string; [campo: string]: unknown }) => ({
     ...serie,
     ultimaOcorrenciaFimEm: ultimaPorSerie.get(serie.id) ?? null,
   })))
