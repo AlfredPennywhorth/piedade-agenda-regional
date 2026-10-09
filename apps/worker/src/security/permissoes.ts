@@ -469,6 +469,14 @@ export async function obterRegionalGestaoAgendaExterna(
     return regionalAtiva?.id ?? null
   }
 
+  // Preferir credenciais de viajante quando presentes, sem misturar gestão administrativa.
+  const regionaisViajante = Array.from(new Set(contexto.acessosAtivos
+    .filter(acesso => acesso.perfilCodigo === 'GESTOR_EVENTOS_EXTERNOS' &&
+      acesso.escopoTipo === 'REGIONAL' && acesso.escopoId !== null)
+    .map(acesso => acesso.escopoId as string)))
+  if (regionaisViajante.length === 1) return regionaisViajante[0]
+  if (regionaisViajante.length > 1) return null
+
   const regionaisGestao = Array.from(new Set(
     contexto.acessosAtivos
       .filter(acesso =>
