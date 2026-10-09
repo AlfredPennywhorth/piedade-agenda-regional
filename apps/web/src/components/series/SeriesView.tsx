@@ -408,13 +408,15 @@ export function SeriesView() {
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
         </div>
-      ) : seriesFiltradas.length === 0 ? (
+      ) : series.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-slate-200 shadow-sm">
           <p className="text-slate-500 mb-4">Nenhuma série cadastrada.</p>
           <button onClick={abrirFormCriar} className="text-brand-600 font-medium hover:text-brand-700">
             Cadastrar primeira série
           </button>
         </div>
+      ) : seriesFiltradas.length === 0 ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">Nenhuma série corresponde aos filtros selecionados. Altere o período ou status para consultar outros registros.</div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
