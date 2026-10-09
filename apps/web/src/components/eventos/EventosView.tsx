@@ -13,6 +13,7 @@ import type { Membro } from '../membros/MembrosView'
 interface ParticipanteExterno {
   eventoId: string
   membroId: string
+  membroNome?: string
   status: 'CONVIDADO' | 'ATRIBUIDO' | 'CONFIRMADO' | 'RECUSADO'
 }
 
@@ -1928,7 +1929,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                   <ul className="text-sm space-y-1">
                     {participantesExternos.map(part => (
                       <li key={part.membroId}>
-                        {candidatosConviteExterno.find(m => m.id === part.membroId)?.nome || membros.find(m => m.id === part.membroId)?.nome || part.membroId} — {part.status === 'CONVIDADO' ? 'Aguardando resposta' : part.status === 'ATRIBUIDO' ? 'Atribuído' : part.status === 'CONFIRMADO' ? 'Confirmado' : 'Recusado'}
+                        {part.membroNome || candidatosConviteExterno.find(m => m.id === part.membroId)?.nome || membros.find(m => m.id === part.membroId)?.nome || part.membroId} — {part.status === 'CONVIDADO' ? 'Aguardando resposta' : part.status === 'ATRIBUIDO' ? 'Atribuído' : part.status === 'CONFIRMADO' ? 'Confirmado' : 'Recusado'}
                       </li>
                     ))}
                     {participantesExternos.length === 0 && <li className="text-slate-500">Nenhum participante incluído ainda.</li>}
