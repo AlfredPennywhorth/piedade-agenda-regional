@@ -222,6 +222,7 @@ describe('EventosView', () => {
     render(<EventosView />)
     await screen.findByText('Reunião Presencial')
     fireEvent.change(screen.getByLabelText('Filtrar por status do evento'), { target: { value: 'CANCELADOS' } })
+    fireEvent.change(screen.getByLabelText('Filtrar eventos por período'), { target: { value: 'PASSADOS' } })
     expect(await screen.findByText('Evento Encerrado')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /reativar evento/i })).not.toBeInTheDocument()
   })
