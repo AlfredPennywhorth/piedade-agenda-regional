@@ -237,6 +237,23 @@ describe('Eventos pessoais e segregação', () => {
     })).status).toBe(403)
   })
 
+  it('busca nominal de viajante retorna apenas id/nome da própria Regional', async () => {
+    const viajante = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
+    const outro = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
+    const fora = await usuario(casaOutraReg)
+    await db.update(s.membros).set({ nome: 'Diacono Jose Regional' }).where(eq(s.membros.id, autor.id))
+    await db.update(s.membros).set({ nome: 'Diacono Jose Fora' }).where(eq(s.membros.id, fora.id))
+    const id = await evento({ regionalId: reg }, {
+      abrangencia: 'NACIONAL', regionalGestaoId: reg, destinoUf: 'RJ',
+      destinoCidadeLocal: 'Rio de Janeiro', criadorMembroId: viajante.id,
+    })
+    const busca = await req(viajante, `/eventos/${id}/candidatos-externos?q=Jose`)
+    expect(busca.status).toBe(200)
+    expect(await busca.json()).toEqual([{ id: autor.id, nome: 'Diacono Jose Regional' }])
+    expect((await req(outro, `/eventos/${id}/candidatos-externos?q=Jose`)).status).toBe(403)
+    expect((await req(viajante, `/eventos/${id}/candidatos-externos?q=Jo`)).status).toBe(400)
+  })
+
   it('viajante tem gestão somente sobre eventos externos que criou', async () => {
     const viajante = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
     const outro = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
