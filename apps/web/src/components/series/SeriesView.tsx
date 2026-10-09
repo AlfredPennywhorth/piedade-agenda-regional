@@ -12,6 +12,7 @@ import type { Membro } from '../membros/MembrosView'
 interface Local {
   id: string
   nome: string
+  proprietarioMembroId?: string | null
 }
 
 interface EspacoLocal {
@@ -133,7 +134,7 @@ export function SeriesView() {
       const resultados = await lookupsPromise
 
       const setters = [
-        (valor: unknown) => setLocais(valor as Local[]),
+        (valor: unknown) => setLocais((valor as Local[]).filter(local => !local.proprietarioMembroId)),
         (valor: unknown) => setEspacos(valor as EspacoLocal[]),
         (valor: unknown) => setMembros(valor as Membro[]),
         (valor: unknown) => setRegionais(valor as Regional[]),

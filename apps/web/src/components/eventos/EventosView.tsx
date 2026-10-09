@@ -445,8 +445,8 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       setorId: '',
       casaId: '',
       grupoTrabalhoId: '',
-      localId: externo ? '' : prev.localId,
-      espacoId: externo ? '' : prev.espacoId,
+      localId: (externo || (!(tipo === 'casa' || externo) && !!locais.find(local => local.id === prev.localId)?.proprietarioMembroId)) ? '' : prev.localId,
+      espacoId: (externo || (!(tipo === 'casa' || externo) && !!locais.find(local => local.id === prev.localId)?.proprietarioMembroId)) ? '' : prev.espacoId,
     }))
   }
 
@@ -1009,7 +1009,12 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     setSalvandoEspacoRapido(true)
     setEspacoRapidoErro(null)
     try {
-      const criado = await postWithAuth<EspacoLocal>(formData.pessoal ? '/espacos-locais/particulares' : '/espacos-locais', parsed.data)
+      const localSelecionado = locais.find(local => local.id === formData.localId)
+      if (formData.pessoal && !localSelecionado?.proprietarioMembroId) {
+        setEspacoRapidoErro('Espaços em locais institucionais devem ser cadastrados por um administrador autorizado.')
+        return
+      }
+      const criado = await postWithAuth<EspacoLocal>(localSelecionado?.proprietarioMembroId ? '/espacos-locais/particulares' : '/espacos-locais', parsed.data)
       setEspacos(atuais => [...atuais.filter(item => item.id !== criado.id), criado]
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
       setFormData(atual => ({ ...atual, espacoId: criado.id }))
@@ -2149,7 +2154,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         title="Editar Evento Recorrente (Este e os próximos)"
         initialData={serieInitialData}
         initialTipoEscopo={serieInitialTipoEscopo}
-        lookups={{ locais, espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
+        lookups={{ locais: locais.filter(local => !local.proprietarioMembroId), espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
         onSubmit={handleSerieSubmit}
         externalError={erro}
       />
