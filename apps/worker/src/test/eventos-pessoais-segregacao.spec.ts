@@ -212,6 +212,28 @@ describe('Eventos pessoais e segregação', () => {
     master = await usuario(casa, 'MASTER_SISTEMA', 'GLOBAL', null)
   })
   afterEach(() => sqlite.close())
+  it('viajante pode criar eventos institucionais nacionais, mas não regionais', async () => {
+    const viajante = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
+    const body = {
+      titulo: 'Atendimento viajante',
+      modalidade: 'ONLINE',
+      urlOnline: 'https://example.org/meeting',
+      ...horario,
+      abrangencia: 'NACIONAL',
+      destinoUf: 'RJ',
+      destinoCidadeLocal: 'Rio de Janeiro',
+      pessoal: false,
+    }
+    expect((await req(autor, '/eventos', 'POST', body)).status).toBe(403)
+    const criado = await req(viajante, '/eventos', 'POST', body)
+    expect(criado.status).toBe(201)
+    const registro = await criado.json() as { id: string }
+    expect((await req(viajante, `/eventos/${registro.id}`)).status).toBe(200)
+    expect((await req(viajante, '/eventos', 'POST', {
+      ...body, abrangencia: 'TERRITORIAL', destinoUf: null, destinoCidadeLocal: null, casaId: irma,
+    })).status).toBe(403)
+  })
+
   it('viajante tem gestão somente sobre eventos externos que criou', async () => {
     const viajante = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
     const outro = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
