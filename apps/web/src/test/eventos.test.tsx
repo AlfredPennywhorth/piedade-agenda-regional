@@ -1236,6 +1236,7 @@ describe('EventosView', () => {
       if (url === '/membros') return [{ id: 'membro-convidado', nome: 'Diácono Convidado', ativo: true }]
       if (url === `/eventos/${novoEvento.id}`) return novoEvento
       if (url === `/eventos/${novoEvento.id}/participantes-externos`) return []
+      if (url === `/eventos/${novoEvento.id}/candidatos-externos?q=Convidado`) return [{ id: 'membro-convidado', nome: 'Diácono Convidado' }]
       return original(url)
     })
     vi.mocked(apiClient.postWithAuth).mockImplementation(async (url) => {
@@ -1270,6 +1271,9 @@ describe('EventosView', () => {
     expect(apiClient.postWithAuth).toHaveBeenCalledWith('/eventos', expect.objectContaining({
       abrangencia: 'NACIONAL', organizadorMembroId: 'a7777777-7777-4777-8777-777777777777', localId: null,
     }))
+    fireEvent.change(within(detalhe).getByLabelText(/buscar membro cadastrado/i), { target: { value: 'Convidado' } })
+    fireEvent.click(within(detalhe).getByRole('button', { name: /^buscar$/i }))
+    await waitFor(() => expect(within(detalhe).getByRole('option', { name: 'Diácono Convidado' })).toBeInTheDocument())
     fireEvent.change(within(detalhe).getByLabelText('Diácono ou Membro'), { target: { value: 'membro-convidado' } })
     fireEvent.click(within(detalhe).getByRole('button', { name: 'Incluir participante' }))
     await waitFor(() => expect(apiClient.postWithAuth).toHaveBeenCalledWith(
