@@ -2114,7 +2114,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         title="Editar Evento Recorrente (Este e os próximos)"
         initialData={serieInitialData}
         initialTipoEscopo={serieInitialTipoEscopo}
-        lookups={{ locais, espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
+        lookups={{ locais: locais.filter(local => !local.proprietarioMembroId), espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
         onSubmit={handleSerieSubmit}
         externalError={erro}
       />
