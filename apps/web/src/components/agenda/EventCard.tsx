@@ -1,5 +1,6 @@
 import { AgendaItem } from './types'
 import { PAISES_ISO } from '@piedade/shared'
+import { corEscopoEvento } from './escoposCores'
 
 interface EventCardProps {
   item: AgendaItem
@@ -55,6 +56,7 @@ export function EventCard({ item, onClick }: EventCardProps) {
   const timeInicio = inicio.toLocaleTimeString('pt-BR', { timeZone, hour: '2-digit', minute: '2-digit' })
   const timeFim = fim.toLocaleTimeString('pt-BR', { timeZone, hour: '2-digit', minute: '2-digit' })
   const status = statusParticipacao(item)
+  const escopo = corEscopoEvento(item)
   const destino = item.evento.abrangencia === 'NACIONAL'
     ? [item.evento.destinoCidadeLocal, item.evento.destinoUf].filter(Boolean).join(' — ')
     : item.evento.abrangencia === 'INTERNACIONAL'
@@ -64,7 +66,7 @@ export function EventCard({ item, onClick }: EventCardProps) {
   return (
     <button
       onClick={onClick}
-      className={`w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-brand-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-300 ${
+      className={`w-full rounded-2xl border border-slate-200 border-l-4 ${escopo.borda} bg-white p-4 text-left shadow-sm transition hover:border-brand-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-300 ${
         item.conflito?.atenuado ? 'opacity-50' : ''
       }`}
     >
@@ -115,6 +117,7 @@ export function EventCard({ item, onClick }: EventCardProps) {
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${escopo.selo}`}>{escopo.nome}</span>
             <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">
               {item.evento.modalidade}
             </span>

@@ -7,6 +7,11 @@ export interface AgendaItem {
     fimEm: string
     modalidade: 'PRESENCIAL' | 'ONLINE' | 'HIBRIDO'
     abrangencia?: 'TERRITORIAL' | 'NACIONAL' | 'INTERNACIONAL'
+    casaId?: string | null
+    setorId?: string | null
+    administracaoId?: string | null
+    regionalId?: string | null
+    grupoTrabalhoId?: string | null
     destinoUf?: string | null
     destinoPaisCodigo?: string | null
     destinoCidadeLocal?: string | null

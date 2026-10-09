@@ -3,6 +3,7 @@ import { fetchWithAuth, postWithAuth } from '../../api/apiClient'
 import { AgendaItem } from './types'
 import { EventoDetalhe } from './EventoDetalhe'
 import { EventCard } from './EventCard'
+import { legendaEscopos } from './escoposCores'
 
 function resumoConflitos(item: AgendaItem) {
   const conflitos = item.conflito?.eventos ?? []
@@ -143,6 +144,9 @@ export function AgendaView() {
 
   return (
     <div className="p-4 space-y-4">
+      <div className="flex flex-wrap gap-x-3 gap-y-1" aria-label="Legenda de cores dos eventos">
+        {legendaEscopos.map(([nome, cor]) => <span key={nome} className="flex items-center gap-1 text-xs text-slate-700"><span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${cor}`} />{nome}</span>)}
+      </div>
       {error && (
         <div className="rounded-lg bg-red-50 p-4 text-center text-sm text-red-600" role="alert">
           {error}

@@ -4,7 +4,7 @@ import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal, membros,
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, executarOperacaoComAudits, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
-import { podeGerenciarAgendaNoEscopo, podeGerenciarAgendaExterna, obterRegionalGestaoAgendaExterna, eMasterSistema, eGestorRelatoriosAutorizadoParaEvento } from '../security/permissoes'
+import { podeGerenciarAgendaNoEscopo, podeGerenciarAgendaExterna, podeCriarAgendaExterna, obterRegionalGestaoAgendaExterna, eMasterSistema, eGestorRelatoriosAutorizadoParaEvento } from '../security/permissoes'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
 import { carregarEscoposOperacionaisLegados, condicaoEventosVisiveis, condicaoEventosGerenciaveis, podeLerEvento, podeGerenciarEvento } from '../security/eventos'
@@ -12,6 +12,17 @@ import { carregarEscoposOperacionaisLegados, condicaoEventosVisiveis, condicaoEv
 export const eventosRouter = new Hono<any>()
 
 const D1_IN_BATCH = 80
+
+async function obterRegionalMembroAtivo(db: any, membroId: string): Promise<string | null> {
+  const membro = await db.select({ regionalId: administracoes.regionalId })
+    .from(membros)
+    .innerJoin(casas, eq(membros.casaId, casas.id))
+    .innerJoin(setores, eq(casas.setorId, setores.id))
+    .innerJoin(administracoes, eq(setores.administracaoId, administracoes.id))
+    .where(and(eq(membros.id, membroId), eq(membros.ativo, true)))
+    .get()
+  return membro?.regionalId ?? null
+}
 
 async function carregarEmLotes<T>(
   ids: string[],
@@ -274,7 +285,7 @@ eventosRouter.post('/', async (c) => {
           parsed.pessoal === true ||
           (
             !!regionalGestaoId &&
-            await podeGerenciarAgendaExterna(db, atorMembroId, regionalGestaoId)
+            await podeCriarAgendaExterna(db, atorMembroId, regionalGestaoId)
           )
         )
       : await podeGerenciarAgendaNoEscopo(
@@ -299,6 +310,14 @@ eventosRouter.post('/', async (c) => {
         return c.json({ error: 'Evento Próprio pertence ao usuário conectado', code: 'FORBIDDEN' }, 403)
       }
       parsed.organizadorMembroId = atorMembroId
+    } else if (externo && parsed.organizadorMembroId) {
+      const regionalOrganizador = await obterRegionalMembroAtivo(db, parsed.organizadorMembroId)
+      if (!regionalGestaoId || regionalOrganizador !== regionalGestaoId) {
+        return c.json({
+          error: 'O organizador deve pertencer à Regional responsável pelo evento externo',
+          code: 'ORGANIZADOR_FORA_REGIONAL'
+        }, 400)
+      }
     }
 
     const auditData: AuditLogData = {
@@ -516,7 +535,7 @@ eventosRouter.patch('/:id', async (c) => {
           (merged.pessoal === true && existing.criadorMembroId === membroId) ||
           (
             !!regionalGestaoFinal &&
-            await podeGerenciarAgendaExterna(db, membroId, regionalGestaoFinal)
+            await (existing.abrangencia === 'NACIONAL' || existing.abrangencia === 'INTERNACIONAL' ? podeGerenciarAgendaExterna(db, membroId, regionalGestaoFinal) : podeCriarAgendaExterna(db, membroId, regionalGestaoFinal))
           )
         )
       : await podeGerenciarAgendaNoEscopo(
@@ -536,6 +555,15 @@ eventosRouter.patch('/:id', async (c) => {
     }
     if (merged.pessoal && merged.organizadorMembroId !== existing.criadorMembroId) {
       return c.json({ error: 'Evento Próprio não pode ser transferido a outro usuário', code: 'FORBIDDEN' }, 403)
+    }
+    if (externoFinal && !merged.pessoal && merged.organizadorMembroId) {
+      const regionalOrganizador = await obterRegionalMembroAtivo(db, merged.organizadorMembroId)
+      if (!regionalGestaoFinal || regionalOrganizador !== regionalGestaoFinal) {
+        return c.json({
+          error: 'O organizador deve pertencer à Regional responsável pelo evento externo',
+          code: 'ORGANIZADOR_FORA_REGIONAL'
+        }, 400)
+      }
     }
 
     // PMO Rule: Ao alterar uma ocorrência individual, preservar serie_recorrencia_id e marcar recorrencia_excecao = true.
@@ -610,8 +638,48 @@ eventosRouter.get('/:id/participantes-externos', async c => {
   const evento = await db.select().from(eventos).where(eq(eventos.id,id)).get()
   if (!evento || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia)) return c.json({error:'Evento externo não encontrado'},404)
   if (!membroId || !((await podeGerenciarEvento(db, membroId, evento)) || (await eGestorRelatoriosAutorizadoParaEvento(db, membroId, evento)))) return c.json({error:'Acesso não autorizado para consultar os participantes'},403)
-  const itens = await db.select().from(eventosParticipantesExternos).where(eq(eventosParticipantesExternos.eventoId,id)).all()
+  const itens = await db.select({
+    eventoId: eventosParticipantesExternos.eventoId,
+    membroId: eventosParticipantesExternos.membroId,
+    membroNome: membros.nome,
+    status: eventosParticipantesExternos.status,
+    criadoPorMembroId: eventosParticipantesExternos.criadoPorMembroId,
+    createdAt: eventosParticipantesExternos.createdAt,
+    updatedAt: eventosParticipantesExternos.updatedAt,
+  }).from(eventosParticipantesExternos)
+    .innerJoin(membros, eq(eventosParticipantesExternos.membroId, membros.id))
+    .where(eq(eventosParticipantesExternos.eventoId,id)).all()
   return c.json(itens)
+})
+
+// Consulta nominal mínima para convidar: nunca disponibiliza dados cadastrais
+// completos aos viajantes, nem membros de outras Regionais.
+eventosRouter.get('/:id/candidatos-externos', async c => {
+  const db = c.get('db')
+  const id = c.req.param('id')
+  const ator = c.get('membroId')
+  const evento = await db.select().from(eventos).where(eq(eventos.id, id)).get()
+  if (!evento || !evento.ativo || evento.pessoal || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia))
+    return c.json({ error: 'Evento externo não encontrado' }, 404)
+  if (!ator || !(await podeGerenciarEvento(db, ator, evento)))
+    return c.json({ error: 'Acesso não autorizado' }, 403)
+  const termo = (c.req.query('q') || '').trim().replace(/\s+/g, ' ')
+  if (termo.length < 3 || termo.length > 80)
+    return c.json({ error: 'Informe ao menos três caracteres do nome' }, 400)
+  const regionalId = evento.regionalGestaoId || evento.regionalId
+  if (!regionalId) return c.json([], 200)
+  const candidatos = await db.select({ id: membros.id, nome: membros.nome })
+    .from(membros)
+    .innerJoin(casas, eq(membros.casaId, casas.id))
+    .innerJoin(setores, eq(casas.setorId, setores.id))
+    .innerJoin(administracoes, eq(setores.administracaoId, administracoes.id))
+    .where(and(
+      eq(membros.ativo, true),
+      eq(administracoes.regionalId, regionalId),
+      sql`instr(lower(${membros.nome}), lower(${termo})) > 0`
+    ))
+    .limit(20).all()
+  return c.json(candidatos)
 })
 
 eventosRouter.post('/:id/participantes-externos', async c => {
@@ -619,14 +687,14 @@ eventosRouter.post('/:id/participantes-externos', async c => {
   const id = c.req.param('id')
   const ator = c.get('membroId')
   const evento = await db.select().from(eventos).where(eq(eventos.id,id)).get()
-  if (!evento || !evento.ativo || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia)) return c.json({error:'Evento externo não encontrado'},404)
+  if (!evento || !evento.ativo || evento.pessoal || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia)) return c.json({error:'Evento externo não encontrado'},404)
   if (!ator || !(await podeGerenciarEvento(db,ator,evento))) return c.json({error:'Acesso não autorizado'},403)
   const payload: unknown = await c.req.json().catch(() => null)
   if (!payload || typeof payload !== 'object') return c.json({error:'Dados inválidos'},400)
   const { membroId, tipo } = payload as Record<string,unknown>
   if (typeof membroId !== 'string' || !membroId || (tipo !== 'CONVIDADO' && tipo !== 'ATRIBUIDO')) return c.json({error:'Membro e tipo de participação inválidos'},400)
-  const membro = await db.select({id:membros.id,ativo:membros.ativo}).from(membros).where(eq(membros.id,membroId)).get()
-  if (!membro || !membro.ativo) return c.json({error:'Membro não encontrado ou inativo'},404)
+  const regionalMembro = await obterRegionalMembroAtivo(db, membroId)
+  if (!regionalMembro || regionalMembro !== (evento.regionalGestaoId || evento.regionalId)) return c.json({error:'Membro não encontrado ou fora da Regional do evento'},404)
   try {
     await executarOperacaoComAudit(db, qdb => [qdb.insert(eventosParticipantesExternos).values({eventoId:id,membroId,status:tipo,criadoPorMembroId:ator})], {
       acao: tipo === 'CONVIDADO' ? 'EVENTO_EXTERNO_CONVITE' : 'EVENTO_EXTERNO_ATRIBUICAO',

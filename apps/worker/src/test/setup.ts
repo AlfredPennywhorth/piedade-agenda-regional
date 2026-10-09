@@ -891,6 +891,7 @@ export function setupDb(sqlite: any) {
       ('MASTER_SISTEMA', 'Master do Sistema', 'Governança global e contingência.'),
       ('ADMINISTRADOR_SISTEMA', 'Administrador do Sistema', 'Administração de uma Regional.'),
       ('GESTOR_AGENDA', 'Gestor de Agenda', 'Gestão de agenda autorizada.'),
+      ('GESTOR_EVENTOS_EXTERNOS', 'Gestor de Eventos Externos', 'Atendimentos nacionais e internacionais próprios.'),
       ('OPERADOR_PORTARIA_PERMANENTE', 'Operador de Portaria permanente', 'Operação permanente de Portaria.'),
       ('GESTOR_RELATORIOS', 'Gestor de Relatórios', 'Consulta de relatórios autorizados.'),
       ('AUDITOR', 'Auditor', 'Consulta de auditoria autorizada.'),
