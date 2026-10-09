@@ -237,6 +237,42 @@ describe('Eventos pessoais e segregação', () => {
     })).status).toBe(403)
   })
 
+  it('restringe organizador de evento externo institucional à Regional gestora no POST e PATCH', async () => {
+    const viajante = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
+    const organizadorLocal = await usuario(casa)
+    const organizadorFora = await usuario(casaOutraReg)
+    const body = {
+      titulo: 'Atendimento com organizador',
+      modalidade: 'ONLINE',
+      urlOnline: 'https://example.org/meeting',
+      ...horario,
+      abrangencia: 'NACIONAL',
+      destinoUf: 'RJ',
+      destinoCidadeLocal: 'Rio de Janeiro',
+      pessoal: false,
+    }
+
+    const postFora = await req(viajante, '/eventos', 'POST', {
+      ...body,
+      organizadorMembroId: organizadorFora.id,
+    })
+    expect(postFora.status).toBe(400)
+    expect(await postFora.json()).toMatchObject({ code: 'ORGANIZADOR_FORA_REGIONAL' })
+
+    const criado = await req(viajante, '/eventos', 'POST', {
+      ...body,
+      organizadorMembroId: organizadorLocal.id,
+    })
+    expect(criado.status).toBe(201)
+    const eventoCriado = await criado.json() as { id: string }
+
+    const patchFora = await req(viajante, `/eventos/${eventoCriado.id}`, 'PATCH', {
+      organizadorMembroId: organizadorFora.id,
+    })
+    expect(patchFora.status).toBe(400)
+    expect(await patchFora.json()).toMatchObject({ code: 'ORGANIZADOR_FORA_REGIONAL' })
+  })
+
   it('busca nominal de viajante retorna apenas id/nome da própria Regional', async () => {
     const viajante = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
     const outro = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
@@ -279,6 +315,11 @@ describe('Eventos pessoais e segregação', () => {
     }
     const valido = await req(viajante, `/eventos/${externo}/participantes-externos`, 'POST', { membroId: autor.id, tipo: 'CONVIDADO' })
     expect(valido.status).toBe(201)
+    const lista = await req(viajante, `/eventos/${externo}/participantes-externos`)
+    expect(lista.status).toBe(200)
+    expect(await lista.json()).toEqual([
+      expect.objectContaining({ membroId: autor.id, membroNome: autor.id, status: 'CONVIDADO' }),
+    ])
   })
 
   it('eventos pessoais não disponibilizam pesquisa nem inclusão nominal', async () => {
