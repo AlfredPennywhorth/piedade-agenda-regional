@@ -232,6 +232,14 @@ describe('Eventos pessoais e segregação', () => {
     expect(criado.status).toBe(201)
     const registro = await criado.json() as { id: string }
     expect((await req(viajante, `/eventos/${registro.id}`)).status).toBe(200)
+    const conversao = await req(viajante, `/eventos/${registro.id}`, 'PATCH', {
+      abrangencia: 'TERRITORIAL',
+      destinoUf: null,
+      destinoCidadeLocal: null,
+      casaId: casa,
+    })
+    expect(conversao.status).toBe(409)
+    expect((await conversao.json() as { code: string }).code).toBe('EVENTO_ABRANGENCIA_CONVERSAO_NAO_PERMITIDA')
     expect((await req(viajante, '/eventos', 'POST', {
       ...body, abrangencia: 'TERRITORIAL', destinoUf: null, destinoCidadeLocal: null, casaId: irma,
     })).status).toBe(403)
