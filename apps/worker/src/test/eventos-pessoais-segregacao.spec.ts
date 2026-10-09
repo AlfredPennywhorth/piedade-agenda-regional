@@ -254,6 +254,33 @@ describe('Eventos pessoais e segregação', () => {
     expect((await req(viajante, `/eventos/${id}/candidatos-externos?q=Jo`)).status).toBe(400)
   })
 
+  it('não permite conversão territorial para externo sem credencial de viajante', async () => {
+    const gestor = await usuario(casa, 'GESTOR_AGENDA', 'REGIONAL', reg)
+    const territorial = await evento({ regionalId: reg }, {
+      criadorMembroId: gestor.id, organizadorMembroId: gestor.id,
+    })
+    const resposta = await req(gestor, `/eventos/${territorial}`, 'PATCH', {
+      abrangencia: 'NACIONAL', destinoUf: 'RJ', destinoCidadeLocal: 'Rio de Janeiro',
+    })
+    expect(resposta.status).toBe(403)
+  })
+
+  it('rejeita convite e atribuição nominal fora da Regional mesmo com UUID conhecido', async () => {
+    const viajante = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
+    const fora = await usuario(casaOutraReg)
+    const externo = await evento({ regionalId: reg }, {
+      abrangencia: 'NACIONAL', regionalGestaoId: reg,
+      destinoUf: 'RJ', destinoCidadeLocal: 'Rio de Janeiro',
+      criadorMembroId: viajante.id,
+    })
+    for (const tipo of ['CONVIDADO', 'ATRIBUIDO']) {
+      const resposta = await req(viajante, `/eventos/${externo}/participantes-externos`, 'POST', { membroId: fora.id, tipo })
+      expect(resposta.status).toBe(404)
+    }
+    const valido = await req(viajante, `/eventos/${externo}/participantes-externos`, 'POST', { membroId: autor.id, tipo: 'CONVIDADO' })
+    expect(valido.status).toBe(201)
+  })
+
   it('viajante tem gestão somente sobre eventos externos que criou', async () => {
     const viajante = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
     const outro = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
