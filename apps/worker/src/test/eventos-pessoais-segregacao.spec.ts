@@ -281,6 +281,19 @@ describe('Eventos pessoais e segregação', () => {
     expect(valido.status).toBe(201)
   })
 
+  it('não permite lookup ou inclusão nominal em evento externo pessoal', async () => {
+    const pessoal = await evento({ casaId: casa }, {
+      pessoal: true, abrangencia: 'INTERNACIONAL', destinoPaisCodigo: 'US',
+      destinoCidadeLocal: 'Miami', criadorMembroId: autor.id,
+    })
+    expect((await req(autor, `/eventos/${pessoal}/candidatos-externos?q=Maria`)).status).toBe(404)
+    for (const tipo of ['CONVIDADO', 'ATRIBUIDO']) {
+      expect((await req(autor, `/eventos/${pessoal}/participantes-externos`, 'POST', {
+        membroId: colega.id, tipo,
+      })).status).toBe(404)
+    }
+  })
+
   it('viajante tem gestão somente sobre eventos externos que criou', async () => {
     const viajante = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
     const outro = await usuario(casa, 'GESTOR_EVENTOS_EXTERNOS', 'REGIONAL', reg)
