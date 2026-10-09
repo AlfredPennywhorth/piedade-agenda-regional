@@ -1334,6 +1334,37 @@ describe('EventosView', () => {
     await waitFor(() => expect(seletor).toHaveValue(''))
   })
 
+  it('preserva ações seguras quando a consulta dos participantes externos falha', async () => {
+    const evento = {
+      ...mockEventos[0],
+      id: '88888888-8888-4888-8888-888888888890',
+      abrangencia: 'NACIONAL',
+      destinoUf: 'DF',
+      destinoCidadeLocal: 'Brasília',
+      pessoal: false,
+      podeGerenciar: true,
+    }
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos') return [evento]
+      if (url === `/eventos/${evento.id}`) return evento
+      if (url === `/eventos/${evento.id}/participantes-externos`) throw new Error('Falha ao carregar participantes')
+      return original(url)
+    })
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    expect(await within(detalhe).findByText(/Falha ao carregar participantes/)).toBeInTheDocument()
+    expect(within(detalhe).queryByText('Nenhum participante incluído ainda.')).not.toBeInTheDocument()
+    expect(within(detalhe).getByRole('button', { name: 'Incluir participante' })).toBeDisabled()
+    expect(within(detalhe).getByLabelText('Diácono ou Membro')).toBeDisabled()
+    expect(within(detalhe).getByLabelText(/buscar membro cadastrado/i)).toBeInTheDocument()
+    expect(within(detalhe).getByRole('button', { name: 'Concluir e voltar aos Eventos' })).toBeInTheDocument()
+    fireEvent.click(within(detalhe).getByRole('button', { name: 'Concluir e voltar aos Eventos' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /detalhes do evento/i })).not.toBeInTheDocument())
+  })
+
   it('gestor de relatórios visualiza lista externa sem poder convocar', async () => {
     const evento = {
       ...mockEventos[0], abrangencia: 'NACIONAL', destinoUf: 'MG',
