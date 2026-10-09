@@ -30,6 +30,7 @@ const MOCK_SERIES = [
     intervalo: 1,
     dataInicio: '2025-01-01',
     dataFim: '2099-12-31',
+    ultimaOcorrenciaFimEm: '2099-12-31T23:00:00.000Z',
     horarioInicio: '20:00',
     horarioFim: '21:00',
     diaSemana: 1, // Segunda
