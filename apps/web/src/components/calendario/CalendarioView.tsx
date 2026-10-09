@@ -3,6 +3,7 @@ import { fetchWithAuth } from '../../api/apiClient'
 import { AgendaItem } from '../agenda/types'
 import { EventCard } from '../agenda/EventCard'
 import { EventoDetalhe } from '../agenda/EventoDetalhe'
+import { corEscopoEvento, legendaEscopos } from '../agenda/escoposCores'
 
 function chaveDiaSaoPaulo(iso: string) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -171,6 +172,9 @@ export function CalendarioView() {
         </button>
       </div>
 
+      <div className="mb-3 flex flex-wrap gap-x-3 gap-y-1" aria-label="Legenda de cores dos eventos">
+        {legendaEscopos.map(([nome, cor]) => <span key={nome} className="flex items-center gap-1 text-xs text-slate-700"><span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${cor}`} />{nome}</span>)}
+      </div>
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="grid grid-cols-7 border-b border-slate-100">
           {dayNames.map(d => (
@@ -214,8 +218,8 @@ export function CalendarioView() {
                 </span>
                 {hasEvent && (
                   <div className="flex gap-0.5 mt-1">
-                    {dayEvents.slice(0, 3).map((_, i) => (
-                      <div key={i} className="w-1.5 h-1.5 bg-brand-500 rounded-full"></div>
+                    {dayEvents.slice(0, 3).map((evento, i) => (
+                      <div key={i} title={corEscopoEvento(evento).nome} className={`w-1.5 h-1.5 rounded-full ${corEscopoEvento(evento).ponto}`}></div>
                     ))}
                   </div>
                 )}
