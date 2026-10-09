@@ -150,6 +150,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   const [membroConviteId, setMembroConviteId] = useState('')
   const [buscaConviteExterno, setBuscaConviteExterno] = useState('')
   const [buscaConviteExecutada, setBuscaConviteExecutada] = useState(false)
+  const buscaConviteSeq = useRef(0)
   const [candidatosConviteExterno, setCandidatosConviteExterno] = useState<Array<{ id: string; nome: string }>>([])
   const [buscandoConviteExterno, setBuscandoConviteExterno] = useState(false)
   const [tipoConviteExterno, setTipoConviteExterno] = useState<'CONVIDADO' | 'ATRIBUIDO'>('CONVIDADO')
@@ -526,6 +527,8 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     setSalvandoConviteExterno(false)
     setMembroConviteId('')
     setBuscaConviteExterno('')
+    buscaConviteSeq.current += 1
+    setBuscaConviteExecutada(false)
     setCandidatosConviteExterno([])
     setBuscandoConviteExterno(false)
     setErroConviteExterno(null)
@@ -572,6 +575,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     const termo = buscaConviteExterno.trim().replace(/\s+/g, ' ')
     if (!eventoId || termo.length < 3 || buscandoConviteExterno) return
     const geracao = eventoDetalheConsultaSeq.current
+    const buscaAtual = ++buscaConviteSeq.current
     setBuscandoConviteExterno(true)
     setBuscaConviteExecutada(false)
     setCandidatosConviteExterno([])
@@ -581,15 +585,15 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       const pessoas = await fetchWithAuth<Array<{ id: string; nome: string }>>(
         `/eventos/${eventoId}/candidatos-externos?q=${encodeURIComponent(termo)}`
       )
-      if (geracao !== eventoDetalheConsultaSeq.current || eventoDetalheIdRef.current !== eventoId) return
+      if (geracao !== eventoDetalheConsultaSeq.current || eventoDetalheIdRef.current !== eventoId || buscaAtual !== buscaConviteSeq.current) return
       setMembroConviteId('')
       setCandidatosConviteExterno(pessoas)
       setBuscaConviteExecutada(true)
     } catch (error: any) {
-      if (geracao === eventoDetalheConsultaSeq.current && eventoDetalheIdRef.current === eventoId)
+      if (geracao === eventoDetalheConsultaSeq.current && eventoDetalheIdRef.current === eventoId && buscaAtual === buscaConviteSeq.current)
         setErroConviteExterno(error.message || 'Não foi possível buscar membros.')
     } finally {
-      if (geracao === eventoDetalheConsultaSeq.current && eventoDetalheIdRef.current === eventoId)
+      if (geracao === eventoDetalheConsultaSeq.current && eventoDetalheIdRef.current === eventoId && buscaAtual === buscaConviteSeq.current)
         setBuscandoConviteExterno(false)
     }
   }
@@ -619,7 +623,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
 
   const fecharDetalheEvento = () => {
     eventoDetalheConsultaSeq.current += 1
+    buscaConviteSeq.current += 1
     eventoDetalheIdRef.current = null
+    setBuscaConviteExecutada(false)
     setEventoDetalhe(null)
   }
 
@@ -1949,6 +1955,8 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                    <div className="flex gap-2">
                      <input id="buscaConviteExterno" type="search" value={buscaConviteExterno} onChange={e => {
                        setBuscaConviteExterno(e.target.value)
+                       buscaConviteSeq.current += 1
+                       setBuscandoConviteExterno(false)
                        setBuscaConviteExecutada(false)
                        setCandidatosConviteExterno([])
                        setMembroConviteId('')
@@ -1965,7 +1973,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                     <option value="">Selecione uma pessoa</option>
                     {candidatosConviteExterno.filter(m => !participantesExternos.some(p => p.membroId === m.id)).sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
                   </select>
-                  {buscaConviteExecutada && candidatosConviteExterno.length === 0 && (
+                  {buscaConviteExecutada && candidatosConviteExterno.every(m => participantesExternos.some(p => p.membroId === m.id)) && (
                     <p role="status" className="text-sm text-slate-600">Nenhum membro ativo encontrado na Regional responsável por este evento. Confira o nome ou tente outra busca.</p>
                   )}
                   <label htmlFor="tipoConviteExterno" className="block text-sm font-medium">Tipo de participação</label>
