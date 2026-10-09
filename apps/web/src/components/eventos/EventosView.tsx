@@ -1236,7 +1236,16 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
               <tbody className="divide-y divide-slate-100">
                 {eventosFiltrados.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900">{item.titulo}{item.pessoal && <span className="ml-2 text-xs text-brand-700">Próprio</span>}</td>
+                    <td className="px-6 py-4 font-medium text-slate-900">
+                      {item.titulo}{item.pessoal && <span className="ml-2 text-xs text-brand-700">Próprio</span>}
+                      {(item.abrangencia === 'NACIONAL' || item.abrangencia === 'INTERNACIONAL') && (
+                        <p className="mt-1 text-xs font-normal text-slate-600">
+                          {item.abrangencia === 'NACIONAL'
+                            ? [item.destinoCidadeLocal, item.destinoUf].filter(Boolean).join(' — ')
+                            : [item.destinoCidadeLocal, PAISES_ISO.find(([codigo]) => codigo === item.destinoPaisCodigo)?.[1] || item.destinoPaisCodigo].filter(Boolean).join(' — ')}
+                        </p>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-slate-600">
                       {new Date(item.inicioEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                     </td>
@@ -1904,7 +1913,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                   <label htmlFor="tipoConviteExterno" className="block text-sm font-medium">Tipo de participação</label>
                   <select id="tipoConviteExterno" value={tipoConviteExterno} onChange={e => setTipoConviteExterno(e.target.value as 'CONVIDADO' | 'ATRIBUIDO')} className="w-full rounded-lg border border-slate-300 p-2 text-sm">
                     <option value="CONVIDADO">Convidar — solicita confirmação</option>
-                    <option value="ATRIBUIDO">Atribuir — participação direta</option>
+                    <option value="ATRIBUIDO">Registrar participação — sem confirmação do convidado</option>
                   </select>
                   <button type="button" disabled={!membroConviteId || salvandoConviteExterno} onClick={() => void incluirParticipanteExterno()} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                     {salvandoConviteExterno ? 'Incluindo...' : 'Incluir participante'}

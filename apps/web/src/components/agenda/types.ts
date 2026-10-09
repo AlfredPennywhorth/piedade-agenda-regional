@@ -6,6 +6,10 @@ export interface AgendaItem {
     inicioEm: string
     fimEm: string
     modalidade: 'PRESENCIAL' | 'ONLINE' | 'HIBRIDO'
+    abrangencia?: 'TERRITORIAL' | 'NACIONAL' | 'INTERNACIONAL'
+    destinoUf?: string | null
+    destinoPaisCodigo?: string | null
+    destinoCidadeLocal?: string | null
     urlOnline?: string | null
     urlMaps?: string | null
     urlWaze?: string | null

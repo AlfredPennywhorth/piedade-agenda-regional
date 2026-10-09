@@ -73,6 +73,23 @@ export function CalendarioView() {
     void load()
   }, [])
 
+  const handleExternalResponseUpdated = (eventoId: string, status: 'CONFIRMADO' | 'RECUSADO') => {
+    const atualizar = (item: AgendaItem): AgendaItem => ({
+      ...item,
+      participacaoExterna: item.evento.id === eventoId && item.participacaoExterna
+        ? { ...item.participacaoExterna, status }
+        : item.participacaoExterna,
+      // Resposta pode remover conflitos e prioridades calculados no servidor.
+      conflito: null,
+    })
+    setSelectedDayEvents(current => current?.map(atualizar) ?? null)
+    setItems(current => current.map(atualizar))
+    void carregarAgenda().catch(err => {
+      console.error('Não foi possível atualizar os conflitos após responder ao convite.', err)
+      setErroAtualizacaoConflitos('A resposta foi salva, mas não foi possível atualizar os conflitos. Recarregue o calendário.')
+    })
+  }
+
   const handleRsvpUpdated = (destinatarioId: string, rsvp: any) => {
     const atualizarItem = (item: AgendaItem) =>
       item.destinatarioId === destinatarioId ? { ...item, rsvp } : item
@@ -234,6 +251,7 @@ export function CalendarioView() {
           item={selectedEvent} 
           onClose={() => setSelectedEvent(null)} 
           onRsvpUpdated={handleRsvpUpdated}
+          onExternalResponseUpdated={handleExternalResponseUpdated}
         />
       )}
       
