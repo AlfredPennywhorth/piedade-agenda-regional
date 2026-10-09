@@ -32,6 +32,7 @@ export interface SerieRecorrencia {
   intervalo: number
   dataInicio: string
   dataFim: string
+  ultimaOcorrenciaFimEm?: string | null
   horarioInicio: string
   horarioFim: string
   diaSemana: number | null
@@ -354,12 +355,15 @@ export function SeriesView() {
     return ano && mes && dia ? `${dia}/${mes}/${ano}` : data
   }
 
-  const hoje = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+  const agora = Date.now()
   const seriesFiltradas = series.filter(serie => {
     if (statusFiltro === 'ATIVAS' && !serie.ativo) return false
     if (statusFiltro === 'INATIVAS' && serie.ativo) return false
-    if (periodoFiltro === 'FUTUROS' && serie.dataFim < hoje) return false
-    if (periodoFiltro === 'PASSADOS' && serie.dataFim >= hoje) return false
+    // O fim da última ocorrência real, não o fim nominal da série, rege o filtro.
+    const ultimaOcorrencia = serie.ultimaOcorrenciaFimEm
+    const possuiOcorrenciaFutura = !!ultimaOcorrencia && new Date(ultimaOcorrencia).getTime() > agora
+    if (periodoFiltro === 'FUTUROS' && !possuiOcorrenciaFutura) return false
+    if (periodoFiltro === 'PASSADOS' && possuiOcorrenciaFutura) return false
     return true
   })
 
