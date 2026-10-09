@@ -484,6 +484,17 @@ eventosRouter.patch('/:id', async (c) => {
 
     if (!(await podeGerenciarEvento(db, c.get('membroId'), existing))) return c.json({ error: 'Acesso não autorizado para este evento', code: 'FORBIDDEN' }, 403)
 
+    if (
+      (existing.abrangencia === 'NACIONAL' || existing.abrangencia === 'INTERNACIONAL') &&
+      parsed.abrangencia === 'TERRITORIAL'
+    ) {
+      return c.json({
+        error: 'Não é possível transformar um evento nacional ou internacional em territorial. Crie um novo evento regional para preservar o destino e o histórico deste atendimento.',
+        code: 'EVENTO_ABRANGENCIA_CONVERSAO_NAO_PERMITIDA',
+      }, 409)
+    }
+
+
     if (new Date(existing.fimEm).getTime() <= Date.now()) {
       return c.json({
         error: 'Eventos já encerrados não podem ser alterados. O registro deve preservar o que efetivamente ocorreu.',
