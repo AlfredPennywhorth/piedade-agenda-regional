@@ -300,7 +300,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
           </div>
         </div>
 
-        {isPresentialOrHybrid && destinoExterno && (
+        {destinoExterno && (
           <div className="border-t border-slate-100 pt-6">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Destino da reunião</h3>
             <div className="bg-slate-50 rounded-lg p-4 border border-slate-100">
