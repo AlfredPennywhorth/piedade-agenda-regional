@@ -20,7 +20,7 @@ function navegadorSafariIos() {
   const userAgent = window.navigator.userAgent.toLocaleLowerCase('en-US')
   return (
     userAgent.includes('safari') &&
-    !/(crios|fxios|edgios|opios|duckduckgo|gsa)/.test(userAgent)
+    !/(crios|fxios|edgios|opios|duckduckgo|gsa|brave)/.test(userAgent)
   )
 }
 
