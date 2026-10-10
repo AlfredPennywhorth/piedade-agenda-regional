@@ -473,6 +473,7 @@ export function SeriesView() {
         isOpen={formOpen}
         onClose={fecharFormulario}
         title={serieEditandoId ? 'Editar Série de Recorrência' : 'Nova Série de Recorrência'}
+        operation={serieEditandoId ? 'editar' : 'criar'}
         initialData={formData}
         initialTipoEscopo={tipoEscopo}
         lookups={{ locais, espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
