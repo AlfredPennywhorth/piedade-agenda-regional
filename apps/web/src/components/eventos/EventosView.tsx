@@ -108,6 +108,10 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   const [filtros, setFiltros] = useState<{ master: boolean; filtrarEscopo?: boolean; pessoas: { id: string; nome: string }[] }>({ master: false, pessoas: [] })
   const [pessoaFiltro, setPessoaFiltro] = useState('')
   const [escopoFiltro, setEscopoFiltro] = useState('')
+  const [tipoEscopoFiltro, setTipoEscopoFiltro] = useState('')
+  const [regionalFiltroId, setRegionalFiltroId] = useState('')
+  const [administracaoFiltroId, setAdministracaoFiltroId] = useState('')
+  const [setorFiltroId, setSetorFiltroId] = useState('')
   const [statusEventoFiltro, setStatusEventoFiltro] = useState<'ATIVOS' | 'CANCELADOS' | 'TODOS'>('ATIVOS')
   const [periodoFiltro, setPeriodoFiltro] = useState<'FUTUROS' | 'PASSADOS' | 'TODOS'>('FUTUROS')
   const pessoaConsultaSeq = useRef(0)
@@ -357,15 +361,40 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       if (seq === pessoaConsultaSeq.current) setLoading(false)
     }
   }
-  const opcoesEscopo = [
-    ...regionais.map(item => ({ valor: `regionalId:${item.id}`, nome: `Regional: ${item.nome}` })),
-    ...administracoes.map(item => ({ valor: `administracaoId:${item.id}`, nome: `Administração: ${item.nome}` })),
-    ...setores.map(item => ({ valor: `setorId:${item.id}`, nome: `Setor: ${item.nome}` })),
-    ...casas.map(item => ({ valor: `casaId:${item.id}`, nome: `Casa: ${item.nome}` })),
-    ...gruposTrabalho.map(item => ({ valor: `grupoTrabalhoId:${item.id}`, nome: `GT: ${item.nome}` })),
-    { valor: 'abrangencia:NACIONAL', nome: 'Abrangência: Nacional' },
-    { valor: 'abrangencia:INTERNACIONAL', nome: 'Abrangência: Internacional' },
-  ]
+  const alterarTipoEscopo = (tipo: string) => {
+    setTipoEscopoFiltro(tipo)
+    setRegionalFiltroId('')
+    setAdministracaoFiltroId('')
+    setSetorFiltroId('')
+    setEscopoFiltro(tipo === 'NACIONAL' || tipo === 'INTERNACIONAL' ? `abrangencia:${tipo}` : '')
+  }
+  const selecionarRegionalFiltro = (id: string) => {
+    setRegionalFiltroId(id)
+    setAdministracaoFiltroId('')
+    setSetorFiltroId('')
+    setEscopoFiltro(id ? `regionalId:${id}` : '')
+  }
+  const selecionarAdministracaoFiltro = (id: string) => {
+    setAdministracaoFiltroId(id)
+    setSetorFiltroId('')
+    setEscopoFiltro(id ? `administracaoId:${id}` : regionalFiltroId ? `regionalId:${regionalFiltroId}` : '')
+  }
+  const selecionarSetorFiltro = (id: string) => {
+    setSetorFiltroId(id)
+    setEscopoFiltro(id ? `setorId:${id}` : administracaoFiltroId ? `administracaoId:${administracaoFiltroId}` : regionalFiltroId ? `regionalId:${regionalFiltroId}` : '')
+  }
+  const administracoesEscopo = administracoes.filter(item => !regionalFiltroId || item.regionalId === regionalFiltroId)
+  const setoresEscopo = setores.filter(item => !administracaoFiltroId || item.administracaoId === administracaoFiltroId)
+    .filter(item => !regionalFiltroId || administracoes.find(adm => adm.id === item.administracaoId)?.regionalId === regionalFiltroId)
+  const casasEscopo = casas.filter(item => !setorFiltroId || item.setorId === setorFiltroId)
+    .filter(item => !administracaoFiltroId || setores.find(setor => setor.id === item.setorId)?.administracaoId === administracaoFiltroId)
+    .filter(item => !regionalFiltroId || administracoes.find(adm => adm.id === setores.find(setor => setor.id === item.setorId)?.administracaoId)?.regionalId === regionalFiltroId)
+  const gruposEscopo = gruposTrabalho.filter(item => {
+    if (!regionalFiltroId) return true
+    const setor = setores.find(setor => setor.id === item.setorId)
+    const administracao = administracoes.find(adm => adm.id === (item.administracaoId || setor?.administracaoId))
+    return (item.regionalId || administracao?.regionalId) === regionalFiltroId
+  })
   const eventosFiltrados = eventos.filter(evento => {
     const fim = new Date(evento.fimEm).getTime()
     if (periodoFiltro === 'FUTUROS' && fim <= Date.now()) return false
@@ -1203,12 +1232,50 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       </div>
 
       {!formOpen && !eventoDetalhe && <div className="flex flex-wrap gap-4 rounded-xl border border-slate-200 bg-white p-4">
-        {(filtros.master || filtros.filtrarEscopo) && <label className="flex flex-col gap-1 text-sm text-slate-700">Escopo
-          <select aria-label="Filtrar por escopo" value={escopoFiltro} onChange={e => setEscopoFiltro(e.target.value)} className="rounded-lg border border-slate-300 p-2">
-            <option value="">{filtros.master ? 'Todos os eventos' : 'Meus eventos e escopos autorizados'}</option>
-            {opcoesEscopo.map(item => <option key={item.valor} value={item.valor}>{item.nome}</option>)}
-          </select>
-        </label>}
+        {(filtros.master || filtros.filtrarEscopo) && <>
+          <label className="flex flex-col gap-1 text-sm text-slate-700 min-w-0 w-full sm:w-auto">Abrangência
+            <select aria-label="Filtrar por tipo de escopo" value={tipoEscopoFiltro} onChange={e => alterarTipoEscopo(e.target.value)} className="min-w-0 w-full sm:max-w-64 rounded-lg border border-slate-300 p-2">
+              <option value="">Todos os escopos autorizados</option>
+              <option value="regionalId">Regional</option>
+              <option value="administracaoId">Administração</option>
+              <option value="setorId">Setor</option>
+              <option value="casaId">Casa de Oração</option>
+              <option value="grupoTrabalhoId">Grupo de Trabalho</option>
+              <option value="NACIONAL">Nacional</option>
+              <option value="INTERNACIONAL">Internacional</option>
+            </select>
+          </label>
+          {['regionalId', 'administracaoId', 'setorId', 'casaId', 'grupoTrabalhoId'].includes(tipoEscopoFiltro) && <label className="flex flex-col gap-1 text-sm text-slate-700 min-w-0 w-full sm:w-auto">Regional
+            <select aria-label="Filtrar por Regional" value={regionalFiltroId} onChange={e => selecionarRegionalFiltro(e.target.value)} className="min-w-0 w-full sm:max-w-64 rounded-lg border border-slate-300 p-2">
+              <option value="">Todas as regionais</option>
+              {regionais.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
+            </select>
+          </label>}
+          {['administracaoId', 'setorId', 'casaId'].includes(tipoEscopoFiltro) && <label className="flex flex-col gap-1 text-sm text-slate-700 min-w-0 w-full sm:w-auto">Administração
+            <select aria-label="Filtrar por Administração" value={administracaoFiltroId} onChange={e => selecionarAdministracaoFiltro(e.target.value)} className="min-w-0 w-full sm:max-w-64 rounded-lg border border-slate-300 p-2">
+              <option value="">Todas as administrações</option>
+              {administracoesEscopo.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
+            </select>
+          </label>}
+          {['setorId', 'casaId'].includes(tipoEscopoFiltro) && <label className="flex flex-col gap-1 text-sm text-slate-700 min-w-0 w-full sm:w-auto">Setor
+            <select aria-label="Filtrar por Setor" value={setorFiltroId} onChange={e => selecionarSetorFiltro(e.target.value)} className="min-w-0 w-full sm:max-w-64 rounded-lg border border-slate-300 p-2">
+              <option value="">Todos os setores</option>
+              {setoresEscopo.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
+            </select>
+          </label>}
+          {tipoEscopoFiltro === 'casaId' && <label className="flex flex-col gap-1 text-sm text-slate-700 min-w-0 w-full sm:w-auto">Casa de Oração
+            <select aria-label="Filtrar por Casa de Oração" value={escopoFiltro.startsWith('casaId:') ? escopoFiltro.slice(7) : ''} onChange={e => setEscopoFiltro(e.target.value ? `casaId:${e.target.value}` : setorFiltroId ? `setorId:${setorFiltroId}` : administracaoFiltroId ? `administracaoId:${administracaoFiltroId}` : regionalFiltroId ? `regionalId:${regionalFiltroId}` : '')} className="min-w-0 w-full sm:max-w-64 rounded-lg border border-slate-300 p-2">
+              <option value="">Todas as casas</option>
+              {casasEscopo.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
+            </select>
+          </label>}
+          {tipoEscopoFiltro === 'grupoTrabalhoId' && <label className="flex flex-col gap-1 text-sm text-slate-700 min-w-0 w-full sm:w-auto">Grupo de Trabalho
+            <select aria-label="Filtrar por Grupo de Trabalho" value={escopoFiltro.startsWith('grupoTrabalhoId:') ? escopoFiltro.slice(16) : ''} onChange={e => setEscopoFiltro(e.target.value ? `grupoTrabalhoId:${e.target.value}` : regionalFiltroId ? `regionalId:${regionalFiltroId}` : '')} className="min-w-0 w-full sm:max-w-64 rounded-lg border border-slate-300 p-2">
+              <option value="">Todos os grupos</option>
+              {gruposEscopo.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
+            </select>
+          </label>}
+        </>}
         {filtros.master && <label className="flex flex-col gap-1 text-sm text-slate-700">Pessoa
           <select aria-label="Filtrar por pessoa" value={pessoaFiltro} onChange={e => void selecionarPessoa(e.target.value)} className="rounded-lg border border-slate-300 p-2">
             <option value="">Todas as pessoas</option>
