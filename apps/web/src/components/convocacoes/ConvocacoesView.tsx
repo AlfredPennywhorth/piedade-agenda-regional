@@ -649,6 +649,8 @@ export function ConvocacoesView({
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
         >
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+          <span data-screen-code={editandoId ? 'AGD-ADM-032' : 'AGD-ADM-031'} className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela {editandoId ? 'AGD-ADM-032' : 'AGD-ADM-031'}</span>
+
             <div className="p-6 border-b border-slate-200">
               <h2 id="dialog-title" className="text-xl font-bold text-slate-900">
                 {editandoId ? 'Editar Rascunho' : 'Nova Convocação'}
@@ -733,6 +735,8 @@ export function ConvocacoesView({
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
         >
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+          <span data-screen-code={actionConfirm.type === 'PUBLICAR' ? 'AGD-ADM-033' : 'AGD-ADM-034'} className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela {actionConfirm.type === 'PUBLICAR' ? 'AGD-ADM-033' : 'AGD-ADM-034'}</span>
+
             <div className="p-6 border-b border-slate-200">
               <h2 id="confirm-dialog-title" className="text-xl font-bold text-slate-900">
                 {actionConfirm.type === 'PUBLICAR' ? 'Publicar Convocação' : 'Cancelar Convocação'}

@@ -473,6 +473,7 @@ export function SeriesView() {
         isOpen={formOpen}
         onClose={fecharFormulario}
         title={serieEditandoId ? 'Editar Série de Recorrência' : 'Nova Série de Recorrência'}
+        operation={serieEditandoId ? 'editar' : 'criar'}
         initialData={formData}
         initialTipoEscopo={tipoEscopo}
         lookups={{ locais, espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
@@ -517,6 +518,7 @@ export function SeriesView() {
       {serieDetalhe && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-detalhe-title" className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
+          <span data-screen-code="AGD-ADM-026" className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-026</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-detalhe-title" className="text-lg font-semibold text-slate-900">
                 Detalhes da Série
@@ -569,6 +571,7 @@ export function SeriesView() {
       {confirmacaoEditar && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-confirm-edit-title" className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden p-6 space-y-4">
+          <span data-screen-code="AGD-ADM-027" className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-027</span>
             <h3 id="modal-confirm-edit-title" className="text-lg font-semibold text-slate-900">Confirmar Edição de Série</h3>
             {Object.keys(confirmacaoEditar).every(campo =>
               ['modalidade', 'localId', 'espacoId', 'urlOnline'].includes(campo)
@@ -617,6 +620,7 @@ export function SeriesView() {
       {confirmacaoInativar && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-confirm-inactivate-title" className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden p-6 space-y-4">
+          <span data-screen-code="AGD-ADM-028" className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-028</span>
             <h3 id="modal-confirm-inactivate-title" className="text-lg font-semibold text-red-600">Inativar Série</h3>
             <p className="text-sm text-slate-600">
               Você está prestes a inativar a série <strong>{confirmacaoInativar.titulo}</strong>.
