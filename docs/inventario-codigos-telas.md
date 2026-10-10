@@ -93,3 +93,20 @@ Os identificadores abaixo aplicam-se aos cartões de criação/edição (não mo
 
 
 O formulário de Membros possui operações distintas: `AGD-ADM-035` no cadastro manual, `AGD-ADM-036` na edição e `AGD-ADM-048` na finalização de pré-cadastro. Os códigos acompanham a escolha do modo; a identificação não depende da rota de origem.
+
+## Subtelas — Funções, Vínculos e Locais (quarta fatia da #247)
+
+| Código | Operação | Tela pai |
+|---|---|---|
+| AGD-ADM-049 | Cadastrar função | AGD-ADM-011 |
+| AGD-ADM-050 | Editar função | AGD-ADM-011 |
+| AGD-ADM-051 | Detalhes da função | AGD-ADM-011 |
+| AGD-ADM-052 | Cadastrar vínculo funcional | AGD-ADM-012 |
+| AGD-ADM-053 | Editar vínculo funcional | AGD-ADM-012 |
+| AGD-ADM-054 | Detalhes do vínculo funcional | AGD-ADM-012 |
+| AGD-ADM-055 | Novo local | AGD-ADM-013 |
+| AGD-ADM-056 | Editar local | AGD-ADM-013 |
+| AGD-ADM-057 | Detalhes do local | AGD-ADM-013 |
+| AGD-ADM-058 | Gerenciar espaços de um local (inclui formulário inline) | AGD-ADM-013 |
+
+O diálogo de espaços (`AGD-ADM-058`) contém formulário e listagem no mesmo contexto. Uma evolução futura deverá distinguir operações de criar e editar Espaço se houver estados CRUD independentes; este código identifica somente a superfície atual. As confirmações nativas do navegador e demais operações permanecem pendentes no inventário global.
