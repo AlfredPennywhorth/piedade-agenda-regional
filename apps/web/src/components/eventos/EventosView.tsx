@@ -389,7 +389,12 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   const casasEscopo = casas.filter(item => !setorFiltroId || item.setorId === setorFiltroId)
     .filter(item => !administracaoFiltroId || setores.find(setor => setor.id === item.setorId)?.administracaoId === administracaoFiltroId)
     .filter(item => !regionalFiltroId || administracoes.find(adm => adm.id === setores.find(setor => setor.id === item.setorId)?.administracaoId)?.regionalId === regionalFiltroId)
-  const gruposEscopo = gruposTrabalho.filter(item => !regionalFiltroId || item.regionalId === regionalFiltroId)
+  const gruposEscopo = gruposTrabalho.filter(item => {
+    if (!regionalFiltroId) return true
+    const setor = setores.find(setor => setor.id === item.setorId)
+    const administracao = administracoes.find(adm => adm.id === (item.administracaoId || setor?.administracaoId))
+    return (item.regionalId || administracao?.regionalId) === regionalFiltroId
+  })
   const eventosFiltrados = eventos.filter(evento => {
     const fim = new Date(evento.fimEm).getTime()
     if (periodoFiltro === 'FUTUROS' && fim <= Date.now()) return false
