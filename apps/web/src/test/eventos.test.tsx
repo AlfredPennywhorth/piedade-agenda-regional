@@ -76,9 +76,11 @@ describe('EventosView', () => {
       return original(url)
     })
     render(<EventosView />)
-    const filtro = await screen.findByLabelText('Filtrar por escopo')
+    const tipo = await screen.findByLabelText('Filtrar por tipo de escopo')
     await screen.findByText('Evento da Casa')
-    fireEvent.change(filtro, { target: { value: 'administracaoId:adm-1' } })
+    fireEvent.change(tipo, { target: { value: 'administracaoId' } })
+    fireEvent.change(screen.getByLabelText('Filtrar por Regional'), { target: { value: REGIONAL_ID } })
+    fireEvent.change(screen.getByLabelText('Filtrar por Administração'), { target: { value: 'adm-1' } })
     expect(screen.getByText('Evento da Casa')).toBeInTheDocument()
     expect(screen.queryByText('Reunião Presencial')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Filtrar por pessoa')).not.toBeInTheDocument()
@@ -107,7 +109,7 @@ describe('EventosView', () => {
     render(<EventosView />)
     await screen.findByText('Reunião Presencial')
     expect(screen.queryByLabelText('Filtrar por pessoa')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Filtrar por escopo')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Filtrar por tipo de escopo')).not.toBeInTheDocument()
   })
 
   it('Próprio na Casa salva e vai para agenda sem iniciar convocação', async () => {
