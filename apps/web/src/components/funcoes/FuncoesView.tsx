@@ -209,6 +209,7 @@ export function FuncoesView() {
 
       {modoForm && (
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-md space-y-4">
+          <span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-049' : 'AGD-ADM-050'} className="block text-right text-[10px] font-medium text-slate-500">Tela {modoForm === 'criar' ? 'AGD-ADM-049' : 'AGD-ADM-050'}</span>
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <h3 className="font-bold text-slate-800 text-base">
               {modoForm === 'criar' ? 'Cadastrar Nova Função' : 'Editar Função'}
@@ -391,6 +392,7 @@ export function FuncoesView() {
             aria-modal="true"
             aria-labelledby="modal-detalhes-titulo"
           >
+            <span data-screen-code="AGD-ADM-051" className="block text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-051</span>
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
               <h3 id="modal-detalhes-titulo" className="font-bold text-slate-800 text-base">Detalhes da Função</h3>
               <button
