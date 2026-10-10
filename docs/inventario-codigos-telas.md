@@ -26,8 +26,8 @@ Fonte canônica atual: `apps/web/src/components/layout/MainLayout.tsx` (abas) e 
 | AGD-ADM-013 | Locais | Aba locais |
 | AGD-ADM-014 | Convocações | Aba convocacoes |
 | AGD-ADM-015 | Contas e acessos | Aba acessos |
-| AGD-MOB-005 | Cadastro de convidado | Tela pública em App |
-| AGD-MOB-006 | Operador de portaria temporário | Tela pública em App |
+| AGD-MOB-005 | Operador de portaria temporário | Tela pública em App |
+| AGD-MOB-006 | Cadastro de convidado | Tela pública em App |
 
 ## Subtelas — Eventos (primeira fatia da #247)
 
