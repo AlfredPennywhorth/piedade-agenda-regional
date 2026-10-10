@@ -210,7 +210,7 @@ export function RegionaisView({ podeEditar = true }: { podeEditar?: boolean }) {
       {/* Form de Criação / Edição Inline ou Card */}
       {podeEditar && modoForm && (
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-md space-y-4">
-          <span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-037' : 'AGD-ADM-038'} aria-label={`Código da subtela ${modoForm === 'criar' ? 'AGD-ADM-037' : 'AGD-ADM-038'}`} className="block text-right text-[10px] font-medium tracking-wide text-slate-500">Tela {modoForm === 'criar' ? 'AGD-ADM-037' : 'AGD-ADM-038'}</span>
+          <span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-037' : 'AGD-ADM-038'} className="block text-right text-[10px] font-medium tracking-wide text-slate-500">Tela {modoForm === 'criar' ? 'AGD-ADM-037' : 'AGD-ADM-038'}</span>
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <h3 className="font-bold text-slate-800 text-base">
               {modoForm === 'criar' ? 'Cadastrar Nova Regional' : 'Editar Regional'}
