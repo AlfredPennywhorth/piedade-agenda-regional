@@ -45,3 +45,21 @@ Fonte canônica atual: `apps/web/src/components/layout/MainLayout.tsx` (abas) e 
 ## A completar
 
 Subtelas de Séries, Convocações, Administração, Portaria, Relatórios, Meu Cadastro e demais módulos; diálogos de confirmação, fluxos públicos adicionais e variantes de componentes compartilhados. Inventariar código, rota/aba, superfície pai, perfil autorizado, ação, componente e estados antes de declarar #247 concluída.
+
+## Subtelas — Séries e Convocações (segunda fatia da #247)
+
+| Código | Subtela | Ação/estado | Pai |
+|---|---|---|---|
+| AGD-ADM-024 | Nova Série | Criar | AGD-ADM-002 |
+| AGD-ADM-025 | Editar Série | Editar | AGD-ADM-002 |
+| AGD-ADM-026 | Detalhes da Série | Consultar | AGD-ADM-002 |
+| AGD-ADM-027 | Confirmar edição da Série | Confirmação | AGD-ADM-025 |
+| AGD-ADM-028 | Inativar Série | Confirmação | AGD-ADM-002 |
+| AGD-ADM-029 | Criar Local na Série | Criar inline | AGD-ADM-024/025 |
+| AGD-ADM-030 | Criar Espaço na Série | Criar inline | AGD-ADM-024/025 |
+| AGD-ADM-031 | Nova Convocação | Criar | AGD-ADM-014 |
+| AGD-ADM-032 | Editar Rascunho de Convocação | Editar | AGD-ADM-014 |
+| AGD-ADM-033 | Publicar Convocação | Confirmação | AGD-ADM-014 |
+| AGD-ADM-034 | Cancelar Convocação | Confirmação | AGD-ADM-014 |
+
+Nota: a numeração mantém todos os códigos de telas publicados previamente. Os identificadores aparecem discretamente na superfície secundária correspondente, além do código da aba pai.
