@@ -76,6 +76,7 @@ Os identificadores abaixo aplicam-se aos cartões de criação/edição (não mo
 |---|---|---|
 | AGD-ADM-035 | Membros — cadastrar manualmente | AGD-ADM-010 |
 | AGD-ADM-036 | Membros — editar | AGD-ADM-010 |
+| AGD-ADM-048 | Membros — localizar e finalizar pré-cadastro ministerial | AGD-ADM-010 |
 | AGD-ADM-037 | Regionais — cadastrar | AGD-ADM-005 |
 | AGD-ADM-038 | Regionais — editar | AGD-ADM-005 |
 | AGD-ADM-039 | Administrações — cadastrar | AGD-ADM-006 |
@@ -90,6 +91,5 @@ Os identificadores abaixo aplicam-se aos cartões de criação/edição (não mo
 
 **Pendências:** mapear estados próprios de pré-cadastro de Membros, inativação/exclusão e seus diálogos, fluxos adicionais e demais módulos. Não declarar a issue #247 concluída com esta PR.
 
-| AGD-ADM-048 | Membros — localizar e finalizar pré-cadastro ministerial | AGD-ADM-010 |
 
 O formulário de Membros possui operações distintas: `AGD-ADM-035` no cadastro manual, `AGD-ADM-036` na edição e `AGD-ADM-048` na finalização de pré-cadastro. Os códigos acompanham a escolha do modo; a identificação não depende da rota de origem.
