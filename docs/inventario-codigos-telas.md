@@ -51,15 +51,19 @@ Subtelas de Séries, Convocações, Administração, Portaria, Relatórios, Meu 
 | Código | Subtela | Ação/estado | Pai |
 |---|---|---|---|
 | AGD-ADM-024 | Nova Série | Criar | AGD-ADM-002 |
-| AGD-ADM-025 | Editar Série | Editar | AGD-ADM-002 |
+| AGD-ADM-025 | Editar recorrência (formulário compartilhado) | Editar | AGD-ADM-002 ou AGD-ADM-001 |
 | AGD-ADM-026 | Detalhes da Série | Consultar | AGD-ADM-002 |
 | AGD-ADM-027 | Confirmar edição da Série | Confirmação | AGD-ADM-025 |
 | AGD-ADM-028 | Inativar Série | Confirmação | AGD-ADM-002 |
-| AGD-ADM-029 | Criar Local na Série | Criar inline | AGD-ADM-024/025 |
-| AGD-ADM-030 | Criar Espaço na Série | Criar inline | AGD-ADM-024/025 |
+| AGD-ADM-029 | Criar Local no formulário compartilhado de recorrência | Criar inline | AGD-ADM-024/025 |
+| AGD-ADM-030 | Criar Espaço no formulário compartilhado de recorrência | Criar inline | AGD-ADM-024/025 |
 | AGD-ADM-031 | Nova Convocação | Criar | AGD-ADM-014 |
 | AGD-ADM-032 | Editar Rascunho de Convocação | Editar | AGD-ADM-014 |
 | AGD-ADM-033 | Publicar Convocação | Confirmação | AGD-ADM-014 |
 | AGD-ADM-034 | Cancelar Convocação | Confirmação | AGD-ADM-014 |
 
 Nota: a numeração mantém todos os códigos de telas publicados previamente. Os identificadores aparecem discretamente na superfície secundária correspondente, além do código da aba pai.
+
+### Regra de identidade funcional
+
+Os códigos identificam a **operação/superfície**, não a trilha de navegação. O mesmo `SerieFormModal` ao editar uma recorrência em Séries **ou** em Eventos mantém `AGD-ADM-025`, e seus diálogos internos de criação de Local/Espaço mantêm `AGD-ADM-029/030`. A origem pode ser registrada separadamente como contexto, sem gerar códigos novos. Criar e Editar permanecem distintos (`024`/`025`). Não confundir com os formulários inline de Eventos (`019`/`020`), que são implementações diferentes e exigem análise funcional própria antes de eventual unificação.
