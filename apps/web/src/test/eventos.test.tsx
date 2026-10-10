@@ -53,6 +53,8 @@ const mockEventoRecorrente = {
 describe('EventosView', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    // Evita que os eventos do fixture passem a ser históricos conforme o calendário real avança.
+    vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-10-09T12:00:00.000Z').getTime())
     vi.mocked(apiClient.fetchWithAuth).mockReset()
     vi.mocked(apiClient.postWithAuth).mockReset()
     vi.mocked(apiClient.patchWithAuth).mockReset()
