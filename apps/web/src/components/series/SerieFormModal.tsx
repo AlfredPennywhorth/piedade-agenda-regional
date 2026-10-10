@@ -19,6 +19,7 @@ export interface SerieFormModalProps {
   isOpen: boolean
   onClose: () => void
   title: string
+  operation: 'criar' | 'editar'
   initialData: Partial<SerieCreateInput>
   initialTipoEscopo: TipoEscopo
   lookups: Lookups
@@ -30,6 +31,7 @@ export function SerieFormModal({
   isOpen,
   onClose,
   title,
+  operation,
   initialData,
   initialTipoEscopo,
   lookups,
@@ -439,7 +441,7 @@ export function SerieFormModal({
     <>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in overflow-y-auto">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-form-title" className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden my-8">
-          <span data-screen-code={title.startsWith('Editar') ? 'AGD-ADM-025' : 'AGD-ADM-024'} className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela {title.startsWith('Editar') ? 'AGD-ADM-025' : 'AGD-ADM-024'}</span>
+          <span data-screen-code={operation === 'editar' ? 'AGD-ADM-025' : 'AGD-ADM-024'} className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela {operation === 'editar' ? 'AGD-ADM-025' : 'AGD-ADM-024'}</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-form-title" className="text-lg font-semibold text-slate-900">
                 {title}
