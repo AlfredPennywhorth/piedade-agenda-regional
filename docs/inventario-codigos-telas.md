@@ -67,3 +67,25 @@ Nota: a numeração mantém todos os códigos de telas publicados previamente. O
 ### Regra de identidade funcional
 
 Os códigos identificam a **operação/superfície**, não a trilha de navegação. O mesmo `SerieFormModal` ao editar uma recorrência em Séries **ou** em Eventos mantém `AGD-ADM-025`, e seus diálogos internos de criação de Local/Espaço mantêm `AGD-ADM-029/030`. A origem pode ser registrada separadamente como contexto, sem gerar códigos novos. Criar e Editar permanecem distintos (`024`/`025`). Não confundir com os formulários inline de Eventos (`019`/`020`), que são implementações diferentes e exigem análise funcional própria antes de eventual unificação.
+
+## Subtelas — cadastros administrativos (terceira fatia da #247)
+
+Os identificadores abaixo aplicam-se aos cartões de criação/edição (não modais) e ao modal de detalhes de Grupo de Trabalho. Permanecem visíveis em viewport móvel; o código da aba pai não é substituído.
+
+| Código | Operação | Tela pai |
+|---|---|---|
+| AGD-ADM-035 | Membros — cadastrar | AGD-ADM-010 |
+| AGD-ADM-036 | Membros — editar | AGD-ADM-010 |
+| AGD-ADM-037 | Regionais — cadastrar | AGD-ADM-005 |
+| AGD-ADM-038 | Regionais — editar | AGD-ADM-005 |
+| AGD-ADM-039 | Administrações — cadastrar | AGD-ADM-006 |
+| AGD-ADM-040 | Administrações — editar | AGD-ADM-006 |
+| AGD-ADM-041 | Setores — cadastrar | AGD-ADM-007 |
+| AGD-ADM-042 | Setores — editar | AGD-ADM-007 |
+| AGD-ADM-043 | Casas de Oração — cadastrar | AGD-ADM-008 |
+| AGD-ADM-044 | Casas de Oração — editar | AGD-ADM-008 |
+| AGD-ADM-045 | Grupos de Trabalho — cadastrar | AGD-ADM-009 |
+| AGD-ADM-046 | Grupos de Trabalho — editar | AGD-ADM-009 |
+| AGD-ADM-047 | Grupos de Trabalho — detalhes | AGD-ADM-009 |
+
+**Pendências:** mapear estados próprios de pré-cadastro de Membros, inativação/exclusão e seus diálogos, fluxos adicionais e demais módulos. Não declarar a issue #247 concluída com esta PR.
