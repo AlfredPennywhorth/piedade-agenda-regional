@@ -439,6 +439,7 @@ export function SerieFormModal({
     <>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in overflow-y-auto">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-form-title" className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden my-8">
+          <span data-screen-code={title.startsWith('Editar') ? 'AGD-ADM-025' : 'AGD-ADM-024'} className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela {title.startsWith('Editar') ? 'AGD-ADM-025' : 'AGD-ADM-024'}</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-form-title" className="text-lg font-semibold text-slate-900">
                 {title}
@@ -925,6 +926,7 @@ export function SerieFormModal({
         {localRapidoOpen && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
             <div ref={localRapidoDialogRef} role="dialog" aria-modal="true" aria-labelledby="serie-local-rapido-title" className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+          <span data-screen-code="AGD-ADM-029" className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-029</span>
               <div className="border-b border-slate-200 px-5 py-4">
                 <h3 id="serie-local-rapido-title" className="font-semibold text-slate-900">Criar Local</h3>
                 <p className="mt-1 text-xs text-slate-500">O novo local será selecionado automaticamente na série.</p>
@@ -984,6 +986,7 @@ export function SerieFormModal({
         {espacoRapidoOpen && formData.localId && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
             <div ref={espacoRapidoDialogRef} role="dialog" aria-modal="true" aria-labelledby="serie-espaco-rapido-title" className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+          <span data-screen-code="AGD-ADM-030" className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-030</span>
               <div className="border-b border-slate-200 px-5 py-4">
                 <h3 id="serie-espaco-rapido-title" className="font-semibold text-slate-900">Criar Espaço</h3>
                 <p className="mt-1 text-xs text-slate-500">O novo espaço será selecionado automaticamente na série.</p>
