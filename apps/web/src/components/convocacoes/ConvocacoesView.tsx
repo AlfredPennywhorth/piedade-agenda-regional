@@ -403,7 +403,7 @@ export function ConvocacoesView({
           onClick={abrirFormCriar}
           className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors"
         >
-          Novo Rascunho
+          Nova Convocação
         </button>
       </div>
 
