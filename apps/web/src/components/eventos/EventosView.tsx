@@ -1445,7 +1445,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       {formOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in overflow-y-auto">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-form-title" className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden my-8">
-            <span data-screen-code={{eventoEditandoId ? 'AGD-ADM-017' : 'AGD-ADM-016'}} aria-label={`Código da subtela ${{eventoEditandoId ? 'AGD-ADM-017' : 'AGD-ADM-016'}}`} className="block text-right px-4 pt-2 text-[10px] font-medium tracking-wide text-slate-500">Tela {{eventoEditandoId ? 'AGD-ADM-017' : 'AGD-ADM-016'}}</span>
+            <span data-screen-code={eventoEditandoId ? 'AGD-ADM-017' : 'AGD-ADM-016'} aria-label={`Código da subtela ${eventoEditandoId ? 'AGD-ADM-017' : 'AGD-ADM-016'}`} className="block text-right px-4 pt-2 text-[10px] font-medium tracking-wide text-slate-500">Tela {eventoEditandoId ? 'AGD-ADM-017' : 'AGD-ADM-016'}</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-form-title" className="text-lg font-semibold text-slate-900">
                 {eventoEditandoId ? 'Editar Evento' : 'Novo Evento'}
