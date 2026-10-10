@@ -1445,6 +1445,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       {formOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in overflow-y-auto">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-form-title" className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden my-8">
+            <span data-screen-code={eventoEditandoId ? 'AGD-ADM-017' : 'AGD-ADM-016'} aria-label={`Código da subtela ${eventoEditandoId ? 'AGD-ADM-017' : 'AGD-ADM-016'}`} className="block text-right px-4 pt-2 text-[10px] font-medium tracking-wide text-slate-500">Tela {eventoEditandoId ? 'AGD-ADM-017' : 'AGD-ADM-016'}</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-form-title" className="text-lg font-semibold text-slate-900">
                 {eventoEditandoId ? 'Editar Evento' : 'Novo Evento'}
@@ -1894,6 +1895,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       {localRapidoOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
           <div ref={localRapidoDialogRef} role="dialog" aria-modal="true" aria-labelledby="local-rapido-title" className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+            <span data-screen-code={'AGD-ADM-019'} aria-label={`Código da subtela ${'AGD-ADM-019'}`} className="block text-right px-4 pt-2 text-[10px] font-medium tracking-wide text-slate-500">Tela {'AGD-ADM-019'}</span>
             <div className="border-b border-slate-200 px-5 py-4">
               <h3 id="local-rapido-title" className="font-semibold text-slate-900">Criar Local</h3>
               <p className="mt-1 text-xs text-slate-500">O novo local será selecionado automaticamente no evento.</p>
@@ -1950,6 +1952,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       {espacoRapidoOpen && formData.localId && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
           <div ref={espacoRapidoDialogRef} role="dialog" aria-modal="true" aria-labelledby="espaco-rapido-title" className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <span data-screen-code={'AGD-ADM-020'} aria-label={`Código da subtela ${'AGD-ADM-020'}`} className="block text-right px-4 pt-2 text-[10px] font-medium tracking-wide text-slate-500">Tela {'AGD-ADM-020'}</span>
             <div className="border-b border-slate-200 px-5 py-4">
               <h3 id="espaco-rapido-title" className="font-semibold text-slate-900">Criar Espaço</h3>
               <p className="mt-1 text-xs text-slate-500">O novo espaço será selecionado automaticamente.</p>
@@ -1970,6 +1973,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       {eventoDetalhe && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-detalhe-title" className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
+            <span data-screen-code={'AGD-ADM-018'} aria-label={`Código da subtela ${'AGD-ADM-018'}`} className="block text-right px-4 pt-2 text-[10px] font-medium tracking-wide text-slate-500">Tela {'AGD-ADM-018'}</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-detalhe-title" className="text-lg font-semibold text-slate-900">
                 Detalhes do Evento
@@ -2149,6 +2153,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       {escolhaSerieAberto && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-escolha-title" className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+            <span data-screen-code={'AGD-ADM-021'} aria-label={`Código da subtela ${'AGD-ADM-021'}`} className="block text-right px-4 pt-2 text-[10px] font-medium tracking-wide text-slate-500">Tela {'AGD-ADM-021'}</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-escolha-title" className="text-lg font-semibold text-slate-900">
                 Editar Evento Recorrente
@@ -2196,6 +2201,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       {confirmacaoThisAberto && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-confirm-this-title" className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+            <span data-screen-code={'AGD-ADM-022'} aria-label={`Código da subtela ${'AGD-ADM-022'}`} className="block text-right px-4 pt-2 text-[10px] font-medium tracking-wide text-slate-500">Tela {'AGD-ADM-022'}</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-confirm-this-title" className="text-lg font-semibold text-slate-900">
                 Confirmar Exceção
@@ -2230,6 +2236,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       {confirmacaoFutureAberto && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-confirm-future-title" className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+            <span data-screen-code={'AGD-ADM-023'} aria-label={`Código da subtela ${'AGD-ADM-023'}`} className="block text-right px-4 pt-2 text-[10px] font-medium tracking-wide text-slate-500">Tela {'AGD-ADM-023'}</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-confirm-future-title" className="text-lg font-semibold text-slate-900">
                 Confirmar Edição
