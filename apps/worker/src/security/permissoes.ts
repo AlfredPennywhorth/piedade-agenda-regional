@@ -681,7 +681,7 @@ export async function eOperadorPortariaAutorizado(
   contextoPermissoes?: ContextoPermissoes
 ): Promise<boolean> {
   if (!db || !membroId || !evento) return false
-  if (evento.pessoal) return false
+  if (evento.pessoal || evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') return false
 
   const estadoPortaria = await db
     .select({ status: schema.portariasEvento.status })
