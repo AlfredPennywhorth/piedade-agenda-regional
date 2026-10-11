@@ -23,7 +23,7 @@ function banco() {
 describe('0046 — integridade Portaria e abrangência', () => {
   it('impede portaria em evento externo', () => {
     const db = banco()
-    db.prepare("UPDATE eventos SET abrangencia='NACIONAL' WHERE id='e'").run()
+    db.prepare("UPDATE eventos SET abrangencia='NACIONAL', regional_gestao_id='r', regional_id='r', setor_id=NULL, destino_uf='RJ', destino_cidade_local='Rio de Janeiro' WHERE id='e'").run()
     expect(() => db.prepare("INSERT INTO portarias_evento (evento_id) VALUES ('e')").run())
       .toThrow(/PORTARIA_EVENTO_INCOMPATIVEL/)
     db.close()
@@ -32,7 +32,7 @@ describe('0046 — integridade Portaria e abrangência', () => {
   it('impede converter escopo depois de criar estado de Portaria', () => {
     const db = banco()
     db.prepare("INSERT INTO portarias_evento (evento_id) VALUES ('e')").run()
-    expect(() => db.prepare("UPDATE eventos SET abrangencia='NACIONAL' WHERE id='e'").run())
+    expect(() => db.prepare("UPDATE eventos SET abrangencia='NACIONAL', regional_gestao_id='r', regional_id='r', setor_id=NULL, destino_uf='RJ', destino_cidade_local='Rio de Janeiro' WHERE id='e'").run())
       .toThrow(/EVENTO_COM_PORTARIA_NAO_PODE_MUDAR_ESCOPO/)
     db.close()
   })
