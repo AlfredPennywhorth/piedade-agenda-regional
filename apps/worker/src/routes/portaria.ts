@@ -41,7 +41,7 @@ portariaRouter.post('/eventos/:eventoId/credenciais-operador', async c => {
     return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
   }
 
-  if (evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') return c.json({error:'Portaria indisponível para eventos externos',code:'PORTARIA_EXTERNA_INDISPONIVEL'},409)
+  if (evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') return c.json({error:'Portaria indisponível para eventos externos',code:'PORTARIA_INDISPONIVEL'},409)
   if (!atorMembroId || !(await podeGerarCredencialOperador(db, atorMembroId, contexto, evento))) {
     return c.json({ error: 'Acesso não autorizado para gerar porteiro temporário', code: 'FORBIDDEN' }, 403)
   }
