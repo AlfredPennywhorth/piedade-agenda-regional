@@ -812,6 +812,10 @@ portariaRouter.get('/eventos/:eventoId/fechamento', async c => {
   const contexto = c.get('contextoPermissoes')
   const eventoId = c.req.param('eventoId')
 
+  const evento = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
+  if (!evento) return c.json({ error: 'Evento não encontrado', code: 'NOT_FOUND' }, 404)
+  if (!portariaDisponivel(evento)) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+
   const fechamento = await db.select().from(portariaFechamentos)
     .where(eq(portariaFechamentos.eventoId, eventoId)).get()
 
