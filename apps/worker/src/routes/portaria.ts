@@ -59,40 +59,45 @@ portariaRouter.post('/eventos/:eventoId/credenciais-operador', async c => {
   const expiraEm = getSaoPauloEndOfDayIso(evento.inicioEm)
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
-  await executarOperacaoComAudit(
-    db,
-    qdb => {
-      const queries = []
-      if (!estado) {
-        queries.push(qdb.insert(portariasEvento).values({
+  try {
+    await executarOperacaoComAudit(
+      db,
+      qdb => {
+        const queries = []
+        if (!estado) {
+          queries.push(qdb.insert(portariasEvento).values({
+            eventoId,
+            status: 'ABERTA',
+            createdAt: agora,
+            updatedAt: agora,
+          }))
+        }
+        queries.push(qdb.insert(credenciaisOperadorPortariaEvento).values({
+          id: credencialId,
           eventoId,
-          status: 'ABERTA',
+          tokenHash,
+          expiraEm,
+          criadoPorMembroId: atorMembroId,
+          ativo: true,
           createdAt: agora,
           updatedAt: agora,
         }))
+        return queries
+      },
+      {
+        acao: 'PORTARIA_CREDENCIAL_OPERADOR_CRIADA',
+        atorMembroId,
+        recursoTipo: 'CREDENCIAL_OPERADOR_PORTARIA',
+        recursoId: credencialId,
+        escopoTipo,
+        escopoId,
+        contexto: { eventoId },
       }
-      queries.push(qdb.insert(credenciaisOperadorPortariaEvento).values({
-        id: credencialId,
-        eventoId,
-        tokenHash,
-        expiraEm,
-        criadoPorMembroId: atorMembroId,
-        ativo: true,
-        createdAt: agora,
-        updatedAt: agora,
-      }))
-      return queries
-    },
-    {
-      acao: 'PORTARIA_CREDENCIAL_OPERADOR_CRIADA',
-      atorMembroId,
-      recursoTipo: 'CREDENCIAL_OPERADOR_PORTARIA',
-      recursoId: credencialId,
-      escopoTipo,
-      escopoId,
-      contexto: { eventoId },
-    }
-  )
+    )
+  } catch (err: unknown) {
+    if (String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    throw err
+  }
 
   return c.json({
     id: credencialId,
@@ -255,39 +260,44 @@ portariaRouter.post('/eventos/:eventoId/operadores', async c => {
   const autorizacaoId = crypto.randomUUID()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
-  await executarOperacaoComAudit(
-    db,
-    qdb => {
-      const queries = []
-      if (!estado) {
-        queries.push(qdb.insert(portariasEvento).values({
+  try {
+    await executarOperacaoComAudit(
+      db,
+      qdb => {
+        const queries = []
+        if (!estado) {
+          queries.push(qdb.insert(portariasEvento).values({
+            eventoId,
+            status: 'ABERTA',
+            createdAt: agora,
+            updatedAt: agora,
+          }))
+        }
+        queries.push(qdb.insert(portariaOperadoresEvento).values({
+          id: autorizacaoId,
           eventoId,
-          status: 'ABERTA',
+          membroId: body.membroId!,
+          concedidoPorMembroId: atorMembroId,
+          ativo: true,
           createdAt: agora,
           updatedAt: agora,
         }))
+        return queries
+      },
+      {
+        acao: 'PORTARIA_OPERADOR_TEMPORARIO_CONCEDIDO',
+        atorMembroId,
+        recursoTipo: 'PORTARIA_OPERADOR_EVENTO',
+        recursoId: autorizacaoId,
+        escopoTipo,
+        escopoId,
+        contexto: { eventoId, operadorMembroId: body.membroId },
       }
-      queries.push(qdb.insert(portariaOperadoresEvento).values({
-        id: autorizacaoId,
-        eventoId,
-        membroId: body.membroId!,
-        concedidoPorMembroId: atorMembroId,
-        ativo: true,
-        createdAt: agora,
-        updatedAt: agora,
-      }))
-      return queries
-    },
-    {
-      acao: 'PORTARIA_OPERADOR_TEMPORARIO_CONCEDIDO',
-      atorMembroId,
-      recursoTipo: 'PORTARIA_OPERADOR_EVENTO',
-      recursoId: autorizacaoId,
-      escopoTipo,
-      escopoId,
-      contexto: { eventoId, operadorMembroId: body.membroId },
-    }
-  )
+    )
+  } catch (err: unknown) {
+    if (String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    throw err
+  }
 
   return c.json({
     id: autorizacaoId,
