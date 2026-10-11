@@ -408,10 +408,6 @@ export function FuncoesView() {
             ) : (
               <div className="space-y-3 text-sm">
                 <div>
-                  <span className="text-xs font-semibold text-slate-500 block">ID:</span>
-                  <span className="text-xs font-mono text-slate-700">{funcaoDetalhe.id}</span>
-                </div>
-                <div>
                   <span className="text-xs font-semibold text-slate-500 block">Nome:</span>
                   <span className="font-semibold text-slate-800">{funcaoDetalhe.nome}</span>
                 </div>

@@ -110,3 +110,7 @@ O formulário de Membros possui operações distintas: `AGD-ADM-035` no cadastro
 | AGD-ADM-058 | Gerenciar espaços de um local (inclui formulário inline) | AGD-ADM-013 |
 
 O diálogo de espaços (`AGD-ADM-058`) contém formulário e listagem no mesmo contexto. Uma evolução futura deverá distinguir operações de criar e editar Espaço se houver estados CRUD independentes; este código identifica somente a superfície atual. As confirmações nativas do navegador e demais operações permanecem pendentes no inventário global.
+
+### Diretriz de apresentação dos detalhes (correção pós-smoke #284)
+
+Os identificadores internos de banco (`id` UUID/chaves técnicas) não são exibidos ao usuário nos detalhes de Funções, Vínculos, Regionais, Administrações, Setores, Casas de Oração e GT. As chaves continuam existindo no modelo e no uso interno. O código de **tela** permanece visível quando atribuído. Em modais de Locais (`AGD-ADM-055`–`058`), exibir o código no cabeçalho, dentro da área de padding, nunca encostado no canto arredondado do cartão.
