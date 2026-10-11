@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { hashToken } from '../security/tokens'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
@@ -121,7 +121,8 @@ portariaPublicaRouter.post('/cadastro/:token', async c => {
   const convidadoId = crypto.randomUUID()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(credencial.evento)
 
-  await executarOperacaoComAudit(
+  try {
+    await executarOperacaoComAudit(
     db,
     qdb => [
       qdb.insert(schema.convidadosEvento).values({
@@ -131,7 +132,9 @@ portariaPublicaRouter.post('/cadastro/:token', async c => {
         localidade,
         referencia,
         observacoes,
-        status: 'PENDENTE',
+        // CHECK do banco aborta atomicamente INSERT e auditoria caso o evento
+        // tenha sido convertido em externo/pessoal durante a requisição.
+        status: sql`CASE WHEN EXISTS (SELECT 1 FROM eventos e WHERE e.id = ${credencial.evento.id} AND e.ativo = 1 AND e.pessoal = 0 AND e.abrangencia NOT IN ('NACIONAL', 'INTERNACIONAL')) THEN 'PENDENTE' ELSE 'PORTARIA_INDISPONIVEL' END`,
         criadoPorMembroId: null,
         ativo: true,
         createdAt: agora,
@@ -147,7 +150,13 @@ portariaPublicaRouter.post('/cadastro/:token', async c => {
       escopoId,
       contexto: { eventoId: credencial.evento.id },
     }
-  )
+    )
+  } catch (err: unknown) {
+    if (String(err).includes('CHECK constraint')) {
+      return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    }
+    throw err
+  }
 
   return c.json({
     cadastrado: true,
