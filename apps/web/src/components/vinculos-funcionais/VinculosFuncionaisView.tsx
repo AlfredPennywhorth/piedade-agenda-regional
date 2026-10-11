@@ -811,10 +811,6 @@ export function VinculosFuncionaisView() {
                   {vinculoDetalhe.ativo ? 'Ativo' : 'Inativo'}
                 </span>
               </div>
-              <div>
-                <span className="text-xs font-semibold text-slate-500 block">ID do Vínculo:</span>
-                <span className="text-xs font-mono text-slate-600">{vinculoDetalhe.id}</span>
-              </div>
               {vinculoDetalhe.createdAt && (
                 <div>
                   <span className="text-xs font-semibold text-slate-500 block">Criado em:</span>
