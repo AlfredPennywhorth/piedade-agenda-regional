@@ -718,7 +718,7 @@ eventosRouter.post('/:id/participantes-externos', async c => {
   const regionalMembro = await obterRegionalMembroAtivo(db, membroId)
   if (!regionalMembro || regionalMembro !== (evento.regionalGestaoId || evento.regionalId)) return c.json({error:'Membro não encontrado ou fora da Regional do evento'},404)
   try {
-    await executarOperacaoComAudit(db, qdb => [qdb.insert(eventosParticipantesExternos).values({eventoId:id,membroId,status:tipo,criadoPorMembroId:ator})], {
+    await executarOperacaoComAudit(db, qdb => [qdb.insert(eventosParticipantesExternos).values({eventoId:id,membroId,status:sql`CASE WHEN EXISTS (SELECT 1 FROM eventos WHERE id = ${id} AND ativo = 1 AND julianday(inicio_em) > julianday('now')) THEN ${tipo} ELSE 'EVENTO_INICIADO' END`,criadoPorMembroId:ator})], {
       acao: tipo === 'CONVIDADO' ? 'EVENTO_EXTERNO_CONVITE' : 'EVENTO_EXTERNO_ATRIBUICAO',
       atorMembroId: ator, recursoTipo: 'EVENTO', recursoId: id,
       escopoTipo: 'REGIONAL', escopoId: evento.regionalGestaoId ?? evento.regionalId,
@@ -726,6 +726,7 @@ eventosRouter.post('/:id/participantes-externos', async c => {
     })
     return c.json({eventoId:id,membroId,status:tipo},201)
   } catch(err:any) {
+    if (String(err?.message).includes('CHECK constraint')) return c.json({error:'Participantes não podem ser incluídos após o início do evento',code:'EVENTO_INICIADO'},409)
     if (String(err?.message).includes('UNIQUE constraint')) return c.json({error:'Membro já incluído neste evento'},409)
     return c.json({error:'Falha ao incluir participante'},400)
   }
