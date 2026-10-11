@@ -15,6 +15,10 @@ export const portariaRouter = new Hono<{ Variables: Variables }>()
 portariaRouter.use('*', authMiddleware)
 
 
+function portariaDisponivel(evento: any): boolean {
+  return !evento.pessoal && evento.abrangencia !== 'NACIONAL' && evento.abrangencia !== 'INTERNACIONAL'
+}
+
 async function podeGerarCredencialOperador(db: any, membroId: string, contexto: any, evento: any) {
   // Eventos externos usam participação nominal, sem destinatários de convocação.
   // A Portaria tradicional não suporta check-in externo; não oferecer credenciais.
@@ -379,6 +383,7 @@ portariaRouter.get('/eventos/:eventoId/fechamento-solicitacao', async c => {
 
   const evento = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
   if (!evento) return c.json({ error: 'Evento não encontrado', code: 'NOT_FOUND' }, 404)
+  if (!portariaDisponivel(evento)) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
 
   const operador = await eOperadorPortariaAutorizado(db, atorMembroId, evento)
   const gestor = Boolean(
@@ -490,6 +495,7 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
     .where(and(eq(eventos.id, eventoId), eq(eventos.ativo, true))).get()
   if (!evento) {
     return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
+  if (!portariaDisponivel(evento)) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
   }
 
   const estado = await db.select().from(portariasEvento)
@@ -704,6 +710,7 @@ portariaRouter.post('/eventos/:eventoId/reabrir', async c => {
     .where(and(eq(eventos.id, eventoId), eq(eventos.ativo, true))).get()
   if (!evento) {
     return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
+  if (!portariaDisponivel(evento)) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
   }
 
   if (!atorMembroId || !(await podeGerarCredencialOperador(db, atorMembroId, contexto, evento))) {
@@ -1168,6 +1175,7 @@ portariaRouter.get('/eventos', async (c) => {
     const authorizedEvents = []
 
     for (const evento of candidateEvents) {
+      if (!portariaDisponivel(evento)) continue
       // Filtrar pela data paulista com helper
       try {
         if (getSaoPauloDateString(evento.inicioEm) !== targetDateStr) {
