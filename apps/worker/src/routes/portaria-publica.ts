@@ -26,6 +26,9 @@ function validarCredencial(credencial: any) {
   if (!credencial) {
     return { status: 404, body: { error: 'Credencial inválida', code: 'NOT_FOUND' } }
   }
+  if (credencial.evento.pessoal || credencial.evento.abrangencia === 'NACIONAL' || credencial.evento.abrangencia === 'INTERNACIONAL') {
+    return { status: 409, body: { error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' } }
+  }
   if (credencial.portaria?.status === 'FECHADA') {
     return { status: 409, body: { error: 'Portaria fechada', code: 'PORTARIA_FECHADA' } }
   }
