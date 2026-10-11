@@ -495,8 +495,8 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
     .where(and(eq(eventos.id, eventoId), eq(eventos.ativo, true))).get()
   if (!evento) {
     return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
-  if (!portariaDisponivel(evento)) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
   }
+  if (!portariaDisponivel(evento)) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
 
   const estado = await db.select().from(portariasEvento)
     .where(eq(portariasEvento.eventoId, eventoId)).get()
@@ -710,8 +710,8 @@ portariaRouter.post('/eventos/:eventoId/reabrir', async c => {
     .where(and(eq(eventos.id, eventoId), eq(eventos.ativo, true))).get()
   if (!evento) {
     return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
-  if (!portariaDisponivel(evento)) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
   }
+  if (!portariaDisponivel(evento)) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
 
   if (!atorMembroId || !(await podeGerarCredencialOperador(db, atorMembroId, contexto, evento))) {
     return c.json(
