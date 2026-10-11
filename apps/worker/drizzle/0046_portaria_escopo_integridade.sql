@@ -86,7 +86,7 @@ BEGIN SELECT RAISE(ABORT, 'PORTARIA_EVENTO_INCOMPATIVEL'); END;
 
 CREATE TRIGGER trg_portaria_operadores_evento_institucional_update_ativo
 BEFORE UPDATE OF ativo ON portaria_operadores_evento
-WHEN NOT EXISTS (SELECT 1 FROM eventos e WHERE e.id = NEW.evento_id AND e.ativo = 1 AND e.pessoal = 0 AND e.abrangencia = 'TERRITORIAL')
+WHEN NEW.ativo = 1 AND NOT EXISTS (SELECT 1 FROM eventos e WHERE e.id = NEW.evento_id AND e.ativo = 1 AND e.pessoal = 0 AND e.abrangencia = 'TERRITORIAL')
 BEGIN SELECT RAISE(ABORT, 'PORTARIA_EVENTO_INCOMPATIVEL'); END;
 
 CREATE TRIGGER trg_portaria_reaberturas_institucional_update_evento_id
