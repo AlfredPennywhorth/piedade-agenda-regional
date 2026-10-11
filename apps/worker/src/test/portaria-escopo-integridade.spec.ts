@@ -29,6 +29,14 @@ describe('0046 — integridade Portaria e abrangência', () => {
     db.close()
   })
 
+  it('impede check-in em evento externo mesmo com destinatário legado', () => {
+    const db = banco()
+    db.prepare("UPDATE eventos SET abrangencia='NACIONAL', regional_gestao_id='r', regional_id='r', setor_id=NULL, destino_uf='RJ', destino_cidade_local='Rio de Janeiro' WHERE id='e'").run()
+    expect(() => db.prepare("INSERT INTO checkins (id, convocacao_destinatario_id, evento_id, membro_id, forma) VALUES ('ci','destinatario-legado','e','membro-legado','MANUAL')").run())
+      .toThrow(/PORTARIA_EVENTO_INCOMPATIVEL/)
+    db.close()
+  })
+
   it('impede converter escopo depois de criar estado de Portaria', () => {
     const db = banco()
     db.prepare("INSERT INTO portarias_evento (evento_id) VALUES ('e')").run()
