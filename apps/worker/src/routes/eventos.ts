@@ -276,8 +276,12 @@ eventosRouter.post('/', async (c) => {
       return c.json({ error: 'Escopo da Agenda indisponível', code: 'FORBIDDEN' }, 403)
     }
 
+    // Eventos externos pessoais pertencem à Regional de origem do membro,
+    // independentemente de grants institucionais ou de viajante.
     const regionalGestaoId = externo
-      ? await obterRegionalGestaoAgendaExterna(db, atorMembroId)
+      ? (parsed.pessoal === true
+          ? await obterRegionalMembroAtivo(db, atorMembroId)
+          : await obterRegionalGestaoAgendaExterna(db, atorMembroId))
       : null
 
     const autorizado = externo
@@ -524,8 +528,14 @@ eventosRouter.patch('/:id', async (c) => {
 
     const escopoOriginal = extrairEscopoDoEvento(existing)
     const membroId = c.get('membroId')
+    const destinoExterno = merged.abrangencia === 'NACIONAL' || merged.abrangencia === 'INTERNACIONAL'
+    const regionalFallback = destinoExterno && !existing.regionalGestaoId && membroId
+      ? (merged.pessoal === true && existing.criadorMembroId
+          ? await obterRegionalMembroAtivo(db, existing.criadorMembroId)
+          : await obterRegionalGestaoAgendaExterna(db, membroId))
+      : null
     const escopoFinal = merged.abrangencia === 'NACIONAL' || merged.abrangencia === 'INTERNACIONAL'
-      ? { escopoTipo: 'REGIONAL', escopoId: existing.regionalGestaoId || (membroId ? await obterRegionalGestaoAgendaExterna(db, membroId) : null) }
+      ? { escopoTipo: 'REGIONAL', escopoId: existing.regionalGestaoId || regionalFallback }
       : extrairEscopoDoEvento(merged)
     if (
       !membroId ||
@@ -539,7 +549,7 @@ eventosRouter.patch('/:id', async (c) => {
 
     const externoFinal = merged.abrangencia === 'NACIONAL' || merged.abrangencia === 'INTERNACIONAL'
     const regionalGestaoFinal = externoFinal
-      ? (existing.regionalGestaoId || await obterRegionalGestaoAgendaExterna(db, membroId))
+      ? (existing.regionalGestaoId || regionalFallback)
       : null
     const autorizadoFinal = externoFinal
       ? (
