@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs'
+
+const portariaIntegridadeSql = readFileSync(decodeURIComponent(new URL('../../drizzle/0046_portaria_escopo_integridade.sql', import.meta.url).pathname)).toString('utf8')
+
 export function setupDb(sqlite: any) {
   const setupSql = `
     CREATE TABLE IF NOT EXISTS regionais (id text PRIMARY KEY NOT NULL, nome text NOT NULL, codigo text, ativo integer DEFAULT true NOT NULL, created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL, updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL);
@@ -980,4 +984,5 @@ export function setupDb(sqlite: any) {
 
   `
   sqlite.exec(setupSql)
+  sqlite.exec(portariaIntegridadeSql)
 }

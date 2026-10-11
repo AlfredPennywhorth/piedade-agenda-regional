@@ -640,6 +640,9 @@ eventosRouter.patch('/:id', async (c) => {
     const updated = await db.select().from(eventos).where(eq(eventos.id, id)).get()
     return c.json(updated)
   } catch (err: any) {
+    if (String(err?.message).includes('EVENTO_COM_PORTARIA_NAO_PODE_MUDAR_ESCOPO')) {
+      return c.json({ error: 'Evento com registros de Portaria ou check-in não pode mudar de escopo', code: 'EVENTO_COM_PORTARIA_NAO_PODE_MUDAR_ESCOPO' }, 409)
+    }
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
       return c.json({ error: 'Local, Espaço ou Escopo vinculado não existe' }, 400)
     }
@@ -709,6 +712,7 @@ eventosRouter.post('/:id/participantes-externos', async c => {
   const ator = c.get('membroId')
   const evento = await db.select().from(eventos).where(eq(eventos.id,id)).get()
   if (!evento || !evento.ativo || evento.pessoal || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia)) return c.json({error:'Evento externo não encontrado'},404)
+  if (new Date(evento.inicioEm).getTime() <= Date.now()) return c.json({error:'Participantes não podem ser incluídos após o início do evento', code:'EVENTO_INICIADO'},409)
   if (!ator || !(await podeGerenciarEvento(db,ator,evento))) return c.json({error:'Acesso não autorizado'},403)
   const payload: unknown = await c.req.json().catch(() => null)
   if (!payload || typeof payload !== 'object') return c.json({error:'Dados inválidos'},400)
@@ -717,7 +721,7 @@ eventosRouter.post('/:id/participantes-externos', async c => {
   const regionalMembro = await obterRegionalMembroAtivo(db, membroId)
   if (!regionalMembro || regionalMembro !== (evento.regionalGestaoId || evento.regionalId)) return c.json({error:'Membro não encontrado ou fora da Regional do evento'},404)
   try {
-    await executarOperacaoComAudit(db, qdb => [qdb.insert(eventosParticipantesExternos).values({eventoId:id,membroId,status:tipo,criadoPorMembroId:ator})], {
+    await executarOperacaoComAudit(db, qdb => [qdb.insert(eventosParticipantesExternos).values({eventoId:id,membroId,status:sql`CASE WHEN EXISTS (SELECT 1 FROM eventos WHERE id = ${id} AND ativo = 1 AND julianday(inicio_em) > julianday('now')) THEN ${tipo} ELSE 'EVENTO_INICIADO' END`,criadoPorMembroId:ator})], {
       acao: tipo === 'CONVIDADO' ? 'EVENTO_EXTERNO_CONVITE' : 'EVENTO_EXTERNO_ATRIBUICAO',
       atorMembroId: ator, recursoTipo: 'EVENTO', recursoId: id,
       escopoTipo: 'REGIONAL', escopoId: evento.regionalGestaoId ?? evento.regionalId,
@@ -725,6 +729,7 @@ eventosRouter.post('/:id/participantes-externos', async c => {
     })
     return c.json({eventoId:id,membroId,status:tipo},201)
   } catch(err:any) {
+    if (String(err?.message).includes('CHECK constraint')) return c.json({error:'Participantes não podem ser incluídos após o início do evento',code:'EVENTO_INICIADO'},409)
     if (String(err?.message).includes('UNIQUE constraint')) return c.json({error:'Membro já incluído neste evento'},409)
     return c.json({error:'Falha ao incluir participante'},400)
   }
