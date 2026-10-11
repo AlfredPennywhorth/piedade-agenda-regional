@@ -179,34 +179,39 @@ async function registrarCheckin(c: any, forma: 'QR' | 'MANUAL') {
   const id = crypto.randomUUID()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(ctx.evento)
 
-  await executarOperacaoComAudit(
-    ctx.db,
-    qdb => [qdb.insert(checkins).values({
-      id,
-      convocacaoDestinatarioId: dest.destinatario.id,
-      eventoId: ctx.eventoId,
-      membroId: dest.destinatario.membroId,
-      forma,
-      status: 'ATIVO',
-      operadorMembroId: null,
-      dataHoraCheckin: agora,
-      createdAt: agora,
-      updatedAt: agora,
-    })],
-    {
-      acao: forma === 'QR' ? 'CHECKIN_QR' : 'CHECKIN_MANUAL',
-      atorMembroId: null,
-      recursoTipo: 'CHECKIN',
-      recursoId: id,
-      escopoTipo,
-      escopoId,
-      contexto: {
+  try {
+    await executarOperacaoComAudit(
+      ctx.db,
+      qdb => [qdb.insert(checkins).values({
+        id,
+        convocacaoDestinatarioId: dest.destinatario.id,
         eventoId: ctx.eventoId,
+        membroId: dest.destinatario.membroId,
         forma,
-        operadorCredencialId: ctx.id,
-      },
-    }
-  )
+        status: 'ATIVO',
+        operadorMembroId: null,
+        dataHoraCheckin: agora,
+        createdAt: agora,
+        updatedAt: agora,
+      })],
+      {
+        acao: forma === 'QR' ? 'CHECKIN_QR' : 'CHECKIN_MANUAL',
+        atorMembroId: null,
+        recursoTipo: 'CHECKIN',
+        recursoId: id,
+        escopoTipo,
+        escopoId,
+        contexto: {
+          eventoId: ctx.eventoId,
+          forma,
+          operadorCredencialId: ctx.id,
+        },
+      }
+    )
+  } catch (err: unknown) {
+    if (String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    throw err
+  }
 
   return c.json({
     id,
