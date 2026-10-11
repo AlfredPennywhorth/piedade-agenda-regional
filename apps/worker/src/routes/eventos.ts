@@ -529,8 +529,8 @@ eventosRouter.patch('/:id', async (c) => {
     const escopoOriginal = extrairEscopoDoEvento(existing)
     const membroId = c.get('membroId')
     const regionalFallback = membroId
-      ? (merged.pessoal === true && existing.criadorMembroId === membroId
-          ? await obterRegionalMembroAtivo(db, membroId)
+      ? (merged.pessoal === true && existing.criadorMembroId
+          ? await obterRegionalMembroAtivo(db, existing.criadorMembroId)
           : await obterRegionalGestaoAgendaExterna(db, membroId))
       : null
     const escopoFinal = merged.abrangencia === 'NACIONAL' || merged.abrangencia === 'INTERNACIONAL'
