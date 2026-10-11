@@ -561,7 +561,8 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
     ])
   } catch (err: unknown) {
     if (String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
-    return c.json({ error: 'A Portaria já está sendo encerrada', code: 'PORTARIA_FECHANDO' }, 409)
+    if (/UNIQUE constraint failed: portaria_fechamento_locks\.evento_id/i.test(String(err))) return c.json({ error: 'A Portaria já está sendo encerrada', code: 'PORTARIA_FECHANDO' }, 409)
+    throw err
   }
 
   let snapshot
@@ -699,6 +700,7 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
     await db.delete(portariaFechamentoLocks)
       .where(eq(portariaFechamentoLocks.eventoId, eventoId))
       .execute()
+    if (String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
     throw err
   }
 
@@ -766,47 +768,52 @@ portariaRouter.post('/eventos/:eventoId/reabrir', async c => {
   const reaberturaId = crypto.randomUUID()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
-  await executarOperacaoComAudit(
-    db,
-    qdb => [
-      qdb.delete(portariaFechamentoItens)
-        .where(eq(portariaFechamentoItens.fechamentoId, fechamento.id)),
-      qdb.delete(portariaFechamentos)
-        .where(eq(portariaFechamentos.id, fechamento.id)),
-      qdb.delete(portariaSolicitacoesFechamento)
-        .where(eq(portariaSolicitacoesFechamento.eventoId, eventoId)),
-      qdb.update(portariasEvento).set({
-        status: 'ABERTA',
-        fechadaEm: null,
-        fechadaPorMembroId: null,
-        updatedAt: agora,
-      }).where(eq(portariasEvento.eventoId, eventoId)),
-      qdb.insert(portariaReaberturas).values({
-        id: reaberturaId,
-        eventoId,
-        fechamentoAnteriorId: fechamento.id,
-        reabertaPorMembroId: atorMembroId,
-        motivo,
-        reabertaEm: agora,
-        createdAt: agora,
-        updatedAt: agora,
-      }),
-    ],
-    {
-      acao: 'PORTARIA_REABERTA',
-      atorMembroId,
-      recursoTipo: 'PORTARIA',
-      recursoId: eventoId,
-      escopoTipo,
-      escopoId,
-      contexto: {
-        eventoId,
-        fechamentoAnteriorId: fechamento.id,
-        motivo,
-        credenciaisTemporariasReativadas: false,
-      },
-    }
-  )
+  try {
+    await executarOperacaoComAudit(
+      db,
+      qdb => [
+        qdb.delete(portariaFechamentoItens)
+          .where(eq(portariaFechamentoItens.fechamentoId, fechamento.id)),
+        qdb.delete(portariaFechamentos)
+          .where(eq(portariaFechamentos.id, fechamento.id)),
+        qdb.delete(portariaSolicitacoesFechamento)
+          .where(eq(portariaSolicitacoesFechamento.eventoId, eventoId)),
+        qdb.update(portariasEvento).set({
+          status: 'ABERTA',
+          fechadaEm: null,
+          fechadaPorMembroId: null,
+          updatedAt: agora,
+        }).where(eq(portariasEvento.eventoId, eventoId)),
+        qdb.insert(portariaReaberturas).values({
+          id: reaberturaId,
+          eventoId,
+          fechamentoAnteriorId: fechamento.id,
+          reabertaPorMembroId: atorMembroId,
+          motivo,
+          reabertaEm: agora,
+          createdAt: agora,
+          updatedAt: agora,
+        }),
+      ],
+      {
+        acao: 'PORTARIA_REABERTA',
+        atorMembroId,
+        recursoTipo: 'PORTARIA',
+        recursoId: eventoId,
+        escopoTipo,
+        escopoId,
+        contexto: {
+          eventoId,
+          fechamentoAnteriorId: fechamento.id,
+          motivo,
+          credenciaisTemporariasReativadas: false,
+        },
+      }
+    )
+  } catch (err: unknown) {
+    if (String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    throw err
+  }
 
   return c.json({
     status: 'ABERTA',
