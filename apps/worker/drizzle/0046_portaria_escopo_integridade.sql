@@ -16,6 +16,7 @@ WHEN (NEW.abrangencia IN ('NACIONAL','INTERNACIONAL') OR NEW.pessoal = 1)
    OR    EXISTS (SELECT 1 FROM portaria_reaberturas WHERE evento_id = OLD.id)
    OR    EXISTS (SELECT 1 FROM convidados_evento WHERE evento_id = OLD.id)
    OR    EXISTS (SELECT 1 FROM presencas_convidado_evento WHERE evento_id = OLD.id)
+   OR    EXISTS (SELECT 1 FROM checkins WHERE evento_id = OLD.id)
  )
 BEGIN SELECT RAISE(ABORT, 'EVENTO_COM_PORTARIA_NAO_PODE_MUDAR_ESCOPO'); END;
 
@@ -94,3 +95,9 @@ BEFORE UPDATE OF evento_id ON portaria_reaberturas
 WHEN NOT EXISTS (SELECT 1 FROM eventos e WHERE e.id = NEW.evento_id AND e.ativo = 1 AND e.pessoal = 0 AND e.abrangencia = 'TERRITORIAL')
 BEGIN SELECT RAISE(ABORT, 'PORTARIA_EVENTO_INCOMPATIVEL'); END;
 
+
+-- Serializa inserções de check-in com alterações de escopo do evento.
+CREATE TRIGGER trg_checkins_evento_institucional_insert
+BEFORE INSERT ON checkins
+WHEN NOT EXISTS (SELECT 1 FROM eventos e WHERE e.id = NEW.evento_id AND e.ativo = 1 AND e.pessoal = 0 AND e.abrangencia = 'TERRITORIAL')
+BEGIN SELECT RAISE(ABORT, 'PORTARIA_EVENTO_INCOMPATIVEL'); END;
