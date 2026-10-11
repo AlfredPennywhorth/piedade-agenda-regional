@@ -1021,7 +1021,7 @@ portariaRouter.post('/eventos/:eventoId/convidados', async c => {
     )
   
   } catch (err: unknown) {
-    if (String(err).includes('CHECK constraint')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    if ((String(err).includes('CHECK constraint') || String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL'))) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
     throw err
   }
 
@@ -1144,7 +1144,7 @@ portariaRouter.post('/eventos/:eventoId/convidados/:convidadoId/validar', async 
     )
   
   } catch (err: unknown) {
-    if (String(err).includes('CHECK constraint')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    if ((String(err).includes('CHECK constraint') || String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL'))) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
     throw err
   }
 
