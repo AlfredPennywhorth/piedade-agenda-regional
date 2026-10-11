@@ -3,7 +3,7 @@ import Database from 'better-sqlite3'
 import { readFileSync } from 'node:fs'
 import { setupDb } from './setup'
 
-const migracao = readFileSync(new URL('../../drizzle/0046_portaria_escopo_integridade.sql', import.meta.url), 'utf8')
+const migracao = readFileSync(decodeURIComponent(new URL('../../drizzle/0046_portaria_escopo_integridade.sql', import.meta.url).pathname)).toString('utf8')
 
 function banco() {
   const sqlite = new Database(':memory:')
