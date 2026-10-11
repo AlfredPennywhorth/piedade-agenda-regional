@@ -18,7 +18,7 @@ portariaRouter.use('*', authMiddleware)
 async function podeGerarCredencialOperador(db: any, membroId: string, contexto: any, evento: any) {
   // Eventos externos usam participação nominal, sem destinatários de convocação.
   // A Portaria tradicional não suporta check-in externo; não oferecer credenciais.
-  if (evento.pessoal || evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') return false
+  if (evento.pessoal) return false
   if (eMasterSistema(contexto)) return true
   return podeGerenciarEvento(db, membroId, evento)
 }
@@ -37,6 +37,7 @@ portariaRouter.post('/eventos/:eventoId/credenciais-operador', async c => {
     return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
   }
 
+  if (evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') return c.json({error:'Portaria indisponível para eventos externos',code:'PORTARIA_EXTERNA_INDISPONIVEL'},409)
   if (!atorMembroId || !(await podeGerarCredencialOperador(db, atorMembroId, contexto, evento))) {
     return c.json({ error: 'Acesso não autorizado para gerar porteiro temporário', code: 'FORBIDDEN' }, 403)
   }
@@ -213,6 +214,7 @@ portariaRouter.post('/eventos/:eventoId/operadores', async c => {
   if (!evento) {
     return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
   }
+  if (evento.pessoal || evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') return c.json({error:'Portaria indisponível para este evento',code:'PORTARIA_INDISPONIVEL'},409)
 
   const operador = await db
     .select({ membroId: membros.id, contaId: contasAcesso.id, status: contasAcesso.status })
