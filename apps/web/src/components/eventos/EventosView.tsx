@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput, SerieCreateInput, LocalCreate, EspacoLocalCreate, createUtcDateFromSaoPaulo } from '@piedade/shared'
+import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput, SerieCreateInput, LocalCreate, EspacoLocalCreate, createUtcDateFromSaoPaulo, UF_BRASIL, PAISES_ISO } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import { SerieFormModal, TipoEscopo } from '../series/SerieFormModal'
 import { generateQrMatrix } from '../agenda/qrGenerator'
@@ -10,9 +10,17 @@ import type { Regional } from '../regionais/RegionaisView'
 import type { GrupoTrabalho } from '../grupos-trabalho/GruposTrabalhoView'
 import type { Membro } from '../membros/MembrosView'
 
+interface ParticipanteExterno {
+  eventoId: string
+  membroId: string
+  membroNome?: string
+  status: 'CONVIDADO' | 'ATRIBUIDO' | 'CONFIRMADO' | 'RECUSADO'
+}
+
 interface Local {
   id: string
   nome: string
+  proprietarioMembroId?: string | null
 }
 
 interface EspacoLocal {
@@ -41,6 +49,10 @@ interface SerieResponse {
   espacoId: string | null
   urlOnline: string | null
   organizadorMembroId: string | null
+  abrangencia?: 'TERRITORIAL' | 'NACIONAL' | 'INTERNACIONAL'
+  destinoUf?: string | null
+  destinoPaisCodigo?: string | null
+  destinoCidadeLocal?: string | null
   regionalId: string | null
   administracaoId: string | null
   setorId: string | null
@@ -50,7 +62,14 @@ interface SerieResponse {
   ativo: boolean
 }
 
+type EventoFormData = Omit<Partial<EventoCreateInput>, 'destinoUf'> & {
+  destinoUf?: EventoCreateInput['destinoUf'] | ''
+}
+
 export interface Evento {
+  pessoal?: boolean
+  podeGerenciar?: boolean
+  criadorMembroId?: string | null
   id: string
   titulo: string
   descricao: string | null
@@ -62,11 +81,19 @@ export interface Evento {
   espacoId: string | null
   urlOnline: string | null
   organizadorMembroId: string | null
+  abrangencia?: 'TERRITORIAL' | 'NACIONAL' | 'INTERNACIONAL'
+  destinoUf?: (typeof UF_BRASIL)[number] | null
+  destinoPaisCodigo?: string | null
+  destinoCidadeLocal?: string | null
+  regionalGestaoId?: string | null
   regionalId: string | null
   administracaoId: string | null
   setorId: string | null
   casaId: string | null
   grupoTrabalhoId: string | null
+  filtroRegionalId?: string | null
+  filtroAdministracaoId?: string | null
+  filtroSetorId?: string | null
   observacoes: string | null
   ativo: boolean
   createdAt?: string
@@ -75,13 +102,25 @@ export interface Evento {
   recorrenciaExcecao?: boolean
 }
 
-export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: string) => void }) {
+export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEventoCriado?: (eventoId: string) => void; onEventoPessoalCriado?: () => void }) {
   const [eventos, setEventos] = useState<Evento[]>([])
   
+  const [filtros, setFiltros] = useState<{ master: boolean; filtrarEscopo?: boolean; pessoas: { id: string; nome: string }[] }>({ master: false, pessoas: [] })
+  const [pessoaFiltro, setPessoaFiltro] = useState('')
+  const [escopoFiltro, setEscopoFiltro] = useState('')
+  const [tipoEscopoFiltro, setTipoEscopoFiltro] = useState('')
+  const [regionalFiltroId, setRegionalFiltroId] = useState('')
+  const [administracaoFiltroId, setAdministracaoFiltroId] = useState('')
+  const [setorFiltroId, setSetorFiltroId] = useState('')
+  const [statusEventoFiltro, setStatusEventoFiltro] = useState<'ATIVOS' | 'CANCELADOS' | 'TODOS'>('ATIVOS')
+  const [periodoFiltro, setPeriodoFiltro] = useState<'FUTUROS' | 'PASSADOS' | 'TODOS'>('FUTUROS')
+  const pessoaConsultaSeq = useRef(0)
+
   // Lookups
   const [locais, setLocais] = useState<Local[]>([])
   const [espacos, setEspacos] = useState<EspacoLocal[]>([])
   const [membros, setMembros] = useState<Membro[]>([])
+  const [identidade, setIdentidade] = useState<{ id: string; nome: string } | null>(null)
   const [regionais, setRegionais] = useState<Regional[]>([])
   const [administracoes, setAdministracoes] = useState<Administracao[]>([])
   const [setores, setSetores] = useState<Setor[]>([])
@@ -90,6 +129,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
 
   const [loading, setLoading] = useState<boolean>(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [erroCancelamento, setErroCancelamento] = useState<string | null>(null)
   const [acessoPortariaUrl, setAcessoPortariaUrl] = useState<string | null>(null)
   
   // Form State
@@ -110,8 +150,22 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
 
   // Modal Details
   const [eventoDetalhe, setEventoDetalhe] = useState<Evento | null>(null)
+  const [participantesExternos, setParticipantesExternos] = useState<ParticipanteExterno[]>([])
+  const [podeVerParticipantesExternos, setPodeVerParticipantesExternos] = useState(false)
+  const [listaParticipantesCarregada, setListaParticipantesCarregada] = useState(false)
+  const [erroListaParticipantes, setErroListaParticipantes] = useState<string | null>(null)
+  const [membroConviteId, setMembroConviteId] = useState('')
+  const [buscaConviteExterno, setBuscaConviteExterno] = useState('')
+  const [buscaConviteExecutada, setBuscaConviteExecutada] = useState(false)
+  const buscaConviteSeq = useRef(0)
+  const [candidatosConviteExterno, setCandidatosConviteExterno] = useState<Array<{ id: string; nome: string }>>([])
+  const [buscandoConviteExterno, setBuscandoConviteExterno] = useState(false)
+  const [tipoConviteExterno, setTipoConviteExterno] = useState<'CONVIDADO' | 'ATRIBUIDO'>('CONVIDADO')
+  const [erroConviteExterno, setErroConviteExterno] = useState<string | null>(null)
+  const [salvandoConviteExterno, setSalvandoConviteExterno] = useState(false)
 
-  const [formData, setFormData] = useState<Partial<EventoCreateInput>>({
+  const [formData, setFormData] = useState<EventoFormData>({
+    pessoal: false,
     titulo: '',
     descricao: '',
     pauta: '',
@@ -122,6 +176,10 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     espacoId: '',
     urlOnline: '',
     organizadorMembroId: '',
+    abrangencia: 'TERRITORIAL',
+    destinoUf: '',
+    destinoPaisCodigo: '',
+    destinoCidadeLocal: '',
     regionalId: '',
     administracaoId: '',
     setorId: '',
@@ -131,7 +189,8 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     ativo: true,
   })
   
-  const [tipoEscopo, setTipoEscopo] = useState<'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | ''>('')
+  const [tipoEscopo, setTipoEscopo] = useState<'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | 'nacional' | 'internacional' | ''>('')
+  const [casaSetorFiltro, setCasaSetorFiltro] = useState('')
   
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
   const [localRapidoOpen, setLocalRapidoOpen] = useState(false)
@@ -227,15 +286,24 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     }
   }, [espacoRapidoOpen])
 
+  const montarUrlEventos = (pessoaId = pessoaFiltro) => {
+    const params = new URLSearchParams()
+    if (pessoaId) params.set('pessoaId', pessoaId)
+    if (statusEventoFiltro === 'CANCELADOS') params.set('ativo', 'false')
+    const query = params.toString()
+    return query ? `/eventos?${query}` : '/eventos'
+  }
+
   const carregarDados = async () => {
+    const seq = ++pessoaConsultaSeq.current
     setLoading(true)
     setErro(null)
     try {
       const [
         eventosData, locaisData, espacosData, membrosData, regionaisData,
-        administracoesData, setoresData, casasData, gruposData
+        administracoesData, setoresData, casasData, gruposData, identidadeData
       ] = await Promise.all([
-        fetchWithAuth<Evento[]>('/eventos'),
+        fetchWithAuth<Evento[]>(montarUrlEventos()),
         fetchWithAuth<Local[]>('/locais'),
         fetchWithAuth<EspacoLocal[]>('/espacos-locais?ativo=true'),
         fetchWithAuth<Membro[]>('/membros'),
@@ -244,27 +312,118 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
         fetchWithAuth<Setor[]>('/setores'),
         fetchWithAuth<Casa[]>('/casas'),
         fetchWithAuth<GrupoTrabalho[]>('/grupos-trabalho'),
+        fetchWithAuth<{ id: string; nome: string }>('/auth/me'),
       ])
       
-      setEventos(eventosData || [])
+      if (seq === pessoaConsultaSeq.current) setEventos(eventosData || [])
       setLocais(locaisData || [])
       setEspacos(espacosData || [])
       setMembros(membrosData || [])
+      setIdentidade(identidadeData)
       setRegionais(regionaisData || [])
       setAdministracoes(administracoesData || [])
       setSetores(setoresData || [])
       setCasas(casasData || [])
       setGruposTrabalho(gruposData || [])
     } catch (err: any) {
-      setErro(err.message || 'Erro ao carregar os dados.')
+      if (seq === pessoaConsultaSeq.current) setErro(err.message || 'Erro ao carregar os dados.')
     } finally {
-      setLoading(false)
+      if (seq === pessoaConsultaSeq.current) setLoading(false)
     }
   }
 
   useEffect(() => {
-    carregarDados()
+    void carregarDados()
+  }, [statusEventoFiltro])
+
+  useEffect(() => {
+    let ativo = true
+    fetchWithAuth<{ master: boolean; filtrarEscopo?: boolean; pessoas: { id: string; nome: string }[] }>('/eventos/filtros')
+      .then(data => { if (ativo && data && typeof data.master === 'boolean') setFiltros(data) })
+      .catch(() => { /* A listagem permanece protegida mesmo sem os metadados. */ })
+    return () => { ativo = false }
   }, [])
+
+  const selecionarPessoa = async (id: string) => {
+    setPessoaFiltro(id)
+    const seq = ++pessoaConsultaSeq.current
+    setLoading(true)
+    setErro(null)
+    try {
+      const data = await fetchWithAuth<Evento[]>(montarUrlEventos(id))
+      if (seq === pessoaConsultaSeq.current) setEventos(data || [])
+    } catch (err) {
+      if (seq === pessoaConsultaSeq.current) {
+        setEventos([])
+        setErro(err instanceof Error ? err.message : 'Erro ao filtrar eventos.')
+      }
+    } finally {
+      if (seq === pessoaConsultaSeq.current) setLoading(false)
+    }
+  }
+  const alterarTipoEscopo = (tipo: string) => {
+    setTipoEscopoFiltro(tipo)
+    setRegionalFiltroId('')
+    setAdministracaoFiltroId('')
+    setSetorFiltroId('')
+    setEscopoFiltro(tipo === 'NACIONAL' || tipo === 'INTERNACIONAL' ? `abrangencia:${tipo}` : '')
+  }
+  const selecionarRegionalFiltro = (id: string) => {
+    setRegionalFiltroId(id)
+    setAdministracaoFiltroId('')
+    setSetorFiltroId('')
+    setEscopoFiltro(id ? `regionalId:${id}` : '')
+  }
+  const selecionarAdministracaoFiltro = (id: string) => {
+    setAdministracaoFiltroId(id)
+    setSetorFiltroId('')
+    setEscopoFiltro(id ? `administracaoId:${id}` : regionalFiltroId ? `regionalId:${regionalFiltroId}` : '')
+  }
+  const selecionarSetorFiltro = (id: string) => {
+    setSetorFiltroId(id)
+    setEscopoFiltro(id ? `setorId:${id}` : administracaoFiltroId ? `administracaoId:${administracaoFiltroId}` : regionalFiltroId ? `regionalId:${regionalFiltroId}` : '')
+  }
+  const administracoesEscopo = administracoes.filter(item => !regionalFiltroId || item.regionalId === regionalFiltroId)
+  const setoresEscopo = setores.filter(item => !administracaoFiltroId || item.administracaoId === administracaoFiltroId)
+    .filter(item => !regionalFiltroId || administracoes.find(adm => adm.id === item.administracaoId)?.regionalId === regionalFiltroId)
+  const casasEscopo = casas.filter(item => !setorFiltroId || item.setorId === setorFiltroId)
+    .filter(item => !administracaoFiltroId || setores.find(setor => setor.id === item.setorId)?.administracaoId === administracaoFiltroId)
+    .filter(item => !regionalFiltroId || administracoes.find(adm => adm.id === setores.find(setor => setor.id === item.setorId)?.administracaoId)?.regionalId === regionalFiltroId)
+  const gruposEscopo = gruposTrabalho.filter(item => {
+    if (!regionalFiltroId) return true
+    const setor = setores.find(setor => setor.id === item.setorId)
+    const administracao = administracoes.find(adm => adm.id === (item.administracaoId || setor?.administracaoId))
+    return (item.regionalId || administracao?.regionalId) === regionalFiltroId
+  })
+  const eventosFiltrados = eventos.filter(evento => {
+    const fim = new Date(evento.fimEm).getTime()
+    if (periodoFiltro === 'FUTUROS' && fim <= Date.now()) return false
+    if (periodoFiltro === 'PASSADOS' && fim > Date.now()) return false
+    if (statusEventoFiltro === 'ATIVOS' && !evento.ativo) return false
+    if (statusEventoFiltro === 'CANCELADOS' && evento.ativo) return false
+    if (!escopoFiltro) return true
+    const [campo, id] = escopoFiltro.split(':')
+    if (evento[campo as keyof Evento] === id) return true
+    if (campo === 'setorId' && evento.filtroSetorId) return evento.filtroSetorId === id
+    if (campo === 'administracaoId' && evento.filtroAdministracaoId) {
+      return evento.filtroAdministracaoId === id
+    }
+    if (campo === 'regionalId' && evento.filtroRegionalId) return evento.filtroRegionalId === id
+
+    // Compatibilidade com respostas antigas durante rollout.
+    const casa = casas.find(item => item.id === evento.casaId)
+    const setor = setores.find(item => item.id === (evento.setorId || casa?.setorId))
+    const adm = administracoes.find(item => item.id === (evento.administracaoId || setor?.administracaoId))
+    if (campo === 'setorId') return setor?.id === id
+    if (campo === 'administracaoId') return adm?.id === id
+    if (campo === 'regionalId') {
+      const gt = gruposTrabalho.find(item => item.id === evento.grupoTrabalhoId)
+      const gtSetor = setores.find(item => item.id === gt?.setorId)
+      const gtAdm = administracoes.find(item => item.id === (gt?.administracaoId || gtSetor?.administracaoId))
+      return adm?.regionalId === id || (gt?.regionalId || gtAdm?.regionalId) === id
+    }
+    return false
+  })
 
   const parseDatetimeLocal = (val: string) => {
     if (!val) return ''
@@ -295,24 +454,36 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
   }
 
   const handleModalidadeChange = (mod: 'PRESENCIAL' | 'ONLINE' | 'HIBRIDO') => {
-    setFormData(prev => ({
-      ...prev,
-      modalidade: mod,
-      localId: mod === 'ONLINE' ? '' : prev.localId,
-      espacoId: mod === 'ONLINE' ? '' : prev.espacoId,
-      urlOnline: mod === 'PRESENCIAL' ? '' : prev.urlOnline
-    }))
+    setFormData(prev => {
+      const externo = prev.abrangencia === 'NACIONAL' || prev.abrangencia === 'INTERNACIONAL'
+      return {
+        ...prev,
+        modalidade: mod,
+        localId: mod === 'ONLINE' || externo ? '' : prev.localId,
+        espacoId: mod === 'ONLINE' || externo ? '' : prev.espacoId,
+        urlOnline: mod === 'PRESENCIAL' ? '' : prev.urlOnline
+      }
+    })
   }
 
-  const handleTipoEscopoChange = (tipo: 'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | '') => {
+  const handleTipoEscopoChange = (tipo: 'regional' | 'administracao' | 'setor' | 'casa' | 'grupoTrabalho' | 'nacional' | 'internacional' | '') => {
     setTipoEscopo(tipo)
+    setCasaSetorFiltro('')
+    const externo = tipo === 'nacional' || tipo === 'internacional'
     setFormData(prev => ({
       ...prev,
+      pessoal: (tipo === 'casa' || externo) ? prev.pessoal : false,
+      abrangencia: tipo === 'nacional' ? 'NACIONAL' : tipo === 'internacional' ? 'INTERNACIONAL' : 'TERRITORIAL',
+      destinoUf: '',
+      destinoPaisCodigo: '',
+      destinoCidadeLocal: '',
       regionalId: '',
       administracaoId: '',
       setorId: '',
       casaId: '',
-      grupoTrabalhoId: ''
+      grupoTrabalhoId: '',
+      localId: (externo || (!(tipo === 'casa' || externo) && !!locais.find(local => local.id === prev.localId)?.proprietarioMembroId)) ? '' : prev.localId,
+      espacoId: (externo || (!(tipo === 'casa' || externo) && !!locais.find(local => local.id === prev.localId)?.proprietarioMembroId)) ? '' : prev.espacoId,
     }))
   }
 
@@ -343,6 +514,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     setEventoEditandoSerieId(null)
     setCarregandoDetalhes(false)
     setFormData({
+      pessoal: false,
       titulo: '',
       descricao: '',
       pauta: '',
@@ -352,7 +524,11 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       localId: '',
       espacoId: '',
       urlOnline: '',
-      organizadorMembroId: '',
+      organizadorMembroId: identidade?.id || '',
+      abrangencia: 'TERRITORIAL',
+      destinoUf: '',
+      destinoPaisCodigo: '',
+      destinoCidadeLocal: '',
       regionalId: '',
       administracaoId: '',
       setorId: '',
@@ -362,6 +538,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       ativo: true,
     })
     setTipoEscopo('')
+    setCasaSetorFiltro('')
     setErrosForm({})
     setErro(null)
     setFormOpen(true)
@@ -380,6 +557,18 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     setErro(null)
     eventoDetalheIdRef.current = item.id
     setEventoDetalhe(item)
+    setParticipantesExternos([])
+    setPodeVerParticipantesExternos(false)
+    setListaParticipantesCarregada(false)
+    setErroListaParticipantes(null)
+    setSalvandoConviteExterno(false)
+    setMembroConviteId('')
+    setBuscaConviteExterno('')
+    buscaConviteSeq.current += 1
+    setBuscaConviteExecutada(false)
+    setCandidatosConviteExterno([])
+    setBuscandoConviteExterno(false)
+    setErroConviteExterno(null)
     let itemCompleto = item
 
     try {
@@ -390,6 +579,22 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
 
     if (consultaAtual !== eventoDetalheConsultaSeq.current) return
     setEventoDetalhe(itemCompleto)
+    // O acesso à gestão nominal não deve desaparecer por uma falha isolada na
+    // consulta dos participantes; a API continuará validando cada operação.
+    if ((itemCompleto.abrangencia === 'NACIONAL' || itemCompleto.abrangencia === 'INTERNACIONAL') && !itemCompleto.pessoal) {
+      setPodeVerParticipantesExternos(itemCompleto.podeGerenciar !== false)
+      try {
+        const lista = await fetchWithAuth<ParticipanteExterno[]>(`/eventos/${itemCompleto.id}/participantes-externos`)
+        if (consultaAtual !== eventoDetalheConsultaSeq.current) return
+        setParticipantesExternos(lista)
+        setListaParticipantesCarregada(true)
+        setErroListaParticipantes(null)
+        setPodeVerParticipantesExternos(true)
+      } catch (err: any) {
+        if (consultaAtual !== eventoDetalheConsultaSeq.current) return
+        setErroListaParticipantes(err instanceof Error ? err.message : 'Não foi possível carregar os participantes.')
+      }
+    }
 
     if (!itemCompleto.espacoId || !itemCompleto.localId || espacos.some(espaco => espaco.id === itemCompleto.espacoId)) {
       return
@@ -407,9 +612,62 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     }
   }
 
+  const buscarParticipanteExterno = async () => {
+    const eventoId = eventoDetalhe?.id
+    const termo = buscaConviteExterno.trim().replace(/\s+/g, ' ')
+    if (!eventoId || termo.length < 3 || buscandoConviteExterno) return
+    const geracao = eventoDetalheConsultaSeq.current
+    const buscaAtual = ++buscaConviteSeq.current
+    setBuscandoConviteExterno(true)
+    setBuscaConviteExecutada(false)
+    setCandidatosConviteExterno([])
+    setMembroConviteId('')
+    setErroConviteExterno(null)
+    try {
+      const pessoas = await fetchWithAuth<Array<{ id: string; nome: string }>>(
+        `/eventos/${eventoId}/candidatos-externos?q=${encodeURIComponent(termo)}`
+      )
+      if (geracao !== eventoDetalheConsultaSeq.current || eventoDetalheIdRef.current !== eventoId || buscaAtual !== buscaConviteSeq.current) return
+      setMembroConviteId('')
+      setCandidatosConviteExterno(pessoas)
+      setBuscaConviteExecutada(true)
+    } catch (error: any) {
+      if (geracao === eventoDetalheConsultaSeq.current && eventoDetalheIdRef.current === eventoId && buscaAtual === buscaConviteSeq.current)
+        setErroConviteExterno(error.message || 'Não foi possível buscar membros.')
+    } finally {
+      if (geracao === eventoDetalheConsultaSeq.current && eventoDetalheIdRef.current === eventoId && buscaAtual === buscaConviteSeq.current)
+        setBuscandoConviteExterno(false)
+    }
+  }
+
+  const incluirParticipanteExterno = async () => {
+    if (!eventoDetalhe || !eventoDetalhe.ativo || !listaParticipantesCarregada || !membroConviteId || salvandoConviteExterno) return
+    const eventoId = eventoDetalhe.id
+    const geracaoDetalhe = eventoDetalheConsultaSeq.current
+    const aindaNoMesmoEvento = () =>
+      geracaoDetalhe === eventoDetalheConsultaSeq.current && eventoDetalheIdRef.current === eventoId
+    setSalvandoConviteExterno(true)
+    setErroConviteExterno(null)
+    try {
+      const novo = await postWithAuth<ParticipanteExterno>(
+        `/eventos/${eventoId}/participantes-externos`,
+        { membroId: membroConviteId, tipo: tipoConviteExterno },
+      )
+      if (!aindaNoMesmoEvento()) return
+      setParticipantesExternos(atuais => [...atuais, novo])
+      setMembroConviteId('')
+    } catch (err: any) {
+      if (aindaNoMesmoEvento()) setErroConviteExterno(err.message || 'Não foi possível incluir o participante.')
+    } finally {
+      if (aindaNoMesmoEvento()) setSalvandoConviteExterno(false)
+    }
+  }
+
   const fecharDetalheEvento = () => {
     eventoDetalheConsultaSeq.current += 1
+    buscaConviteSeq.current += 1
     eventoDetalheIdRef.current = null
+    setBuscaConviteExecutada(false)
     setEventoDetalhe(null)
   }
 
@@ -443,14 +701,18 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       if (consultaAtual !== eventoFormConsultaSeq.current) return
       
       let tipo: any = ''
-      if (item.regionalId) tipo = 'regional'
+      if (item.abrangencia === 'NACIONAL') tipo = 'nacional'
+      else if (item.abrangencia === 'INTERNACIONAL') tipo = 'internacional'
+      else if (item.regionalId) tipo = 'regional'
       else if (item.administracaoId) tipo = 'administracao'
       else if (item.setorId) tipo = 'setor'
       else if (item.casaId) tipo = 'casa'
       else if (item.grupoTrabalhoId) tipo = 'grupoTrabalho'
       
       setTipoEscopo(tipo)
+      setCasaSetorFiltro(tipo === 'casa' ? (casas.find(casa => casa.id === item.casaId)?.setorId ?? '') : '')
       setFormData({
+        pessoal: item.pessoal ?? false,
         titulo: item.titulo || '',
         descricao: item.descricao || '',
         pauta: item.pauta || '',
@@ -461,6 +723,10 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
         espacoId: item.espacoId || '',
         urlOnline: item.urlOnline || '',
         organizadorMembroId: item.organizadorMembroId || '',
+        abrangencia: item.abrangencia || 'TERRITORIAL',
+        destinoUf: item.destinoUf || '',
+        destinoPaisCodigo: item.destinoPaisCodigo || '',
+        destinoCidadeLocal: item.destinoCidadeLocal || '',
         regionalId: item.regionalId || '',
         administracaoId: item.administracaoId || '',
         setorId: item.setorId || '',
@@ -554,7 +820,11 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       localId: formData.localId || null,
       espacoId: formData.espacoId || null,
       urlOnline: formData.urlOnline || null,
-      organizadorMembroId: formData.organizadorMembroId || null,
+      organizadorMembroId: formData.pessoal && !eventoEditandoId ? null : (eventoEditandoId ? formData.organizadorMembroId : identidade?.id) || null,
+      abrangencia: formData.abrangencia || 'TERRITORIAL',
+      destinoUf: formData.destinoUf || null,
+      destinoPaisCodigo: formData.destinoPaisCodigo || null,
+      destinoCidadeLocal: formData.destinoCidadeLocal || null,
       regionalId: formData.regionalId || null,
       administracaoId: formData.administracaoId || null,
       setorId: formData.setorId || null,
@@ -605,7 +875,16 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       } else {
         const criado = await postWithAuth<Evento>('/eventos', parsed.data)
         fecharFormularioEvento()
-        if (onEventoCriado) {
+        if (criado.pessoal && onEventoPessoalCriado) {
+          onEventoPessoalCriado()
+          return
+        }
+        if (!criado.pessoal && (criado.abrangencia === 'NACIONAL' || criado.abrangencia === 'INTERNACIONAL')) {
+          void carregarDados()
+          void abrirDetalheEvento(criado)
+          return
+        }
+        if (onEventoCriado && !criado.pessoal) {
           onEventoCriado(criado.id)
           return
         }
@@ -752,7 +1031,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     setSalvandoLocalRapido(true)
     setLocalRapidoErro(null)
     try {
-      const criado = await postWithAuth<Local>('/locais', parsed.data)
+      const criado = await postWithAuth<Local>(formData.pessoal ? '/locais/particulares' : '/locais', parsed.data)
       setLocais(atuais => [...atuais.filter(item => item.id !== criado.id), criado]
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
       setFormData(atual => ({ ...atual, localId: criado.id, espacoId: '' }))
@@ -783,7 +1062,12 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     setSalvandoEspacoRapido(true)
     setEspacoRapidoErro(null)
     try {
-      const criado = await postWithAuth<EspacoLocal>('/espacos-locais', parsed.data)
+      const localSelecionado = locais.find(local => local.id === formData.localId)
+      if (formData.pessoal && !localSelecionado?.proprietarioMembroId) {
+        setEspacoRapidoErro('Espaços em locais institucionais devem ser cadastrados por um administrador autorizado.')
+        return
+      }
+      const criado = await postWithAuth<EspacoLocal>(localSelecionado?.proprietarioMembroId ? '/espacos-locais/particulares' : '/espacos-locais', parsed.data)
       setEspacos(atuais => [...atuais.filter(item => item.id !== criado.id), criado]
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
       setFormData(atual => ({ ...atual, espacoId: criado.id }))
@@ -796,13 +1080,14 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
     }
   }
 
-  const handleCancelarEvento = async (item: Evento, origem: 'lista' | 'detalhe' = 'lista') => {
+  const handleCancelarEvento = async (item: Evento, _origem: 'lista' | 'detalhe' = 'lista') => {
     const confirmou = window.confirm(
       `Cancelar o evento "${item.titulo}"? Se houver convocação em rascunho, as funções serão removidas e a convocação também será cancelada.`
     )
     if (!confirmou) return
 
     setErro(null)
+    setErroCancelamento(null)
 
     try {
       await postWithAuth(`/eventos/${item.id}/cancelar`, {})
@@ -817,10 +1102,25 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
           : err instanceof Error
             ? (err.message || 'Não foi possível cancelar o evento.')
             : 'Não foi possível cancelar o evento.'
-      if (origem === 'detalhe' && eventoDetalheIdRef.current === item.id) {
-        fecharDetalheEvento()
+      setErroCancelamento(mensagem)
+    }
+  }
+
+  const handleReativarEvento = async (item: Evento) => {
+    if (!window.confirm(`Reativar o evento "${item.titulo}"? A convocação cancelada, se houver, não será reaberta automaticamente.`)) return
+    setErro(null)
+    setErroCancelamento(null)
+    try {
+      const atualizado = await patchWithAuth<Evento>(`/eventos/${item.id}`, { ativo: true })
+      setEventos(atuais => atuais.map(evento => evento.id === item.id ? { ...evento, ...atualizado, ativo: true } : evento))
+      if (eventoDetalheIdRef.current === item.id) {
+        setEventoDetalhe(atual => atual?.id === item.id ? { ...atual, ...atualizado, ativo: true } : atual)
       }
-      setErro(mensagem)
+    } catch (err: unknown) {
+      const mensagem = err instanceof ApiError && err.body?.error
+        ? (typeof err.body.error === 'string' ? err.body.error : 'Não foi possível reativar o evento.')
+        : err instanceof Error ? (err.message || 'Não foi possível reativar o evento.') : 'Não foi possível reativar o evento.'
+      setErroCancelamento(mensagem)
     }
   }
 
@@ -899,6 +1199,25 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
+      {erroCancelamento && !formOpen && !eventoDetalhe && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="fixed left-4 right-4 top-4 z-[100] mx-auto max-w-3xl rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800 shadow-xl"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <span>{erroCancelamento}</span>
+            <button
+              type="button"
+              onClick={() => setErroCancelamento(null)}
+              className="shrink-0 rounded px-2 py-1 font-semibold text-red-800 hover:bg-red-100"
+              aria-label="Fechar erro de cancelamento"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
       <div className="bg-brand-900 text-white p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold">Gestão de Eventos</h2>
@@ -911,6 +1230,79 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
           + Novo Evento
         </button>
       </div>
+
+      {!formOpen && !eventoDetalhe && <div className="flex flex-wrap gap-4 rounded-xl border border-slate-200 bg-white p-4">
+        {(filtros.master || filtros.filtrarEscopo) && <>
+          <label className="flex flex-col gap-1 text-sm text-slate-700 min-w-0 w-full sm:w-auto">Abrangência
+            <select aria-label="Filtrar por tipo de escopo" value={tipoEscopoFiltro} onChange={e => alterarTipoEscopo(e.target.value)} className="min-w-0 w-full sm:max-w-64 rounded-lg border border-slate-300 p-2">
+              <option value="">Todos os escopos autorizados</option>
+              <option value="regionalId">Regional</option>
+              <option value="administracaoId">Administração</option>
+              <option value="setorId">Setor</option>
+              <option value="casaId">Casa de Oração</option>
+              <option value="grupoTrabalhoId">Grupo de Trabalho</option>
+              <option value="NACIONAL">Nacional</option>
+              <option value="INTERNACIONAL">Internacional</option>
+            </select>
+          </label>
+          {['regionalId', 'administracaoId', 'setorId', 'casaId', 'grupoTrabalhoId'].includes(tipoEscopoFiltro) && <label className="flex flex-col gap-1 text-sm text-slate-700 min-w-0 w-full sm:w-auto">Regional
+            <select aria-label="Filtrar por Regional" value={regionalFiltroId} onChange={e => selecionarRegionalFiltro(e.target.value)} className="min-w-0 w-full sm:max-w-64 rounded-lg border border-slate-300 p-2">
+              <option value="">Todas as regionais</option>
+              {regionais.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
+            </select>
+          </label>}
+          {['administracaoId', 'setorId', 'casaId'].includes(tipoEscopoFiltro) && <label className="flex flex-col gap-1 text-sm text-slate-700 min-w-0 w-full sm:w-auto">Administração
+            <select aria-label="Filtrar por Administração" value={administracaoFiltroId} onChange={e => selecionarAdministracaoFiltro(e.target.value)} className="min-w-0 w-full sm:max-w-64 rounded-lg border border-slate-300 p-2">
+              <option value="">Todas as administrações</option>
+              {administracoesEscopo.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
+            </select>
+          </label>}
+          {['setorId', 'casaId'].includes(tipoEscopoFiltro) && <label className="flex flex-col gap-1 text-sm text-slate-700 min-w-0 w-full sm:w-auto">Setor
+            <select aria-label="Filtrar por Setor" value={setorFiltroId} onChange={e => selecionarSetorFiltro(e.target.value)} className="min-w-0 w-full sm:max-w-64 rounded-lg border border-slate-300 p-2">
+              <option value="">Todos os setores</option>
+              {setoresEscopo.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
+            </select>
+          </label>}
+          {tipoEscopoFiltro === 'casaId' && <label className="flex flex-col gap-1 text-sm text-slate-700 min-w-0 w-full sm:w-auto">Casa de Oração
+            <select aria-label="Filtrar por Casa de Oração" value={escopoFiltro.startsWith('casaId:') ? escopoFiltro.slice(7) : ''} onChange={e => setEscopoFiltro(e.target.value ? `casaId:${e.target.value}` : setorFiltroId ? `setorId:${setorFiltroId}` : administracaoFiltroId ? `administracaoId:${administracaoFiltroId}` : regionalFiltroId ? `regionalId:${regionalFiltroId}` : '')} className="min-w-0 w-full sm:max-w-64 rounded-lg border border-slate-300 p-2">
+              <option value="">Todas as casas</option>
+              {casasEscopo.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
+            </select>
+          </label>}
+          {tipoEscopoFiltro === 'grupoTrabalhoId' && <label className="flex flex-col gap-1 text-sm text-slate-700 min-w-0 w-full sm:w-auto">Grupo de Trabalho
+            <select aria-label="Filtrar por Grupo de Trabalho" value={escopoFiltro.startsWith('grupoTrabalhoId:') ? escopoFiltro.slice(16) : ''} onChange={e => setEscopoFiltro(e.target.value ? `grupoTrabalhoId:${e.target.value}` : regionalFiltroId ? `regionalId:${regionalFiltroId}` : '')} className="min-w-0 w-full sm:max-w-64 rounded-lg border border-slate-300 p-2">
+              <option value="">Todos os grupos</option>
+              {gruposEscopo.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
+            </select>
+          </label>}
+        </>}
+        {filtros.master && <label className="flex flex-col gap-1 text-sm text-slate-700">Pessoa
+          <select aria-label="Filtrar por pessoa" value={pessoaFiltro} onChange={e => void selecionarPessoa(e.target.value)} className="rounded-lg border border-slate-300 p-2">
+            <option value="">Todas as pessoas</option>
+            {filtros.pessoas.map(item => <option key={item.id} value={item.id}>{item.nome}</option>)}
+          </select>
+        </label>}
+        <label className="flex flex-col gap-1 text-sm text-slate-700">Status
+          <select
+            aria-label="Filtrar por status do evento"
+            value={statusEventoFiltro}
+            onChange={e => setStatusEventoFiltro(e.target.value as 'ATIVOS' | 'CANCELADOS' | 'TODOS')}
+            className="rounded-lg border border-slate-300 p-2"
+          >
+            <option value="ATIVOS">Ativos</option>
+            <option value="CANCELADOS">Cancelados</option>
+            <option value="TODOS">Todos</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-slate-700">Período
+          <select aria-label="Filtrar eventos por período" value={periodoFiltro} onChange={e => setPeriodoFiltro(e.target.value as typeof periodoFiltro)} className="rounded-lg border border-slate-300 p-2">
+            <option value="FUTUROS">Futuros e em andamento</option>
+            <option value="PASSADOS">Passados</option>
+            <option value="TODOS">Todos os períodos</option>
+          </select>
+        </label>
+        <p className="self-end py-2 text-sm text-slate-500">{eventosFiltrados.length} evento(s)</p>
+      </div>}
 
       {erro && !formOpen && (
         <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm animate-in fade-in">
@@ -954,9 +1346,9 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
         </div>
-      ) : (eventos || []).length === 0 ? (
+      ) : eventosFiltrados.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-slate-200 shadow-sm">
-          <p className="text-slate-500 mb-4">Nenhum evento cadastrado.</p>
+          <p className="text-slate-500 mb-4">Nenhum evento encontrado neste filtro.</p>
           <button onClick={abrirFormCriar} className="text-brand-600 font-medium hover:text-brand-700">
             Cadastrar primeiro evento
           </button>
@@ -975,9 +1367,18 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {eventos.map((item) => (
+                {eventosFiltrados.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-slate-900">{item.titulo}</td>
+                    <td className="px-6 py-4 font-medium text-slate-900">
+                      {item.titulo}{item.pessoal && <span className="ml-2 text-xs text-brand-700">Próprio</span>}
+                      {(item.abrangencia === 'NACIONAL' || item.abrangencia === 'INTERNACIONAL') && (
+                        <p className="mt-1 text-xs font-normal text-slate-600">
+                          {item.abrangencia === 'NACIONAL'
+                            ? [item.destinoCidadeLocal, item.destinoUf].filter(Boolean).join(' — ')
+                            : [item.destinoCidadeLocal, PAISES_ISO.find(([codigo]) => codigo === item.destinoPaisCodigo)?.[1] || item.destinoPaisCodigo].filter(Boolean).join(' — ')}
+                        </p>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-slate-600">
                       {new Date(item.inicioEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                     </td>
@@ -998,27 +1399,36 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                         >
                           Ver
                         </button>
-                        <button
+                        {item.podeGerenciar !== false && !item.pessoal && <button
                           type="button"
                           onClick={() => void gerarAcessoPortaria(item.id)}
                           className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-green-800 hover:bg-green-50 hover:text-green-950 font-medium"
                         >
                           Gerar acesso de Portaria
-                        </button>
-                        <button
+                        </button>}
+                        {item.podeGerenciar !== false && <button
                           type="button"
                           onClick={() => handleClickEditar(item)}
                           className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-amber-700 hover:bg-amber-50 hover:text-amber-900 font-medium"
                         >
                           Editar
-                        </button>
-                        {item.ativo && (
+                        </button>}
+                        {item.ativo && item.podeGerenciar !== false && (
                           <button
                             type="button"
                             onClick={() => void handleCancelarEvento(item)}
                             className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-red-700 hover:bg-red-50 hover:text-red-900 font-medium"
                           >
                             Cancelar Evento
+                          </button>
+                        )}
+                        {!item.ativo && item.podeGerenciar !== false && new Date(item.fimEm).getTime() > Date.now() && (
+                          <button
+                            type="button"
+                            onClick={() => void handleReativarEvento(item)}
+                            className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-900 font-medium"
+                          >
+                            Reativar Evento
                           </button>
                         )}
                       </div>
@@ -1035,6 +1445,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       {formOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in overflow-y-auto">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-form-title" className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden my-8">
+            <span data-screen-code={eventoEditandoId ? 'AGD-ADM-017' : 'AGD-ADM-016'} aria-label={`Código da subtela ${eventoEditandoId ? 'AGD-ADM-017' : 'AGD-ADM-016'}`} className="block text-right px-4 pt-2 text-[10px] font-medium tracking-wide text-slate-500">Tela {eventoEditandoId ? 'AGD-ADM-017' : 'AGD-ADM-016'}</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-form-title" className="text-lg font-semibold text-slate-900">
                 {eventoEditandoId ? 'Editar Evento' : 'Novo Evento'}
@@ -1043,6 +1454,16 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
             </div>
             
             <form onSubmit={handleSubmit} noValidate className="p-6 overflow-y-auto space-y-6">
+              {erroCancelamento && (
+                <div role="alert" aria-live="assertive" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+                  <div className="flex items-start justify-between gap-4">
+                    <span>{erroCancelamento}</span>
+                    <button type="button" onClick={() => setErroCancelamento(null)} className="shrink-0 font-semibold" aria-label="Fechar erro de cancelamento">
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              )}
               {erro && (
                 <div role="alert" className="p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
                   {erro}
@@ -1092,6 +1513,200 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                       </div>
                     </div>
 
+                    <div className="border-t pt-4">
+                      <h4 className="font-medium text-sm text-slate-900 mb-3">Escopo / Destino do Evento</h4>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label htmlFor="tipoEscopo" className="block text-xs font-medium text-slate-700 mb-1">Tipo de Escopo</label>
+                          <select
+                            id="tipoEscopo"
+                            value={tipoEscopo}
+                            disabled={!!eventoEditandoId && !!formData.pessoal}
+                            onChange={e => handleTipoEscopoChange(e.target.value as any)}
+                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                          >
+                            <option value="">Selecione...</option>
+                            <option value="regional">Regional</option>
+                            <option value="administracao">Administração</option>
+                            <option value="setor">Setor</option>
+                            <option value="casa">Casa de Oração</option>
+                            <option value="grupoTrabalho">Grupo de Trabalho</option>
+                            <option value="nacional">Nacional</option>
+                            <option value="internacional">Internacional</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          {tipoEscopo === 'regional' && (
+                            <>
+                              <label htmlFor="regionalId" className="block text-xs font-medium text-slate-700 mb-1">Regional *</label>
+                              <select
+                                id="regionalId"
+                                value={formData.regionalId || ''}
+                                onChange={e => setFormData({ ...formData, regionalId: e.target.value })}
+                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                              >
+                                <option value="">Selecione...</option>
+                                {regionais.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
+                              </select>
+                            </>
+                          )}
+                          {tipoEscopo === 'administracao' && (
+                            <>
+                              <label htmlFor="administracaoId" className="block text-xs font-medium text-slate-700 mb-1">Administração *</label>
+                              <select
+                                id="administracaoId"
+                                value={formData.administracaoId || ''}
+                                onChange={e => setFormData({ ...formData, administracaoId: e.target.value })}
+                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                              >
+                                <option value="">Selecione...</option>
+                                {administracoes.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+                              </select>
+                            </>
+                          )}
+                          {tipoEscopo === 'setor' && (
+                            <>
+                              <label htmlFor="setorId" className="block text-xs font-medium text-slate-700 mb-1">Setor *</label>
+                              <select
+                                id="setorId"
+                                value={formData.setorId || ''}
+                                onChange={e => setFormData({ ...formData, setorId: e.target.value })}
+                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                              >
+                                <option value="">Selecione...</option>
+                                {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                              </select>
+                            </>
+                          )}
+                          {tipoEscopo === 'casa' && (
+                            <div className="space-y-2">
+                              <label htmlFor="casaSetorFiltro" className="block text-xs font-medium text-slate-700">Filtrar Casa por Setor</label>
+                              <select
+                                id="casaSetorFiltro"
+                                value={casaSetorFiltro}
+                                onChange={e => {
+                                  setCasaSetorFiltro(e.target.value)
+                                  setFormData({ ...formData, casaId: '' })
+                                }}
+                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                              >
+                                <option value="">Todos os Setores</option>
+                                {[...setores].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(s => (
+                                  <option key={s.id} value={s.id}>{s.nome}</option>
+                                ))}
+                              </select>
+                              <label htmlFor="casaId" className="block text-xs font-medium text-slate-700">Casa de Oração *</label>
+                              <select
+                                id="casaId"
+                                value={formData.casaId || ''}
+                                onChange={e => setFormData({ ...formData, casaId: e.target.value })}
+                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                              >
+                                <option value="">Selecione...</option>
+                                {casas
+                                  .filter(casa => !casaSetorFiltro || casa.setorId === casaSetorFiltro)
+                                  .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+                                  .map(casa => <option key={casa.id} value={casa.id}>{casa.nome}</option>)}
+                              </select>
+                            </div>
+                          )}
+                          {tipoEscopo === 'grupoTrabalho' && (
+                            <>
+                              <label htmlFor="grupoTrabalhoId" className="block text-xs font-medium text-slate-700 mb-1">GT *</label>
+                              <select
+                                id="grupoTrabalhoId"
+                                value={formData.grupoTrabalhoId || ''}
+                                onChange={e => setFormData({ ...formData, grupoTrabalhoId: e.target.value })}
+                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                              >
+                                <option value="">Selecione...</option>
+                                {gruposTrabalho.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
+                              </select>
+                            </>
+                          )}
+                          {tipoEscopo === 'nacional' && (
+                            <div className="space-y-3">
+                              <div>
+                                <label htmlFor="destinoUf" className="block text-xs font-medium text-slate-700 mb-1">UF *</label>
+                                <select
+                                  id="destinoUf"
+                                  value={formData.destinoUf || ''}
+                                  onChange={e => setFormData({ ...formData, destinoUf: e.target.value as (typeof UF_BRASIL)[number] })}
+                                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                                >
+                                  <option value="">Selecione...</option>
+                                  {UF_BRASIL.map(uf => <option key={uf} value={uf}>{uf}</option>)}
+                                </select>
+                                {errosForm.destinoUf && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.destinoUf}</p>}
+                              </div>
+                              <div>
+                                <label htmlFor="destinoCidadeLocal" className="block text-xs font-medium text-slate-700 mb-1">Cidade / Local de Atendimento *</label>
+                                <input
+                                  id="destinoCidadeLocal"
+                                  value={formData.destinoCidadeLocal || ''}
+                                  onChange={e => setFormData({ ...formData, destinoCidadeLocal: e.target.value })}
+                                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                                />
+                                {errosForm.destinoCidadeLocal && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.destinoCidadeLocal}</p>}
+                              </div>
+                            </div>
+                          )}
+                          {tipoEscopo === 'internacional' && (
+                            <div className="space-y-3">
+                              <div>
+                                <label htmlFor="destinoPaisCodigo" className="block text-xs font-medium text-slate-700 mb-1">País *</label>
+                                <select
+                                  id="destinoPaisCodigo"
+                                  value={formData.destinoPaisCodigo || ''}
+                                  onChange={e => setFormData({ ...formData, destinoPaisCodigo: e.target.value })}
+                                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                                >
+                                  <option value="">Selecione...</option>
+                                  {PAISES_ISO.map(([codigo, nome]) => <option key={codigo} value={codigo}>{nome}</option>)}
+                                </select>
+                                {errosForm.destinoPaisCodigo && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.destinoPaisCodigo}</p>}
+                              </div>
+                              <div>
+                                <label htmlFor="destinoCidadeLocal" className="block text-xs font-medium text-slate-700 mb-1">Cidade / Local de Atendimento *</label>
+                                <input
+                                  id="destinoCidadeLocal"
+                                  value={formData.destinoCidadeLocal || ''}
+                                  onChange={e => setFormData({ ...formData, destinoCidadeLocal: e.target.value })}
+                                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                                />
+                                {errosForm.destinoCidadeLocal && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.destinoCidadeLocal}</p>}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {(tipoEscopo === 'casa' || tipoEscopo === 'nacional' || tipoEscopo === 'internacional') && !eventoEditandoSerieId && (
+                        <div className="mt-4">
+                          <label htmlFor="publicoEvento" className="block text-sm font-medium text-slate-700 mb-1">Público do evento</label>
+                          <select id="publicoEvento" value={formData.pessoal ? 'PROPRIO' : 'INSTITUCIONAL'} disabled={!!eventoEditandoId}
+                            onChange={e => {
+                              const pessoal = e.target.value === 'PROPRIO'
+                              const localPrivado = locais.some(local => local.id === formData.localId && !!local.proprietarioMembroId)
+                              setFormData(prev => ({
+                                ...prev,
+                                pessoal,
+                                localId: !pessoal && localPrivado ? '' : prev.localId,
+                                espacoId: !pessoal && localPrivado ? '' : prev.espacoId,
+                              }))
+                            }}
+                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm">
+                            <option value="INSTITUCIONAL">{tipoEscopo === 'nacional' || tipoEscopo === 'internacional' ? 'Institucional — convites nominais' : 'Institucional — com convocação'}</option>
+                            <option value="PROPRIO">Próprio — somente para mim</option>
+                          </select>
+                          {formData.pessoal && <p className="mt-2 text-sm text-brand-700">Ao salvar, o evento entra diretamente na sua agenda, sem convocação.</p>}
+                        </div>
+                      )}
+                      {errosForm.pessoal && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.pessoal}</p>}
+                      {errosForm.escopo && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.escopo}</p>}
+                    </div>
+
                     <div>
                       <label htmlFor="modalidade" className="block text-sm font-medium text-slate-700 mb-1">Modalidade *</label>
                       <select
@@ -1107,7 +1722,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                       {errosForm.modalidade && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.modalidade}</p>}
                     </div>
 
-                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && (
+                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.abrangencia !== 'NACIONAL' && formData.abrangencia !== 'INTERNACIONAL' && (
                       <div>
                         <div className="mb-1 flex items-center justify-between gap-3">
                           <label htmlFor="localId" className="block text-sm font-medium text-slate-700">Local *</label>
@@ -1132,7 +1747,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         >
                           <option value="">Selecione...</option>
-                          {locais.map(l => (
+                          {[...locais].filter(l => formData.pessoal || !l.proprietarioMembroId).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(l => (
                             <option key={l.id} value={l.id}>{l.nome}</option>
                           ))}
                         </select>
@@ -1140,7 +1755,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                       </div>
                     )}
 
-                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.localId && (
+                    {(formData.modalidade === 'PRESENCIAL' || formData.modalidade === 'HIBRIDO') && formData.abrangencia !== 'NACIONAL' && formData.abrangencia !== 'INTERNACIONAL' && formData.localId && (
                       <div>
                         <div className="mb-1 flex items-center justify-between gap-3">
                           <label htmlFor="espacoId" className="block text-sm font-medium text-slate-700">Espaço</label>
@@ -1194,116 +1809,16 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                       </div>
                     )}
 
-                    <div className="border-t pt-4">
-                      <h4 className="font-medium text-sm text-slate-900 mb-3">Escopo (Selecione exatamente um)</h4>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label htmlFor="tipoEscopo" className="block text-xs font-medium text-slate-700 mb-1">Tipo de Escopo</label>
-                          <select
-                            id="tipoEscopo"
-                            value={tipoEscopo}
-                            onChange={e => handleTipoEscopoChange(e.target.value as any)}
-                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                          >
-                            <option value="">Selecione...</option>
-                            <option value="regional">Regional</option>
-                            <option value="administracao">Administração</option>
-                            <option value="setor">Setor</option>
-                            <option value="casa">Casa de Oração</option>
-                            <option value="grupoTrabalho">Grupo de Trabalho</option>
-                          </select>
-                        </div>
-                        
-                        <div>
-                          {tipoEscopo === 'regional' && (
-                            <>
-                              <label htmlFor="regionalId" className="block text-xs font-medium text-slate-700 mb-1">Regional *</label>
-                              <select
-                                id="regionalId"
-                                value={formData.regionalId || ''}
-                                onChange={e => setFormData({ ...formData, regionalId: e.target.value })}
-                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                              >
-                                <option value="">Selecione...</option>
-                                {regionais.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
-                              </select>
-                            </>
-                          )}
-                          {tipoEscopo === 'administracao' && (
-                            <>
-                              <label htmlFor="administracaoId" className="block text-xs font-medium text-slate-700 mb-1">Administração *</label>
-                              <select
-                                id="administracaoId"
-                                value={formData.administracaoId || ''}
-                                onChange={e => setFormData({ ...formData, administracaoId: e.target.value })}
-                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                              >
-                                <option value="">Selecione...</option>
-                                {administracoes.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
-                              </select>
-                            </>
-                          )}
-                          {tipoEscopo === 'setor' && (
-                            <>
-                              <label htmlFor="setorId" className="block text-xs font-medium text-slate-700 mb-1">Setor *</label>
-                              <select
-                                id="setorId"
-                                value={formData.setorId || ''}
-                                onChange={e => setFormData({ ...formData, setorId: e.target.value })}
-                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                              >
-                                <option value="">Selecione...</option>
-                                {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-                              </select>
-                            </>
-                          )}
-                          {tipoEscopo === 'casa' && (
-                            <>
-                              <label htmlFor="casaId" className="block text-xs font-medium text-slate-700 mb-1">Casa de Oração *</label>
-                              <select
-                                id="casaId"
-                                value={formData.casaId || ''}
-                                onChange={e => setFormData({ ...formData, casaId: e.target.value })}
-                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                              >
-                                <option value="">Selecione...</option>
-                                {casas.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                              </select>
-                            </>
-                          )}
-                          {tipoEscopo === 'grupoTrabalho' && (
-                            <>
-                              <label htmlFor="grupoTrabalhoId" className="block text-xs font-medium text-slate-700 mb-1">GT *</label>
-                              <select
-                                id="grupoTrabalhoId"
-                                value={formData.grupoTrabalhoId || ''}
-                                onChange={e => setFormData({ ...formData, grupoTrabalhoId: e.target.value })}
-                                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                              >
-                                <option value="">Selecione...</option>
-                                {gruposTrabalho.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
-                              </select>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      {errosForm.escopo && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.escopo}</p>}
-                    </div>
-
-                    <div className="border-t pt-4">
+                    {!formData.pessoal && <div className="border-t pt-4">
                       <label htmlFor="organizadorMembroId" className="block text-sm font-medium text-slate-700 mb-1">Organizador (Membro)</label>
-                      <select
-                        id="organizadorMembroId"
-                        value={formData.organizadorMembroId || ''}
-                        onChange={e => setFormData({ ...formData, organizadorMembroId: e.target.value })}
-                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                      >
-                        <option value="">Selecione...</option>
-                        {membros.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
-                      </select>
+                      <p id="organizadorMembroId" className="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-lg text-sm">
+                        {eventoEditandoId
+                          ? (membros.find(m => m.id === formData.organizadorMembroId)?.nome || 'Organizador não informado')
+                          : (identidade?.nome || 'Identificando usuário...')}
+                      </p>
+                      {!eventoEditandoId && <p className="text-xs text-slate-500 mt-1">Vinculado automaticamente ao usuário logado.</p>}
                       {errosForm.organizadorMembroId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.organizadorMembroId}</p>}
-                    </div>
+                    </div>}
 
                     <div>
                       <label htmlFor="descricao" className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
@@ -1380,6 +1895,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       {localRapidoOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
           <div ref={localRapidoDialogRef} role="dialog" aria-modal="true" aria-labelledby="local-rapido-title" className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+            <span data-screen-code={'AGD-ADM-019'} aria-label={`Código da subtela ${'AGD-ADM-019'}`} className="block text-right px-4 pt-2 text-[10px] font-medium tracking-wide text-slate-500">Tela {'AGD-ADM-019'}</span>
             <div className="border-b border-slate-200 px-5 py-4">
               <h3 id="local-rapido-title" className="font-semibold text-slate-900">Criar Local</h3>
               <p className="mt-1 text-xs text-slate-500">O novo local será selecionado automaticamente no evento.</p>
@@ -1436,6 +1952,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       {espacoRapidoOpen && formData.localId && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
           <div ref={espacoRapidoDialogRef} role="dialog" aria-modal="true" aria-labelledby="espaco-rapido-title" className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <span data-screen-code={'AGD-ADM-020'} aria-label={`Código da subtela ${'AGD-ADM-020'}`} className="block text-right px-4 pt-2 text-[10px] font-medium tracking-wide text-slate-500">Tela {'AGD-ADM-020'}</span>
             <div className="border-b border-slate-200 px-5 py-4">
               <h3 id="espaco-rapido-title" className="font-semibold text-slate-900">Criar Espaço</h3>
               <p className="mt-1 text-xs text-slate-500">O novo espaço será selecionado automaticamente.</p>
@@ -1455,7 +1972,8 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       {/* Modal Detalhe */}
       {eventoDetalhe && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-          <div role="dialog" aria-modal="true" aria-labelledby="modal-detalhe-title" className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
+          <div role="dialog" aria-modal="true" aria-labelledby="modal-detalhe-title" className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
+            <span data-screen-code={'AGD-ADM-018'} aria-label={`Código da subtela ${'AGD-ADM-018'}`} className="block text-right px-4 pt-2 text-[10px] font-medium tracking-wide text-slate-500">Tela {'AGD-ADM-018'}</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-detalhe-title" className="text-lg font-semibold text-slate-900">
                 Detalhes do Evento
@@ -1463,6 +1981,16 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
               <button onClick={fecharDetalheEvento} className="text-slate-400 hover:text-slate-600">✕</button>
             </div>
             <div className="p-6 space-y-4">
+              {erroCancelamento && (
+                <div role="alert" aria-live="assertive" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+                  <div className="flex items-start justify-between gap-4">
+                    <span>{erroCancelamento}</span>
+                    <button type="button" onClick={() => setErroCancelamento(null)} className="shrink-0 font-semibold" aria-label="Fechar erro de cancelamento">
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              )}
               <div>
                 <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Título</span>
                 <p className="text-slate-900 font-medium">{eventoDetalhe.titulo}</p>
@@ -1487,7 +2015,73 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                   <p className="text-slate-900">{eventoDetalhe.ativo ? 'Ativo' : 'Inativo'}</p>
                 </div>
               </div>
-              {(eventoDetalhe.modalidade === 'PRESENCIAL' || eventoDetalhe.modalidade === 'HIBRIDO') && (
+              {(eventoDetalhe.abrangencia === 'NACIONAL' || eventoDetalhe.abrangencia === 'INTERNACIONAL') && (
+                <div>
+                  <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                    {eventoDetalhe.abrangencia === 'NACIONAL' ? 'Destino Nacional' : 'Destino Internacional'}
+                  </span>
+                  <p className="text-slate-900">
+                    {eventoDetalhe.destinoCidadeLocal}
+                    {eventoDetalhe.abrangencia === 'NACIONAL' && eventoDetalhe.destinoUf ? ` — ${eventoDetalhe.destinoUf}` : ''}
+                    {eventoDetalhe.abrangencia === 'INTERNACIONAL' && eventoDetalhe.destinoPaisCodigo
+                      ? ` — ${PAISES_ISO.find(([codigo]) => codigo === eventoDetalhe.destinoPaisCodigo)?.[1] || eventoDetalhe.destinoPaisCodigo}`
+                      : ''}
+                  </p>
+                </div>
+              )}
+              {(eventoDetalhe.abrangencia === 'NACIONAL' || eventoDetalhe.abrangencia === 'INTERNACIONAL') && !eventoDetalhe.pessoal && podeVerParticipantesExternos && (
+                <section className="rounded-xl border border-brand-200 bg-brand-50 p-4 space-y-3" aria-label="Convocação nominal externa">
+                  <h4 className="font-semibold text-brand-900">Convocação nominal de Diáconos e Membros</h4>
+                  <p className="text-xs text-slate-600">Para eventos externos, selecione pessoas diretamente. Não há seleção de cargos ou funções.</p>
+                  <ul className="text-sm space-y-1">
+                    {participantesExternos.map(part => (
+                      <li key={part.membroId}>
+                        {part.membroNome || candidatosConviteExterno.find(m => m.id === part.membroId)?.nome || membros.find(m => m.id === part.membroId)?.nome || part.membroId} — {part.status === 'CONVIDADO' ? 'Aguardando resposta' : part.status === 'ATRIBUIDO' ? 'Atribuído' : part.status === 'CONFIRMADO' ? 'Confirmado' : 'Recusado'}
+                      </li>
+                    ))}
+                    {listaParticipantesCarregada && participantesExternos.length === 0 && <li className="text-slate-500">Nenhum participante incluído ainda.</li>}
+                  </ul>
+                  {erroListaParticipantes && <p role="alert" className="text-sm text-red-700">Não foi possível consultar os participantes deste evento. A inclusão ficará indisponível até que a lista seja carregada. {erroListaParticipantes}</p>}
+                  {eventoDetalhe.ativo && eventoDetalhe.podeGerenciar !== false && (<>
+                  <label htmlFor="buscaConviteExterno" className="block text-sm font-medium">Buscar membro cadastrado (mínimo três letras)</label>
+                   <div className="flex gap-2">
+                     <input id="buscaConviteExterno" type="search" value={buscaConviteExterno} onChange={e => {
+                       setBuscaConviteExterno(e.target.value)
+                       buscaConviteSeq.current += 1
+                       setBuscandoConviteExterno(false)
+                       setBuscaConviteExecutada(false)
+                       setCandidatosConviteExterno([])
+                       setMembroConviteId('')
+                     }}
+                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void buscarParticipanteExterno() } }}
+                       className="min-w-0 flex-1 rounded-lg border border-slate-300 p-2 text-sm" placeholder="Nome do convidado" />
+                     <button type="button" disabled={buscaConviteExterno.trim().length < 3 || buscandoConviteExterno}
+                       onClick={() => void buscarParticipanteExterno()} className="rounded-lg border border-brand-400 px-3 text-sm font-medium disabled:opacity-50">
+                       {buscandoConviteExterno ? 'Buscando...' : 'Buscar'}
+                     </button>
+                   </div>
+                   <label htmlFor="membroConviteId" className="block text-sm font-medium">Diácono ou Membro</label>
+                  <select id="membroConviteId" disabled={!listaParticipantesCarregada} value={membroConviteId} onChange={e => setMembroConviteId(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2 text-sm">
+                    <option value="">Selecione uma pessoa</option>
+                    {candidatosConviteExterno.filter(m => !participantesExternos.some(p => p.membroId === m.id)).sort((a,b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                  </select>
+                  {buscaConviteExecutada && candidatosConviteExterno.every(m => participantesExternos.some(p => p.membroId === m.id)) && (
+                    <p role="status" className="text-sm text-slate-600">Nenhum membro ativo encontrado na Regional responsável por este evento. Confira o nome ou tente outra busca.</p>
+                  )}
+                  <label htmlFor="tipoConviteExterno" className="block text-sm font-medium">Tipo de participação</label>
+                  <select id="tipoConviteExterno" value={tipoConviteExterno} onChange={e => setTipoConviteExterno(e.target.value as 'CONVIDADO' | 'ATRIBUIDO')} className="w-full rounded-lg border border-slate-300 p-2 text-sm">
+                    <option value="CONVIDADO">Convidar — solicita confirmação</option>
+                    <option value="ATRIBUIDO">Registrar participação — sem confirmação do convidado</option>
+                  </select>
+                  <button type="button" disabled={!listaParticipantesCarregada || !membroConviteId || salvandoConviteExterno} onClick={() => void incluirParticipanteExterno()} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                    {salvandoConviteExterno ? 'Incluindo...' : 'Incluir participante'}
+                  </button>
+                  </>)}
+                  {!eventoDetalhe.ativo && <p className="text-sm text-slate-500">Evento cancelado: participantes disponíveis somente para consulta.</p>}
+                  {erroConviteExterno && <p role="alert" className="text-sm text-red-700">{erroConviteExterno}</p>}
+                </section>
+              )}
+              {(eventoDetalhe.modalidade === 'PRESENCIAL' || eventoDetalhe.modalidade === 'HIBRIDO') && eventoDetalhe.abrangencia !== 'NACIONAL' && eventoDetalhe.abrangencia !== 'INTERNACIONAL' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Local</span>
@@ -1527,13 +2121,27 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
                 </div>
               )}
               {eventoDetalhe.ativo && (
-                <div className="flex justify-end border-t border-slate-100 pt-4">
-                  <button
+                <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 pt-4">
+                  <button type="button" onClick={fecharDetalheEvento} className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Concluir e voltar aos Eventos
+                  </button>
+                  {eventoDetalhe.podeGerenciar !== false && <button
                     type="button"
                     onClick={() => void handleCancelarEvento(eventoDetalhe, 'detalhe')}
                     className="inline-flex min-h-10 items-center rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
                   >
                     Cancelar Evento
+                  </button>}
+                </div>
+              )}
+              {!eventoDetalhe.ativo && eventoDetalhe.podeGerenciar !== false && new Date(eventoDetalhe.fimEm).getTime() > Date.now() && (
+                <div className="flex justify-end border-t border-slate-100 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => void handleReativarEvento(eventoDetalhe)}
+                    className="inline-flex min-h-10 items-center rounded-lg border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                  >
+                    Reativar Evento
                   </button>
                 </div>
               )}
@@ -1545,6 +2153,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       {escolhaSerieAberto && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-escolha-title" className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+            <span data-screen-code={'AGD-ADM-021'} aria-label={`Código da subtela ${'AGD-ADM-021'}`} className="block text-right px-4 pt-2 text-[10px] font-medium tracking-wide text-slate-500">Tela {'AGD-ADM-021'}</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-escolha-title" className="text-lg font-semibold text-slate-900">
                 Editar Evento Recorrente
@@ -1592,6 +2201,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       {confirmacaoThisAberto && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-confirm-this-title" className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+            <span data-screen-code={'AGD-ADM-022'} aria-label={`Código da subtela ${'AGD-ADM-022'}`} className="block text-right px-4 pt-2 text-[10px] font-medium tracking-wide text-slate-500">Tela {'AGD-ADM-022'}</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-confirm-this-title" className="text-lg font-semibold text-slate-900">
                 Confirmar Exceção
@@ -1626,6 +2236,7 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
       {confirmacaoFutureAberto && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-confirm-future-title" className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+            <span data-screen-code={'AGD-ADM-023'} aria-label={`Código da subtela ${'AGD-ADM-023'}`} className="block text-right px-4 pt-2 text-[10px] font-medium tracking-wide text-slate-500">Tela {'AGD-ADM-023'}</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-confirm-future-title" className="text-lg font-semibold text-slate-900">
                 Confirmar Edição
@@ -1660,9 +2271,10 @@ export function EventosView({ onEventoCriado }: { onEventoCriado?: (eventoId: st
         isOpen={serieFormOpen}
         onClose={() => setSerieFormOpen(false)}
         title="Editar Evento Recorrente (Este e os próximos)"
+        operation="editar"
         initialData={serieInitialData}
         initialTipoEscopo={serieInitialTipoEscopo}
-        lookups={{ locais, espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
+        lookups={{ locais: locais.filter(local => !local.proprietarioMembroId), espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
         onSubmit={handleSerieSubmit}
         externalError={erro}
       />

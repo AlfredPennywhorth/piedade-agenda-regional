@@ -53,15 +53,98 @@ const mockEventoRecorrente = {
 describe('EventosView', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    // Evita que os eventos do fixture passem a ser históricos conforme o calendário real avança.
+    vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-10-09T12:00:00.000Z').getTime())
     vi.mocked(apiClient.fetchWithAuth).mockReset()
     vi.mocked(apiClient.postWithAuth).mockReset()
     vi.mocked(apiClient.patchWithAuth).mockReset()
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/auth/me') return { id: 'a7777777-7777-4777-8777-777777777777', nome: 'Gestor Logado' }
       if (url === '/eventos') return mockEventos
       if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
       if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
       return []
     })
+  })
+
+  it('gestor filtra a Administração incluindo eventos de Casas subordinadas', async () => {
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos/filtros') return { master: false, filtrarEscopo: true, pessoas: [] }
+      if (url === '/administracoes') return [{ id: 'adm-1', nome: 'Administração SP', regionalId: REGIONAL_ID }]
+      if (url === '/setores') return [{ id: 'setor-1', nome: 'Setor', administracaoId: 'adm-1' }]
+      if (url === '/casas') return [{ id: 'casa-1', nome: 'Casa', setorId: 'setor-1' }]
+      if (url === '/eventos') return [mockEventos[0], { ...mockEventos[0], id: 'outro', titulo: 'Evento da Casa', regionalId: null, casaId: 'casa-1' }]
+      return original(url)
+    })
+    render(<EventosView />)
+    const tipo = await screen.findByLabelText('Filtrar por tipo de escopo')
+    await screen.findByText('Evento da Casa')
+    fireEvent.change(tipo, { target: { value: 'administracaoId' } })
+    fireEvent.change(screen.getByLabelText('Filtrar por Regional'), { target: { value: REGIONAL_ID } })
+    fireEvent.change(screen.getByLabelText('Filtrar por Administração'), { target: { value: 'adm-1' } })
+    expect(screen.getByText('Evento da Casa')).toBeInTheDocument()
+    expect(screen.queryByText('Reunião Presencial')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Filtrar por pessoa')).not.toBeInTheDocument()
+  })
+
+  it('Master filtra eventos por pessoa na API e pode limpar o filtro', async () => {
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos/filtros') return { master: true, pessoas: [{ id: 'pessoa-1', nome: 'André' }] }
+      if (url === '/eventos?pessoaId=pessoa-1') return [{ ...mockEventos[0], titulo: 'Evento do André' }]
+      return original(url)
+    })
+    render(<EventosView />)
+    const filtro = await screen.findByLabelText('Filtrar por pessoa')
+    fireEvent.change(filtro, { target: { value: 'pessoa-1' } })
+    expect(await screen.findByText('Evento do André')).toBeInTheDocument()
+    expect(screen.queryByText('Reunião Presencial')).not.toBeInTheDocument()
+    fireEvent.change(filtro, { target: { value: '' } })
+    expect(await screen.findByText('Reunião Presencial')).toBeInTheDocument()
+  })
+
+  it('usuário comum não recebe filtros de pessoas nem de escopo', async () => {
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => url === '/eventos/filtros'
+      ? { master: false, filtrarEscopo: false, pessoas: [] } : original(url))
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    expect(screen.queryByLabelText('Filtrar por pessoa')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Filtrar por tipo de escopo')).not.toBeInTheDocument()
+  })
+
+  it('Próprio na Casa salva e vai para agenda sem iniciar convocação', async () => {
+    const casaId = '99999999-9999-4999-8999-999999999999'
+    const originalFetch = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => url === '/casas' ? [{ id: casaId, nome: 'Minha Casa' }] : originalFetch(url))
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({ ...mockEventos[0], pessoal: true, casaId, regionalId: null })
+    const onEventoCriado = vi.fn(), onEventoPessoalCriado = vi.fn()
+    render(<EventosView onEventoCriado={onEventoCriado} onEventoPessoalCriado={onEventoPessoalCriado} />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+    fireEvent.change(within(dialog).getByLabelText(/título/i), { target: { value: 'Meu compromisso' } })
+    fireEvent.change(within(dialog).getByLabelText(/início/i), { target: { value: '2026-10-10T10:00' } })
+    fireEvent.change(within(dialog).getByLabelText(/fim/i), { target: { value: '2026-10-10T12:00' } })
+    fireEvent.change(within(dialog).getByLabelText(/modalidade/i), { target: { value: 'ONLINE' } })
+    fireEvent.change(within(dialog).getByLabelText(/url online/i), { target: { value: 'https://example.org' } })
+    fireEvent.change(within(dialog).getByLabelText(/tipo de escopo/i), { target: { value: 'casa' } })
+    fireEvent.change(within(dialog).getByLabelText(/casa de oração \*/i), { target: { value: casaId } })
+    fireEvent.change(within(dialog).getByLabelText(/público do evento/i), { target: { value: 'PROPRIO' } })
+    expect(within(dialog).queryByLabelText(/organizador/i)).not.toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar evento/i }))
+    await waitFor(() => expect(onEventoPessoalCriado).toHaveBeenCalledOnce())
+    expect(onEventoCriado).not.toHaveBeenCalled()
+    expect(apiClient.postWithAuth).toHaveBeenCalledWith('/eventos', expect.objectContaining({ pessoal: true, casaId, organizadorMembroId: null }))
+  })
+
+  it('evento somente de leitura não oferece edição, cancelamento ou portaria', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => url === '/eventos' ? [{ ...mockEventos[0], podeGerenciar: false }] : [])
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    expect(screen.getByRole('button', { name: /^ver$/i })).toBeInTheDocument()
+    for (const name of [/^editar$/i, /cancelar evento/i, /gerar acesso de portaria/i]) expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
   })
 
   it('deve listar eventos corretamente', async () => {
@@ -72,6 +155,105 @@ describe('EventosView', () => {
       expect(screen.getByText('Reunião Presencial')).toBeInTheDocument()
       expect(screen.getByText('PRESENCIAL')).toBeInTheDocument()
     })
+  })
+
+  it('oculta cancelados por padrão e permite consultá-los pelo filtro de status', async () => {
+    const cancelado = { ...mockEventos[0], id: '77777777-7777-4777-8777-777777777777', titulo: 'Evento Cancelado', ativo: false }
+
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return [mockEventos[0], cancelado]
+      if (url === '/eventos?ativo=false') return [cancelado]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+
+    render(<EventosView />)
+
+    expect(await screen.findByText('Reunião Presencial')).toBeInTheDocument()
+    expect(screen.queryByText('Evento Cancelado')).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Filtrar por status do evento'), {
+      target: { value: 'CANCELADOS' },
+    })
+
+    expect(await screen.findByText('Evento Cancelado')).toBeInTheDocument()
+    expect(apiClient.fetchWithAuth).toHaveBeenCalledWith('/eventos?ativo=false')
+  })
+
+  it('reativa evento cancelado via PATCH sem reabrir convocação', async () => {
+    const cancelado = { ...mockEventos[0], id: '77777777-7777-4777-8777-777777777777', titulo: 'Evento Cancelado', ativo: false, podeGerenciar: true }
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === '/eventos?ativo=false') return [cancelado]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({ ...cancelado, ativo: true })
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.change(screen.getByLabelText('Filtrar por status do evento'), { target: { value: 'CANCELADOS' } })
+    expect(await screen.findByText('Evento Cancelado')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /reativar evento/i }))
+
+    await waitFor(() => {
+      expect(apiClient.patchWithAuth).toHaveBeenCalledWith('/eventos/77777777-7777-4777-8777-777777777777', { ativo: true })
+      expect(screen.queryByText('Evento Cancelado')).not.toBeInTheDocument()
+    })
+  })
+
+  it('não oferece reativação para evento inativo já encerrado', async () => {
+    const encerrado = {
+      ...mockEventos[0],
+      id: '77777777-7777-4777-8777-777777777778',
+      titulo: 'Evento Encerrado',
+      ativo: false,
+      podeGerenciar: true,
+      inicioEm: '2026-10-01T10:00:00.000Z',
+      fimEm: '2026-10-01T12:00:00.000Z',
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === '/eventos?ativo=false') return [encerrado]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.change(screen.getByLabelText('Filtrar por status do evento'), { target: { value: 'CANCELADOS' } })
+    fireEvent.change(screen.getByLabelText('Filtrar eventos por período'), { target: { value: 'PASSADOS' } })
+    expect(await screen.findByText('Evento Encerrado')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /reativar evento/i })).not.toBeInTheDocument()
+  })
+
+  it('exibe falha de reativação dentro do detalhe aberto', async () => {
+    const cancelado = { ...mockEventos[0], id: '77777777-7777-4777-8777-777777777779', titulo: 'Evento Cancelado Detalhe', ativo: false, podeGerenciar: true }
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === '/eventos?ativo=false') return [cancelado]
+      if (url === `/eventos/${cancelado.id}`) return cancelado
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
+    })
+    vi.mocked(apiClient.patchWithAuth).mockRejectedValueOnce(
+      new apiClient.ApiError(409, 'Falha', { error: 'Evento não pode ser reativado.' })
+    )
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.change(screen.getByLabelText('Filtrar por status do evento'), { target: { value: 'CANCELADOS' } })
+    await screen.findByText('Evento Cancelado Detalhe')
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    fireEvent.click(within(detalhe).getByRole('button', { name: /reativar evento/i }))
+    expect(await within(detalhe).findByRole('alert')).toHaveTextContent('Evento não pode ser reativado.')
   })
 
   it('deve cancelar evento e removê-lo da lista operacional', async () => {
@@ -291,7 +473,7 @@ describe('EventosView', () => {
     render(<EventosView />)
 
     await waitFor(() => {
-      expect(screen.getByText('Nenhum evento cadastrado.')).toBeInTheDocument()
+      expect(screen.getByText('Nenhum evento encontrado neste filtro.')).toBeInTheDocument()
     })
   })
 
@@ -378,6 +560,42 @@ describe('EventosView', () => {
     fireEvent.change(getByLabelText(/modalidade/i), { target: { value: 'PRESENCIAL' } })
     expect(queryByLabelText(/url online/i)).not.toBeInTheDocument()
     expect(getByLabelText(/local \*/i)).toBeInTheDocument()
+  })
+
+  it('filtra Casas por Setor e ordena Locais alfabeticamente no formulário', async () => {
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/locais') return [
+        { id: 'local-z', nome: 'Zeta' },
+        { id: 'local-a', nome: 'Alfa' },
+      ]
+      if (url === '/setores') return [
+        { id: 'setor-1', nome: 'Setor Um', administracaoId: 'adm-1' },
+        { id: 'setor-2', nome: 'Setor Dois', administracaoId: 'adm-1' },
+      ]
+      if (url === '/casas') return [
+        { id: 'casa-1', nome: 'Casa A', setorId: 'setor-1' },
+        { id: 'casa-2', nome: 'Casa B', setorId: 'setor-2' },
+      ]
+      return original(url)
+    })
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+
+    const localSelect = within(dialog).getByLabelText(/local \*/i)
+    const locais = within(localSelect).getAllByRole('option').map(option => option.textContent)
+    expect(locais.slice(1)).toEqual(['Alfa', 'Zeta'])
+
+    fireEvent.change(within(dialog).getByLabelText(/tipo de escopo/i), { target: { value: 'casa' } })
+    const filtroSetor = within(dialog).getByLabelText(/filtrar casa por setor/i)
+    fireEvent.change(filtroSetor, { target: { value: 'setor-1' } })
+
+    const casaSelect = within(dialog).getByLabelText(/casa de oração \*/i)
+    expect(within(casaSelect).getByRole('option', { name: 'Casa A' })).toBeInTheDocument()
+    expect(within(casaSelect).queryByRole('option', { name: 'Casa B' })).not.toBeInTheDocument()
   })
 
   it('deve editar um evento existente via PATCH e limpar scopes cruzados', async () => {
@@ -656,7 +874,10 @@ describe('EventosView', () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url.startsWith(`/series-recorrencia/${SERIE_ID}`)) return { ...mockEventoRecorrente, frequencia: 'DIARIA', intervalo: 1, dataInicio: '2026-10-10', dataFim: '2026-10-20', horarioInicio: '10:00', horarioFim: '12:00' }
       if (url === '/eventos') return [mockEventoRecorrente]
-      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/locais') return [
+        { id: LOCAL_ID, nome: 'Sede' },
+        { id: 'local-particular-serie', nome: 'Residência particular', proprietarioMembroId: 'membro-proprietario' },
+      ]
       if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
       return []
     })
@@ -679,6 +900,9 @@ describe('EventosView', () => {
     await waitFor(() => {
       expect(getByLabelText(/título/i)).toHaveValue('Reunião Recorrente')
     })
+    const seletorLocal = getByLabelText(/local \*/i)
+    expect(within(seletorLocal).getByRole('option', { name: 'Sede' })).toBeInTheDocument()
+    expect(within(seletorLocal).queryByRole('option', { name: 'Residência particular' })).not.toBeInTheDocument()
 
     fireEvent.change(getByLabelText(/título/i), { target: { value: 'Série Editada' } })
     fireEvent.click(getByRole('button', { name: /salvar série/i }))
@@ -893,7 +1117,7 @@ describe('EventosView', () => {
   })
 
 
-  it('deve fechar o detalhe e exibir erro global quando o cancelamento falhar', async () => {
+  it('mantém o detalhe aberto e exibe erro de cancelamento acima do modal', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url === '/eventos') return mockEventos
@@ -916,10 +1140,300 @@ describe('EventosView', () => {
     await waitFor(() => {
       expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/eventos/${EVENTO_ID}/cancelar`, {})
     })
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: /detalhes do evento/i })).not.toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ocorrências já encerradas não podem ser canceladas.')
+    expect(screen.getByRole('dialog', { name: /detalhes do evento/i })).toBeInTheDocument()
+  })
+
+  it('mantém falha iniciada na lista visível se um detalhe for aberto durante a requisição', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return mockEventos
+      if (url === `/eventos/${EVENTO_ID}`) return mockEventos[0]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }]
+      if (url === '/regionais') return [{ id: REGIONAL_ID, nome: 'Reg 1' }]
+      return []
     })
-    expect(await screen.findByText('Ocorrências já encerradas não podem ser canceladas.')).toBeInTheDocument()
+
+    let rejeitarCancelamento!: (reason?: unknown) => void
+    vi.mocked(apiClient.postWithAuth).mockImplementationOnce(
+      () => new Promise((_, reject) => { rejeitarCancelamento = reject })
+    )
+
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+
+    fireEvent.click(screen.getByRole('button', { name: /cancelar evento/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    expect(await screen.findByRole('dialog', { name: /detalhes do evento/i })).toBeInTheDocument()
+
+    rejeitarCancelamento(
+      new apiClient.ApiError(409, 'Falha', { error: 'Não foi possível cancelar este evento.' })
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível cancelar este evento.')
+    expect(screen.getByRole('dialog', { name: /detalhes do evento/i })).toBeInTheDocument()
+  })
+
+
+  it('exibe destino dinâmico e salva Evento Próprio Nacional sem Local de SP', async () => {
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      ...mockEventos[0],
+      pessoal: true,
+      abrangencia: 'NACIONAL',
+      destinoUf: 'MG',
+      destinoCidadeLocal: 'Belo Horizonte',
+      localId: null,
+      regionalId: null,
+      casaId: null,
+    })
+    const onEventoPessoalCriado = vi.fn()
+
+    render(<EventosView onEventoPessoalCriado={onEventoPessoalCriado} />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+    fireEvent.change(within(dialog).getByLabelText(/título/i), { target: { value: 'Viagem ministerial' } })
+    fireEvent.change(within(dialog).getByLabelText(/início/i), { target: { value: '2026-10-10T10:00' } })
+    fireEvent.change(within(dialog).getByLabelText(/fim/i), { target: { value: '2026-10-10T12:00' } })
+    fireEvent.change(within(dialog).getByLabelText(/tipo de escopo/i), { target: { value: 'nacional' } })
+
+    expect(within(dialog).queryByLabelText(/^local \*$/i)).not.toBeInTheDocument()
+    expect(within(dialog).queryByLabelText(/casa de oração \*/i)).not.toBeInTheDocument()
+
+    fireEvent.change(within(dialog).getByLabelText(/^uf \*$/i), { target: { value: 'MG' } })
+    fireEvent.change(within(dialog).getByLabelText(/cidade \/ local de atendimento \*/i), {
+      target: { value: 'Belo Horizonte' },
+    })
+    fireEvent.change(within(dialog).getByLabelText(/público do evento/i), { target: { value: 'PROPRIO' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar evento/i }))
+
+    await waitFor(() => expect(onEventoPessoalCriado).toHaveBeenCalledOnce())
+    expect(apiClient.postWithAuth).toHaveBeenCalledWith('/eventos', expect.objectContaining({
+      pessoal: true,
+      abrangencia: 'NACIONAL',
+      destinoUf: 'MG',
+      destinoCidadeLocal: 'Belo Horizonte',
+      localId: null,
+      regionalId: null,
+      administracaoId: null,
+      setorId: null,
+      casaId: null,
+      grupoTrabalhoId: null,
+    }))
+  })
+
+  it('evento institucional Nacional abre convites nominais sem redirecionar para funções', async () => {
+    const novoEvento = {
+      ...mockEventos[0],
+      id: '88888888-8888-4888-8888-888888888888',
+      titulo: 'Atendimento fora de São Paulo',
+      abrangencia: 'NACIONAL',
+      destinoUf: 'MG',
+      destinoCidadeLocal: 'Belo Horizonte',
+      localId: null,
+      regionalId: REGIONAL_ID,
+      pessoal: false,
+      podeGerenciar: true,
+    }
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/membros') return [{ id: 'membro-convidado', nome: 'Diácono Convidado', ativo: true }]
+      if (url === `/eventos/${novoEvento.id}`) return novoEvento
+      if (url === `/eventos/${novoEvento.id}/participantes-externos`) return []
+      if (url === `/eventos/${novoEvento.id}/candidatos-externos?q=Convidado`) return [{ id: 'membro-convidado', nome: 'Diácono Convidado' }]
+      return original(url)
+    })
+    vi.mocked(apiClient.postWithAuth).mockImplementation(async (url) => {
+      if (url === '/eventos') return novoEvento
+      if (url === `/eventos/${novoEvento.id}/participantes-externos`) {
+        return { eventoId: novoEvento.id, membroId: 'membro-convidado', status: 'CONVIDADO' }
+      }
+      return {}
+    })
+    const onEventoCriado = vi.fn()
+    render(<EventosView onEventoCriado={onEventoCriado} />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+
+    const scope = within(dialog).getByLabelText(/tipo de escopo/i)
+    const scopePosition = Array.from(dialog.querySelectorAll('select')).findIndex(el => el.id === 'tipoEscopo')
+    expect(scopePosition).toBeLessThan(Array.from(dialog.querySelectorAll('select')).findIndex(el => el.id === 'modalidade'))
+    expect(within(dialog).getByText('Gestor Logado')).toBeInTheDocument()
+    fireEvent.change(within(dialog).getByLabelText(/título/i), { target: { value: novoEvento.titulo } })
+    fireEvent.change(within(dialog).getByLabelText(/início/i), { target: { value: '2026-10-10T10:00' } })
+    fireEvent.change(within(dialog).getByLabelText(/fim/i), { target: { value: '2026-10-10T12:00' } })
+    fireEvent.change(scope, { target: { value: 'nacional' } })
+    expect(within(dialog).getByRole('option', { name: /institucional — convites nominais/i })).toBeInTheDocument()
+    expect(within(dialog).queryByLabelText(/^local \*$/i)).not.toBeInTheDocument()
+    fireEvent.change(within(dialog).getByLabelText(/^uf \*$/i), { target: { value: 'MG' } })
+    fireEvent.change(within(dialog).getByLabelText(/cidade \/ local de atendimento \*/i), { target: { value: 'Belo Horizonte' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar evento/i }))
+
+    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    expect(onEventoCriado).not.toHaveBeenCalled()
+    expect(apiClient.postWithAuth).toHaveBeenCalledWith('/eventos', expect.objectContaining({
+      abrangencia: 'NACIONAL', organizadorMembroId: 'a7777777-7777-4777-8777-777777777777', localId: null,
+    }))
+    fireEvent.change(within(detalhe).getByLabelText(/buscar membro cadastrado/i), { target: { value: 'Convidado' } })
+    fireEvent.click(within(detalhe).getByRole('button', { name: /^buscar$/i }))
+    await waitFor(() => expect(within(detalhe).getByRole('option', { name: 'Diácono Convidado' })).toBeInTheDocument())
+    fireEvent.change(within(detalhe).getByLabelText('Diácono ou Membro'), { target: { value: 'membro-convidado' } })
+    fireEvent.click(within(detalhe).getByRole('button', { name: 'Incluir participante' }))
+    await waitFor(() => expect(apiClient.postWithAuth).toHaveBeenCalledWith(
+      `/eventos/${novoEvento.id}/participantes-externos`,
+      { membroId: 'membro-convidado', tipo: 'CONVIDADO' },
+    ))
+    expect(within(detalhe).getByText(/Diácono Convidado — Aguardando resposta/)).toBeInTheDocument()
+  })
+
+  it('normaliza espaços na busca nominal e limpa seleção ao substituir resultados', async () => {
+    const evento = {
+      ...mockEventos[0],
+      id: '88888888-8888-4888-8888-888888888889',
+      titulo: 'Atendimento externo para busca',
+      abrangencia: 'NACIONAL',
+      destinoUf: 'MG',
+      destinoCidadeLocal: 'Belo Horizonte',
+      localId: null,
+      pessoal: false,
+      podeGerenciar: true,
+    }
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos') return [evento]
+      if (url === `/eventos/${evento.id}`) return evento
+      if (url === `/eventos/${evento.id}/participantes-externos`) return []
+      if (url === `/eventos/${evento.id}/candidatos-externos?q=Maria%20Silva`) {
+        return [{ id: 'maria', nome: 'Maria Silva' }]
+      }
+      if (url === `/eventos/${evento.id}/candidatos-externos?q=Joao`) {
+        return [{ id: 'joao', nome: 'Joao Souza' }]
+      }
+      return original(url)
+    })
+
+    render(<EventosView />)
+    await screen.findByText(evento.titulo)
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    const busca = within(detalhe).getByLabelText(/buscar membro cadastrado/i)
+    const seletor = within(detalhe).getByLabelText('Diácono ou Membro')
+
+    fireEvent.change(busca, { target: { value: '  Maria   Silva  ' } })
+    fireEvent.click(within(detalhe).getByRole('button', { name: /^buscar$/i }))
+    await waitFor(() => {
+      expect(apiClient.fetchWithAuth).toHaveBeenCalledWith(
+        `/eventos/${evento.id}/candidatos-externos?q=Maria%20Silva`
+      )
+    })
+    await waitFor(() => expect(within(seletor).getByRole('option', { name: 'Maria Silva' })).toBeInTheDocument())
+    fireEvent.change(seletor, { target: { value: 'maria' } })
+    expect(seletor).toHaveValue('maria')
+
+    fireEvent.change(busca, { target: { value: 'Joao' } })
+    expect(seletor).toHaveValue('')
+    expect(within(seletor).queryByRole('option', { name: 'Maria Silva' })).not.toBeInTheDocument()
+    fireEvent.click(within(detalhe).getByRole('button', { name: /^buscar$/i }))
+    await waitFor(() => expect(seletor).toHaveValue(''))
+  })
+
+  it('preserva ações seguras quando a consulta dos participantes externos falha', async () => {
+    const evento = {
+      ...mockEventos[0],
+      id: '88888888-8888-4888-8888-888888888890',
+      abrangencia: 'NACIONAL',
+      destinoUf: 'DF',
+      destinoCidadeLocal: 'Brasília',
+      pessoal: false,
+      podeGerenciar: true,
+    }
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos') return [evento]
+      if (url === `/eventos/${evento.id}`) return evento
+      if (url === `/eventos/${evento.id}/participantes-externos`) throw new Error('Falha ao carregar participantes')
+      return original(url)
+    })
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    expect(await within(detalhe).findByText(/Falha ao carregar participantes/)).toBeInTheDocument()
+    expect(within(detalhe).queryByText('Nenhum participante incluído ainda.')).not.toBeInTheDocument()
+    expect(within(detalhe).getByRole('button', { name: 'Incluir participante' })).toBeDisabled()
+    expect(within(detalhe).getByLabelText('Diácono ou Membro')).toBeDisabled()
+    expect(within(detalhe).getByLabelText(/buscar membro cadastrado/i)).toBeInTheDocument()
+    expect(within(detalhe).getByRole('button', { name: 'Concluir e voltar aos Eventos' })).toBeInTheDocument()
+    fireEvent.click(within(detalhe).getByRole('button', { name: 'Concluir e voltar aos Eventos' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /detalhes do evento/i })).not.toBeInTheDocument())
+  })
+
+  it('gestor de relatórios visualiza lista externa sem poder convocar', async () => {
+    const evento = {
+      ...mockEventos[0], abrangencia: 'NACIONAL', destinoUf: 'MG',
+      destinoCidadeLocal: 'Belo Horizonte', podeGerenciar: false,
+    }
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos') return [evento]
+      if (url === `/eventos/${evento.id}`) return evento
+      if (url === `/eventos/${evento.id}/participantes-externos`) return [
+        { eventoId: evento.id, membroId: 'membro-externo', membroNome: 'Diácono Persistido', status: 'CONFIRMADO' },
+      ]
+      return original(url)
+    })
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    let detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    expect(await within(detalhe).findByText(/Diácono Persistido — Confirmado/)).toBeInTheDocument()
+    expect(within(detalhe).queryByText(/membro-externo — Confirmado/)).not.toBeInTheDocument()
+    expect(within(detalhe).queryByLabelText('Diácono ou Membro')).not.toBeInTheDocument()
+
+    fireEvent.click(within(detalhe).getByRole('button', { name: '✕' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /detalhes do evento/i })).not.toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    expect(await within(detalhe).findByText(/Diácono Persistido — Confirmado/)).toBeInTheDocument()
+  })
+
+  it('não permite adicionar participantes a evento externo cancelado', async () => {
+    const evento = {
+      ...mockEventos[0], abrangencia: 'INTERNACIONAL', destinoPaisCodigo: 'PT',
+      destinoCidadeLocal: 'Lisboa', ativo: false, podeGerenciar: true,
+    }
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos' || url === '/eventos?ativo=false') return [evento]
+      if (url === `/eventos/${evento.id}`) return evento
+      if (url === `/eventos/${evento.id}/participantes-externos`) return []
+      return original(url)
+    })
+    render(<EventosView />)
+    fireEvent.change(await screen.findByLabelText('Filtrar por status do evento'), { target: { value: 'CANCELADOS' } })
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    expect(await within(detalhe).findByText(/Evento cancelado: participantes disponíveis somente para consulta/)).toBeInTheDocument()
+    expect(within(detalhe).queryByRole('button', { name: /incluir participante/i })).not.toBeInTheDocument()
+  })
+
+  it('troca o destino externo para País em escopo Internacional', async () => {
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+
+    fireEvent.change(within(dialog).getByLabelText(/tipo de escopo/i), {
+      target: { value: 'internacional' },
+    })
+
+    const pais = within(dialog).getByLabelText(/^país \*$/i)
+    expect(pais).toBeInTheDocument()
+    expect(within(dialog).queryByLabelText(/^uf \*$/i)).not.toBeInTheDocument()
+    expect(within(pais).getByRole('option', { name: 'Portugal' })).toHaveValue('PT')
   })
 
 })

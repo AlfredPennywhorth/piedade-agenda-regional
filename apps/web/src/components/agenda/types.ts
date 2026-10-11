@@ -1,10 +1,20 @@
 export interface AgendaItem {
   evento: {
     id: string
+    pessoal?: boolean
     titulo: string
     inicioEm: string
     fimEm: string
     modalidade: 'PRESENCIAL' | 'ONLINE' | 'HIBRIDO'
+    abrangencia?: 'TERRITORIAL' | 'NACIONAL' | 'INTERNACIONAL'
+    casaId?: string | null
+    setorId?: string | null
+    administracaoId?: string | null
+    regionalId?: string | null
+    grupoTrabalhoId?: string | null
+    destinoUf?: string | null
+    destinoPaisCodigo?: string | null
+    destinoCidadeLocal?: string | null
     urlOnline?: string | null
     urlMaps?: string | null
     urlWaze?: string | null
@@ -17,7 +27,7 @@ export interface AgendaItem {
   convocacao: {
     id: string
     observacoes: string | null
-  }
+  } | null
   local: {
     nome: string
     endereco: string
@@ -28,7 +38,8 @@ export interface AgendaItem {
     id: string
     nome: string
   } | null
-  destinatarioId: string
+  participacaoExterna?: { status: 'CONVIDADO' | 'ATRIBUIDO' | 'CONFIRMADO' | 'RECUSADO'; membroId: string } | null
+  destinatarioId: string | null
   vinculo?: {
     funcaoId: string
     funcaoNome: string

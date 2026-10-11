@@ -386,6 +386,7 @@ export function VinculosFuncionaisView() {
 
       {modoForm && (
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-md space-y-4">
+          <span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-052' : 'AGD-ADM-053'} className="block text-right text-[10px] font-medium text-slate-500">Tela {modoForm === 'criar' ? 'AGD-ADM-052' : 'AGD-ADM-053'}</span>
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <h3 className="font-bold text-slate-800 text-base">
               {modoForm === 'criar' ? 'Cadastrar Novo Vínculo' : 'Editar Vínculo'}
@@ -713,7 +714,7 @@ export function VinculosFuncionaisView() {
             Nenhum vínculo funcional cadastrado até o momento.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="master-table-scroll">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                 <tr>
@@ -778,6 +779,7 @@ export function VinculosFuncionaisView() {
             aria-modal="true"
             aria-labelledby="modal-detalhes-titulo"
           >
+            <span data-screen-code="AGD-ADM-054" className="block text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-054</span>
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
               <h3 id="modal-detalhes-titulo" className="font-bold text-slate-800 text-base">Detalhes do Vínculo</h3>
               <button
@@ -808,10 +810,6 @@ export function VinculosFuncionaisView() {
                 }`}>
                   {vinculoDetalhe.ativo ? 'Ativo' : 'Inativo'}
                 </span>
-              </div>
-              <div>
-                <span className="text-xs font-semibold text-slate-500 block">ID do Vínculo:</span>
-                <span className="text-xs font-mono text-slate-600">{vinculoDetalhe.id}</span>
               </div>
               {vinculoDetalhe.createdAt && (
                 <div>

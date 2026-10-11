@@ -1,15 +1,92 @@
 import { Hono } from 'hono'
-import { eq, and, gte, sql, inArray } from 'drizzle-orm'
-import { administracoes, casas, eventos, gruposTrabalho, membros, seriesRecorrencia, setores, locais, espacosLocal } from '../db/schema'
+import { eq, and, gte, sql, inArray, isNotNull } from 'drizzle-orm'
+import { auditoriaLogs, administracoes, casas, eventos, gruposTrabalho, membros, seriesRecorrencia, setores, locais, espacosLocal } from '../db/schema'
 import { SerieCreate, SerieUpdatePayload, generateOccurrences, getLocalDateFromUtc } from '@piedade/shared'
 import { EventoCreate } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, podeGerenciarAgendaNoEscopo, regionaisAdministradas } from '../security/permissoes'
+import { podeGerenciarEvento } from '../security/eventos'
 import { criarAuditQuery, executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
 export const seriesRecorrenciaRouter = new Hono<any>()
+
+// Usado por todas as regenerações: editar ou dividir uma série não transfere autoria.
+async function recuperarCriadorDaSerie(db: any, serieId: string): Promise<string | null> {
+  const criacao = await db.select({ membroId: auditoriaLogs.atorMembroId })
+    .from(auditoriaLogs)
+    .where(and(
+      eq(auditoriaLogs.acao, 'SERIE_RECORRENCIA_CRIADA'),
+      eq(auditoriaLogs.recursoTipo, 'SERIE_RECORRENCIA'),
+      eq(auditoriaLogs.recursoId, serieId),
+      isNotNull(auditoriaLogs.atorMembroId)
+    ))
+    .orderBy(auditoriaLogs.criadoEm, auditoriaLogs.id).get()
+  const ocorrenciaOriginal = criacao ? null : await db
+    .select({ membroId: eventos.criadorMembroId }).from(eventos)
+    .where(and(eq(eventos.serieRecorrenciaId, serieId), isNotNull(eventos.criadorMembroId)))
+    .orderBy(eventos.createdAt, eventos.id).get()
+  return criacao?.membroId ?? ocorrenciaOriginal?.membroId ?? null
+
+}
+async function recuperarCriadoresDasSeries(db: any, serieIds: string[]): Promise<Map<string, string>> {
+  const criadores = new Map<string, string>()
+  if (serieIds.length === 0) return criadores
+
+  const criacoes = await carregarEmLotes<{
+    serieId: string | null
+    membroId: string | null
+    criadoEm: string
+    id: string
+  }>(serieIds, lote =>
+    db.select({
+      serieId: auditoriaLogs.recursoId,
+      membroId: auditoriaLogs.atorMembroId,
+      criadoEm: auditoriaLogs.criadoEm,
+      id: auditoriaLogs.id,
+    }).from(auditoriaLogs).where(and(
+      eq(auditoriaLogs.acao, 'SERIE_RECORRENCIA_CRIADA'),
+      eq(auditoriaLogs.recursoTipo, 'SERIE_RECORRENCIA'),
+      inArray(auditoriaLogs.recursoId, lote),
+      isNotNull(auditoriaLogs.atorMembroId)
+    )).orderBy(auditoriaLogs.criadoEm, auditoriaLogs.id).all()
+  )
+
+  for (const item of criacoes) {
+    if (item.serieId && item.membroId && !criadores.has(item.serieId)) {
+      criadores.set(item.serieId, item.membroId)
+    }
+  }
+
+  const faltantes = serieIds.filter(id => !criadores.has(id))
+  if (faltantes.length === 0) return criadores
+
+  const ocorrencias = await carregarEmLotes<{
+    serieId: string | null
+    membroId: string | null
+    createdAt: string
+    id: string
+  }>(faltantes, lote =>
+    db.select({
+      serieId: eventos.serieRecorrenciaId,
+      membroId: eventos.criadorMembroId,
+      createdAt: eventos.createdAt,
+      id: eventos.id,
+    }).from(eventos).where(and(
+      inArray(eventos.serieRecorrenciaId, lote),
+      isNotNull(eventos.criadorMembroId)
+    )).orderBy(eventos.createdAt, eventos.id).all()
+  )
+
+  for (const item of ocorrencias) {
+    if (item.serieId && item.membroId && !criadores.has(item.serieId)) {
+      criadores.set(item.serieId, item.membroId)
+    }
+  }
+  return criadores
+}
+
 
 function mesmoInstante(a: string, b: string) {
   return new Date(a).getTime() === new Date(b).getTime()
@@ -114,6 +191,19 @@ async function criarAvisoAlteracaoOcorrencia(db: any, anterior: any, atual: any)
 
 seriesRecorrenciaRouter.use('*', authMiddleware)
 
+const D1_IN_BATCH = 80
+
+async function carregarEmLotes<T>(
+  ids: string[],
+  carregar: (lote: string[]) => Promise<T[]>
+): Promise<T[]> {
+  const resultado: T[] = []
+  for (let i = 0; i < ids.length; i += D1_IN_BATCH) {
+    resultado.push(...await carregar(ids.slice(i, i + D1_IN_BATCH)))
+  }
+  return resultado
+}
+
 interface EscoposAgendaAutorizados {
   tudo: boolean
   regionaisIds: Set<string>
@@ -126,7 +216,6 @@ interface EscoposAgendaAutorizados {
 async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAutorizados> {
   const db = c.get('db')
   const contexto = c.get('contextoPermissoes')
-  const membroId = c.get('membroId')
 
   const resultado: EscoposAgendaAutorizados = {
     tudo: eMasterSistema(contexto),
@@ -160,40 +249,36 @@ async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAu
     if (acesso.escopoTipo === 'GRUPO_TRABALHO') gtsAgenda.add(acesso.escopoId)
   }
 
-  const membro = await db
-    .select({ casaId: membros.casaId })
-    .from(membros)
-    .where(eq(membros.id, membroId))
-    .get()
-  if (membro?.casaId) casasAgenda.add(membro.casaId)
-
   const regionaisIds = Array.from(regionaisAgenda)
   if (regionaisIds.length > 0) {
-    const adms = await db
-      .select({ id: administracoes.id })
-      .from(administracoes)
-      .where(inArray(administracoes.regionalId, regionaisIds))
-      .all()
+    const adms = await carregarEmLotes(regionaisIds, lote =>
+      db.select({ id: administracoes.id })
+        .from(administracoes)
+        .where(inArray(administracoes.regionalId, lote))
+        .all()
+    )
     adms.forEach((item: any) => {
       administracoesAgenda.add(item.id)
       administracoesDescendentesDeRegional.add(item.id)
     })
 
-    const gtsRegionais = await db
-      .select({ id: gruposTrabalho.id })
-      .from(gruposTrabalho)
-      .where(inArray(gruposTrabalho.regionalId, regionaisIds))
-      .all()
+    const gtsRegionais = await carregarEmLotes(regionaisIds, lote =>
+      db.select({ id: gruposTrabalho.id })
+        .from(gruposTrabalho)
+        .where(inArray(gruposTrabalho.regionalId, lote))
+        .all()
+    )
     gtsRegionais.forEach((item: any) => gtsAgenda.add(item.id))
   }
 
   const administracoesIds = Array.from(administracoesAgenda)
   if (administracoesIds.length > 0) {
-    const itensSetor = await db
-      .select({ id: setores.id, administracaoId: setores.administracaoId })
-      .from(setores)
-      .where(inArray(setores.administracaoId, administracoesIds))
-      .all()
+    const itensSetor = await carregarEmLotes(administracoesIds, lote =>
+      db.select({ id: setores.id, administracaoId: setores.administracaoId })
+        .from(setores)
+        .where(inArray(setores.administracaoId, lote))
+        .all()
+    )
     itensSetor.forEach((item: any) => {
       setoresAgenda.add(item.id)
       if (administracoesDescendentesDeRegional.has(item.administracaoId)) {
@@ -203,31 +288,34 @@ async function carregarEscoposAgendaAutorizados(c: any): Promise<EscoposAgendaAu
 
     const administracoesRegionaisIds = Array.from(administracoesDescendentesDeRegional)
     if (administracoesRegionaisIds.length > 0) {
-      const gtsAdministracao = await db
-        .select({ id: gruposTrabalho.id })
-        .from(gruposTrabalho)
-        .where(inArray(gruposTrabalho.administracaoId, administracoesRegionaisIds))
-        .all()
+      const gtsAdministracao = await carregarEmLotes(administracoesRegionaisIds, lote =>
+        db.select({ id: gruposTrabalho.id })
+          .from(gruposTrabalho)
+          .where(inArray(gruposTrabalho.administracaoId, lote))
+          .all()
+      )
       gtsAdministracao.forEach((item: any) => gtsAgenda.add(item.id))
     }
   }
 
   const setoresIds = Array.from(setoresAgenda)
   if (setoresIds.length > 0) {
-    const itensCasa = await db
-      .select({ id: casas.id })
-      .from(casas)
-      .where(inArray(casas.setorId, setoresIds))
-      .all()
+    const itensCasa = await carregarEmLotes(setoresIds, lote =>
+      db.select({ id: casas.id })
+        .from(casas)
+        .where(inArray(casas.setorId, lote))
+        .all()
+    )
     itensCasa.forEach((item: any) => casasAgenda.add(item.id))
 
     const setoresRegionaisIds = Array.from(setoresDescendentesDeRegional)
     if (setoresRegionaisIds.length > 0) {
-      const gtsSetor = await db
-        .select({ id: gruposTrabalho.id })
-        .from(gruposTrabalho)
-        .where(inArray(gruposTrabalho.setorId, setoresRegionaisIds))
-        .all()
+      const gtsSetor = await carregarEmLotes(setoresRegionaisIds, lote =>
+        db.select({ id: gruposTrabalho.id })
+          .from(gruposTrabalho)
+          .where(inArray(gruposTrabalho.setorId, lote))
+          .all()
+      )
       gtsSetor.forEach((item: any) => gtsAgenda.add(item.id))
     }
   }
@@ -250,7 +338,35 @@ function serieAutorizadaNoEscopo(serie: any, escopos: EscoposAgendaAutorizados):
   return false
 }
 
-async function podeGerenciarEntidade(c: any, entidade: any): Promise<boolean> {
+async function podeGerenciarSerie(c: any, serie: any): Promise<boolean> {
+  const db = c.get('db')
+  const membroId = c.get('membroId')
+  const contexto = c.get('contextoPermissoes')
+  if (!membroId) return false
+  if (eMasterSistema(contexto)) return true
+
+  const escopos = await carregarEscoposAgendaAutorizados(c)
+  if (serieAutorizadaNoEscopo(serie, escopos)) return true
+
+  // Autoria/organização não transformam a Casa inteira em área de gestão:
+  // só o próprio autor/organizador, enquanto vinculado à mesma Casa, pode gerir.
+  if (!serie.casaId) return false
+  const criadorMembroId = await recuperarCriadorDaSerie(db, serie.id)
+  if (criadorMembroId !== membroId && serie.organizadorMembroId !== membroId) return false
+
+  const membro = await db
+    .select({ casaId: membros.casaId, ativo: membros.ativo })
+    .from(membros)
+    .where(eq(membros.id, membroId))
+    .get()
+  return membro?.ativo === true && membro.casaId === serie.casaId
+}
+
+async function podeGerenciarEntidade(
+  c: any,
+  entidade: any,
+  permitirCasaAutomatica = true
+): Promise<boolean> {
   const db = c.get('db')
   const membroId = c.get('membroId')
   const escopo = extrairEscopoDoEvento(entidade)
@@ -261,8 +377,17 @@ async function podeGerenciarEntidade(c: any, entidade: any): Promise<boolean> {
     db,
     membroId,
     escopo.escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-    escopo.escopoId
+    escopo.escopoId,
+    permitirCasaAutomatica
   )
+}
+
+function atorEhAutorOuOrganizador(
+  membroId: string | null,
+  criadorMembroId: string | null | undefined,
+  organizadorMembroId: string | null | undefined
+) {
+  return !!membroId && (membroId === criadorMembroId || membroId === organizadorMembroId)
 }
 
 seriesRecorrenciaRouter.get('/', async (c) => {
@@ -279,8 +404,45 @@ seriesRecorrenciaRouter.get('/', async (c) => {
     ? await query.where(and(...conditions)).all()
     : await query.all()
 
-  const escoposAutorizados = await carregarEscoposAgendaAutorizados(c)
-  return c.json(data.filter((serie: any) => serieAutorizadaNoEscopo(serie, escoposAutorizados)))
+  const membroId = c.get('membroId')
+  const contexto = c.get('contextoPermissoes')
+  if (!membroId) return c.json([])
+
+  const escopos = await carregarEscoposAgendaAutorizados(c)
+  const membro = eMasterSistema(contexto) ? null : await db
+    .select({ casaId: membros.casaId, ativo: membros.ativo })
+    .from(membros)
+    .where(eq(membros.id, membroId))
+    .get()
+  const criadores = await recuperarCriadoresDasSeries(db, data.map((serie: any) => serie.id))
+
+  const autorizadas = data.filter((serie: any) => {
+    if (escopos.tudo || serieAutorizadaNoEscopo(serie, escopos)) return true
+    if (!serie.casaId || membro?.ativo !== true || membro.casaId !== serie.casaId) return false
+    return atorEhAutorOuOrganizador(
+      membroId,
+      criadores.get(serie.id) ?? null,
+      serie.organizadorMembroId
+    )
+  })
+  // Classificação temporal deriva das ocorrências efetivamente geradas,
+  // incluindo exceções individuais, sem inferir datas pela regra nominal da série.
+  const finais = await carregarEmLotes<{
+    serieId: string | null
+    ultimaOcorrenciaFimEm: string | null
+  }>(autorizadas.map((serie: { id: string }) => serie.id), lote =>
+    db.select({
+      serieId: eventos.serieRecorrenciaId,
+      ultimaOcorrenciaFimEm: sql<string>`max(${eventos.fimEm})`,
+    }).from(eventos)
+      .where(and(inArray(eventos.serieRecorrenciaId, lote), eq(eventos.ativo, true)))
+      .groupBy(eventos.serieRecorrenciaId).all()
+  )
+  const ultimaPorSerie = new Map(finais.map(item => [item.serieId, item.ultimaOcorrenciaFimEm]))
+  return c.json(autorizadas.map((serie: { id: string; [campo: string]: unknown }) => ({
+    ...serie,
+    ultimaOcorrenciaFimEm: ultimaPorSerie.get(serie.id) ?? null,
+  })))
 })
 
 seriesRecorrenciaRouter.get('/:id', async (c) => {
@@ -289,7 +451,7 @@ seriesRecorrenciaRouter.get('/:id', async (c) => {
   const data = await db.select().from(seriesRecorrencia).where(eq(seriesRecorrencia.id, id)).get()
   
   if (!data) return c.json({ error: 'Série não encontrada' }, 404)
-  if (!(await podeGerenciarEntidade(c, data))) {
+  if (!(await podeGerenciarSerie(c, data))) {
     return c.json({ error: 'Acesso não autorizado para gerir esta série', code: 'FORBIDDEN' }, 403)
   }
   return c.json(data)
@@ -332,6 +494,7 @@ seriesRecorrenciaRouter.post('/', async (c) => {
         localId: serieBaseData.localId,
         espacoId: serieBaseData.espacoId,
         urlOnline: serieBaseData.urlOnline,
+        criadorMembroId: c.get('membroId'),
         organizadorMembroId: serieBaseData.organizadorMembroId,
         regionalId: serieBaseData.regionalId,
         administracaoId: serieBaseData.administracaoId,
@@ -394,7 +557,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
     
     const existingSerie = await db.select().from(seriesRecorrencia).where(eq(seriesRecorrencia.id, serieId)).get()
     if (!existingSerie) return c.json({ error: 'Série não encontrada' }, 404)
-    if (!(await podeGerenciarEntidade(c, existingSerie))) {
+    if (!(await podeGerenciarSerie(c, existingSerie))) {
       return c.json({ error: 'Acesso não autorizado para gerir esta série', code: 'FORBIDDEN' }, 403)
     }
     
@@ -415,7 +578,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         }, 409)
       }
       
-      if (!(await podeGerenciarEntidade(c, existingEvent))) {
+      if (!(await podeGerenciarEvento(db, c.get('membroId'), existingEvent))) {
         return c.json({ error: 'Acesso não autorizado para gerir este evento', code: 'FORBIDDEN' }, 403)
       }
 
@@ -435,7 +598,12 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         }
         return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
       }
-      if (!(await podeGerenciarEntidade(c, mergedEvent))) {
+      const permitirCasaAutomaticaDestino = atorEhAutorOuOrganizador(
+        c.get('membroId'),
+        existingEvent.criadorMembroId,
+        existingEvent.organizadorMembroId
+      )
+      if (!(await podeGerenciarEntidade(c, mergedEvent, permitirCasaAutomaticaDestino))) {
         return c.json({ error: 'Acesso não autorizado para mover o evento para este escopo', code: 'FORBIDDEN' }, 403)
       }
       
@@ -489,7 +657,13 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
           }
           return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
         }
-        if (!(await podeGerenciarEntidade(c, mergedSerieData))) {
+        const criadorOriginal = await recuperarCriadorDaSerie(db, existingSerie.id)
+        const permitirCasaAutomaticaDestino = atorEhAutorOuOrganizador(
+          c.get('membroId'),
+          criadorOriginal,
+          existingSerie.organizadorMembroId
+        )
+        if (!(await podeGerenciarEntidade(c, mergedSerieData, permitirCasaAutomaticaDestino))) {
           return c.json({ error: 'Acesso não autorizado para mover a série para este escopo', code: 'FORBIDDEN' }, 403)
         }
       }
@@ -598,6 +772,8 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         .filter(occ => occ.inicioEm >= nowIso)
         .filter(occ => !exceptionDates.has(getLocalDateFromUtc(occ.inicioEm)))
         
+      const criadorMembroId = await recuperarCriadorDaSerie(db, serieId)
+
       const eventosToInsert = futureOccurrences.map(occ => {
         const { ...serieBaseData } = mergedSerieData
         return {
@@ -609,6 +785,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
           localId: serieBaseData.localId,
           espacoId: serieBaseData.espacoId,
           urlOnline: serieBaseData.urlOnline,
+          criadorMembroId,
           organizadorMembroId: serieBaseData.organizadorMembroId,
           regionalId: serieBaseData.regionalId,
           administracaoId: serieBaseData.administracaoId,
@@ -683,7 +860,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         }, 409)
       }
       
-      if (!(await podeGerenciarEntidade(c, existingEvent))) {
+      if (!(await podeGerenciarEvento(db, c.get('membroId'), existingEvent))) {
         return c.json({ error: 'Acesso não autorizado para gerir este evento', code: 'FORBIDDEN' }, 403)
       }
 
@@ -718,7 +895,13 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         }
         return c.json({ error: 'O espaço selecionado não pertence ao Local informado', code: 'ESPACO_FORA_DO_LOCAL' }, 400)
       }
-      if (!(await podeGerenciarEntidade(c, serieBData))) {
+      const criadorOriginal = await recuperarCriadorDaSerie(db, existingSerie.id)
+      const permitirCasaAutomaticaDestino = atorEhAutorOuOrganizador(
+        c.get('membroId'),
+        criadorOriginal,
+        existingSerie.organizadorMembroId
+      )
+      if (!(await podeGerenciarEntidade(c, serieBData, permitirCasaAutomaticaDestino))) {
         return c.json({ error: 'Acesso não autorizado para mover a série para este escopo', code: 'FORBIDDEN' }, 403)
       }
       if (alteracaoApenasOperacional) {
@@ -868,6 +1051,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         )
       )
       
+      const criadorMembroId = await recuperarCriadorDaSerie(db, serieId)
       const occurrencesDates = generateOccurrences(serieBData)
       const eventosToInsert = occurrencesDates
         .filter(occ => !exceptionDates.has(getLocalDateFromUtc(occ.inicioEm)))
@@ -882,7 +1066,8 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
             localId: serieBaseData.localId,
             espacoId: serieBaseData.espacoId,
             urlOnline: serieBaseData.urlOnline,
-            organizadorMembroId: serieBaseData.organizadorMembroId,
+            criadorMembroId,
+          organizadorMembroId: serieBaseData.organizadorMembroId,
             regionalId: serieBaseData.regionalId,
             administracaoId: serieBaseData.administracaoId,
             setorId: serieBaseData.setorId,

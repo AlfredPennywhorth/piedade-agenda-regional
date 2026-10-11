@@ -3,46 +3,18 @@ import { eq, and } from 'drizzle-orm'
 import { eventos, eventoRefeicoes } from '../db/schema'
 import { EventoRefeicaoCreate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { eGestorRelatoriosAutorizadoParaEvento, obterEscoposTerritoriaisVisiveis, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
-import { extrairEscopoDoEvento } from '../services/auditoria'
+import { podeLerEvento as podeConsultarEvento, podeGerenciarEvento as podeAlterarEvento } from '../security/eventos'
 
 export const eventoRefeicoesRouter = new Hono<any>()
 
 eventoRefeicoesRouter.use('*', authMiddleware)
 
-function eventoVisivelNoEscopo(evento: any, escopos: any): boolean {
-  if (escopos.tudo) return true
-  if (evento.regionalId && escopos.regionaisIds.has(evento.regionalId)) return true
-  if (evento.administracaoId && escopos.administracoesIds.has(evento.administracaoId)) return true
-  if (evento.setorId && escopos.setoresIds.has(evento.setorId)) return true
-  if (evento.casaId && escopos.casasIds.has(evento.casaId)) return true
-  if (evento.grupoTrabalhoId && escopos.gruposTrabalhoIds.has(evento.grupoTrabalhoId)) return true
-  return false
-}
-
-async function podeLerEvento(c: any, evento: any): Promise<boolean> {
-  const db = c.get('db')
-  const membroId = c.get('membroId')
-  if (!membroId) return false
-
-  const escopos = await obterEscoposTerritoriaisVisiveis(db, c.get('contextoPermissoes'))
-  if (eventoVisivelNoEscopo(evento, escopos)) return true
-
-  return eGestorRelatoriosAutorizadoParaEvento(db, membroId, evento)
+async function podeLerEvento(c: any, evento: any) {
+  return podeConsultarEvento(c.get('db'), c.get('contextoPermissoes'), evento.id)
 }
 
 async function podeGerenciarEvento(c: any, evento: any) {
-  const db = c.get('db')
-  const membroId = c.get('membroId')
-  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
-  if (!membroId || !escopoTipo || !escopoId) return false
-
-  return podeGerenciarAgendaNoEscopo(
-    db,
-    membroId,
-    escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-    escopoId
-  )
+  return podeAlterarEvento(c.get('db'), c.get('membroId'), evento)
 }
 
 eventoRefeicoesRouter.get('/:eventoId/refeicoes', async (c) => {

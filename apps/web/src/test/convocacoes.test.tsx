@@ -146,7 +146,7 @@ describe('ConvocacoesView', () => {
       expect(screen.getByText('Minha observação rascunho')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /novo rascunho/i }))
+    fireEvent.click(screen.getByRole('button', { name: /nova convocação/i }))
 
     const select = await screen.findByLabelText('Evento da convocação')
     const dataHoraEsperada = new Intl.DateTimeFormat('pt-BR', {
@@ -364,7 +364,7 @@ describe('ConvocacoesView', () => {
       expect(screen.queryByRole('dialog', { name: /nova convocação/i })).not.toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /novo rascunho/i }))
+    fireEvent.click(screen.getByRole('button', { name: /nova convocação/i }))
     const manual = await screen.findByRole('dialog', { name: /nova convocação/i })
     expect(within(manual).getByLabelText('Evento da convocação')).toHaveValue('')
   })
@@ -376,7 +376,7 @@ describe('ConvocacoesView', () => {
       expect(screen.getByText('Minha observação rascunho')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /novo rascunho/i }))
+    fireEvent.click(screen.getByRole('button', { name: /nova convocação/i }))
 
     await waitFor(() => {
       expect(screen.getByRole('dialog', { name: /nova convocação/i })).toBeInTheDocument()

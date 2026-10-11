@@ -251,6 +251,7 @@ export function setupDb(sqlite: any) {
     CREATE TABLE IF NOT EXISTS locais (
       id text PRIMARY KEY NOT NULL,
       nome text NOT NULL,
+      proprietario_membro_id text REFERENCES membros(id),
       endereco text NOT NULL,
       numero text NOT NULL,
       complemento text,
@@ -271,6 +272,7 @@ export function setupDb(sqlite: any) {
     CREATE TABLE IF NOT EXISTS espacos_local (
       id text PRIMARY KEY NOT NULL,
       local_id text NOT NULL,
+      proprietario_membro_id text REFERENCES membros(id),
       nome text NOT NULL,
       descricao text,
       capacidade integer,
@@ -279,6 +281,8 @@ export function setupDb(sqlite: any) {
       updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
       FOREIGN KEY (local_id) REFERENCES locais(id)
     );
+    CREATE INDEX IF NOT EXISTS idx_locais_proprietario ON locais(proprietario_membro_id, ativo);
+    CREATE INDEX IF NOT EXISTS idx_espacos_local_proprietario ON espacos_local(proprietario_membro_id, ativo);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_espacos_local_nome_ativo ON espacos_local(local_id, nome) WHERE ativo = 1;
 
     CREATE TABLE IF NOT EXISTS series_recorrencia (
@@ -332,6 +336,8 @@ export function setupDb(sqlite: any) {
 
     CREATE TABLE IF NOT EXISTS eventos (
       id text PRIMARY KEY NOT NULL,
+      pessoal integer DEFAULT 0 NOT NULL,
+      criador_membro_id text REFERENCES membros(id),
       titulo text NOT NULL,
       descricao text,
       pauta text,
@@ -344,6 +350,11 @@ export function setupDb(sqlite: any) {
       espaco_id text,
       url_online text,
       organizador_membro_id text,
+      abrangencia text DEFAULT 'TERRITORIAL' NOT NULL,
+      destino_uf text,
+      destino_pais_codigo text,
+      destino_cidade_local text,
+      regional_gestao_id text,
       regional_id text,
       administracao_id text,
       setor_id text,
@@ -362,18 +373,43 @@ export function setupDb(sqlite: any) {
       FOREIGN KEY (local_id) REFERENCES locais(id),
       FOREIGN KEY (espaco_id) REFERENCES espacos_local(id),
       FOREIGN KEY (organizador_membro_id) REFERENCES membros(id),
+      FOREIGN KEY (regional_gestao_id) REFERENCES regionais(id),
       FOREIGN KEY (regional_id) REFERENCES regionais(id),
       FOREIGN KEY (administracao_id) REFERENCES administracoes(id),
       FOREIGN KEY (setor_id) REFERENCES setores(id),
       FOREIGN KEY (casa_id) REFERENCES casas(id),
       FOREIGN KEY (grupo_trabalho_id) REFERENCES grupos_trabalho(id),
       FOREIGN KEY (serie_recorrencia_id) REFERENCES series_recorrencia(id),
-      CONSTRAINT check_evento_escopo_unico CHECK (
-        (CASE WHEN regional_id IS NOT NULL THEN 1 ELSE 0 END) +
-        (CASE WHEN administracao_id IS NOT NULL THEN 1 ELSE 0 END) +
-        (CASE WHEN setor_id IS NOT NULL THEN 1 ELSE 0 END) +
-        (CASE WHEN casa_id IS NOT NULL THEN 1 ELSE 0 END) +
-        (CASE WHEN grupo_trabalho_id IS NOT NULL THEN 1 ELSE 0 END) = 1
+      CONSTRAINT check_evento_abrangencia_destino CHECK (
+        (
+          abrangencia = 'TERRITORIAL'
+          AND (
+            (CASE WHEN regional_id IS NOT NULL THEN 1 ELSE 0 END) +
+            (CASE WHEN administracao_id IS NOT NULL THEN 1 ELSE 0 END) +
+            (CASE WHEN setor_id IS NOT NULL THEN 1 ELSE 0 END) +
+            (CASE WHEN casa_id IS NOT NULL THEN 1 ELSE 0 END) +
+            (CASE WHEN grupo_trabalho_id IS NOT NULL THEN 1 ELSE 0 END)
+          ) = 1
+          AND destino_uf IS NULL AND destino_pais_codigo IS NULL AND destino_cidade_local IS NULL
+        )
+        OR
+        (
+          abrangencia = 'NACIONAL'
+          AND regional_gestao_id IS NOT NULL
+          AND regional_id IS NOT NULL
+          AND regional_id = regional_gestao_id
+          AND administracao_id IS NULL AND setor_id IS NULL AND casa_id IS NULL AND grupo_trabalho_id IS NULL
+          AND destino_uf IS NOT NULL AND destino_pais_codigo IS NULL AND destino_cidade_local IS NOT NULL
+        )
+        OR
+        (
+          abrangencia = 'INTERNACIONAL'
+          AND regional_gestao_id IS NOT NULL
+          AND regional_id IS NOT NULL
+          AND regional_id = regional_gestao_id
+          AND administracao_id IS NULL AND setor_id IS NULL AND casa_id IS NULL AND grupo_trabalho_id IS NULL
+          AND destino_uf IS NULL AND destino_pais_codigo IS NOT NULL AND destino_cidade_local IS NOT NULL
+        )
       )
     );
 
@@ -381,7 +417,26 @@ export function setupDb(sqlite: any) {
     CREATE INDEX IF NOT EXISTS idx_eventos_ativo ON eventos (ativo);
     CREATE INDEX IF NOT EXISTS idx_eventos_local_id ON eventos (local_id);
     CREATE INDEX IF NOT EXISTS idx_eventos_serie_recorrencia_id ON eventos (serie_recorrencia_id);
+    CREATE INDEX IF NOT EXISTS idx_eventos_abrangencia ON eventos (abrangencia, ativo);
+    CREATE INDEX IF NOT EXISTS idx_eventos_abrangencia_gestao ON eventos (abrangencia, regional_gestao_id, ativo);
 
+    CREATE TABLE IF NOT EXISTS eventos_destinos_externos (
+      evento_id text PRIMARY KEY REFERENCES eventos(id),
+      regional_id text NOT NULL REFERENCES regionais(id),
+      abrangencia text NOT NULL,
+      uf text, municipio text, pais_codigo text, cidade text
+    );
+    CREATE INDEX IF NOT EXISTS idx_eventos_destinos_externos_regional ON eventos_destinos_externos(regional_id, abrangencia);
+    CREATE TABLE IF NOT EXISTS eventos_participantes_externos (
+      evento_id text NOT NULL REFERENCES eventos(id),
+      membro_id text NOT NULL REFERENCES membros(id),
+      status text NOT NULL CHECK(status IN ('CONVIDADO', 'ATRIBUIDO', 'CONFIRMADO', 'RECUSADO')),
+      criado_por_membro_id text NOT NULL REFERENCES membros(id),
+      created_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      updated_at text DEFAULT CURRENT_TIMESTAMP NOT NULL,
+      PRIMARY KEY(evento_id,membro_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_eventos_participantes_externos_membro ON eventos_participantes_externos(membro_id,status);
     CREATE TABLE IF NOT EXISTS convocacoes (
       id text PRIMARY KEY NOT NULL,
       evento_id text NOT NULL,
@@ -836,6 +891,7 @@ export function setupDb(sqlite: any) {
       ('MASTER_SISTEMA', 'Master do Sistema', 'Governança global e contingência.'),
       ('ADMINISTRADOR_SISTEMA', 'Administrador do Sistema', 'Administração de uma Regional.'),
       ('GESTOR_AGENDA', 'Gestor de Agenda', 'Gestão de agenda autorizada.'),
+      ('GESTOR_EVENTOS_EXTERNOS', 'Gestor de Eventos Externos', 'Atendimentos nacionais e internacionais próprios.'),
       ('OPERADOR_PORTARIA_PERMANENTE', 'Operador de Portaria permanente', 'Operação permanente de Portaria.'),
       ('GESTOR_RELATORIOS', 'Gestor de Relatórios', 'Consulta de relatórios autorizados.'),
       ('AUDITOR', 'Auditor', 'Consulta de auditoria autorizada.'),
@@ -891,6 +947,29 @@ export function setupDb(sqlite: any) {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_ciencia_responsabilidade_unica
       ON ciencias_responsabilidade
       (conta_acesso_id, acesso_conta_id, tipo, versao_texto);
+
+    CREATE TRIGGER IF NOT EXISTS trg_espaco_particular_proprietario_insert
+      BEFORE INSERT ON espacos_local
+      WHEN (SELECT proprietario_membro_id FROM locais WHERE id=NEW.local_id) IS NOT NEW.proprietario_membro_id
+      BEGIN SELECT RAISE(ABORT,'ESPACO_PRIVACIDADE_INVALIDA'); END;
+    CREATE TRIGGER IF NOT EXISTS trg_espaco_particular_proprietario_update
+      BEFORE UPDATE ON espacos_local
+      WHEN (SELECT proprietario_membro_id FROM locais WHERE id=NEW.local_id) IS NOT NEW.proprietario_membro_id
+      BEGIN SELECT RAISE(ABORT,'ESPACO_PRIVACIDADE_INVALIDA'); END;
+    CREATE TRIGGER IF NOT EXISTS trg_evento_local_particular_insert
+      BEFORE INSERT ON eventos
+      WHEN NEW.local_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM locais l WHERE l.id=NEW.local_id
+          AND l.proprietario_membro_id IS NOT NULL
+          AND (NEW.pessoal <> 1 OR NEW.criador_membro_id IS NOT l.proprietario_membro_id))
+      BEGIN SELECT RAISE(ABORT,'LOCAL_PARTICULAR_SEM_AUTORIZACAO'); END;
+    CREATE TRIGGER IF NOT EXISTS trg_evento_local_particular_update
+      BEFORE UPDATE ON eventos
+      WHEN NEW.local_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM locais l WHERE l.id=NEW.local_id
+          AND l.proprietario_membro_id IS NOT NULL
+          AND (NEW.pessoal <> 1 OR NEW.criador_membro_id IS NOT l.proprietario_membro_id))
+      BEGIN SELECT RAISE(ABORT,'LOCAL_PARTICULAR_SEM_AUTORIZACAO'); END;
 
     CREATE TABLE IF NOT EXISTS bootstrap_master (
       id text PRIMARY KEY NOT NULL CHECK (id = 'PRIMEIRO_MASTER'),

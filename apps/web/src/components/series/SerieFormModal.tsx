@@ -9,7 +9,7 @@ export interface Lookups {
   regionais: { id: string; nome: string }[]
   administracoes: { id: string; nome: string }[]
   setores: { id: string; nome: string }[]
-  casas: { id: string; nome: string }[]
+  casas: { id: string; nome: string; setorId: string }[]
   gruposTrabalho: { id: string; nome: string }[]
 }
 
@@ -19,6 +19,7 @@ export interface SerieFormModalProps {
   isOpen: boolean
   onClose: () => void
   title: string
+  operation: 'criar' | 'editar'
   initialData: Partial<SerieCreateInput>
   initialTipoEscopo: TipoEscopo
   lookups: Lookups
@@ -30,6 +31,7 @@ export function SerieFormModal({
   isOpen,
   onClose,
   title,
+  operation,
   initialData,
   initialTipoEscopo,
   lookups,
@@ -38,6 +40,7 @@ export function SerieFormModal({
 }: SerieFormModalProps) {
   const [formData, setFormData] = useState<Partial<SerieCreateInput>>(initialData)
   const [tipoEscopo, setTipoEscopo] = useState<TipoEscopo>(initialTipoEscopo)
+  const [casaSetorFiltro, setCasaSetorFiltro] = useState('')
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState<boolean>(false)
@@ -71,12 +74,18 @@ export function SerieFormModal({
 
   const { locais, espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho } = lookups
   const locaisDisponiveis = [...locais, ...locaisRapidos.filter(item => !locais.some(local => local.id === item.id))]
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   const espacosDisponiveis = [...espacos, ...espacosRapidos.filter(item => !espacos.some(espaco => espaco.id === item.id))]
 
   useEffect(() => {
     if (isOpen) {
       setFormData(initialData)
       setTipoEscopo(initialTipoEscopo)
+      setCasaSetorFiltro(
+        initialTipoEscopo === 'casa'
+          ? (casas.find(casa => casa.id === initialData.casaId)?.setorId ?? '')
+          : ''
+      )
       setErrosForm({})
       setErro(null)
       setSalvando(false)
@@ -89,7 +98,7 @@ export function SerieFormModal({
       setLocalRapido({ nome: '', endereco: '', numero: '', bairro: '', cidade: 'São Paulo', uf: 'SP', cep: '' })
       setEspacoRapidoNome('')
     }
-  }, [isOpen, initialData, initialTipoEscopo])
+  }, [isOpen, initialData, initialTipoEscopo, casas])
 
   useEffect(() => {
     if (!localRapidoOpen) return
@@ -169,6 +178,7 @@ export function SerieFormModal({
 
   const handleTipoEscopoChange = (tipo: TipoEscopo) => {
     setTipoEscopo(tipo)
+    setCasaSetorFiltro('')
     setFormData(prev => ({
       ...prev,
       regionalId: '',
@@ -431,6 +441,7 @@ export function SerieFormModal({
     <>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in overflow-y-auto">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-form-title" className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden my-8">
+          <span data-screen-code={operation === 'editar' ? 'AGD-ADM-025' : 'AGD-ADM-024'} className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela {operation === 'editar' ? 'AGD-ADM-025' : 'AGD-ADM-024'}</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-form-title" className="text-lg font-semibold text-slate-900">
                 {title}
@@ -781,8 +792,23 @@ export function SerieFormModal({
                         </>
                       )}
                       {tipoEscopo === 'casa' && (
-                        <>
-                          <label htmlFor="casaId" className="block text-xs font-medium text-slate-700 mb-1">Casa de Oração *</label>
+                        <div className="space-y-2">
+                          <label htmlFor="serieCasaSetorFiltro" className="block text-xs font-medium text-slate-700">Filtrar Casa por Setor</label>
+                          <select
+                            id="serieCasaSetorFiltro"
+                            value={casaSetorFiltro}
+                            onChange={e => {
+                              setCasaSetorFiltro(e.target.value)
+                              setFormData({ ...formData, casaId: '' })
+                            }}
+                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                          >
+                            <option value="">Todos os Setores</option>
+                            {[...setores].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(s => (
+                              <option key={s.id} value={s.id}>{s.nome}</option>
+                            ))}
+                          </select>
+                          <label htmlFor="casaId" className="block text-xs font-medium text-slate-700">Casa de Oração *</label>
                           <select
                             id="casaId"
                             value={formData.casaId || ''}
@@ -790,9 +816,12 @@ export function SerieFormModal({
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                           >
                             <option value="">Selecione...</option>
-                            {casas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                            {casas
+                              .filter(casa => !casaSetorFiltro || casa.setorId === casaSetorFiltro)
+                              .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+                              .map(casa => <option key={casa.id} value={casa.id}>{casa.nome}</option>)}
                           </select>
-                        </>
+                        </div>
                       )}
                       {tipoEscopo === 'grupoTrabalho' && (
                         <>
@@ -899,6 +928,7 @@ export function SerieFormModal({
         {localRapidoOpen && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
             <div ref={localRapidoDialogRef} role="dialog" aria-modal="true" aria-labelledby="serie-local-rapido-title" className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+          <span data-screen-code="AGD-ADM-029" className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-029</span>
               <div className="border-b border-slate-200 px-5 py-4">
                 <h3 id="serie-local-rapido-title" className="font-semibold text-slate-900">Criar Local</h3>
                 <p className="mt-1 text-xs text-slate-500">O novo local será selecionado automaticamente na série.</p>
@@ -958,6 +988,7 @@ export function SerieFormModal({
         {espacoRapidoOpen && formData.localId && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4">
             <div ref={espacoRapidoDialogRef} role="dialog" aria-modal="true" aria-labelledby="serie-espaco-rapido-title" className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+          <span data-screen-code="AGD-ADM-030" className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-030</span>
               <div className="border-b border-slate-200 px-5 py-4">
                 <h3 id="serie-espaco-rapido-title" className="font-semibold text-slate-900">Criar Espaço</h3>
                 <p className="mt-1 text-xs text-slate-500">O novo espaço será selecionado automaticamente na série.</p>

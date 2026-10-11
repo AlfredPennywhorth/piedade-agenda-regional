@@ -314,6 +314,7 @@ export function GruposTrabalhoView() {
       {/* Form de Criação / Edição */}
       {modoForm && (
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-md space-y-4">
+          <span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-045' : 'AGD-ADM-046'} className="block text-right text-[10px] font-medium tracking-wide text-slate-500">Tela {modoForm === 'criar' ? 'AGD-ADM-045' : 'AGD-ADM-046'}</span>
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <h3 className="font-bold text-slate-800 text-base">
               {modoForm === 'criar' ? 'Cadastrar Novo Grupo' : 'Editar Grupo'}
@@ -427,7 +428,7 @@ export function GruposTrabalhoView() {
             Nenhum grupo de trabalho encontrado.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="master-table-scroll">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                 <tr>
@@ -488,6 +489,7 @@ export function GruposTrabalhoView() {
             aria-modal="true"
             aria-labelledby="modal-detalhes-titulo"
           >
+            <span data-screen-code="AGD-ADM-047" className="block text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-047</span>
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
               <h3 id="modal-detalhes-titulo" className="font-bold text-slate-800 text-base">Detalhes do Grupo de Trabalho</h3>
               <button
@@ -502,10 +504,6 @@ export function GruposTrabalhoView() {
               <div className="py-6 text-center text-slate-500 text-sm">Carregando detalhes...</div>
             ) : (
               <div className="space-y-3 text-sm">
-                <div>
-                  <span className="text-xs font-semibold text-slate-500 block">ID:</span>
-                  <span className="text-xs font-mono text-slate-700">{grupoDetalhe.id}</span>
-                </div>
                 <div>
                   <span className="text-xs font-semibold text-slate-500 block">Nome:</span>
                   <span className="font-semibold text-slate-800">{grupoDetalhe.nome}</span>

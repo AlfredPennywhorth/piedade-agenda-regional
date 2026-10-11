@@ -439,11 +439,102 @@ export function temPerfilNoEscopo(
   )
 }
 
+async function obterRegionalDaCasaDoMembro(db: any, membroId: string): Promise<string | null> {
+  const row = await db
+    .select({ regionalId: schema.administracoes.regionalId })
+    .from(schema.membros)
+    .innerJoin(schema.casas, eq(schema.membros.casaId, schema.casas.id))
+    .innerJoin(schema.setores, eq(schema.casas.setorId, schema.setores.id))
+    .innerJoin(schema.administracoes, eq(schema.setores.administracaoId, schema.administracoes.id))
+    .where(and(eq(schema.membros.id, membroId), eq(schema.membros.ativo, true)))
+    .get()
+  return row?.regionalId ?? null
+}
+
+export async function obterRegionalGestaoAgendaExterna(
+  db: any,
+  membroId: string
+): Promise<string | null> {
+  if (!db || !membroId) return null
+  const contexto = await carregarContextoPermissoes(db, membroId)
+
+  if (eMasterSistema(contexto)) {
+    const regionalCasa = await obterRegionalDaCasaDoMembro(db, membroId)
+    if (regionalCasa) return regionalCasa
+    const regionalAtiva = await db
+      .select({ id: schema.regionais.id })
+      .from(schema.regionais)
+      .where(eq(schema.regionais.ativo, true))
+      .get()
+    return regionalAtiva?.id ?? null
+  }
+
+  // Preferir credenciais de viajante quando presentes, sem misturar gestão administrativa.
+  const regionaisViajante = Array.from(new Set(contexto.acessosAtivos
+    .filter(acesso => acesso.perfilCodigo === 'GESTOR_EVENTOS_EXTERNOS' &&
+      acesso.escopoTipo === 'REGIONAL' && acesso.escopoId !== null)
+    .map(acesso => acesso.escopoId as string)))
+  if (regionaisViajante.length === 1) return regionaisViajante[0]
+  if (regionaisViajante.length > 1) return null
+
+  const regionaisGestao = Array.from(new Set(
+    contexto.acessosAtivos
+      .filter(acesso =>
+        ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA', 'GESTOR_EVENTOS_EXTERNOS'].includes(acesso.perfilCodigo) &&
+        acesso.escopoTipo === 'REGIONAL' &&
+        acesso.escopoId !== null
+      )
+      .map(acesso => acesso.escopoId as string)
+  ))
+
+  if (regionaisGestao.length === 1) return regionaisGestao[0]
+  if (regionaisGestao.length > 1) return null
+
+  return obterRegionalDaCasaDoMembro(db, membroId)
+}
+
+// Cadastro de atendimentos externos é atribuição nominal dos viajantes.
+// Administradores regionais preservam a supervisão dos eventos já existentes,
+// mas somente viajantes credenciados (ou Master) podem criar novos.
+export async function podeCriarAgendaExterna(
+  db: any,
+  membroId: string,
+  regionalGestaoId: string
+): Promise<boolean> {
+  if (!db || !membroId || !regionalGestaoId) return false
+  const contexto = await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) return true
+  return contexto.acessosAtivos.some(acesso =>
+    acesso.perfilCodigo === 'GESTOR_EVENTOS_EXTERNOS' &&
+    acesso.escopoTipo === 'REGIONAL' &&
+    acesso.escopoId === regionalGestaoId
+  )
+}
+
+export async function podeGerenciarAgendaExterna(
+  db: any,
+  membroId: string,
+  regionalGestaoId?: string | null
+): Promise<boolean> {
+  if (!db || !membroId) return false
+  const contexto = await carregarContextoPermissoes(db, membroId)
+  if (eMasterSistema(contexto)) return true
+
+  return contexto.acessosAtivos.some(
+    acesso =>
+      ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA', 'GESTOR_EVENTOS_EXTERNOS'].includes(acesso.perfilCodigo) &&
+      acesso.escopoTipo === 'REGIONAL' &&
+      acesso.escopoId !== null &&
+      (!regionalGestaoId || acesso.escopoId === regionalGestaoId)
+  )
+}
+
 export async function podeGerenciarAgendaNoEscopo(
   db: any,
   membroId: string,
   escopoTipo: Exclude<AcessoTecnico['escopoTipo'], 'GLOBAL'>,
-  escopoId: string
+  escopoId: string,
+  permitirCasaAutomatica = true
 ): Promise<boolean> {
   if (!db || !membroId || !escopoId) return false
 
@@ -457,7 +548,7 @@ export async function podeGerenciarAgendaNoEscopo(
   if (podeAdministrarRegional(contexto, regionalAlvo)) return true
 
   // Regra institucional: todo membro pode gerir automaticamente a Agenda da própria Casa.
-  if (escopoTipo === 'CASA') {
+  if (permitirCasaAutomatica && escopoTipo === 'CASA') {
     const membro = await db
       .select({ casaId: schema.membros.casaId })
       .from(schema.membros)
@@ -590,6 +681,7 @@ export async function eOperadorPortariaAutorizado(
   contextoPermissoes?: ContextoPermissoes
 ): Promise<boolean> {
   if (!db || !membroId || !evento) return false
+  if (evento.pessoal) return false
 
   const estadoPortaria = await db
     .select({ status: schema.portariasEvento.status })
@@ -655,69 +747,50 @@ export async function eOperadorPortariaAutorizado(
  * Valida se o membro possui permissão de relatórios para um evento específico.
  * Autorizado se:
  * 1. É o organizador do evento (evento.organizadorMembroId === membroId); OU
- * 2. Possui vínculo ativo com a função GESTOR_RELATORIOS no exato escopo do evento.
+ * 2. Possui vínculo ativo com a função GESTOR_RELATORIOS no escopo do evento ou em um ancestral autorizado.
  */
 export async function eGestorRelatoriosAutorizadoParaEvento(db: any, membroId: string, evento: any): Promise<boolean> {
   if (!db || !membroId || !evento) return false
 
   const contexto = await carregarContextoPermissoes(db, membroId)
   if (eMasterSistema(contexto)) return true
+  if (evento.pessoal) return evento.criadorMembroId === membroId
 
-  const escopoEvento =
-    evento.regionalId ? { tipo: 'REGIONAL', id: evento.regionalId } :
-    evento.administracaoId ? { tipo: 'ADMINISTRACAO', id: evento.administracaoId } :
-    evento.setorId ? { tipo: 'SETOR', id: evento.setorId } :
-    evento.casaId ? { tipo: 'CASA', id: evento.casaId } :
-    evento.grupoTrabalhoId ? { tipo: 'GRUPO_TRABALHO', id: evento.grupoTrabalhoId } :
-    null
-
-  if (
-    escopoEvento &&
-    contexto.acessosAtivos.some(
-      acesso =>
-        acesso.perfilCodigo === 'GESTOR_RELATORIOS' &&
-        acesso.escopoTipo === escopoEvento.tipo &&
-        acesso.escopoId === escopoEvento.id
+  if (evento.organizadorMembroId === membroId) return true
+  const { condicaoEscopo } = await import('./eventos')
+  if ((evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') && evento.regionalGestaoId) {
+    const gestorRegional = contexto.acessosAtivos.some(acesso =>
+      acesso.perfilCodigo === 'GESTOR_RELATORIOS' &&
+      acesso.escopoTipo === 'REGIONAL' &&
+      acesso.escopoId === evento.regionalGestaoId
     )
-  ) {
-    return true
+    if (gestorRegional) return true
   }
-
-  // Compatibilidade: organizador do evento.
-  if (evento.organizadorMembroId === membroId) {
-    return true
-  }
-
-  // Compatibilidade legada: vínculo funcional GESTOR_RELATORIOS no mesmo escopo
-  const vinculosGestor = await db
-    .select({
-      v: schema.vinculosFuncionais,
-      f: schema.funcoes
-    })
+  const condicoes = contexto.acessosAtivos
+    .filter(acesso => acesso.perfilCodigo === 'GESTOR_RELATORIOS')
+    .map(condicaoEscopo)
+    .filter(condicao => !!condicao)
+  const legados = await db
+    .select({ v: schema.vinculosFuncionais })
     .from(schema.vinculosFuncionais)
     .innerJoin(schema.funcoes, eq(schema.vinculosFuncionais.funcaoId, schema.funcoes.id))
-    .where(
-      and(
-        eq(schema.vinculosFuncionais.membroId, membroId),
-        eq(schema.vinculosFuncionais.ativo, true),
-        eq(schema.funcoes.ativo, true),
-        eq(schema.funcoes.codigo, 'GESTOR_RELATORIOS')
-      )
-    )
-    .all()
-
-  if (!vinculosGestor || vinculosGestor.length === 0) {
-    return false
+    .where(and(eq(schema.vinculosFuncionais.membroId, membroId),
+      eq(schema.vinculosFuncionais.ativo, true), eq(schema.funcoes.ativo, true),
+      eq(schema.funcoes.codigo, 'GESTOR_RELATORIOS'))).all()
+  for (const { v } of legados) {
+    if ((evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') &&
+      evento.regionalGestaoId && v.regionalId === evento.regionalGestaoId) return true
+    const campos = [ ['REGIONAL', v.regionalId], ['ADMINISTRACAO', v.administracaoId],
+      ['SETOR', v.setorId], ['CASA', v.casaId], ['GRUPO_TRABALHO', v.grupoTrabalhoId] ] as const
+    for (const [escopoTipo, escopoId] of campos) {
+      if (!escopoId) continue
+      const condicao = condicaoEscopo({ id: v.id, perfilCodigo: 'GESTOR_RELATORIOS', escopoTipo, escopoId })
+      if (condicao) condicoes.push(condicao)
+    }
   }
-
-  return vinculosGestor.some(({ v }: any) => {
-    if (evento.regionalId && v.regionalId === evento.regionalId) return true
-    if (evento.administracaoId && v.administracaoId === evento.administracaoId) return true
-    if (evento.setorId && v.setorId === evento.setorId) return true
-    if (evento.casaId && v.casaId === evento.casaId) return true
-    if (evento.grupoTrabalhoId && v.grupoTrabalhoId === evento.grupoTrabalhoId) return true
-    return false
-  })
+  if (!condicoes.length) return false
+  return !!(await db.select({ id: schema.eventos.id }).from(schema.eventos)
+    .where(and(eq(schema.eventos.id, evento.id), or(...condicoes))).get())
 }
 
 /**

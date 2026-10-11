@@ -394,7 +394,7 @@ describe('Eventos API (S04)', () => {
         regionalId: crypto.randomUUID(),
         administracaoId: crypto.randomUUID()
       }).run()
-    }).toThrow(/CHECK constraint failed: check_evento_escopo_unico/)
+    }).toThrow(/CHECK constraint failed: check_evento_(escopo_unico|abrangencia_destino)/)
   })
 
   // =========================================================================
@@ -845,6 +845,148 @@ describe('Eventos API (S04)', () => {
 
     expect(persistido?.ativo).toBe(true)
     expect(logs.some((item: any) => item.acao === 'EVENTO_CANCELADO')).toBe(false)
+  })
+
+
+  it('EXT-01 cria atendimento Nacional sem Local territorial', async () => {
+    const res = await req('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Atendimento Nacional',
+        modalidade: 'PRESENCIAL',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        abrangencia: 'NACIONAL',
+        destinoUf: 'MG',
+        destinoCidadeLocal: 'Belo Horizonte — atendimento',
+      }),
+    })
+
+    expect(res.status).toBe(201)
+    const evento = await res.json()
+    expect(evento).toMatchObject({
+      abrangencia: 'NACIONAL',
+      destinoUf: 'MG',
+      destinoCidadeLocal: 'Belo Horizonte — atendimento',
+      localId: null,
+      casaId: null,
+    })
+    expect(evento.regionalGestaoId).toBeTruthy()
+  })
+
+  it('EXT-02 cria atendimento Internacional com País e Cidade/Local', async () => {
+    const res = await req('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Atendimento Internacional',
+        modalidade: 'PRESENCIAL',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        abrangencia: 'INTERNACIONAL',
+        destinoPaisCodigo: 'PT',
+        destinoCidadeLocal: 'Lisboa — atendimento',
+      }),
+    })
+
+    expect(res.status).toBe(201)
+    const evento = await res.json()
+    expect(evento).toMatchObject({
+      abrangencia: 'INTERNACIONAL',
+      destinoPaisCodigo: 'PT',
+      destinoCidadeLocal: 'Lisboa — atendimento',
+      localId: null,
+      regionalId: expect.any(String),
+    })
+    expect(evento.regionalGestaoId).toBe(evento.regionalId)
+  })
+
+  it('EXT-03 rejeita combinação externa com escopo territorial', async () => {
+    const regionalId = await createRegional()
+    const res = await req('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Atendimento Nacional inválido',
+        modalidade: 'PRESENCIAL',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        abrangencia: 'NACIONAL',
+        destinoUf: 'PR',
+        destinoCidadeLocal: 'Curitiba',
+        regionalId,
+      }),
+    })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('EXT-04 usuário comum cria Evento Próprio externo, mas não institucional', async () => {
+    const casa = sqlite.prepare(`
+      SELECT c.id AS casa_id
+      FROM casas c
+      LIMIT 1
+    `).get() as { casa_id: string }
+    const membroId = crypto.randomUUID()
+    const contaId = crypto.randomUUID()
+    const tokenComum = crypto.randomUUID()
+    const tokenHash = await hashToken(tokenComum)
+
+    await db.insert(membros).values({
+      id: membroId,
+      nome: 'Membro Viajante',
+      casaId: casa.casa_id,
+      ativo: true,
+      autenticacaoAtiva: true,
+    })
+    sqlite.prepare(
+      "INSERT INTO contas_acesso (id, membro_id, status, ativado_em) VALUES (?, ?, 'ATIVA', CURRENT_TIMESTAMP)"
+    ).run(contaId, membroId)
+    await db.insert(sessoes).values({
+      id: crypto.randomUUID(),
+      contaAcessoId: contaId,
+      membroId,
+      tokenHash,
+      expiraEm: new Date(Date.now() + 86400000).toISOString(),
+      createdAt: new Date().toISOString(),
+    })
+
+    const requestComum = (body: Record<string, unknown>) => app.request('/api/v1/eventos', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${tokenComum}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+
+    const institucional = await requestComum({
+      titulo: 'Institucional fora do escopo',
+      modalidade: 'PRESENCIAL',
+      inicioEm: validDate1,
+      fimEm: validDate2,
+      abrangencia: 'NACIONAL',
+      destinoUf: 'BA',
+      destinoCidadeLocal: 'Salvador',
+    })
+    expect(institucional.status).toBe(403)
+
+    const proprio = await requestComum({
+      pessoal: true,
+      titulo: 'Viagem ministerial própria',
+      modalidade: 'PRESENCIAL',
+      inicioEm: validDate1,
+      fimEm: validDate2,
+      abrangencia: 'NACIONAL',
+      destinoUf: 'BA',
+      destinoCidadeLocal: 'Salvador',
+    })
+    expect(proprio.status).toBe(201)
+    const evento = await proprio.json()
+    expect(evento.pessoal).toBe(true)
+    expect(evento.criadorMembroId).toBe(membroId)
+    expect(evento.organizadorMembroId).toBe(membroId)
   })
 
 })

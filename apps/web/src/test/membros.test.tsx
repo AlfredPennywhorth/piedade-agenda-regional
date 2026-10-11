@@ -74,9 +74,10 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
 
   it('1. Listar: carrega membros e Casas associadas', async () => {
     mockEstrutura()
-    render(<MembrosView />)
+    const { container } = render(<MembrosView />)
 
     expect(await screen.findByText('João da Silva')).toBeInTheDocument()
+    expect(container.querySelector('.master-table-scroll')).toBeInTheDocument()
     expect(screen.getByText('Maria Souza')).toBeInTheDocument()
     expect(screen.getByText('Central de Osasco')).toBeInTheDocument()
     expect(screen.getByText('Jardim Samambaia')).toBeInTheDocument()

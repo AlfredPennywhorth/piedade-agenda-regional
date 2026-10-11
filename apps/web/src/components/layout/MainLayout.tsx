@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { IosInstallPrompt } from '../pwa/IosInstallPrompt'
 
 export interface CapacidadesFrontend {
   podeVisualizarRelatorios?: boolean
@@ -12,6 +13,29 @@ export interface CapacidadesFrontend {
   podeAdministrarFuncoes?: boolean
   podeGerirAgenda?: boolean
 }
+
+const SCREEN_CODES = {
+  agenda: 'AGD-MOB-001',
+  eventos: 'AGD-ADM-001',
+  series: 'AGD-ADM-002',
+  calendario: 'AGD-MOB-002',
+  avisos: 'AGD-MOB-003',
+  cadastro: 'AGD-SHR-001',
+  portaria: 'AGD-MOB-004',
+  relatorios: 'AGD-ADM-003',
+  auditoria: 'AGD-ADM-004',
+  regionais: 'AGD-ADM-005',
+  administracoes: 'AGD-ADM-006',
+  setores: 'AGD-ADM-007',
+  casas: 'AGD-ADM-008',
+  'grupos-trabalho': 'AGD-ADM-009',
+  membros: 'AGD-ADM-010',
+  funcoes: 'AGD-ADM-011',
+  'vinculos-funcionais': 'AGD-ADM-012',
+  locais: 'AGD-ADM-013',
+  convocacoes: 'AGD-ADM-014',
+  acessos: 'AGD-ADM-015',
+} as const
 
 interface MainLayoutProps {
   children: ReactNode
@@ -82,7 +106,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 pb-16">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 safe-area-layout-bottom">
       <a
         href="#conteudo-principal"
         className="sr-only z-50 rounded-md bg-white px-3 py-2 text-sm font-semibold text-brand-800 shadow focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
@@ -90,7 +114,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
         Ir para o conteúdo principal
       </a>
       {/* Header */}
-      <header className="bg-brand-900 text-white p-4 shadow-md sticky top-0 z-10">
+      <header className="bg-brand-900 text-white p-4 shadow-md sticky top-0 z-10 safe-area-top">
         <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <img
@@ -144,6 +168,13 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
           </div>
         )}
         {children}
+        <div
+          className="px-4 pb-4 pt-2 text-right text-[10px] font-medium tracking-wide text-slate-400"
+          data-screen-code={SCREEN_CODES[currentTab]}
+          aria-label={`Código da tela ${SCREEN_CODES[currentTab]}`}
+        >
+          Tela {SCREEN_CODES[currentTab]}
+        </div>
       </main>
 
       {/* Navegação principal única */}
@@ -252,6 +283,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
         </div>
       </nav>
 
+      <IosInstallPrompt />
     </div>
   )
 }

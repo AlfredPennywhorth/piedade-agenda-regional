@@ -11,6 +11,7 @@ import {
   checkins,
   agendaPrioridadesConflito,
   convocacaoDestinatarioEvidencias,
+  eventosParticipantesExternos,
 } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { executeAtomic } from '../db/batch'
@@ -77,6 +78,7 @@ type RegistroAgenda = {
   destinatario: any
   rsvp: any
   checkin: any
+  participacao?: { status: string; membroId: string } | null
 }
 
 function tipoConflito(a: RegistroAgenda, b: RegistroAgenda): 'SOBREPOSICAO' | 'PROXIMIDADE' | null {
@@ -97,7 +99,7 @@ function tipoConflito(a: RegistroAgenda, b: RegistroAgenda): 'SOBREPOSICAO' | 'P
 }
 
 function montarMapaConflitos(records: RegistroAgenda[]) {
-  const ativos = records.filter(record => record.rsvp?.resposta !== 'NAO_PARTICIPAREI')
+  const ativos = records.filter(record => record.rsvp?.resposta !== 'NAO_PARTICIPAREI' && record.participacao?.status !== 'RECUSADO')
   const mapa = new Map<string, Array<{ eventoId: string; tipo: 'SOBREPOSICAO' | 'PROXIMIDADE' }>>()
 
   for (let i = 0; i < ativos.length; i++) {
@@ -157,7 +159,7 @@ function chaveConflitoPar(
 }
 
 async function buscarRegistrosAgenda(db: any, membroId: string): Promise<RegistroAgenda[]> {
-  return db.select({
+  const convocados: RegistroAgenda[] = await db.select({
     evento: eventos,
     convocacao: convocacoes,
     local: locais,
@@ -190,6 +192,31 @@ async function buscarRegistrosAgenda(db: any, membroId: string): Promise<Registr
     )
     .orderBy(asc(eventos.inicioEm))
     .all()
+  const pessoais = await db.select({ evento: eventos, local: locais, espaco: espacosLocal })
+    .from(eventos)
+    .leftJoin(locais, eq(eventos.localId, locais.id))
+    .leftJoin(espacosLocal, eq(eventos.espacoId, espacosLocal.id))
+    .where(and(eq(eventos.pessoal, true), eq(eventos.criadorMembroId, membroId), eq(eventos.ativo, true)))
+    .all()
+  const participacoesExternas = await db.select({
+    evento: eventos, local: locais, espaco: espacosLocal,
+    participacao: eventosParticipantesExternos,
+  })
+    .from(eventosParticipantesExternos)
+    .innerJoin(eventos, eq(eventosParticipantesExternos.eventoId, eventos.id))
+    .leftJoin(locais, eq(eventos.localId, locais.id))
+    .leftJoin(espacosLocal, eq(eventos.espacoId, espacosLocal.id))
+    .where(and(eq(eventosParticipantesExternos.membroId, membroId), eq(eventos.ativo, true), inArray(eventos.abrangencia, ['NACIONAL', 'INTERNACIONAL'])))
+    .all()
+  const registros = [...convocados, ...pessoais.map((record: any) => ({
+    ...record, convocacao: null, destinatario: null, rsvp: null, checkin: null,
+  })), ...participacoesExternas.map((record: any) => ({
+    ...record, convocacao: null, destinatario: null,
+    rsvp: null, checkin: null,
+  }))]
+  return Array.from(new Map(registros.map(record => [record.evento.id, record])).values())
+    .sort((a, b) => new Date(a.evento.inicioEm).getTime() - new Date(b.evento.inicioEm).getTime())
+
 }
 
 agendaRouter.get('/', async (c) => {
@@ -203,7 +230,7 @@ agendaRouter.get('/', async (c) => {
   try {
     const records = await buscarRegistrosAgenda(db, membroId)
     const eventoIds = records.map(record => record.evento.id)
-    const destinatarioIds = records.map(record => record.destinatario.id)
+    const destinatarioIds = records.filter(record => record.destinatario).map(record => record.destinatario.id)
     const mapaConflitos = montarMapaConflitos(records)
 
     let refOferecidas: any[] = []
@@ -308,15 +335,16 @@ agendaRouter.get('/', async (c) => {
         convocacao: record.convocacao,
         local: record.local,
         espaco: record.espaco,
-        destinatarioId: record.destinatario.id,
+        destinatarioId: record.destinatario?.id ?? null,
         vinculo: (() => {
           const vinculo = escolherMaiorVinculo(
             evidenciasVinculo.filter(
-              evidencia => evidencia.convocacaoDestinatarioId === record.destinatario.id
+              evidencia => evidencia.convocacaoDestinatarioId === record.destinatario?.id
             )
           )
           return vinculo?.funcaoNome ? vinculo : null
         })(),
+        participacaoExterna: record.participacao ? { status: record.participacao.status, membroId: record.participacao.membroId } : null,
         rsvp: record.rsvp ? {
           resposta: record.rsvp.resposta,
           justificativa: record.rsvp.justificativa,
