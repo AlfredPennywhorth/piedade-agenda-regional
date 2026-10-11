@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import {
   checkins,
   convocacoes,
@@ -276,40 +276,46 @@ portariaOperadorPublicaRouter.post('/convidados/:convidadoId/validar', async c =
   const presencaId = crypto.randomUUID()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(ctx.evento)
 
-  await executarOperacaoComAudit(
-    ctx.db,
-    qdb => [
-      qdb.update(convidadosEvento).set({
-        status: 'VALIDADO',
-        validadoPorMembroId: null,
-        validadoEm: agora,
-        updatedAt: agora,
-      }).where(eq(convidadosEvento.id, convidadoId)),
-      qdb.insert(presencasConvidadoEvento).values({
-        id: presencaId,
-        convidadoId,
-        eventoId: ctx.eventoId,
-        forma: 'VALIDACAO_PORTEIRO',
-        registradoPorMembroId: null,
-        registradoEm: agora,
-        createdAt: agora,
-        updatedAt: agora,
-      }),
-    ],
-    {
-      acao: 'PORTARIA_CONVIDADO_VALIDADO',
-      atorMembroId: null,
-      recursoTipo: 'PRESENCA_CONVIDADO_EVENTO',
-      recursoId: presencaId,
-      escopoTipo,
-      escopoId,
-      contexto: {
-        eventoId: ctx.eventoId,
-        convidadoId,
-        operadorCredencialId: ctx.id,
-      },
-    }
-  )
+  try {
+    await executarOperacaoComAudit(
+      ctx.db,
+      qdb => [
+        qdb.update(convidadosEvento).set({
+          status: sql`CASE WHEN EXISTS (SELECT 1 FROM eventos e WHERE e.id = ${ctx.eventoId} AND e.ativo = 1 AND e.pessoal = 0 AND e.abrangencia NOT IN ('NACIONAL', 'INTERNACIONAL')) THEN 'VALIDADO' ELSE 'PORTARIA_INDISPONIVEL' END`,
+          validadoPorMembroId: null,
+          validadoEm: agora,
+          updatedAt: agora,
+        }).where(eq(convidadosEvento.id, convidadoId)),
+        qdb.insert(presencasConvidadoEvento).values({
+          id: presencaId,
+          convidadoId,
+          eventoId: ctx.eventoId,
+          forma: 'VALIDACAO_PORTEIRO',
+          registradoPorMembroId: null,
+          registradoEm: agora,
+          createdAt: agora,
+          updatedAt: agora,
+        }),
+      ],
+      {
+        acao: 'PORTARIA_CONVIDADO_VALIDADO',
+        atorMembroId: null,
+        recursoTipo: 'PRESENCA_CONVIDADO_EVENTO',
+        recursoId: presencaId,
+        escopoTipo,
+        escopoId,
+        contexto: {
+          eventoId: ctx.eventoId,
+          convidadoId,
+          operadorCredencialId: ctx.id,
+        },
+      }
+    )
+  
+  } catch (err: unknown) {
+    if (String(err).includes('CHECK constraint')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    throw err
+  }
 
   return c.json({ convidadoId, eventoId: ctx.eventoId, status: 'VALIDADO', registradoEm: agora }, 201)
 })
