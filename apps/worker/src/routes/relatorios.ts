@@ -152,7 +152,9 @@ relatoriosRouter.get('/presencas/membros/:membroAlvoId', async c => {
     .where(
       and(
         eq(portariaFechamentoItens.tipoPessoa, 'MEMBRO'),
-        eq(portariaFechamentoItens.origemId, membroAlvoId)
+        eq(portariaFechamentoItens.origemId, membroAlvoId),
+        eq(eventos.pessoal, false),
+        eq(eventos.abrangencia, 'TERRITORIAL')
       )
     )
     .all()
