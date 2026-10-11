@@ -82,7 +82,7 @@ describe('S02-B1 — FuncoesView (Catálogo de Funções Frontend)', () => {
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toBeInTheDocument()
 
-    const { getByText } = within(dialog)
+    const { getByText, queryByText } = within(dialog)
     expect(getByText('Detalhes da Função')).toBeInTheDocument()
     expect(getByText('Ancião')).toBeInTheDocument()
     expect(getByText('Responsável regional')).toBeInTheDocument()
