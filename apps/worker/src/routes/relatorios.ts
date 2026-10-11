@@ -56,6 +56,11 @@ relatoriosRouter.get('/presencas/eventos/:eventoId/final', async c => {
     return c.json({ error: 'Acesso não autorizado para visualizar este relatório', code: 'FORBIDDEN' }, 403)
   }
 
+  // Relatórios de Portaria tradicional não representam a participação nominal externa.
+  if (evento.pessoal || evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') {
+    return c.json({ error: 'Relatório de Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+  }
+
   const fechamento = await db
     .select()
     .from(portariaFechamentos)
@@ -261,7 +266,8 @@ relatoriosRouter.get('/presencas/periodo', async c => {
     return c.json({ error: 'Acesso não autorizado para o escopo informado', code: 'FORBIDDEN' }, 403)
   }
 
-  const condicoes = [eq(eventos.ativo, true)]
+  // Somente eventos territoriais institucionais possuem snapshot compatível com esta consolidação.
+  const condicoes = [eq(eventos.ativo, true), eq(eventos.pessoal, false), eq(eventos.abrangencia, 'TERRITORIAL')]
 
   switch (escopoTipo) {
     case 'REGIONAL':
