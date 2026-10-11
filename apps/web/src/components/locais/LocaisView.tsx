@@ -599,7 +599,7 @@ export function LocaisView() {
             aria-labelledby="modal-form-title"
             className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95"
           >
-            <span data-screen-code={editingId ? 'AGD-ADM-056' : 'AGD-ADM-055'} className="block text-right text-[10px] font-medium text-slate-500">Tela {editingId ? 'AGD-ADM-056' : 'AGD-ADM-055'}</span>
+            <span data-screen-code={editingId ? 'AGD-ADM-056' : 'AGD-ADM-055'} className="block shrink-0 px-6 pt-3 pb-1 text-right text-[10px] font-medium text-slate-500">Tela {editingId ? 'AGD-ADM-056' : 'AGD-ADM-055'}</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-form-title" className="text-lg font-semibold text-slate-900">
                 {editingId ? 'Editar Local' : 'Novo Local'}
@@ -845,7 +845,7 @@ export function LocaisView() {
       {espacosOpen && localEspacos && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-espacos-title" className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-            <span data-screen-code="AGD-ADM-058" className="block text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-058</span>
+            <span data-screen-code="AGD-ADM-058" className="block shrink-0 px-6 pt-3 pb-1 text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-058</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <div>
                 <h3 id="modal-espacos-title" className="text-lg font-semibold text-slate-900">Espaços do Local</h3>
@@ -910,7 +910,7 @@ export function LocaisView() {
             aria-labelledby="modal-detail-title"
             className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95"
           >
-            <span data-screen-code="AGD-ADM-057" className="block text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-057</span>
+            <span data-screen-code="AGD-ADM-057" className="block shrink-0 px-6 pt-3 pb-1 text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-057</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-detail-title" className="text-lg font-semibold text-slate-900">
                 Detalhes do Local
