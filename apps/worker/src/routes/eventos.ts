@@ -640,6 +640,9 @@ eventosRouter.patch('/:id', async (c) => {
     const updated = await db.select().from(eventos).where(eq(eventos.id, id)).get()
     return c.json(updated)
   } catch (err: any) {
+    if (String(err?.message).includes('EVENTO_COM_PORTARIA_NAO_PODE_MUDAR_ESCOPO')) {
+      return c.json({ error: 'Evento com registros de Portaria ou check-in não pode mudar de escopo', code: 'EVENTO_COM_PORTARIA_NAO_PODE_MUDAR_ESCOPO' }, 409)
+    }
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
       return c.json({ error: 'Local, Espaço ou Escopo vinculado não existe' }, 400)
     }
