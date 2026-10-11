@@ -313,7 +313,7 @@ portariaOperadorPublicaRouter.post('/convidados/:convidadoId/validar', async c =
     )
   
   } catch (err: unknown) {
-    if (String(err).includes('CHECK constraint')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    if ((String(err).includes('CHECK constraint') || String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL'))) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
     throw err
   }
 
@@ -331,41 +331,46 @@ portariaOperadorPublicaRouter.post('/cadastro-convidados/credencial', async c =>
   const expiraEm = getSaoPauloEndOfDayIso(ctx.evento.inicioEm)
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(ctx.evento)
 
-  await executarOperacaoComAudit(
-    ctx.db,
-    qdb => [
-      qdb.update(credenciaisCadastroPortariaEvento).set({
-        ativo: false,
-        revogadoEm: agora,
-        updatedAt: agora,
-      }).where(and(
-        eq(credenciaisCadastroPortariaEvento.eventoId, ctx.eventoId),
-        eq(credenciaisCadastroPortariaEvento.ativo, true)
-      )),
-      qdb.insert(credenciaisCadastroPortariaEvento).values({
-        id: credencialId,
-        eventoId: ctx.eventoId,
-        tokenHash,
-        expiraEm,
-        criadoPorMembroId: null,
-        ativo: true,
-        createdAt: agora,
-        updatedAt: agora,
-      }),
-    ],
-    {
-      acao: 'PORTARIA_CREDENCIAL_AUTOCADASTRO_CRIADA',
-      atorMembroId: null,
-      recursoTipo: 'CREDENCIAL_CADASTRO_PORTARIA',
-      recursoId: credencialId,
-      escopoTipo,
-      escopoId,
-      contexto: {
-        eventoId: ctx.eventoId,
-        operadorCredencialId: ctx.id,
-      },
-    }
-  )
+  try {
+    await executarOperacaoComAudit(
+      ctx.db,
+      qdb => [
+        qdb.update(credenciaisCadastroPortariaEvento).set({
+          ativo: false,
+          revogadoEm: agora,
+          updatedAt: agora,
+        }).where(and(
+          eq(credenciaisCadastroPortariaEvento.eventoId, ctx.eventoId),
+          eq(credenciaisCadastroPortariaEvento.ativo, true)
+        )),
+        qdb.insert(credenciaisCadastroPortariaEvento).values({
+          id: credencialId,
+          eventoId: ctx.eventoId,
+          tokenHash,
+          expiraEm,
+          criadoPorMembroId: null,
+          ativo: true,
+          createdAt: agora,
+          updatedAt: agora,
+        }),
+      ],
+      {
+        acao: 'PORTARIA_CREDENCIAL_AUTOCADASTRO_CRIADA',
+        atorMembroId: null,
+        recursoTipo: 'CREDENCIAL_CADASTRO_PORTARIA',
+        recursoId: credencialId,
+        escopoTipo,
+        escopoId,
+        contexto: {
+          eventoId: ctx.eventoId,
+          operadorCredencialId: ctx.id,
+        },
+      }
+    )
+  } catch (err: unknown) {
+    if (String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    throw err
+  }
 
   return c.json({
     eventoId: ctx.eventoId,
@@ -395,43 +400,48 @@ portariaOperadorPublicaRouter.post('/solicitar-fechamento', async c => {
   const agora = new Date().toISOString()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(ctx.evento)
 
-  await executarOperacaoComAudit(
-    ctx.db,
-    qdb => [
-      qdb.insert(portariaSolicitacoesFechamento).values({
-        eventoId: ctx.eventoId,
-        solicitadoPorMembroId: null,
-        solicitadoPorCredencialId: ctx.id,
-        solicitadoEm: agora,
-        confirmadoPorMembroId: null,
-        confirmadoEm: null,
-        createdAt: agora,
-        updatedAt: agora,
-      }).onConflictDoUpdate({
-        target: portariaSolicitacoesFechamento.eventoId,
-        set: {
+  try {
+    await executarOperacaoComAudit(
+      ctx.db,
+      qdb => [
+        qdb.insert(portariaSolicitacoesFechamento).values({
+          eventoId: ctx.eventoId,
           solicitadoPorMembroId: null,
           solicitadoPorCredencialId: ctx.id,
           solicitadoEm: agora,
           confirmadoPorMembroId: null,
           confirmadoEm: null,
+          createdAt: agora,
           updatedAt: agora,
+        }).onConflictDoUpdate({
+          target: portariaSolicitacoesFechamento.eventoId,
+          set: {
+            solicitadoPorMembroId: null,
+            solicitadoPorCredencialId: ctx.id,
+            solicitadoEm: agora,
+            confirmadoPorMembroId: null,
+            confirmadoEm: null,
+            updatedAt: agora,
+          },
+        }),
+      ],
+      {
+        acao: 'PORTARIA_FECHAMENTO_SOLICITADO',
+        atorMembroId: null,
+        recursoTipo: 'PORTARIA',
+        recursoId: ctx.eventoId,
+        escopoTipo,
+        escopoId,
+        contexto: {
+          eventoId: ctx.eventoId,
+          operadorCredencialId: ctx.id,
         },
-      }),
-    ],
-    {
-      acao: 'PORTARIA_FECHAMENTO_SOLICITADO',
-      atorMembroId: null,
-      recursoTipo: 'PORTARIA',
-      recursoId: ctx.eventoId,
-      escopoTipo,
-      escopoId,
-      contexto: {
-        eventoId: ctx.eventoId,
-        operadorCredencialId: ctx.id,
-      },
-    }
-  )
+      }
+    )
+  } catch (err: unknown) {
+    if (String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    throw err
+  }
 
   return c.json({
     status: 'AGUARDANDO_CONFIRMACAO',
