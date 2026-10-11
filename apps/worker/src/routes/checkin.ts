@@ -114,6 +114,7 @@ checkinRouter.post('/qr', async (c) => {
       return c.json({ error: 'Payload inválido', details: err.issues }, 400)
     }
     const mensagem = err instanceof Error ? err.message : String(err)
+    if (mensagem.includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
     if (
       mensagem.includes('UNIQUE constraint failed') ||
       mensagem.includes('idx_checkin_evento_membro_unico')
@@ -226,6 +227,7 @@ checkinRouter.post('/manual', async (c) => {
       return c.json({ error: 'Payload inválido', details: err.issues }, 400)
     }
     const mensagem = err instanceof Error ? err.message : String(err)
+    if (mensagem.includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
     if (
       mensagem.includes('UNIQUE constraint failed') ||
       mensagem.includes('idx_checkin_evento_membro_unico')
