@@ -16,7 +16,9 @@ portariaRouter.use('*', authMiddleware)
 
 
 async function podeGerarCredencialOperador(db: any, membroId: string, contexto: any, evento: any) {
-  if (evento.pessoal) return false
+  // Eventos externos usam participação nominal, sem destinatários de convocação.
+  // A Portaria tradicional não suporta check-in externo; não oferecer credenciais.
+  if (evento.pessoal || evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') return false
   if (eMasterSistema(contexto)) return true
   return podeGerenciarEvento(db, membroId, evento)
 }
