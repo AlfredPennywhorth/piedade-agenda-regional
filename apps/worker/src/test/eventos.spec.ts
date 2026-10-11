@@ -987,6 +987,14 @@ describe('Eventos API (S04)', () => {
     expect(evento.pessoal).toBe(true)
     expect(evento.criadorMembroId).toBe(membroId)
     expect(evento.organizadorMembroId).toBe(membroId)
+    const origem = sqlite.prepare(`
+      SELECT a.regional_id AS regional_id FROM casas c
+      JOIN setores s ON s.id = c.setor_id
+      JOIN administracoes a ON a.id = s.administracao_id
+      WHERE c.id = ?
+    `).get(casa.casa_id) as { regional_id: string }
+    expect(evento.regionalGestaoId).toBe(origem.regional_id)
+    expect(evento.regionalId).toBe(origem.regional_id)
   })
 
 })
