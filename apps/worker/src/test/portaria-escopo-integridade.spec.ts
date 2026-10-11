@@ -41,6 +41,37 @@ describe('0046 — integridade Portaria e abrangência', () => {
     db.close()
   })
 
+  it('impede conversao nacional com RSVP confirmado mesmo apos cancelamento da convocacao', () => {
+    const db = banco()
+    db.exec(`
+      INSERT INTO casas (id, setor_id, nome) VALUES ('casa','s','Casa');
+      INSERT INTO membros (id, nome, casa_id) VALUES ('m','Membro','casa');
+      INSERT INTO convocacoes (id, evento_id, status, ativo) VALUES ('conv','e','PUBLICADA',1);
+      INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES ('dest','conv','m');
+      INSERT INTO rsvp (id, convocacao_destinatario_id, resposta, respondido_em, atualizado_em)
+        VALUES ('rsvp','dest','PARTICIPAREI','2099-01-01','2099-01-01');
+      UPDATE convocacoes SET status='CANCELADA', ativo=0 WHERE id='conv';
+    `)
+    expect(() => db.prepare("UPDATE eventos SET abrangencia='NACIONAL', regional_gestao_id='r', regional_id='r', setor_id=NULL, destino_uf='RJ', destino_cidade_local='Rio de Janeiro' WHERE id='e'").run())
+      .toThrow(/EVENTO_COM_PORTARIA_NAO_PODE_MUDAR_ESCOPO/)
+    db.close()
+  })
+
+  it('permite conversao quando nao existe confirmacao de participacao', () => {
+    const db = banco()
+    db.exec(`
+      INSERT INTO casas (id, setor_id, nome) VALUES ('casa','s','Casa');
+      INSERT INTO membros (id, nome, casa_id) VALUES ('m','Membro','casa');
+      INSERT INTO convocacoes (id, evento_id, status, ativo) VALUES ('conv','e','CANCELADA',0);
+      INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES ('dest','conv','m');
+      INSERT INTO rsvp (id, convocacao_destinatario_id, resposta, respondido_em, atualizado_em)
+        VALUES ('rsvp','dest','NAO_PARTICIPAREI','2099-01-01','2099-01-01');
+    `)
+    expect(() => db.prepare("UPDATE eventos SET abrangencia='NACIONAL', regional_gestao_id='r', regional_id='r', setor_id=NULL, destino_uf='RJ', destino_cidade_local='Rio de Janeiro' WHERE id='e'").run())
+      .not.toThrow()
+    db.close()
+  })
+
   it('preserva portaria territorial', () => {
     const db = banco()
     db.prepare("INSERT INTO portarias_evento (evento_id) VALUES ('e')").run()
