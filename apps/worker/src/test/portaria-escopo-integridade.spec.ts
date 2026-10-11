@@ -53,7 +53,7 @@ describe('0046 — integridade Portaria e abrangência', () => {
       UPDATE convocacoes SET status='CANCELADA', ativo=0 WHERE id='conv';
     `)
     expect(() => db.prepare("UPDATE eventos SET abrangencia='NACIONAL', regional_gestao_id='r', regional_id='r', setor_id=NULL, destino_uf='RJ', destino_cidade_local='Rio de Janeiro' WHERE id='e'").run())
-      .toThrow(/EVENTO_COM_PORTARIA_NAO_PODE_MUDAR_ESCOPO/)
+      .toThrow(/EVENTO_COM_RSVP_CONFIRMADO_NAO_PODE_MUDAR_ESCOPO/)
     db.close()
   })
 
