@@ -125,7 +125,7 @@ describe('S01 — SetoresView (Gestão Territorial Frontend)', () => {
     expect(await screen.findByRole('heading', { name: 'Detalhes do Setor' })).toBeInTheDocument()
     expect(screen.getAllByText('Setor 01 — Osasco Centro').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('SET-01').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText(SET_1_ID)).toBeInTheDocument()
+    expect(screen.queryByText(SET_1_ID)).not.toBeInTheDocument()
   })
 
   it('6. Criar: deve cadastrar um novo setor selecionando administração válida (UUID)', async () => {
