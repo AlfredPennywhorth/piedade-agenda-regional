@@ -709,6 +709,7 @@ eventosRouter.post('/:id/participantes-externos', async c => {
   const ator = c.get('membroId')
   const evento = await db.select().from(eventos).where(eq(eventos.id,id)).get()
   if (!evento || !evento.ativo || evento.pessoal || !['NACIONAL','INTERNACIONAL'].includes(evento.abrangencia)) return c.json({error:'Evento externo não encontrado'},404)
+  if (new Date(evento.inicioEm).getTime() <= Date.now()) return c.json({error:'Participantes não podem ser incluídos após o início do evento', code:'EVENTO_INICIADO'},409)
   if (!ator || !(await podeGerenciarEvento(db,ator,evento))) return c.json({error:'Acesso não autorizado'},403)
   const payload: unknown = await c.req.json().catch(() => null)
   if (!payload || typeof payload !== 'object') return c.json({error:'Dados inválidos'},400)
