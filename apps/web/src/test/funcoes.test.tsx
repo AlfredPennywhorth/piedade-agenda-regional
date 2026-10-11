@@ -86,7 +86,7 @@ describe('S02-B1 — FuncoesView (Catálogo de Funções Frontend)', () => {
     expect(getByText('Detalhes da Função')).toBeInTheDocument()
     expect(getByText('Ancião')).toBeInTheDocument()
     expect(getByText('Responsável regional')).toBeInTheDocument()
-    expect(getByText(FUNCAO_1_ID)).toBeInTheDocument()
+    expect(queryByText(FUNCAO_1_ID)).not.toBeInTheDocument()
   })
 
   it('4. Criar: deve cadastrar uma nova função', async () => {
