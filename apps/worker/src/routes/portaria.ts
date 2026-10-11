@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, sql } from 'drizzle-orm'
 import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento, convidadosEvento, credenciaisCadastroPortariaEvento, credenciaisOperadorPortariaEvento, presencasConvidadoEvento, portariaFechamentos, portariaFechamentoItens, portariaSolicitacoesFechamento, portariaReaberturas, portariaFechamentoLocks } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eMasterSistema, eOperadorPortariaAutorizado } from '../security/permissoes'
@@ -979,45 +979,51 @@ portariaRouter.post('/eventos/:eventoId/convidados', async c => {
   const presencaId = crypto.randomUUID()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
-  await executarOperacaoComAudit(
-    db,
-    qdb => [
-      qdb.insert(convidadosEvento).values({
-        id: convidadoId,
-        eventoId,
-        nome,
-        localidade,
-        referencia: body.referencia?.trim() || null,
-        observacoes: body.observacoes?.trim() || null,
-        status: 'VALIDADO',
-        criadoPorMembroId: atorMembroId,
-        validadoPorMembroId: atorMembroId,
-        validadoEm: agora,
-        ativo: true,
-        createdAt: agora,
-        updatedAt: agora,
-      }),
-      qdb.insert(presencasConvidadoEvento).values({
-        id: presencaId,
-        convidadoId,
-        eventoId,
-        forma: 'MANUAL',
-        registradoPorMembroId: atorMembroId,
-        registradoEm: agora,
-        createdAt: agora,
-        updatedAt: agora,
-      }),
-    ],
-    {
-      acao: 'PORTARIA_CONVIDADO_MANUAL_VALIDADO',
-      atorMembroId,
-      recursoTipo: 'CONVIDADO_EVENTO',
-      recursoId: convidadoId,
-      escopoTipo,
-      escopoId,
-      contexto: { eventoId, forma: 'MANUAL' },
-    }
-  )
+  try {
+    await executarOperacaoComAudit(
+      db,
+      qdb => [
+        qdb.insert(convidadosEvento).values({
+          id: convidadoId,
+          eventoId,
+          nome,
+          localidade,
+          referencia: body.referencia?.trim() || null,
+          observacoes: body.observacoes?.trim() || null,
+          status: sql`CASE WHEN EXISTS (SELECT 1 FROM eventos e WHERE e.id = ${eventoId} AND e.ativo = 1 AND e.pessoal = 0 AND e.abrangencia NOT IN ('NACIONAL', 'INTERNACIONAL')) THEN 'VALIDADO' ELSE 'PORTARIA_INDISPONIVEL' END`,
+          criadoPorMembroId: atorMembroId,
+          validadoPorMembroId: atorMembroId,
+          validadoEm: agora,
+          ativo: true,
+          createdAt: agora,
+          updatedAt: agora,
+        }),
+        qdb.insert(presencasConvidadoEvento).values({
+          id: presencaId,
+          convidadoId,
+          eventoId,
+          forma: 'MANUAL',
+          registradoPorMembroId: atorMembroId,
+          registradoEm: agora,
+          createdAt: agora,
+          updatedAt: agora,
+        }),
+      ],
+      {
+        acao: 'PORTARIA_CONVIDADO_MANUAL_VALIDADO',
+        atorMembroId,
+        recursoTipo: 'CONVIDADO_EVENTO',
+        recursoId: convidadoId,
+        escopoTipo,
+        escopoId,
+        contexto: { eventoId, forma: 'MANUAL' },
+      }
+    )
+  
+  } catch (err: unknown) {
+    if (String(err).includes('CHECK constraint')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    throw err
+  }
 
   return c.json({ id: convidadoId, eventoId, nome, localidade, status: 'VALIDADO' }, 201)
 })
