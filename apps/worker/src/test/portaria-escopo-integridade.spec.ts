@@ -1,15 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { readFileSync } from 'node:fs'
 import { setupDb } from './setup'
-
-const migracao = readFileSync(decodeURIComponent(new URL('../../drizzle/0046_portaria_escopo_integridade.sql', import.meta.url).pathname)).toString('utf8')
 
 function banco() {
   const sqlite = new Database(':memory:')
   sqlite.pragma('foreign_keys = ON')
   setupDb(sqlite)
-  sqlite.exec(migracao)
   sqlite.exec(`
     INSERT INTO regionais (id, nome) VALUES ('r', 'Regional');
     INSERT INTO administracoes (id, regional_id, nome) VALUES ('a','r','Administração');
