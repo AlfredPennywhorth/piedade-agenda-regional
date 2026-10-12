@@ -635,7 +635,12 @@ convocacoesRouter.post('/:id/sincronizar-dco', async c => {
             AND ${convocacoes.ativo} = 1
             AND EXISTS (SELECT 1 FROM ${eventos}
               WHERE ${eventos.id} = ${convocacoes.eventoId}
-              AND ${eventos.ativo} = 1 AND ${eventos.abrangencia} = 'TERRITORIAL')
+              AND ${eventos.ativo} = 1 AND ${eventos.abrangencia} = 'TERRITORIAL'
+              AND ${eventos.regionalId} IS ${evento.regionalId ?? null}
+              AND ${eventos.administracaoId} IS ${evento.administracaoId ?? null}
+              AND ${eventos.setorId} IS ${evento.setorId ?? null}
+              AND ${eventos.casaId} IS ${evento.casaId ?? null}
+              AND ${eventos.grupoTrabalhoId} IS ${evento.grupoTrabalhoId ?? null})
             AND EXISTS (SELECT 1 FROM ${convocacaoFuncoes}
               JOIN ${funcoes} ON ${funcoes.id} = ${convocacaoFuncoes.funcaoId}
               WHERE ${convocacaoFuncoes.convocacaoId} = ${convocacoes.id}
