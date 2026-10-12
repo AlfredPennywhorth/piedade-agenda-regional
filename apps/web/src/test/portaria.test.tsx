@@ -134,10 +134,10 @@ describe('PortariaView', () => {
     expect(screen.getByText('Sem resposta')).toBeInTheDocument()
 
     const rows = screen.getAllByTestId(/row-/i)
-    expect(rows[0]).toHaveTextContent('Beto Pendente')
-    expect(rows[1]).toHaveTextContent('Carlos Pendente')
-    expect(rows[2]).toHaveTextContent('Daniel Pendente')
-    expect(rows[3]).toHaveTextContent('Ana Presente')
+    expect(rows[0]).toHaveTextContent('Ana Presente')
+    expect(rows[1]).toHaveTextContent('Beto Pendente')
+    expect(rows[2]).toHaveTextContent('Carlos Pendente')
+    expect(rows[3]).toHaveTextContent('Daniel Pendente')
   })
 
   it('destaca visualmente após checkin e limpa na troca de evento', async () => {
@@ -553,9 +553,11 @@ describe('PortariaView', () => {
         await flushPromises()
 
         const cards = screen.getAllByTestId(/row-/)
-        expect(cards[1]).toHaveTextContent('Retificar check-in')
-        expect(cards[0]).not.toHaveTextContent('Retificar check-in')
-        expect(cards[0]).toHaveTextContent('Registrar Presença')
+        expect(cards[0]).toHaveTextContent('João Ativo')
+        expect(cards[0]).toHaveTextContent('Retificar check-in')
+        expect(cards[1]).toHaveTextContent('Maria Pendente')
+        expect(cards[1]).not.toHaveTextContent('Retificar check-in')
+        expect(cards[1]).toHaveTextContent('Registrar Presença')
       })
 
       it('abre modal de retificação, mostra aviso LGPD e foca o textarea, cancela sem POST', async () => {
