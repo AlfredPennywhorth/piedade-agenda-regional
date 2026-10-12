@@ -625,20 +625,38 @@ convocacoesRouter.post('/:id/sincronizar-dco', async c => {
   const antes = await db.select({ total: sql<number>`count(*)` }).from(convocacaoDestinatarios)
     .where(eq(convocacaoDestinatarios.convocacaoId, id)).get()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
-  await executarOperacaoComAudit(db,
-    qdb => [
-      ...queriesSincronizacaoDcoAtual(qdb, nowIso, { convocacaoId: id }),
-    ],
-    {
-      acao: 'CONVOCACAO_DCO_SINCRONIZADA',
+  try {
+    await executarOperacaoComAudit(db,
+      qdb => [
+        // Guarda atômica: cancelar/desativar ou remover a função após a leitura
+        // deve abortar o batch inteiro, inclusive a auditoria.
+        qdb.update(convocacoes).set({
+          status: sql`CASE WHEN ${convocacoes.status} = 'PUBLICADA'
+            AND ${convocacoes.ativo} = 1
+            AND EXISTS (SELECT 1 FROM ${eventos}
+              WHERE ${eventos.id} = ${convocacoes.eventoId}
+              AND ${eventos.ativo} = 1 AND ${eventos.abrangencia} = 'TERRITORIAL')
+            AND EXISTS (SELECT 1 FROM ${convocacaoFuncoes}
+              JOIN ${funcoes} ON ${funcoes.id} = ${convocacaoFuncoes.funcaoId}
+              WHERE ${convocacaoFuncoes.convocacaoId} = ${convocacoes.id}
+                AND ${funcoes.codigo} = 'DCO' AND ${funcoes.ativo} = 1)
+            THEN 'PUBLICADA' ELSE 'ABORT_OCC' END` as any,
+        }).where(eq(convocacoes.id, id)),
+        ...queriesSincronizacaoDcoAtual(qdb, nowIso, { convocacaoId: id }),
+      ],
+      {
+        acao: 'CONVOCACAO_DCO_SINCRONIZADA',
       atorMembroId,
       recursoTipo: 'CONVOCACAO',
       recursoId: id,
       escopoTipo,
       escopoId,
       contexto: { operacao: 'ADITIVA_IDEMPOTENTE' },
-    }
-  )
+      }
+    )
+  } catch {
+    return c.json({ error: 'Convocação alterada durante a sincronização; recarregue e tente novamente' }, 409)
+  }
   const depois = await db.select({ total: sql<number>`count(*)` }).from(convocacaoDestinatarios)
     .where(eq(convocacaoDestinatarios.convocacaoId, id)).get()
   return c.json({ success: true, destinatariosAntes: antes?.total ?? 0,
