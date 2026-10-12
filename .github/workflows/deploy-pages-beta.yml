@@ -48,6 +48,9 @@ jobs:
       - name: Build frontend for Beta
         env:
           VITE_API_URL: https://piedade-agenda-worker-beta.aws311274.workers.dev/api/v1
+          VITE_APP_ENV: beta
+          VITE_APP_VERSION: 1.1.0
+          VITE_BUILD_SHA: ${{ github.sha }}
         run: pnpm --filter @piedade/web build
 
       - name: Deploy Pages Beta preview
