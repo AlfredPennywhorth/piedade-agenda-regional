@@ -490,6 +490,61 @@ describe('S06 - Convocações', () => {
     )
   })
 
+  it('15c. DCO: Casa, Administração, Regional e GT respeitam seus limites', async () => {
+    const ctx = await setupBaseData()
+    const dco = await db.select().from(funcoes).where(eq(funcoes.codigo, 'DCO')).get()
+    expect(dco).toBeDefined()
+    const adm = await db.select().from(administracoes).where(eq(administracoes.id,
+      (await db.select().from(setores).where(eq(setores.id, ctx.setId)).get()).administracaoId)).get()
+    const dcoId = dco!.id
+    const registroConta = sqlite.prepare('SELECT id FROM contas_acesso WHERE membro_id = ?').get(ctx.mem1Id) as { id: string }
+    for (const [tipo, id] of [['CASA', ctx.casId], ['ADMINISTRACAO', adm.id], ['REGIONAL', ctx.regId], ['GRUPO_TRABALHO', ctx.gtId]]) {
+      sqlite.prepare("INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, 'GESTOR_AGENDA', ?, ?)")
+        .run(crypto.randomUUID(), registroConta.id, tipo, id)
+    }
+    const outroRegional = crypto.randomUUID()
+    const outraAdmin = crypto.randomUUID()
+    const outroSetor = crypto.randomUUID()
+    const outraCasa = crypto.randomUUID()
+    await db.insert(regionais).values({ id: outroRegional, nome: 'Regional externa' })
+    await db.insert(administracoes).values({ id: outraAdmin, nome: 'Admin externa', regionalId: outroRegional })
+    await db.insert(setores).values({ id: outroSetor, nome: 'Setor externo', administracaoId: outraAdmin })
+    await db.insert(casas).values({ id: outraCasa, nome: 'Casa externa', setorId: outroSetor })
+    const membroDentro = crypto.randomUUID()
+    const membroFora = crypto.randomUUID()
+    await db.insert(membros).values([
+      { id: membroDentro, nome: 'DCO da Regional', casaId: ctx.casId, ativo: true },
+      { id: membroFora, nome: 'DCO de outra Regional', casaId: outraCasa, ativo: true },
+    ])
+    await db.insert(vinculosFuncionais).values([
+      { id: crypto.randomUUID(), membroId: membroDentro, funcaoId: dcoId, casaId: ctx.casId, ativo: true, origem: 'MEMBRO_AUTOMATICO' },
+      { id: crypto.randomUUID(), membroId: membroFora, funcaoId: dcoId, casaId: outraCasa, ativo: true, origem: 'MEMBRO_AUTOMATICO' },
+    ])
+    for (const [tipo, escopo] of [['casaId', ctx.casId], ['administracaoId', adm.id], ['regionalId', ctx.regId], ['grupoTrabalhoId', ctx.gtId]] as const) {
+      const evId = crypto.randomUUID()
+      await db.insert(eventos).values({
+        id: evId, titulo: 'DCO escopo ' + tipo, modalidade: 'ONLINE',
+        inicioEm: '2028-04-01T10:00:00.000Z', fimEm: '2028-04-01T11:00:00.000Z',
+        [tipo]: escopo, ativo: true,
+      })
+      const criado = await app.request('/api/v1/convocacoes', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventoId: evId }) })
+      expect(criado.status).toBe(201)
+      const { id: convId } = await criado.json()
+      expect((await app.request(`/api/v1/convocacoes/${convId}/funcoes`, { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ funcaoId: dcoId }) })).status).toBe(201)
+      const publicada = await app.request(`/api/v1/convocacoes/${convId}/publicar`, { method: 'POST' })
+      expect(publicada.status).toBe(200)
+      const destinos = await (await app.request(`/api/v1/convocacoes/${convId}/destinatarios`)).json() as Array<{ membroId: string }>
+      expect(destinos.map(d => d.membroId)).not.toContain(membroFora)
+      if (tipo === 'grupoTrabalhoId') {
+        expect(destinos).toHaveLength(0)
+      } else {
+        expect(destinos.map(d => d.membroId)).toContain(membroDentro)
+      }
+    }
+  })
+
   it('18-19. alterações posteriores não alteram o snapshot gerado', async () => {
     const ctx = await setupBaseData()
     const convRes = await app.request('/api/v1/convocacoes', {
