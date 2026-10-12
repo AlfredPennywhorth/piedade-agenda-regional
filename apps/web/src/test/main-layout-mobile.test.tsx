@@ -3,6 +3,40 @@ import { describe, expect, it, vi } from 'vitest'
 import { MainLayout } from '../components/layout/MainLayout'
 
 describe('MainLayout — navegação móvel', () => {
+  it('exibe código estável da tela atual', () => {
+    const { rerender } = render(
+      <MainLayout currentTab="agenda" onTabChange={vi.fn()} capacidades={{}}>
+        <div>Conteúdo</div>
+      </MainLayout>
+    )
+
+    expect(screen.getByLabelText('Código da tela AGD-MOB-001')).toHaveTextContent('Tela AGD-MOB-001')
+
+    rerender(
+      <MainLayout currentTab="membros" onTabChange={vi.fn()} capacidades={{}}>
+        <div>Conteúdo</div>
+      </MainLayout>
+    )
+
+    expect(screen.getByLabelText('Código da tela AGD-ADM-010')).toHaveTextContent('Tela AGD-ADM-010')
+  })
+
+  it('aplica safe areas no cabeçalho, conteúdo e navegação móvel', () => {
+    const { container } = render(
+      <MainLayout currentTab="agenda" onTabChange={vi.fn()} capacidades={{}}>
+        <div>Conteúdo</div>
+      </MainLayout>
+    )
+
+    const root = container.firstElementChild as HTMLElement
+    const header = container.querySelector('header') as HTMLElement
+    const nav = screen.getByRole('navigation', { name: /navegação móvel principal/i })
+
+    expect(root.className).toContain('safe-area-layout-bottom')
+    expect(header.className).toContain('safe-area-top')
+    expect(nav.className).toContain('safe-area-bottom')
+  })
+
   it('abre o menu Mais e permite acessar módulos administrativos', () => {
     const onTabChange = vi.fn()
 

@@ -108,7 +108,7 @@ describe('S01 — CasasView (Gestão Territorial Frontend)', () => {
     expect(await screen.findByRole('heading', { name: 'Detalhes da Casa de Oração' })).toBeInTheDocument()
     expect(screen.getAllByText('Central de Osasco').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('C-OSC-01').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText(CASA_1_ID)).toBeInTheDocument()
+    expect(screen.queryByText(CASA_1_ID)).not.toBeInTheDocument()
   })
 
   it('6. Criar: deve cadastrar uma nova casa de oração selecionando setor válido (UUID)', async () => {

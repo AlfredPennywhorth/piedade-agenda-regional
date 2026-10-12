@@ -4,6 +4,9 @@ import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/
 import { ConvocacaoFuncoesModal } from './ConvocacaoFuncoesModal'
 import { AcompanhamentoRsvpModal } from './AcompanhamentoRsvpModal'
 interface EventoLookup {
+  pessoal?: boolean
+  abrangencia?: 'TERRITORIAL' | 'NACIONAL' | 'INTERNACIONAL'
+  podeGerenciar?: boolean
   id: string
   titulo: string
   inicioEm: string
@@ -44,6 +47,7 @@ export function ConvocacoesView({
   const [casas, setCasas] = useState<CasaLookup[]>([])
   const [gruposTrabalho, setGruposTrabalho] = useState<GrupoTrabalhoLookup[]>([])
   const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>('ATIVAS')
+  const [periodoFiltro, setPeriodoFiltro] = useState<'FUTUROS' | 'PASSADOS' | 'TODOS'>('FUTUROS')
   const [filtroRegionalId, setFiltroRegionalId] = useState('')
   const [filtroAdministracaoId, setFiltroAdministracaoId] = useState('')
   const [filtroSetorId, setFiltroSetorId] = useState('')
@@ -320,6 +324,8 @@ export function ConvocacoesView({
 
   const eventosDisponiveis = eventosLookup
     .filter(ev => {
+      // Eventos externos recebem convites nominais diretamente em Gestão de Eventos.
+      if (ev.pessoal || ev.podeGerenciar === false || ev.abrangencia === 'NACIONAL' || ev.abrangencia === 'INTERNACIONAL') return false
       if (editandoId && ev.id === formData.eventoId) return true
       if (ev.ativo === false) return false
       if (new Date(ev.fimEm).getTime() < Date.now()) return false
@@ -361,6 +367,13 @@ export function ConvocacoesView({
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
 
   const convocacoesFiltradas = convocacoes.filter(conv => {
+    const evento = getEvento(conv.eventoId)
+    if (periodoFiltro !== 'TODOS' && !evento) return false
+    if (periodoFiltro !== 'TODOS' && evento) {
+      const finalizado = new Date(evento.fimEm).getTime() <= Date.now()
+      if (periodoFiltro === 'FUTUROS' && finalizado) return false
+      if (periodoFiltro === 'PASSADOS' && !finalizado) return false
+    }
     if (filtroStatus === 'ATIVAS' && conv.status === 'CANCELADA') return false
     if (filtroStatus !== 'ATIVAS' && filtroStatus !== 'TODAS' && conv.status !== filtroStatus) return false
 
@@ -390,7 +403,7 @@ export function ConvocacoesView({
           onClick={abrirFormCriar}
           className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors"
         >
-          Novo Rascunho
+          Nova Convocação
         </button>
       </div>
 
@@ -419,6 +432,14 @@ export function ConvocacoesView({
               </select>
             </label>
 
+            <label className="text-xs font-semibold text-slate-700">
+              Período
+              <select aria-label="Filtrar convocações por período" value={periodoFiltro} onChange={e => setPeriodoFiltro(e.target.value as typeof periodoFiltro)} className="mt-1 w-full p-2 border border-slate-300 rounded-lg bg-white text-sm">
+                <option value="FUTUROS">Futuras e em andamento</option>
+                <option value="PASSADOS">Passadas</option>
+                <option value="TODOS">Todos os períodos</option>
+              </select>
+            </label>
             <label className="text-xs font-semibold text-slate-700">
               Regional
               <select
@@ -523,6 +544,7 @@ export function ConvocacoesView({
               type="button"
               onClick={() => {
                 setFiltroStatus('ATIVAS')
+                setPeriodoFiltro('FUTUROS')
                 setFiltroRegionalId('')
                 setFiltroAdministracaoId('')
                 setFiltroSetorId('')
@@ -572,7 +594,7 @@ export function ConvocacoesView({
                   )}
                 </div>
                 <div className="flex items-start gap-2 flex-wrap justify-end">
-                  {conv.status === 'RASCUNHO' && (
+                  {conv.status === 'RASCUNHO' && getEvento(conv.eventoId)?.podeGerenciar !== false && (
                     <button
                       onClick={() => setActionConfirm({ type: 'PUBLICAR', convocacao: conv })}
                       className="text-green-600 hover:text-green-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors"
@@ -580,7 +602,7 @@ export function ConvocacoesView({
                       Publicar
                     </button>
                   )}
-                  {conv.status === 'RASCUNHO' && (
+                  {conv.status === 'RASCUNHO' && getEvento(conv.eventoId)?.podeGerenciar !== false && (
                     <button
                       onClick={() => setGerenciandoFuncoesId(conv.id)}
                       className="text-slate-600 hover:text-slate-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
@@ -596,7 +618,7 @@ export function ConvocacoesView({
                       Acompanhar RSVP
                     </button>
                   )}
-                  {conv.status === 'RASCUNHO' && (
+                  {conv.status === 'RASCUNHO' && getEvento(conv.eventoId)?.podeGerenciar !== false && (
                     <button
                       onClick={() => handleClickEditar(conv)}
                       className="text-brand-600 hover:text-brand-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-brand-50 transition-colors"
@@ -604,7 +626,7 @@ export function ConvocacoesView({
                       Editar
                     </button>
                   )}
-                  {conv.status !== 'CANCELADA' && (
+                  {conv.status !== 'CANCELADA' && getEvento(conv.eventoId)?.podeGerenciar !== false && (
                     <button
                       onClick={() => setActionConfirm({ type: 'CANCELAR', convocacao: conv })}
                       className="text-red-600 hover:text-red-800 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
@@ -627,6 +649,8 @@ export function ConvocacoesView({
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
         >
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+          <span data-screen-code={editandoId ? 'AGD-ADM-032' : 'AGD-ADM-031'} className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela {editandoId ? 'AGD-ADM-032' : 'AGD-ADM-031'}</span>
+
             <div className="p-6 border-b border-slate-200">
               <h2 id="dialog-title" className="text-xl font-bold text-slate-900">
                 {editandoId ? 'Editar Rascunho' : 'Nova Convocação'}
@@ -657,6 +681,7 @@ export function ConvocacoesView({
                       <option key={ev.id} value={ev.id}>{formatarEvento(ev)}</option>
                     ))}
                   </select>
+                  <p className="text-xs text-slate-500 mt-1">Eventos nacionais e internacionais utilizam convites nominais em Gestão de Eventos; não exigem funções institucionais.</p>
                   {errosForm.eventoId && (
                     <p className="text-red-500 text-sm mt-1">{errosForm.eventoId}</p>
                   )}
@@ -710,6 +735,8 @@ export function ConvocacoesView({
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
         >
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+          <span data-screen-code={actionConfirm.type === 'PUBLICAR' ? 'AGD-ADM-033' : 'AGD-ADM-034'} className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela {actionConfirm.type === 'PUBLICAR' ? 'AGD-ADM-033' : 'AGD-ADM-034'}</span>
+
             <div className="p-6 border-b border-slate-200">
               <h2 id="confirm-dialog-title" className="text-xl font-bold text-slate-900">
                 {actionConfirm.type === 'PUBLICAR' ? 'Publicar Convocação' : 'Cancelar Convocação'}

@@ -210,6 +210,7 @@ export function RegionaisView({ podeEditar = true }: { podeEditar?: boolean }) {
       {/* Form de Criação / Edição Inline ou Card */}
       {podeEditar && modoForm && (
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-md space-y-4">
+          <span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-037' : 'AGD-ADM-038'} className="block text-right text-[10px] font-medium tracking-wide text-slate-500">Tela {modoForm === 'criar' ? 'AGD-ADM-037' : 'AGD-ADM-038'}</span>
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <h3 className="font-bold text-slate-800 text-base">
               {modoForm === 'criar' ? 'Cadastrar Nova Regional' : 'Editar Regional'}
@@ -313,7 +314,7 @@ export function RegionaisView({ podeEditar = true }: { podeEditar?: boolean }) {
             Nenhuma regional cadastrada até o momento.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="master-table-scroll">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                 <tr>
@@ -385,10 +386,6 @@ export function RegionaisView({ podeEditar = true }: { podeEditar?: boolean }) {
               <div className="py-6 text-center text-slate-500 text-sm">Carregando detalhes...</div>
             ) : (
               <div className="space-y-3 text-sm">
-                <div>
-                  <span className="text-xs font-semibold text-slate-500 block">ID:</span>
-                  <span className="text-xs font-mono text-slate-700">{regionalDetalhe.id}</span>
-                </div>
                 <div>
                   <span className="text-xs font-semibold text-slate-500 block">Nome:</span>
                   <span className="font-semibold text-slate-800">{regionalDetalhe.nome}</span>

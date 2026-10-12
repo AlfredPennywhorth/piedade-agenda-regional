@@ -108,7 +108,7 @@ describe('S01 — AdministracoesView (Gestão Territorial Frontend)', () => {
     expect(await screen.findByRole('heading', { name: 'Detalhes da Administração' })).toBeInTheDocument()
     expect(screen.getAllByText('Administração Osasco').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('ADM-OSC').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText(ADM_1_ID)).toBeInTheDocument()
+    expect(screen.queryByText(ADM_1_ID)).not.toBeInTheDocument()
   })
 
   it('6. Criar: deve cadastrar uma nova administração selecionando regional válida (UUID)', async () => {

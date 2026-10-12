@@ -80,6 +80,7 @@ describe('ResponsabilidadeRegionalGate', () => {
     )
 
     expect(await screen.findByText('Ciência do responsável PMO')).toBeDefined()
+    expect(screen.getByLabelText('Código da tela AGD-SHR-005')).toHaveTextContent('Tela AGD-SHR-005')
     expect(screen.getByText('Texto integral das responsabilidades.')).toBeDefined()
     expect(screen.getByText('Regional vinculada: Regional São Paulo')).toBeDefined()
     expect(screen.queryByText('Conteúdo autorizado')).toBeNull()

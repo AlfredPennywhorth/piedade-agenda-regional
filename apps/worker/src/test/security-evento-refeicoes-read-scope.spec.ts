@@ -81,7 +81,7 @@ describe('PR-SEC-01 — leitura de refeições por escopo do evento', () => {
     `)
   })
 
-  it('permite consultar refeições de evento no escopo territorial do membro', async () => {
+  it('pertencer ao território não autoriza consultar refeições de evento alheio', async () => {
     const token = await criarSessao()
     const res = await app.request(
       new Request(`http://localhost/api/v1/eventos/${ids.eventoA}/refeicoes`, {
@@ -89,9 +89,7 @@ describe('PR-SEC-01 — leitura de refeições por escopo do evento', () => {
       })
     )
 
-    expect(res.status).toBe(200)
-    const body = await res.json() as Array<{ tipo: string }>
-    expect(body.map(item => item.tipo)).toContain('ALMOCO')
+    expect(res.status).toBe(403)
   })
 
   it('bloqueia refeições de evento de outra Regional', async () => {

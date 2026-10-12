@@ -140,6 +140,31 @@ describe('PortariaView', () => {
     expect(rows[3]).toHaveTextContent('Ana Presente')
   })
 
+  it('ordena alfabeticamente multiplos presentes depois dos pendentes independentemente da ordem recebida', async () => {
+    mockFetchWithAuth.mockResolvedValueOnce({
+      data: [{ id: UUID_EVT1, titulo: 'Evento Teste', inicioEm: '2026-10-01T14:00:00Z', fimEm: '2026-10-01T16:00:00Z', modalidade: 'PRESENCIAL' }]
+    })
+    render(<PortariaView />)
+    await waitFor(() => screen.getByRole('combobox'))
+    mockFetchWithAuth.mockResolvedValueOnce({
+      participantes: [
+        { convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Tiago', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-1', dataHoraCheckin: '2026-10-01T14:10:00Z', forma: 'MANUAL' } },
+        { convocacaoDestinatarioId: UUID_DEST2, membro: { id: UUID_M2, nome: 'Rodrigo', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-2', dataHoraCheckin: '2026-10-01T14:16:00Z', forma: 'MANUAL' } },
+        { convocacaoDestinatarioId: UUID_DEST3, membro: { id: UUID_M3, nome: 'Andre', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-3', dataHoraCheckin: '2026-10-01T14:17:00Z', forma: 'MANUAL' } },
+        { convocacaoDestinatarioId: UUID_DEST4, membro: { id: UUID_M4, nome: 'Osmar', casaNome: null }, rsvpResposta: null, checkin: null }
+      ]
+    })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: UUID_EVT1 } })
+    await waitFor(() => expect(screen.getByText('Presentes: 3')).toBeInTheDocument())
+    const rows = screen.getAllByTestId(/row-/i)
+    expect(rows.map(row => row.textContent)).toEqual([
+      expect.stringContaining('Osmar'),
+      expect.stringContaining('Andre'),
+      expect.stringContaining('Rodrigo'),
+      expect.stringContaining('Tiago')
+    ])
+  })
+
   it('destaca visualmente após checkin e limpa na troca de evento', async () => {
     const eventosDisponiveis = {
       data: [
@@ -553,9 +578,11 @@ describe('PortariaView', () => {
         await flushPromises()
 
         const cards = screen.getAllByTestId(/row-/)
-        expect(cards[1]).toHaveTextContent('Retificar check-in')
+        expect(cards[0]).toHaveTextContent('Maria Pendente')
         expect(cards[0]).not.toHaveTextContent('Retificar check-in')
         expect(cards[0]).toHaveTextContent('Registrar Presença')
+        expect(cards[1]).toHaveTextContent('João Ativo')
+        expect(cards[1]).toHaveTextContent('Retificar check-in')
       })
 
       it('abre modal de retificação, mostra aviso LGPD e foca o textarea, cancela sem POST', async () => {

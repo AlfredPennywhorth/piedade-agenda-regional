@@ -131,6 +131,25 @@ describe('S07 - Minha Agenda e Calendário', () => {
     })
   }
 
+  it('evento Próprio abre na agenda e calendário sem RSVP, convocação ou QR', async () => {
+    const pessoal = { ...mockEventos[0], evento: { ...mockEventos[0].evento, pessoal: true, titulo: 'Meu compromisso' }, convocacao: null, destinatarioId: null, vinculo: null, rsvp: null }
+    mockAgenda([pessoal])
+    render(<App />)
+    fireEvent.click(await screen.findByText('Meu compromisso'))
+    let dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/já incluído na sua agenda/i)).toBeInTheDocument()
+    expect(within(dialog).queryByText('Sua Participação')).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /apresentar qr code/i })).not.toBeInTheDocument()
+    expect(apiClient.fetchWithAuth).not.toHaveBeenCalledWith(expect.stringContaining('/convocacoes/'))
+    fireEvent.click(within(dialog).getByRole('button', { name: /fechar/i }))
+    fireEvent.click((await mobileNav()).getByText('Calendário'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Selecionar dia 24' }))
+    fireEvent.click(await screen.findByText('Meu compromisso'))
+    dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/já incluído na sua agenda/i)).toBeInTheDocument()
+    expect(apiClient.putWithAuth).not.toHaveBeenCalled()
+  })
+
   it('1. Renderiza o Layout Principal com Navegação', async () => {
     mockAgenda([])
     render(<App />)

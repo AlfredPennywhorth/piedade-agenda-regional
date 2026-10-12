@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { and, eq } from 'drizzle-orm'
-import { espacosLocal } from '../db/schema'
+import { and, eq, isNull, or } from 'drizzle-orm'
+import { espacosLocal, locais } from '../db/schema'
 import { EspacoLocalCreate, EspacoLocalUpdate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { exigirMasterParaEscrita } from '../middleware/master-write'
@@ -9,13 +9,12 @@ import { executarOperacaoComAudit } from '../services/auditoria'
 export const espacosLocaisRouter = new Hono<any>()
 
 espacosLocaisRouter.use('*', authMiddleware)
-espacosLocaisRouter.use('*', exigirMasterParaEscrita)
 
 espacosLocaisRouter.get('/', async c => {
   const db = c.get('db')
   const localId = c.req.query('localId')
   const ativo = c.req.query('ativo')
-  const conditions = []
+  const conditions = [or(isNull(espacosLocal.proprietarioMembroId), eq(espacosLocal.proprietarioMembroId, c.get('membroId')))]
   if (localId) conditions.push(eq(espacosLocal.localId, localId))
   if (ativo !== undefined) conditions.push(eq(espacosLocal.ativo, ativo === 'true'))
 
@@ -30,14 +29,40 @@ espacosLocaisRouter.get('/', async c => {
 espacosLocaisRouter.get('/:id', async c => {
   const db = c.get('db')
   const item = await db.select().from(espacosLocal).where(eq(espacosLocal.id, c.req.param('id'))).get()
-  if (!item) return c.json({ error: 'Espaço não encontrado' }, 404)
+  if (!item || (item.proprietarioMembroId && item.proprietarioMembroId !== c.get('membroId'))) return c.json({ error: 'Espaço não encontrado' }, 404)
   return c.json(item)
 })
 
-espacosLocaisRouter.post('/', async c => {
+espacosLocaisRouter.post('/particulares', async c => {
+  const db = c.get('db')
+  const proprietarioMembroId = c.get('membroId')
+  if (!proprietarioMembroId) return c.json({ error: 'Sessão não autenticada' }, 401)
+  try {
+    const parsed = EspacoLocalCreate.parse(await c.req.json())
+    const local = await db.select().from(locais).where(and(eq(locais.id, parsed.localId), eq(locais.proprietarioMembroId, proprietarioMembroId))).get()
+    if (!local) return c.json({ error: 'Local particular não encontrado' }, 404)
+    const id = crypto.randomUUID()
+    await executarOperacaoComAudit(db, qdb => [qdb.insert(espacosLocal).values({
+      id, ...parsed, proprietarioMembroId,
+    })], {
+      acao: 'ESPACO_PARTICULAR_CRIADO',
+      atorMembroId: proprietarioMembroId, recursoTipo: 'ESPACO_LOCAL', recursoId: id,
+      escopoTipo: 'PESSOAL', escopoId: proprietarioMembroId,
+      contexto: { localId: parsed.localId },
+    })
+    return c.json(await db.select().from(espacosLocal).where(eq(espacosLocal.id,id)).get(), 201)
+  } catch (err: any) {
+    if (String(err.message).includes('UNIQUE constraint')) return c.json({ error: 'Espaço já cadastrado neste local' }, 409)
+    return c.json({ error: err.issues || err.message }, 400)
+  }
+})
+
+espacosLocaisRouter.post('/', exigirMasterParaEscrita, async c => {
   const db = c.get('db')
   try {
     const parsed = EspacoLocalCreate.parse(await c.req.json())
+    const local = await db.select().from(locais).where(eq(locais.id, parsed.localId)).get()
+    if (!local || local.proprietarioMembroId) return c.json({ error: 'Local institucional não encontrado' }, 404)
     const id = crypto.randomUUID()
     await executarOperacaoComAudit(
       db,
@@ -64,12 +89,12 @@ espacosLocaisRouter.post('/', async c => {
   }
 })
 
-espacosLocaisRouter.patch('/:id', async c => {
+espacosLocaisRouter.patch('/:id', exigirMasterParaEscrita, async c => {
   const db = c.get('db')
   try {
     const id = c.req.param('id')
     const existing = await db.select().from(espacosLocal).where(eq(espacosLocal.id, id)).get()
-    if (!existing) return c.json({ error: 'Espaço não encontrado' }, 404)
+    if (!existing || existing.proprietarioMembroId) return c.json({ error: 'Espaço institucional não encontrado' }, 404)
     const parsed = EspacoLocalUpdate.parse(await c.req.json())
     if (parsed.localId && parsed.localId !== existing.localId) {
       return c.json(

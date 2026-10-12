@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { AgendaItem } from './types'
+import { PAISES_ISO } from '@piedade/shared'
 import * as apiClient from '../../api/apiClient'
 import { QrCodeModal } from './QrCodeModal'
 
 interface EventoDetalheProps {
   item: AgendaItem
   onClose: () => void
+  onExternalResponseUpdated?: (eventoId: string, status: 'CONFIRMADO' | 'RECUSADO') => void
   onRsvpUpdated?: (
     destinatarioId: string,
     rsvp: {
@@ -17,9 +19,21 @@ interface EventoDetalheProps {
   ) => void
 }
 
-export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalheProps) {
+export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponseUpdated }: EventoDetalheProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   
+  const [statusExterno, setStatusExterno] = useState(item.participacaoExterna?.status ?? null)
+  const destinoExterno = item.evento.abrangencia === 'NACIONAL'
+    ? [item.evento.destinoCidadeLocal, item.evento.destinoUf].filter(Boolean).join(' — ')
+    : item.evento.abrangencia === 'INTERNACIONAL'
+      ? [
+          item.evento.destinoCidadeLocal,
+          item.evento.destinoPaisCodigo
+            ? (PAISES_ISO.find(([codigo]) => codigo === item.evento.destinoPaisCodigo)?.[1] || item.evento.destinoPaisCodigo)
+            : null,
+        ].filter(Boolean).join(' — ')
+      : ''
+
   const [respostaLocal, setRespostaLocal] = useState<string | null>(item.rsvp?.resposta ?? null)
   const reconfirmacaoPendente = item.rsvp?.reconfirmacaoPendente ?? false
   const [ausenciaSelecionada, setAusenciaSelecionada] = useState(false)
@@ -46,6 +60,8 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
   }, [])
 
   useEffect(() => {
+    if (!item.convocacao) return
+    const convocacaoId = item.convocacao.id
     let ativo = true
 
     const carregarConvidados = async () => {
@@ -61,13 +77,13 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
         }
 
         const primeiraPagina = await apiClient.fetchWithAuth<AcompanhamentoResponse>(
-          `/convocacoes/${item.convocacao.id}/acompanhamento-rsvp?limit=100&page=1`
+          `/convocacoes/${convocacaoId}/acompanhamento-rsvp?limit=100&page=1`
         )
         const todos = [...primeiraPagina.data]
 
         for (let pagina = 2; pagina <= primeiraPagina.meta.lastPage; pagina++) {
           const resposta = await apiClient.fetchWithAuth<AcompanhamentoResponse>(
-            `/convocacoes/${item.convocacao.id}/acompanhamento-rsvp?limit=100&page=${pagina}`
+            `/convocacoes/${convocacaoId}/acompanhamento-rsvp?limit=100&page=${pagina}`
           )
           todos.push(...resposta.data)
         }
@@ -90,7 +106,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
     return () => {
       ativo = false
     }
-  }, [item.convocacao.id])
+  }, [item.convocacao?.id])
 
   const handleClose = () => {
     if (dialogRef.current) {
@@ -100,6 +116,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
   }
 
   const handleRsvp = async (resposta: 'PARTICIPAREI' | 'NAO_PARTICIPAREI' | 'NAO_SEI', bypassEditCheck = false) => {
+    if (!item.destinatarioId || item.evento.pessoal) return
     if (resposta === 'NAO_PARTICIPAREI' && !justificativa.trim()) {
       setRsvpError('Justificativa é obrigatória para ausência.')
       return
@@ -174,6 +191,21 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
     }
   }
 
+  const responderConviteExterno = async (resposta: 'CONFIRMADO' | 'RECUSADO') => {
+    setRsvpError('')
+    setIsLoadingRsvp(true)
+    try {
+      await apiClient.patchWithAuth(`/eventos/${item.evento.id}/participantes-externos/resposta`, { resposta })
+      setStatusExterno(resposta)
+      onExternalResponseUpdated?.(item.evento.id, resposta)
+      onClose()
+    } catch (err: any) {
+      setRsvpError(err.message || 'Erro ao registrar resposta ao convite.')
+    } finally {
+      setIsLoadingRsvp(false)
+    }
+  }
+
   const handlePeriodoToggle = (periodo: string) => {
     setPeriodosLocal(prev => 
       prev.includes(periodo) ? prev.filter(p => p !== periodo) : [...prev, periodo]
@@ -200,7 +232,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
   const isPresentialOrHybrid = item.evento.modalidade === 'PRESENCIAL' || item.evento.modalidade === 'HIBRIDO'
 
   const handleShareWhatsApp = () => {
-    const texto = `*[Agenda Regional]* ${item.evento.titulo}\nData: ${dateStr} às ${timeInicio}${item.local?.nome ? `\nLocal: ${item.local.nome}` : ''}${item.espaco?.nome ? `\nEspaço: ${item.espaco.nome}` : ''}\n\nAcesse a agenda para confirmar sua presença.`
+    const texto = `*[Agenda Regional]* ${item.evento.titulo}\nData: ${dateStr} às ${timeInicio}${destinoExterno ? `\nDestino: ${destinoExterno}` : item.local?.nome ? `\nLocal: ${item.local.nome}` : ''}${item.espaco?.nome ? `\nEspaço: ${item.espaco.nome}` : ''}\n\nAcesse a agenda para confirmar sua presença.`
     const url = `https://wa.me/?text=${encodeURIComponent(texto)}`
     window.open(url, '_blank', 'noopener,noreferrer')
   }
@@ -268,7 +300,18 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
           </div>
         </div>
 
-        {isPresentialOrHybrid && item.local && (
+        {destinoExterno && (
+          <div className="border-t border-slate-100 pt-6">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Destino da reunião</h3>
+            <div className="bg-slate-50 rounded-lg p-4 border border-slate-100">
+              <p className="font-semibold text-slate-900">{destinoExterno}</p>
+              {item.local?.nome && <p className="text-sm text-slate-600 mt-1">Local: {item.local.nome}</p>}
+              {item.espaco?.nome && <p className="text-sm text-slate-600 mt-1">Espaço: {item.espaco.nome}</p>}
+            </div>
+          </div>
+        )}
+
+        {isPresentialOrHybrid && item.local && !destinoExterno && (
           <div className="border-t border-slate-100 pt-6">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Local</h3>
             <div className="bg-slate-50 rounded-lg p-4 border border-slate-100">
@@ -311,11 +354,11 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
           </div>
         )}
 
-        {item.convocacao.observacoes && (
+        {item.convocacao?.observacoes && (
           <div className="border-t border-slate-100 pt-6">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Observações</h3>
             <div className="bg-amber-50 text-amber-900 border border-amber-200 rounded-lg p-4 text-sm whitespace-pre-wrap">
-              {item.convocacao.observacoes}
+              {item.convocacao?.observacoes}
             </div>
           </div>
         )}
@@ -371,7 +414,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
           </div>
         )}
 
-        {showQrModal && (
+        {showQrModal && item.destinatarioId && (
           <QrCodeModal
             destinatarioId={item.destinatarioId}
             tituloEvento={item.evento.titulo}
@@ -379,7 +422,21 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
           />
         )}
 
-        <div className="border-t border-slate-100 pt-6 pb-2">
+        {item.participacaoExterna && (
+          <div className="border-t border-slate-100 pt-6 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase">Participação individual</h3>
+            <p className="text-sm text-slate-700">Situação: {statusExterno === 'CONVIDADO' ? 'Convite pendente' : statusExterno === 'ATRIBUIDO' ? 'Atribuição individual' : statusExterno === 'CONFIRMADO' ? 'Confirmado' : 'Recusado'}</p>
+            {statusExterno === 'CONVIDADO' && dateObjInicio > new Date() && (
+              <div className="flex gap-2">
+                <button disabled={isLoadingRsvp} onClick={() => void responderConviteExterno('CONFIRMADO')} className="flex-1 rounded-lg bg-green-700 text-white px-3 py-2 text-sm">Confirmar</button>
+                <button disabled={isLoadingRsvp} onClick={() => void responderConviteExterno('RECUSADO')} className="flex-1 rounded-lg border border-red-300 text-red-700 px-3 py-2 text-sm">Recusar</button>
+              </div>
+            )}
+            {rsvpError && <p role="alert" className="text-sm text-red-700">{rsvpError}</p>}
+          </div>
+        )}
+
+        {!item.evento.pessoal && item.destinatarioId && <div className="border-t border-slate-100 pt-6 pb-2">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Sua Participação</h3>
             {reconfirmacaoPendente && (
@@ -521,7 +578,9 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated }: EventoDetalhePro
               )}
             </div>
           )}
-        </div>
+        </div>}
+
+        {item.evento.pessoal && <p className="rounded-lg bg-brand-50 p-4 text-sm text-brand-800">Evento Próprio — já incluído na sua agenda.</p>}
 
         {item.evento.refeicoesOferecidas && item.evento.refeicoesOferecidas.length > 0 && (
           <div className="border-t border-slate-100 pt-6">

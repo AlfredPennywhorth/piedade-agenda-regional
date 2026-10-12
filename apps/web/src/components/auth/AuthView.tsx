@@ -102,6 +102,13 @@ export function AuthView({
   if (recuperando && !ativando) {
     return (
       <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <span
+          className="fixed bottom-2 right-2 z-50 rounded bg-white/90 px-2 py-1 text-[10px] font-medium tracking-wide text-slate-400 shadow-sm"
+          data-screen-code="AGD-SHR-004"
+          aria-label="Código da tela AGD-SHR-004"
+        >
+          Tela AGD-SHR-004
+        </span>
         <section className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-lg p-6 space-y-6">
           <header className="space-y-2 text-center">
             <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">
@@ -177,8 +184,17 @@ export function AuthView({
     )
   }
 
+  const screenCode = ativando ? 'AGD-SHR-003' : 'AGD-SHR-002'
+
   return (
     <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <span
+        className="fixed bottom-2 right-2 z-50 rounded bg-white/90 px-2 py-1 text-[10px] font-medium tracking-wide text-slate-400 shadow-sm"
+        data-screen-code={screenCode}
+        aria-label={`Código da tela ${screenCode}`}
+      >
+        Tela {screenCode}
+      </span>
       <section className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-lg p-6 space-y-6">
         <header className="space-y-2 text-center">
           <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">

@@ -1,4 +1,6 @@
 import { AgendaItem } from './types'
+import { PAISES_ISO } from '@piedade/shared'
+import { corEscopoEvento } from './escoposCores'
 
 interface EventCardProps {
   item: AgendaItem
@@ -6,10 +8,18 @@ interface EventCardProps {
 }
 
 function statusParticipacao(item: AgendaItem) {
+  if (item.evento.pessoal) return { label: 'Próprio', className: 'bg-brand-50 text-brand-700 border-brand-200' }
   if (item.rsvp?.reconfirmacaoPendente) {
     return { label: 'Reconfirmar presença', className: 'bg-amber-50 text-amber-800 border-amber-300' }
   }
 
+  if (item.participacaoExterna) {
+    const status = item.participacaoExterna.status
+    if (status === 'CONFIRMADO') return { label: 'Confirmado', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+    if (status === 'RECUSADO') return { label: 'Recusado', className: 'bg-red-50 text-red-700 border-red-200' }
+    if (status === 'ATRIBUIDO') return { label: 'Participação atribuída', className: 'bg-brand-50 text-brand-700 border-brand-200' }
+    return { label: 'Confirmar convite', className: 'bg-amber-50 text-amber-800 border-amber-300' }
+  }
   switch (item.rsvp?.resposta) {
     case 'PARTICIPAREI':
       return { label: 'Confirmado', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
@@ -46,11 +56,17 @@ export function EventCard({ item, onClick }: EventCardProps) {
   const timeInicio = inicio.toLocaleTimeString('pt-BR', { timeZone, hour: '2-digit', minute: '2-digit' })
   const timeFim = fim.toLocaleTimeString('pt-BR', { timeZone, hour: '2-digit', minute: '2-digit' })
   const status = statusParticipacao(item)
+  const escopo = corEscopoEvento(item)
+  const destino = item.evento.abrangencia === 'NACIONAL'
+    ? [item.evento.destinoCidadeLocal, item.evento.destinoUf].filter(Boolean).join(' — ')
+    : item.evento.abrangencia === 'INTERNACIONAL'
+      ? [item.evento.destinoCidadeLocal, item.evento.destinoPaisCodigo ? (PAISES_ISO.find(([codigo]) => codigo === item.evento.destinoPaisCodigo)?.[1] || item.evento.destinoPaisCodigo) : null].filter(Boolean).join(' — ')
+      : null
 
   return (
     <button
       onClick={onClick}
-      className={`w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-brand-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-300 ${
+      className={`w-full rounded-2xl border border-slate-200 border-l-4 ${escopo.borda} bg-white p-4 text-left shadow-sm transition hover:border-brand-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-300 ${
         item.conflito?.atenuado ? 'opacity-50' : ''
       }`}
     >
@@ -82,13 +98,13 @@ export function EventCard({ item, onClick }: EventCardProps) {
               <span>{timeInicio} às {timeFim}</span>
             </p>
 
-            {item.local && (
+            {(destino || item.local) && (
               <p className="flex items-center gap-2">
                 <svg className="h-4 w-4 shrink-0 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <span className="truncate">{item.local.nome}</span>
+                <span className="truncate">{destino || item.local?.nome}</span>
               </p>
             )}
           </div>
@@ -101,6 +117,7 @@ export function EventCard({ item, onClick }: EventCardProps) {
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${escopo.selo}`}>{escopo.nome}</span>
             <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">
               {item.evento.modalidade}
             </span>

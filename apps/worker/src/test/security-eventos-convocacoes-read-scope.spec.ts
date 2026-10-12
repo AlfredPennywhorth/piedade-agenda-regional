@@ -102,16 +102,16 @@ describe('PR-SEC-01 — leitura de Eventos e Convocações por escopo', () => {
     `)
   })
 
-  it('lista e detalhe de eventos não expõem outra Regional', async () => {
+  it('lista e detalhe exibem o evento destinado ao membro e ocultam eventos sem autorização', async () => {
     const token = await criarSessao()
 
     const lista = await req(token, '/api/v1/eventos')
     expect(lista.status).toBe(200)
     const eventos = await lista.json() as Array<{ id: string }>
-    expect(eventos.map(item => item.id)).toContain(id.eventoA)
-    expect(eventos.map(item => item.id)).not.toContain(id.eventoB)
+    expect(eventos.map(item => item.id)).not.toContain(id.eventoA)
+    expect(eventos.map(item => item.id)).toContain(id.eventoB)
 
-    const fora = await req(token, `/api/v1/eventos/${id.eventoB}`)
+    const fora = await req(token, `/api/v1/eventos/${id.eventoB2}`)
     expect(fora.status).toBe(403)
   })
 

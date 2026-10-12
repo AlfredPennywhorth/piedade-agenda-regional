@@ -1,12 +1,13 @@
 import { Hono } from 'hono'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, sql } from 'drizzle-orm'
 import { eventos, convocacoes, convocacaoDestinatarios, membros, casas, rsvp, checkins, contasAcesso, portariasEvento, portariaOperadoresEvento, convidadosEvento, credenciaisCadastroPortariaEvento, credenciaisOperadorPortariaEvento, presencasConvidadoEvento, portariaFechamentos, portariaFechamentoItens, portariaSolicitacoesFechamento, portariaReaberturas, portariaFechamentoLocks } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
-import { eMasterSistema, eOperadorPortariaAutorizado, podeGerenciarAgendaNoEscopo } from '../security/permissoes'
+import { eMasterSistema, eOperadorPortariaAutorizado } from '../security/permissoes'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
 import { PortariaEventosQuerySchema, getSaoPauloDateString, getSaoPauloEndOfDayIso } from '@piedade/shared'
 import { gerarTokenAleatorio, hashToken } from '../security/tokens'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
+import { podeGerenciarEvento } from '../security/eventos'
 import { executeAtomic } from '../db/batch'
 
 export const portariaRouter = new Hono<{ Variables: Variables }>()
@@ -14,16 +15,16 @@ export const portariaRouter = new Hono<{ Variables: Variables }>()
 portariaRouter.use('*', authMiddleware)
 
 
+function portariaDisponivel(evento: any): boolean {
+  return !evento.pessoal && evento.abrangencia !== 'NACIONAL' && evento.abrangencia !== 'INTERNACIONAL'
+}
+
 async function podeGerarCredencialOperador(db: any, membroId: string, contexto: any, evento: any) {
+  // Eventos externos usam participação nominal, sem destinatários de convocação.
+  // A Portaria tradicional não suporta check-in externo; não oferecer credenciais.
+  if (evento.pessoal) return false
   if (eMasterSistema(contexto)) return true
-  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
-  if (!escopoTipo || !escopoId) return false
-  return podeGerenciarAgendaNoEscopo(
-    db,
-    membroId,
-    escopoTipo as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
-    escopoId
-  )
+  return podeGerenciarEvento(db, membroId, evento)
 }
 
 // POST /api/v1/portaria/eventos/:eventoId/credenciais-operador
@@ -40,6 +41,7 @@ portariaRouter.post('/eventos/:eventoId/credenciais-operador', async c => {
     return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
   }
 
+  if (evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') return c.json({error:'Portaria indisponível para eventos externos',code:'PORTARIA_INDISPONIVEL'},409)
   if (!atorMembroId || !(await podeGerarCredencialOperador(db, atorMembroId, contexto, evento))) {
     return c.json({ error: 'Acesso não autorizado para gerar porteiro temporário', code: 'FORBIDDEN' }, 403)
   }
@@ -57,40 +59,45 @@ portariaRouter.post('/eventos/:eventoId/credenciais-operador', async c => {
   const expiraEm = getSaoPauloEndOfDayIso(evento.inicioEm)
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
-  await executarOperacaoComAudit(
-    db,
-    qdb => {
-      const queries = []
-      if (!estado) {
-        queries.push(qdb.insert(portariasEvento).values({
+  try {
+    await executarOperacaoComAudit(
+      db,
+      qdb => {
+        const queries = []
+        if (!estado) {
+          queries.push(qdb.insert(portariasEvento).values({
+            eventoId,
+            status: 'ABERTA',
+            createdAt: agora,
+            updatedAt: agora,
+          }))
+        }
+        queries.push(qdb.insert(credenciaisOperadorPortariaEvento).values({
+          id: credencialId,
           eventoId,
-          status: 'ABERTA',
+          tokenHash,
+          expiraEm,
+          criadoPorMembroId: atorMembroId,
+          ativo: true,
           createdAt: agora,
           updatedAt: agora,
         }))
+        return queries
+      },
+      {
+        acao: 'PORTARIA_CREDENCIAL_OPERADOR_CRIADA',
+        atorMembroId,
+        recursoTipo: 'CREDENCIAL_OPERADOR_PORTARIA',
+        recursoId: credencialId,
+        escopoTipo,
+        escopoId,
+        contexto: { eventoId },
       }
-      queries.push(qdb.insert(credenciaisOperadorPortariaEvento).values({
-        id: credencialId,
-        eventoId,
-        tokenHash,
-        expiraEm,
-        criadoPorMembroId: atorMembroId,
-        ativo: true,
-        createdAt: agora,
-        updatedAt: agora,
-      }))
-      return queries
-    },
-    {
-      acao: 'PORTARIA_CREDENCIAL_OPERADOR_CRIADA',
-      atorMembroId,
-      recursoTipo: 'CREDENCIAL_OPERADOR_PORTARIA',
-      recursoId: credencialId,
-      escopoTipo,
-      escopoId,
-      contexto: { eventoId },
-    }
-  )
+    )
+  } catch (err: unknown) {
+    if (String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    throw err
+  }
 
   return c.json({
     id: credencialId,
@@ -216,6 +223,7 @@ portariaRouter.post('/eventos/:eventoId/operadores', async c => {
   if (!evento) {
     return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
   }
+  if (evento.pessoal || evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') return c.json({error:'Portaria indisponível para este evento',code:'PORTARIA_INDISPONIVEL'},409)
 
   const operador = await db
     .select({ membroId: membros.id, contaId: contasAcesso.id, status: contasAcesso.status })
@@ -252,39 +260,44 @@ portariaRouter.post('/eventos/:eventoId/operadores', async c => {
   const autorizacaoId = crypto.randomUUID()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
-  await executarOperacaoComAudit(
-    db,
-    qdb => {
-      const queries = []
-      if (!estado) {
-        queries.push(qdb.insert(portariasEvento).values({
+  try {
+    await executarOperacaoComAudit(
+      db,
+      qdb => {
+        const queries = []
+        if (!estado) {
+          queries.push(qdb.insert(portariasEvento).values({
+            eventoId,
+            status: 'ABERTA',
+            createdAt: agora,
+            updatedAt: agora,
+          }))
+        }
+        queries.push(qdb.insert(portariaOperadoresEvento).values({
+          id: autorizacaoId,
           eventoId,
-          status: 'ABERTA',
+          membroId: body.membroId!,
+          concedidoPorMembroId: atorMembroId,
+          ativo: true,
           createdAt: agora,
           updatedAt: agora,
         }))
+        return queries
+      },
+      {
+        acao: 'PORTARIA_OPERADOR_TEMPORARIO_CONCEDIDO',
+        atorMembroId,
+        recursoTipo: 'PORTARIA_OPERADOR_EVENTO',
+        recursoId: autorizacaoId,
+        escopoTipo,
+        escopoId,
+        contexto: { eventoId, operadorMembroId: body.membroId },
       }
-      queries.push(qdb.insert(portariaOperadoresEvento).values({
-        id: autorizacaoId,
-        eventoId,
-        membroId: body.membroId!,
-        concedidoPorMembroId: atorMembroId,
-        ativo: true,
-        createdAt: agora,
-        updatedAt: agora,
-      }))
-      return queries
-    },
-    {
-      acao: 'PORTARIA_OPERADOR_TEMPORARIO_CONCEDIDO',
-      atorMembroId,
-      recursoTipo: 'PORTARIA_OPERADOR_EVENTO',
-      recursoId: autorizacaoId,
-      escopoTipo,
-      escopoId,
-      contexto: { eventoId, operadorMembroId: body.membroId },
-    }
-  )
+    )
+  } catch (err: unknown) {
+    if (String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    throw err
+  }
 
   return c.json({
     id: autorizacaoId,
@@ -380,6 +393,7 @@ portariaRouter.get('/eventos/:eventoId/fechamento-solicitacao', async c => {
 
   const evento = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
   if (!evento) return c.json({ error: 'Evento não encontrado', code: 'NOT_FOUND' }, 404)
+  if (!portariaDisponivel(evento)) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
 
   const operador = await eOperadorPortariaAutorizado(db, atorMembroId, evento)
   const gestor = Boolean(
@@ -439,40 +453,45 @@ portariaRouter.post('/eventos/:eventoId/solicitar-fechamento', async c => {
   const agora = new Date().toISOString()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
-  await executarOperacaoComAudit(
-    db,
-    qdb => [
-      qdb.insert(portariaSolicitacoesFechamento).values({
-        eventoId,
-        solicitadoPorMembroId: atorMembroId,
-        solicitadoPorCredencialId: null,
-        solicitadoEm: agora,
-        confirmadoPorMembroId: null,
-        confirmadoEm: null,
-        createdAt: agora,
-        updatedAt: agora,
-      }).onConflictDoUpdate({
-        target: portariaSolicitacoesFechamento.eventoId,
-        set: {
+  try {
+    await executarOperacaoComAudit(
+      db,
+      qdb => [
+        qdb.insert(portariaSolicitacoesFechamento).values({
+          eventoId,
           solicitadoPorMembroId: atorMembroId,
           solicitadoPorCredencialId: null,
           solicitadoEm: agora,
           confirmadoPorMembroId: null,
           confirmadoEm: null,
+          createdAt: agora,
           updatedAt: agora,
-        },
-      }),
-    ],
-    {
-      acao: 'PORTARIA_FECHAMENTO_SOLICITADO',
-      atorMembroId,
-      recursoTipo: 'PORTARIA',
-      recursoId: eventoId,
-      escopoTipo,
-      escopoId,
-      contexto: { eventoId },
-    }
-  )
+        }).onConflictDoUpdate({
+          target: portariaSolicitacoesFechamento.eventoId,
+          set: {
+            solicitadoPorMembroId: atorMembroId,
+            solicitadoPorCredencialId: null,
+            solicitadoEm: agora,
+            confirmadoPorMembroId: null,
+            confirmadoEm: null,
+            updatedAt: agora,
+          },
+        }),
+      ],
+      {
+        acao: 'PORTARIA_FECHAMENTO_SOLICITADO',
+        atorMembroId,
+        recursoTipo: 'PORTARIA',
+        recursoId: eventoId,
+        escopoTipo,
+        escopoId,
+        contexto: { eventoId },
+      }
+    )
+  } catch (err: unknown) {
+    if (String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    throw err
+  }
 
   return c.json({
     status: 'AGUARDANDO_CONFIRMACAO',
@@ -492,6 +511,7 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
   if (!evento) {
     return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
   }
+  if (!portariaDisponivel(evento)) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
 
   const estado = await db.select().from(portariasEvento)
     .where(eq(portariasEvento.eventoId, eventoId)).get()
@@ -539,8 +559,10 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
         criadoEm: new Date().toISOString(),
       }),
     ])
-  } catch {
-    return c.json({ error: 'A Portaria já está sendo encerrada', code: 'PORTARIA_FECHANDO' }, 409)
+  } catch (err: unknown) {
+    if (String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    if (/UNIQUE constraint failed: portaria_fechamento_locks\.evento_id/i.test(String(err))) return c.json({ error: 'A Portaria já está sendo encerrada', code: 'PORTARIA_FECHANDO' }, 409)
+    throw err
   }
 
   let snapshot
@@ -678,6 +700,7 @@ portariaRouter.post('/eventos/:eventoId/fechar', async c => {
     await db.delete(portariaFechamentoLocks)
       .where(eq(portariaFechamentoLocks.eventoId, eventoId))
       .execute()
+    if (String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
     throw err
   }
 
@@ -706,6 +729,7 @@ portariaRouter.post('/eventos/:eventoId/reabrir', async c => {
   if (!evento) {
     return c.json({ error: 'Evento não encontrado ou inativo', code: 'NOT_FOUND' }, 404)
   }
+  if (!portariaDisponivel(evento)) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
 
   if (!atorMembroId || !(await podeGerarCredencialOperador(db, atorMembroId, contexto, evento))) {
     return c.json(
@@ -744,47 +768,52 @@ portariaRouter.post('/eventos/:eventoId/reabrir', async c => {
   const reaberturaId = crypto.randomUUID()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
-  await executarOperacaoComAudit(
-    db,
-    qdb => [
-      qdb.delete(portariaFechamentoItens)
-        .where(eq(portariaFechamentoItens.fechamentoId, fechamento.id)),
-      qdb.delete(portariaFechamentos)
-        .where(eq(portariaFechamentos.id, fechamento.id)),
-      qdb.delete(portariaSolicitacoesFechamento)
-        .where(eq(portariaSolicitacoesFechamento.eventoId, eventoId)),
-      qdb.update(portariasEvento).set({
-        status: 'ABERTA',
-        fechadaEm: null,
-        fechadaPorMembroId: null,
-        updatedAt: agora,
-      }).where(eq(portariasEvento.eventoId, eventoId)),
-      qdb.insert(portariaReaberturas).values({
-        id: reaberturaId,
-        eventoId,
-        fechamentoAnteriorId: fechamento.id,
-        reabertaPorMembroId: atorMembroId,
-        motivo,
-        reabertaEm: agora,
-        createdAt: agora,
-        updatedAt: agora,
-      }),
-    ],
-    {
-      acao: 'PORTARIA_REABERTA',
-      atorMembroId,
-      recursoTipo: 'PORTARIA',
-      recursoId: eventoId,
-      escopoTipo,
-      escopoId,
-      contexto: {
-        eventoId,
-        fechamentoAnteriorId: fechamento.id,
-        motivo,
-        credenciaisTemporariasReativadas: false,
-      },
-    }
-  )
+  try {
+    await executarOperacaoComAudit(
+      db,
+      qdb => [
+        qdb.delete(portariaFechamentoItens)
+          .where(eq(portariaFechamentoItens.fechamentoId, fechamento.id)),
+        qdb.delete(portariaFechamentos)
+          .where(eq(portariaFechamentos.id, fechamento.id)),
+        qdb.delete(portariaSolicitacoesFechamento)
+          .where(eq(portariaSolicitacoesFechamento.eventoId, eventoId)),
+        qdb.update(portariasEvento).set({
+          status: 'ABERTA',
+          fechadaEm: null,
+          fechadaPorMembroId: null,
+          updatedAt: agora,
+        }).where(eq(portariasEvento.eventoId, eventoId)),
+        qdb.insert(portariaReaberturas).values({
+          id: reaberturaId,
+          eventoId,
+          fechamentoAnteriorId: fechamento.id,
+          reabertaPorMembroId: atorMembroId,
+          motivo,
+          reabertaEm: agora,
+          createdAt: agora,
+          updatedAt: agora,
+        }),
+      ],
+      {
+        acao: 'PORTARIA_REABERTA',
+        atorMembroId,
+        recursoTipo: 'PORTARIA',
+        recursoId: eventoId,
+        escopoTipo,
+        escopoId,
+        contexto: {
+          eventoId,
+          fechamentoAnteriorId: fechamento.id,
+          motivo,
+          credenciaisTemporariasReativadas: false,
+        },
+      }
+    )
+  } catch (err: unknown) {
+    if (String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    throw err
+  }
 
   return c.json({
     status: 'ABERTA',
@@ -805,6 +834,10 @@ portariaRouter.get('/eventos/:eventoId/fechamento', async c => {
   const atorMembroId = c.get('membroId')
   const contexto = c.get('contextoPermissoes')
   const eventoId = c.req.param('eventoId')
+
+  const evento = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
+  if (!evento) return c.json({ error: 'Evento não encontrado', code: 'NOT_FOUND' }, 404)
+  if (!portariaDisponivel(evento)) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
 
   const fechamento = await db.select().from(portariaFechamentos)
     .where(eq(portariaFechamentos.eventoId, eventoId)).get()
@@ -884,38 +917,43 @@ portariaRouter.post('/eventos/:eventoId/cadastro-convidados/credencial', async c
   const expiraEm = getSaoPauloEndOfDayIso(evento.inicioEm)
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
-  await executarOperacaoComAudit(
-    db,
-    qdb => [
-      qdb.update(credenciaisCadastroPortariaEvento).set({
-        ativo: false,
-        revogadoEm: agora,
-        updatedAt: agora,
-      }).where(and(
-        eq(credenciaisCadastroPortariaEvento.eventoId, eventoId),
-        eq(credenciaisCadastroPortariaEvento.ativo, true)
-      )),
-      qdb.insert(credenciaisCadastroPortariaEvento).values({
-        id: credencialId,
-        eventoId,
-        tokenHash,
-        expiraEm,
-        criadoPorMembroId: atorMembroId,
-        ativo: true,
-        createdAt: agora,
-        updatedAt: agora,
-      }),
-    ],
-    {
-      acao: 'PORTARIA_CREDENCIAL_AUTOCADASTRO_CRIADA',
-      atorMembroId,
-      recursoTipo: 'CREDENCIAL_CADASTRO_PORTARIA',
-      recursoId: credencialId,
-      escopoTipo,
-      escopoId,
-      contexto: { eventoId },
-    }
-  )
+  try {
+    await executarOperacaoComAudit(
+      db,
+      qdb => [
+        qdb.update(credenciaisCadastroPortariaEvento).set({
+          ativo: false,
+          revogadoEm: agora,
+          updatedAt: agora,
+        }).where(and(
+          eq(credenciaisCadastroPortariaEvento.eventoId, eventoId),
+          eq(credenciaisCadastroPortariaEvento.ativo, true)
+        )),
+        qdb.insert(credenciaisCadastroPortariaEvento).values({
+          id: credencialId,
+          eventoId,
+          tokenHash,
+          expiraEm,
+          criadoPorMembroId: atorMembroId,
+          ativo: true,
+          createdAt: agora,
+          updatedAt: agora,
+        }),
+      ],
+      {
+        acao: 'PORTARIA_CREDENCIAL_AUTOCADASTRO_CRIADA',
+        atorMembroId,
+        recursoTipo: 'CREDENCIAL_CADASTRO_PORTARIA',
+        recursoId: credencialId,
+        escopoTipo,
+        escopoId,
+        contexto: { eventoId },
+      }
+    )
+  } catch (err: unknown) {
+    if (String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    throw err
+  }
 
   return c.json({
     eventoId,
@@ -969,45 +1007,51 @@ portariaRouter.post('/eventos/:eventoId/convidados', async c => {
   const presencaId = crypto.randomUUID()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
-  await executarOperacaoComAudit(
-    db,
-    qdb => [
-      qdb.insert(convidadosEvento).values({
-        id: convidadoId,
-        eventoId,
-        nome,
-        localidade,
-        referencia: body.referencia?.trim() || null,
-        observacoes: body.observacoes?.trim() || null,
-        status: 'VALIDADO',
-        criadoPorMembroId: atorMembroId,
-        validadoPorMembroId: atorMembroId,
-        validadoEm: agora,
-        ativo: true,
-        createdAt: agora,
-        updatedAt: agora,
-      }),
-      qdb.insert(presencasConvidadoEvento).values({
-        id: presencaId,
-        convidadoId,
-        eventoId,
-        forma: 'MANUAL',
-        registradoPorMembroId: atorMembroId,
-        registradoEm: agora,
-        createdAt: agora,
-        updatedAt: agora,
-      }),
-    ],
-    {
-      acao: 'PORTARIA_CONVIDADO_MANUAL_VALIDADO',
-      atorMembroId,
-      recursoTipo: 'CONVIDADO_EVENTO',
-      recursoId: convidadoId,
-      escopoTipo,
-      escopoId,
-      contexto: { eventoId, forma: 'MANUAL' },
-    }
-  )
+  try {
+    await executarOperacaoComAudit(
+      db,
+      qdb => [
+        qdb.insert(convidadosEvento).values({
+          id: convidadoId,
+          eventoId,
+          nome,
+          localidade,
+          referencia: body.referencia?.trim() || null,
+          observacoes: body.observacoes?.trim() || null,
+          status: sql`CASE WHEN EXISTS (SELECT 1 FROM eventos e WHERE e.id = ${eventoId} AND e.ativo = 1 AND e.pessoal = 0 AND e.abrangencia NOT IN ('NACIONAL', 'INTERNACIONAL')) THEN 'VALIDADO' ELSE 'PORTARIA_INDISPONIVEL' END`,
+          criadoPorMembroId: atorMembroId,
+          validadoPorMembroId: atorMembroId,
+          validadoEm: agora,
+          ativo: true,
+          createdAt: agora,
+          updatedAt: agora,
+        }),
+        qdb.insert(presencasConvidadoEvento).values({
+          id: presencaId,
+          convidadoId,
+          eventoId,
+          forma: 'MANUAL',
+          registradoPorMembroId: atorMembroId,
+          registradoEm: agora,
+          createdAt: agora,
+          updatedAt: agora,
+        }),
+      ],
+      {
+        acao: 'PORTARIA_CONVIDADO_MANUAL_VALIDADO',
+        atorMembroId,
+        recursoTipo: 'CONVIDADO_EVENTO',
+        recursoId: convidadoId,
+        escopoTipo,
+        escopoId,
+        contexto: { eventoId, forma: 'MANUAL' },
+      }
+    )
+  
+  } catch (err: unknown) {
+    if ((String(err).includes('CHECK constraint') || String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL'))) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    throw err
+  }
 
   return c.json({ id: convidadoId, eventoId, nome, localidade, status: 'VALIDADO' }, 201)
 })
@@ -1095,36 +1139,42 @@ portariaRouter.post('/eventos/:eventoId/convidados/:convidadoId/validar', async 
   const presencaId = crypto.randomUUID()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
 
-  await executarOperacaoComAudit(
-    db,
-    qdb => [
-      qdb.update(convidadosEvento).set({
-        status: 'VALIDADO',
-        validadoPorMembroId: atorMembroId,
-        validadoEm: agora,
-        updatedAt: agora,
-      }).where(eq(convidadosEvento.id, convidadoId)),
-      qdb.insert(presencasConvidadoEvento).values({
-        id: presencaId,
-        convidadoId,
-        eventoId,
-        forma: 'VALIDACAO_PORTEIRO',
-        registradoPorMembroId: atorMembroId,
-        registradoEm: agora,
-        createdAt: agora,
-        updatedAt: agora,
-      }),
-    ],
-    {
-      acao: 'PORTARIA_CONVIDADO_VALIDADO',
-      atorMembroId,
-      recursoTipo: 'PRESENCA_CONVIDADO_EVENTO',
-      recursoId: presencaId,
-      escopoTipo,
-      escopoId,
-      contexto: { eventoId, convidadoId },
-    }
-  )
+  try {
+    await executarOperacaoComAudit(
+      db,
+      qdb => [
+        qdb.update(convidadosEvento).set({
+          status: sql`CASE WHEN EXISTS (SELECT 1 FROM eventos e WHERE e.id = ${eventoId} AND e.ativo = 1 AND e.pessoal = 0 AND e.abrangencia NOT IN ('NACIONAL', 'INTERNACIONAL')) THEN 'VALIDADO' ELSE 'PORTARIA_INDISPONIVEL' END`,
+          validadoPorMembroId: atorMembroId,
+          validadoEm: agora,
+          updatedAt: agora,
+        }).where(eq(convidadosEvento.id, convidadoId)),
+        qdb.insert(presencasConvidadoEvento).values({
+          id: presencaId,
+          convidadoId,
+          eventoId,
+          forma: 'VALIDACAO_PORTEIRO',
+          registradoPorMembroId: atorMembroId,
+          registradoEm: agora,
+          createdAt: agora,
+          updatedAt: agora,
+        }),
+      ],
+      {
+        acao: 'PORTARIA_CONVIDADO_VALIDADO',
+        atorMembroId,
+        recursoTipo: 'PRESENCA_CONVIDADO_EVENTO',
+        recursoId: presencaId,
+        escopoTipo,
+        escopoId,
+        contexto: { eventoId, convidadoId },
+      }
+    )
+  
+  } catch (err: unknown) {
+    if ((String(err).includes('CHECK constraint') || String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL'))) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
+    throw err
+  }
 
   return c.json({
     convidadoId,
@@ -1169,6 +1219,7 @@ portariaRouter.get('/eventos', async (c) => {
     const authorizedEvents = []
 
     for (const evento of candidateEvents) {
+      if (!portariaDisponivel(evento)) continue
       // Filtrar pela data paulista com helper
       try {
         if (getSaoPauloDateString(evento.inicioEm) !== targetDateStr) {

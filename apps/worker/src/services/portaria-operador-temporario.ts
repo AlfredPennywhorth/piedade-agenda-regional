@@ -48,6 +48,9 @@ export async function validarCredencialOperadorPortaria(
   if (!evento) {
     return { ok: false, status: 409, code: 'EVENTO_INDISPONIVEL', error: 'Evento indisponível' }
   }
+  if (evento.pessoal || evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL') {
+    return { ok: false, status: 409, code: 'PORTARIA_INDISPONIVEL', error: 'Portaria indisponível para este evento' }
+  }
 
   const portaria = await db
     .select({ status: portariasEvento.status })

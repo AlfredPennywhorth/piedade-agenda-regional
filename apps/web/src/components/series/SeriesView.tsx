@@ -12,6 +12,7 @@ import type { Membro } from '../membros/MembrosView'
 interface Local {
   id: string
   nome: string
+  proprietarioMembroId?: string | null
 }
 
 interface EspacoLocal {
@@ -31,6 +32,7 @@ export interface SerieRecorrencia {
   intervalo: number
   dataInicio: string
   dataFim: string
+  ultimaOcorrenciaFimEm?: string | null
   horarioInicio: string
   horarioFim: string
   diaSemana: number | null
@@ -53,6 +55,8 @@ export interface SerieRecorrencia {
 
 export function SeriesView() {
   const [series, setSeries] = useState<SerieRecorrencia[]>([])
+  const [periodoFiltro, setPeriodoFiltro] = useState<'FUTUROS' | 'PASSADOS' | 'TODOS'>('FUTUROS')
+  const [statusFiltro, setStatusFiltro] = useState<'ATIVAS' | 'INATIVAS' | 'TODAS'>('ATIVAS')
   
   // Lookups
   const [locais, setLocais] = useState<Local[]>([])
@@ -133,7 +137,7 @@ export function SeriesView() {
       const resultados = await lookupsPromise
 
       const setters = [
-        (valor: unknown) => setLocais(valor as Local[]),
+        (valor: unknown) => setLocais((valor as Local[]).filter(local => !local.proprietarioMembroId)),
         (valor: unknown) => setEspacos(valor as EspacoLocal[]),
         (valor: unknown) => setMembros(valor as Membro[]),
         (valor: unknown) => setRegionais(valor as Regional[]),
@@ -351,6 +355,18 @@ export function SeriesView() {
     return ano && mes && dia ? `${dia}/${mes}/${ano}` : data
   }
 
+  const agora = Date.now()
+  const seriesFiltradas = series.filter(serie => {
+    if (statusFiltro === 'ATIVAS' && !serie.ativo) return false
+    if (statusFiltro === 'INATIVAS' && serie.ativo) return false
+    // O fim da última ocorrência real, não o fim nominal da série, rege o filtro.
+    const ultimaOcorrencia = serie.ultimaOcorrenciaFimEm
+    const possuiOcorrenciaFutura = !!ultimaOcorrencia && new Date(ultimaOcorrencia).getTime() > agora
+    if (periodoFiltro === 'FUTUROS' && !possuiOcorrenciaFutura) return false
+    if (periodoFiltro === 'PASSADOS' && possuiOcorrenciaFutura) return false
+    return true
+  })
+
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
       <div className="bg-brand-900 text-white p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -378,17 +394,33 @@ export function SeriesView() {
         </div>
       )}
 
+      {!formOpen && !serieDetalhe && <div className="flex flex-wrap gap-4 rounded-xl border border-slate-200 bg-white p-4">
+        <label className="flex flex-col gap-1 text-sm text-slate-700">Status
+          <select aria-label="Filtrar séries por status" value={statusFiltro} onChange={e => setStatusFiltro(e.target.value as typeof statusFiltro)} className="rounded-lg border border-slate-300 p-2">
+            <option value="ATIVAS">Ativas</option><option value="INATIVAS">Inativas</option><option value="TODAS">Todas</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm text-slate-700">Período
+          <select aria-label="Filtrar séries por período" value={periodoFiltro} onChange={e => setPeriodoFiltro(e.target.value as typeof periodoFiltro)} className="rounded-lg border border-slate-300 p-2">
+            <option value="FUTUROS">Com ocorrências futuras</option><option value="PASSADOS">Encerradas</option><option value="TODOS">Todos os períodos</option>
+          </select>
+        </label>
+        <p className="self-end py-2 text-sm text-slate-500">{seriesFiltradas.length} série(s)</p>
+      </div>}
+
       {loading && !formOpen && !serieDetalhe ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
         </div>
-      ) : (series || []).length === 0 ? (
+      ) : series.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-slate-200 shadow-sm">
           <p className="text-slate-500 mb-4">Nenhuma série cadastrada.</p>
           <button onClick={abrirFormCriar} className="text-brand-600 font-medium hover:text-brand-700">
             Cadastrar primeira série
           </button>
         </div>
+      ) : seriesFiltradas.length === 0 ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">Nenhuma série corresponde aos filtros selecionados. Altere o período ou status para consultar outros registros.</div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
@@ -403,7 +435,7 @@ export function SeriesView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {series.map((item) => (
+                {seriesFiltradas.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 font-medium text-slate-900">{item.titulo}</td>
                     <td className="px-6 py-4 text-slate-600">{getFrequenciaLabel(item.frequencia)}</td>
@@ -441,6 +473,7 @@ export function SeriesView() {
         isOpen={formOpen}
         onClose={fecharFormulario}
         title={serieEditandoId ? 'Editar Série de Recorrência' : 'Nova Série de Recorrência'}
+        operation={serieEditandoId ? 'editar' : 'criar'}
         initialData={formData}
         initialTipoEscopo={tipoEscopo}
         lookups={{ locais, espacos, membros, regionais, administracoes, setores, casas, gruposTrabalho }}
@@ -485,6 +518,7 @@ export function SeriesView() {
       {serieDetalhe && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-detalhe-title" className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
+          <span data-screen-code="AGD-ADM-026" className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-026</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-detalhe-title" className="text-lg font-semibold text-slate-900">
                 Detalhes da Série
@@ -537,6 +571,7 @@ export function SeriesView() {
       {confirmacaoEditar && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-confirm-edit-title" className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden p-6 space-y-4">
+          <span data-screen-code="AGD-ADM-027" className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-027</span>
             <h3 id="modal-confirm-edit-title" className="text-lg font-semibold text-slate-900">Confirmar Edição de Série</h3>
             {Object.keys(confirmacaoEditar).every(campo =>
               ['modalidade', 'localId', 'espacoId', 'urlOnline'].includes(campo)
@@ -585,6 +620,7 @@ export function SeriesView() {
       {confirmacaoInativar && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-confirm-inactivate-title" className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden p-6 space-y-4">
+          <span data-screen-code="AGD-ADM-028" className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-028</span>
             <h3 id="modal-confirm-inactivate-title" className="text-lg font-semibold text-red-600">Inativar Série</h3>
             <p className="text-sm text-slate-600">
               Você está prestes a inativar a série <strong>{confirmacaoInativar.titulo}</strong>.

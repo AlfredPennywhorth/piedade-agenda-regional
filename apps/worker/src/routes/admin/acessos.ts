@@ -17,6 +17,7 @@ const PERFIS = new Set([
   'MASTER_SISTEMA',
   'ADMINISTRADOR_SISTEMA',
   'GESTOR_AGENDA',
+  'GESTOR_EVENTOS_EXTERNOS',
   'OPERADOR_PORTARIA_PERMANENTE',
   'GESTOR_RELATORIOS',
   'AUDITOR',
@@ -46,6 +47,7 @@ async function podeAdministrarAcesso(
   escopoId: string | null
 ): Promise<boolean> {
   if (eMasterSistema(contexto)) return true
+  if (perfilCodigo === 'GESTOR_EVENTOS_EXTERNOS' && escopoTipo !== 'REGIONAL') return false
   if (perfilCodigo === 'MASTER_SISTEMA' || escopoTipo === 'GLOBAL' || !escopoId) return false
 
   const regionalId = await obterRegionalDoEscopo(
@@ -857,6 +859,10 @@ adminAcessosApp.post('/', async c => {
     !ESCOPOS.has(body.escopoTipo)
   ) {
     return c.json({ error: 'Perfil ou escopo inválido', code: 'VALIDATION_ERROR' }, 400)
+  }
+
+  if (body.perfilCodigo === 'GESTOR_EVENTOS_EXTERNOS' && body.escopoTipo !== 'REGIONAL') {
+    return c.json({ error: 'Viajantes exigem escopo Regional', code: 'ESCOPO_INVALIDO' }, 400)
   }
 
   if (body.perfilCodigo === 'USUARIO_COMUM') {

@@ -59,3 +59,59 @@
     break-after: auto;
   }
 }
+
+
+@layer components {
+  .master-table-scroll {
+    max-height: min(70vh, 48rem);
+    overflow: auto;
+    overscroll-behavior-x: contain;
+    overscroll-behavior-y: auto;
+    scrollbar-gutter: stable both-edges;
+  }
+
+  .master-table-scroll table {
+    min-width: 100%;
+    width: max-content;
+  }
+
+  .master-table-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #f8fafc;
+  }
+
+  .master-table-scroll th:first-child,
+  .master-table-scroll td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    width: clamp(10rem, 28vw, 18rem);
+    max-width: 18rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    background: #ffffff;
+    box-shadow: 1px 0 0 #e2e8f0;
+  }
+
+  .master-table-scroll thead th:first-child {
+    z-index: 30;
+    background: #f8fafc;
+  }
+}
+
+
+@layer utilities {
+  .safe-area-top {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-layout-bottom {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+}

@@ -71,7 +71,7 @@ describe('S01 — RegionaisView (Gestão Territorial Frontend)', () => {
     expect(await screen.findByRole('heading', { name: 'Detalhes da Regional' })).toBeInTheDocument()
     expect(screen.getAllByText('Regional Campinas').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('CPS').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText('reg-1')).toBeInTheDocument()
+    expect(screen.queryByText('reg-1')).not.toBeInTheDocument()
   })
 
   it('5. Criar: deve cadastrar uma nova regional com sucesso', async () => {

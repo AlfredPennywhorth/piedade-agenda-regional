@@ -15,7 +15,8 @@
     "test": "pnpm -r test",
     "build": "pnpm -r --topological build",
     "dev:web": "pnpm --filter @piedade/web dev",
-    "dev:worker": "pnpm --filter @piedade/worker dev"
+    "dev:worker": "pnpm --filter @piedade/worker dev",
+    "preflight": "node scripts/preflight.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
