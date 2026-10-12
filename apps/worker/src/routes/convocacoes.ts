@@ -429,7 +429,12 @@ convocacoesRouter.post('/:id/publicar', async c => {
   ]
   const vinculoDco = and(eq(funcoes.codigo, 'DCO'), eq(vinculosFuncionais.origem, 'MEMBRO_AUTOMATICO'))
   if (evento.casaId) {
+    const casasAtivas = db.select({ id: casas.id }).from(casas).where(eq(casas.ativo, true))
+    // A regra de Casa ativa aplica-se ao DCO automático; vínculos comuns/manuais
+    // mantêm a correspondência direta, sem herança territorial.
     conditions.push(eq(vinculosFuncionais.casaId, evento.casaId))
+    conditions.push(or(sql`NOT (${funcoes.codigo} = 'DCO' AND ${vinculosFuncionais.origem} = 'MEMBRO_AUTOMATICO')`,
+      inArray(vinculosFuncionais.casaId, casasAtivas))!)
   } else if (evento.setorId) {
     const casasDoSetor = db.select({ id: casas.id }).from(casas)
       .innerJoin(setores, eq(setores.id, casas.setorId))
