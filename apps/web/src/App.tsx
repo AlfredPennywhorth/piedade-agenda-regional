@@ -1,3 +1,4 @@
+import { AvisoAtualizacaoPwa } from './components/versao/VersaoPwa'
 import { useState, useEffect } from 'react'
 import { MainLayout, CapacidadesFrontend } from './components/layout/MainLayout'
 import { AgendaView } from './components/agenda/AgendaView'
@@ -188,6 +189,7 @@ function App() {
   if (estadoSessao === 'anonima') {
     return (
       <>
+        <AvisoAtualizacaoPwa />
         <AuthView
           tokenAtivacao={tokenAtivacao}
           onAuthenticated={concluirAutenticacao}
@@ -199,6 +201,7 @@ function App() {
 
   return (
     <ResponsabilidadeRegionalGate onCienciaRegistrada={carregarIdentidade}>
+    <AvisoAtualizacaoPwa />
     <MainLayout
       currentTab={currentTab}
       onTabChange={alterarAba}
