@@ -476,9 +476,18 @@ describe('S06 - Convocações', () => {
       return await destinatarios.json() as Array<{ membroId: string; evidencias: Array<{ vinculoFuncionalId: string }> }>
     }
 
+    // Vínculo DCO manual/legado na mesma hierarquia não pode herdar o Setor.
+    const legadoId = crypto.randomUUID()
+    await db.insert(membros).values({ id: legadoId, nome: 'DCO legado', casaId: ctx.cas2Id, ativo: true })
+    await db.insert(vinculosFuncionais).values({
+      id: crypto.randomUUID(), membroId: legadoId, funcaoId: dcoId,
+      casaId: ctx.cas2Id, ativo: true,
+    })
+
     const dcos = await criarEPublicar(dcoId)
     expect(dcos.map(item => item.membroId)).toContain(dcoDaCasa)
     expect(dcos.map(item => item.membroId)).not.toContain(dcoOutraCasa)
+    expect(dcos.map(item => item.membroId)).not.toContain(legadoId)
     expect(dcos.find(item => item.membroId === dcoDaCasa)?.evidencias)
       .toEqual(expect.arrayContaining([expect.objectContaining({ vinculoFuncionalId: vinculoDentro })]))
 
