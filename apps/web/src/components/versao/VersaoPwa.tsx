@@ -20,7 +20,13 @@ export function AvisoAtualizacaoPwa() {
     let registro: ServiceWorkerRegistration | null = null
     let desmontado = false
     const solicitarAtualizacao = () => {
-      if (document.visibilityState === 'visible') void registro?.update().catch(() => {})
+      if (document.visibilityState === 'visible') {
+        if (registro?.waiting && navigator.serviceWorker.controller) {
+          setAguardando(registro.waiting)
+          setAdiado(false)
+        }
+        void registro?.update().catch(() => {})
+      }
     }
     const observar = (reg: ServiceWorkerRegistration) => {
       if (reg.waiting && navigator.serviceWorker.controller) setAguardando(reg.waiting)
