@@ -1,3 +1,4 @@
+import { IdentificacaoVersao } from '../versao/VersaoPwa'
 import { FormEvent, useState } from 'react'
 import {
   ativacaoSchema,
@@ -114,6 +115,7 @@ export function AuthView({
             <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">
               Agenda Regional São Paulo
             </p>
+            <IdentificacaoVersao />
             <h1 className="text-2xl font-bold text-slate-900">Recuperar PIN</h1>
             <p className="text-sm text-slate-600">
               Informe seu celular cadastrado. A solicitação será encaminhada para redefinição do acesso.
@@ -200,6 +202,7 @@ export function AuthView({
           <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">
             Agenda Regional São Paulo
           </p>
+          <IdentificacaoVersao />
           <h1 className="text-2xl font-bold text-slate-900">
             {ativando ? 'Ativar conta de acesso' : 'Entrar'}
           </h1>

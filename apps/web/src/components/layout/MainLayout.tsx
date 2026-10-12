@@ -1,3 +1,4 @@
+import { IdentificacaoVersao } from '../versao/VersaoPwa'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { IosInstallPrompt } from '../pwa/IosInstallPrompt'
 
@@ -126,6 +127,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
             <div className="min-w-0">
               <h1 className="truncate text-lg font-semibold sm:text-xl">Agenda Regional SP</h1>
               {nomeUsuario && <p className="truncate text-xs text-brand-100">{nomeUsuario}</p>}
+              <IdentificacaoVersao claro />
             </div>
           </div>
           {onLogout && (

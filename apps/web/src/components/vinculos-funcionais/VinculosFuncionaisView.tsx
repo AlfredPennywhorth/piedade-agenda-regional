@@ -28,6 +28,9 @@ type TipoEscopo = 'regional' | 'administracao' | 'setor' | 'casa' | 'gt' | ''
 
 export function VinculosFuncionaisView() {
   const [vinculos, setVinculos] = useState<VinculoFuncional[]>([])
+  const [buscaVinculo, setBuscaVinculo] = useState('')
+  const [filtroStatusLista, setFiltroStatusLista] = useState<'todos' | 'ativos' | 'inativos'>('ativos')
+  const [filtroTipoLista, setFiltroTipoLista] = useState<TipoEscopo>('')
   
   // Lookups
   const [membros, setMembros] = useState<any[]>([])
@@ -348,6 +351,24 @@ export function VinculosFuncionaisView() {
 
     return 'Escopo não definido'
   }
+
+  const vinculosFiltrados = vinculos.filter(v => {
+    if (filtroStatusLista === 'ativos' && !v.ativo) return false
+    if (filtroStatusLista === 'inativos' && v.ativo) return false
+    const tipo = v.grupoTrabalhoId ? 'gt' : v.casaId ? 'casa' : v.setorId ? 'setor' : v.administracaoId ? 'administracao' : v.regionalId ? 'regional' : ''
+    if (filtroTipoLista && tipo !== filtroTipoLista) return false
+    const termo = buscaVinculo.trim().toLocaleLowerCase('pt-BR')
+    return !termo || [getFuncaoNome(v), getMembroNome(v), renderNomeEscopo(v)].some(nome => nome.toLocaleLowerCase('pt-BR').includes(termo))
+  })
+  // Cada cartão representa uma função no escopo específico, não uma linha por pessoa.
+  const gruposVinculos = Object.values(vinculosFiltrados.reduce<Record<string, { funcao: string; escopo: string; itens: VinculoFuncional[] }>>((grupos, v) => {
+    const escopo = renderNomeEscopo(v)
+    const chave = [v.funcaoId, v.regionalId, v.administracaoId, v.setorId, v.casaId, v.grupoTrabalhoId].join('|')
+    if (!grupos[chave]) grupos[chave] = { funcao: getFuncaoNome(v), escopo, itens: [] }
+    grupos[chave].itens.push(v)
+    return grupos
+  }, {})).sort((a, b) => a.funcao.localeCompare(b.funcao, 'pt-BR', { sensitivity: 'base' }) || a.escopo.localeCompare(b.escopo, 'pt-BR'))
+  gruposVinculos.forEach(grupo => grupo.itens.sort((a, b) => getMembroNome(a).localeCompare(getMembroNome(b), 'pt-BR', { sensitivity: 'base' })))
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-5xl mx-auto">
@@ -704,71 +725,55 @@ export function VinculosFuncionaisView() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-slate-500 text-sm">
-            Carregando vínculos funcionais...
-          </div>
-        ) : vinculos.length === 0 ? (
-          <div className="p-8 text-center text-slate-400 text-sm">
-            Nenhum vínculo funcional cadastrado até o momento.
-          </div>
-        ) : (
-          <div className="master-table-scroll">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                <tr>
-                  <th className="p-3">Membro</th>
-                  <th className="p-3">Função</th>
-                  <th className="p-3">Escopo</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {vinculos.map((v) => (
-                  <tr key={v.id} className="hover:bg-slate-50">
-                    <td className="p-3 font-semibold text-slate-800">
-                      {getMembroNome(v)}
-                    </td>
-                    <td className="p-3 text-slate-600">
-                      {getFuncaoNome(v)}
-                    </td>
-                    <td className="p-3 text-xs text-slate-500">
-                      {renderNomeEscopo(v)}
-                    </td>
-                    <td className="p-3">
-                      {v.ativo ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
-                          Ativo
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                          Inativo
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3 text-right space-x-2 whitespace-nowrap">
-                      <button
-                        onClick={() => verDetalhes(v)}
-                        className="text-xs text-slate-600 hover:text-slate-900 font-medium px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded transition-colors"
-                      >
-                        Detalhes
-                      </button>
-                      <button
-                        onClick={() => abrirFormEditar(v.id)}
-                        className="text-xs text-brand-600 hover:text-brand-800 font-medium px-2 py-1 bg-brand-50 hover:bg-brand-100 rounded transition-colors"
-                      >
-                        Editar
-                      </button>
-                    </td>
-                  </tr>
+      <section aria-label="Vínculos por função" className="space-y-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 grid gap-3 sm:grid-cols-3">
+          <label className="text-sm text-slate-700 sm:col-span-1">
+            Buscar função ou membro
+            <input value={buscaVinculo} onChange={e => setBuscaVinculo(e.target.value)}
+              placeholder="Nome, função ou local..." className="mt-1 w-full rounded-lg border border-slate-300 p-2" />
+          </label>
+          <label className="text-sm text-slate-700">
+            Situação
+            <select value={filtroStatusLista} onChange={e => setFiltroStatusLista(e.target.value as 'todos' | 'ativos' | 'inativos')} className="mt-1 w-full rounded-lg border border-slate-300 p-2">
+              <option value="ativos">Ativos</option><option value="inativos">Inativos</option><option value="todos">Todos</option>
+            </select>
+          </label>
+          <label className="text-sm text-slate-700">
+            Abrangência do vínculo
+            <select value={filtroTipoLista} onChange={e => setFiltroTipoLista(e.target.value as TipoEscopo)} className="mt-1 w-full rounded-lg border border-slate-300 p-2">
+              <option value="">Todas</option><option value="regional">Regional</option><option value="administracao">Administração</option><option value="setor">Setor</option><option value="casa">Casa de Oração</option><option value="gt">Grupo de Trabalho</option>
+            </select>
+          </label>
+        </div>
+        <p className="text-sm text-slate-600">{gruposVinculos.length} funções por escopo · {vinculosFiltrados.length} vínculos encontrados</p>
+        {loading ? <p className="rounded-xl bg-white p-6 text-sm text-slate-500">Carregando vínculos funcionais...</p> :
+          gruposVinculos.length === 0 ? <p className="rounded-xl bg-white p-6 text-sm text-slate-500">{vinculos.length === 0 ? "Nenhum vínculo funcional cadastrado até o momento." : "Nenhum vínculo corresponde aos filtros."}</p> :
+          gruposVinculos.map(grupo => (
+            <details key={grupo.itens[0].id} className="rounded-xl border border-slate-200 bg-white shadow-sm">
+              <summary className="cursor-pointer list-none p-4 flex flex-wrap items-center justify-between gap-3">
+                <span className="min-w-0">
+                  <strong className="block text-slate-900">{grupo.funcao}</strong>
+                  <span className="text-xs text-slate-600">{grupo.escopo}</span>
+                </span>
+                <span className="rounded-full bg-brand-50 px-3 py-1 text-sm font-semibold text-brand-800">{grupo.itens.length} {grupo.itens.length === 1 ? 'membro' : 'membros'} ▾</span>
+              </summary>
+              <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                {grupo.itens.map(v => (
+                  <li key={v.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-800">{getMembroNome(v)}</p>
+                      <span className={v.ativo ? 'text-xs text-emerald-700' : 'text-xs text-slate-500'}>{v.ativo ? 'Ativo' : 'Inativo'}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => verDetalhes(v)} className="rounded bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700">Detalhes</button>
+                      <button type="button" onClick={() => abrirFormEditar(v.id)} className="rounded bg-brand-50 px-3 py-2 text-xs font-medium text-brand-700">Editar</button>
+                    </div>
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+              </ul>
+            </details>
+          ))}
+      </section>
 
       {/* Modal de Detalhes */}
       {vinculoDetalhe && (
