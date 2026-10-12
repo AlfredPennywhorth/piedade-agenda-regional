@@ -632,6 +632,7 @@ convocacoesRouter.post('/:id/sincronizar-dco', async c => {
     .where(and(eq(convocacaoFuncoes.convocacaoId, id), eq(convocacaoFuncoes.funcaoId, dco.id))).get()
   if (!convocouDco) return c.json({ error: 'Convocação não contém a função canônica DCO' }, 409)
   const nowIso = new Date().toISOString()
+  if (evento.fimEm <= nowIso) return c.json({ error: 'Convocação encerrada não pode ser sincronizada' }, 409)
   const antes = await db.select({ total: sql<number>`count(*)` }).from(convocacaoDestinatarios)
     .where(eq(convocacaoDestinatarios.convocacaoId, id)).get()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
@@ -646,6 +647,7 @@ convocacoesRouter.post('/:id/sincronizar-dco', async c => {
             AND EXISTS (SELECT 1 FROM ${eventos}
               WHERE ${eventos.id} = ${convocacoes.eventoId}
               AND ${eventos.ativo} = 1 AND ${eventos.abrangencia} = 'TERRITORIAL'
+              AND ${eventos.fimEm} > ${nowIso}
               AND ${eventos.regionalId} IS ${evento.regionalId ?? null}
               AND ${eventos.administracaoId} IS ${evento.administracaoId ?? null}
               AND ${eventos.setorId} IS ${evento.setorId ?? null}
