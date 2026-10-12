@@ -648,7 +648,7 @@ export function ConvocacoesView({
                       Gerenciar Funções
                     </button>
                   )}
-                  {conv.status === 'PUBLICADA' && conv.possuiFuncaoDco === true && !!getEvento(conv.eventoId)?.fimEm && new Date(getEvento(conv.eventoId)!.fimEm).getTime() > agoraMs && getEvento(conv.eventoId)?.podeGerenciar !== false && (
+                  {conv.status === 'PUBLICADA' && conv.possuiFuncaoDco === true && getEvento(conv.eventoId)?.abrangencia === 'TERRITORIAL' && !!getEvento(conv.eventoId)?.fimEm && new Date(getEvento(conv.eventoId)!.fimEm).getTime() > agoraMs && getEvento(conv.eventoId)?.podeGerenciar !== false && (
                     <button
                       onClick={() => { setSyncFeedback(null); setActionConfirm({ type: 'SINCRONIZAR_DCO', convocacao: conv }) }}
                       className="text-amber-700 hover:text-amber-900 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-amber-50"
