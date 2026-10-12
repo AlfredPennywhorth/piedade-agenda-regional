@@ -553,9 +553,11 @@ describe('PortariaView', () => {
         await flushPromises()
 
         const cards = screen.getAllByTestId(/row-/)
-        expect(cards[1]).toHaveTextContent('Retificar check-in')
+        expect(cards[0]).toHaveTextContent('Maria Pendente')
         expect(cards[0]).not.toHaveTextContent('Retificar check-in')
         expect(cards[0]).toHaveTextContent('Registrar Presença')
+        expect(cards[1]).toHaveTextContent('João Ativo')
+        expect(cards[1]).toHaveTextContent('Retificar check-in')
       })
 
       it('abre modal de retificação, mostra aviso LGPD e foca o textarea, cancela sem POST', async () => {
