@@ -98,11 +98,39 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
     expect(container.querySelectorAll('section[aria-label="Vínculos por função"] details')).toHaveLength(1)
     expect(screen.getByText('1 funções · 2 vínculos encontrados')).toBeInTheDocument()
     const painel = container.querySelector('section[aria-label="Vínculos por função"] details') as HTMLDetailsElement
-    painel.open = true
+    const cabecalho = painel.querySelector('summary') as HTMLElement
+    fireEvent.click(cabecalho)
+    expect(painel.open).toBe(true)
     expect(screen.getByText('João da Silva')).toBeInTheDocument()
     expect(screen.getByText('Maria Oliveira')).toBeInTheDocument()
     expect(screen.getByText('Casa: Casa A')).toBeInTheDocument()
-    expect(screen.getByText('Casa: Casa B')).toBeInTheDocument()
+    expect(screen.getByText('Casa: Casa B')).toBeVisible()
+  })
+
+  it('1c. Mesmo membro em duas Casas conta como uma pessoa e card permanece aberto com filtro', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/membros') return mockMembros
+      if (endpoint === '/funcoes') return mockFuncoes
+      if (endpoint === '/regionais') return mockRegionais
+      if (endpoint === '/administracoes') return mockAdministracoes
+      if (endpoint === '/setores') return mockSetores
+      if (endpoint === '/casas') return mockCasas
+      if (endpoint === '/grupos-trabalho') return []
+      if (endpoint === '/vinculos-funcionais') return [
+        { ...mockVinculo, regionalId: null, casaId: CASA_ID },
+        { ...mockVinculo, id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', regionalId: null, casaId: CASA_ID_2 },
+      ]
+      throw new Error('Not found')
+    })
+    const { container } = render(<VinculosFuncionaisView />)
+    expect(await screen.findByText('1 membro ▾')).toBeInTheDocument()
+    const painel = container.querySelector('section[aria-label="Vínculos por função"] details') as HTMLDetailsElement
+    fireEvent.click(painel.querySelector('summary') as HTMLElement)
+    expect(painel.open).toBe(true)
+    fireEvent.change(screen.getByPlaceholderText('Nome, função ou local...'), { target: { value: 'Casa B' } })
+    expect(screen.getByText('Casa: Casa B')).toBeVisible()
+    expect(painel.open).toBe(true)
+    expect(screen.getByText('1 membro ▾')).toBeVisible()
   })
 
   it('2. Criar com exatamente um escopo e limpar estado incompatível ao trocar', async () => {
