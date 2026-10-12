@@ -537,6 +537,32 @@ describe('S06 - Convocações', () => {
     }
     const lista = await (await app.request(`/api/v1/convocacoes/${id}/destinatarios`)).json() as Array<{ membroId: string }>
     expect(lista.filter(item => item.membroId === membroLegado)).toHaveLength(1)
+
+    // Mudança concorrente de Setor após a autorização inicial deve abortar o batch.
+    const outroSetorId = crypto.randomUUID()
+    const setorOriginal = await db.select().from(setores).where(eq(setores.id, ctx.setId)).get()
+    await db.insert(setores).values({
+      id: outroSetorId, nome: 'Setor alterado durante sincronização',
+      administracaoId: setorOriginal!.administracaoId,
+    })
+    const originalTransaction = db.transaction.bind(db)
+    let interceptado = false
+    db.transaction = (...args: any[]) => {
+      if (!interceptado) {
+        interceptado = true
+        sqlite.prepare('UPDATE eventos SET setor_id = ? WHERE id = ?').run(outroSetorId, eventoId)
+      }
+      return originalTransaction(...args)
+    }
+    try {
+      const res = await app.request(`/api/v1/convocacoes/${id}/sincronizar-dco`, { method: 'POST' })
+      expect(res.status).toBe(409)
+      expect(interceptado).toBe(true)
+    } finally {
+      db.transaction = originalTransaction
+    }
+    expect(sqlite.prepare("SELECT setor_id FROM eventos WHERE id = ?").get(eventoId))
+      .toMatchObject({ setor_id: outroSetorId })
   })
 
   it('15c. DCO: Casa, Administração, Regional e GT respeitam seus limites', async () => {
