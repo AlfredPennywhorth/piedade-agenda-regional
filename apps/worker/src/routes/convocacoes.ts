@@ -67,12 +67,22 @@ async function podeGerirConvocacao(db: any, membroId: string, evento: any): Prom
 convocacoesRouter.get('/', async c => {
   const db = c.get('db')
   const condicao = await condicaoEventosVisiveis(db, c.get('contextoPermissoes'))
-  const data = await db.select({ convocacao: convocacoes })
+  const data = await db.select({
+    convocacao: convocacoes,
+    possuiFuncaoDco: sql<number>`EXISTS (
+      SELECT 1 FROM ${convocacaoFuncoes} cf
+      JOIN ${funcoes} f ON f.id = cf.funcao_id
+      WHERE cf.convocacao_id = ${convocacoes.id}
+      AND f.codigo = 'DCO' AND f.ativo = 1
+    )`,
+  })
     .from(convocacoes)
     .innerJoin(eventos, eq(convocacoes.eventoId, eventos.id))
     .where(condicao)
     .all()
-  return c.json(data.map((item: any) => item.convocacao))
+  return c.json(data.map((item: any) => ({
+    ...item.convocacao, possuiFuncaoDco: Boolean(item.possuiFuncaoDco),
+  })))
 })
 
 convocacoesRouter.get('/:id', async c => {
