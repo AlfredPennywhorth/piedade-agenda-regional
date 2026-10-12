@@ -751,7 +751,7 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
 
   it.each([
     { origem: 'MEMBRO_AUTOMATICO', ativo: 1, totalEsperado: 1 },
-    { origem: null, ativo: 1, totalEsperado: 0 },
+    { origem: null, ativo: 1, totalEsperado: 1 },
     { origem: 'MEMBRO_AUTOMATICO', ativo: 0, totalEsperado: 0 },
   ])('34. Reativação após publicação respeita origem $origem e vínculo ativo $ativo', async ({ origem, ativo, totalEsperado }) => {
     const resCreate = await req('/api/v1/membros', {
@@ -898,10 +898,10 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
       .toMatchObject({ origem: null })
     expect(sqlite.prepare(
       'SELECT count(*) AS total FROM convocacao_destinatarios WHERE convocacao_id = ? AND membro_id = ?'
-    ).get('conv-race-dco', criado.id)).toMatchObject({ total: 0 })
+    ).get('conv-race-dco', criado.id)).toMatchObject({ total: patch.ativo === true ? 1 : 0 })
     expect(sqlite.prepare(
       'SELECT count(*) AS total FROM convocacao_destinatario_evidencias WHERE vinculo_funcional_id = ?'
-    ).get(vinculo.id)).toMatchObject({ total: 0 })
+    ).get(vinculo.id)).toMatchObject({ total: patch.ativo === true ? 1 : 0 })
   })
 
   it('37. Reverte reativação, destinatário e auditoria se a evidência DCO falhar', async () => {

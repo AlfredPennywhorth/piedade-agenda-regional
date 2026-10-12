@@ -477,7 +477,7 @@ describe('S06 - Convocações', () => {
       return await destinatarios.json() as Array<{ membroId: string; evidencias: Array<{ vinculoFuncionalId: string }> }>
     }
 
-    // Vínculo DCO manual/legado na mesma hierarquia não pode herdar o Setor.
+    // Vínculo DCO legado na Casa atual deve herdar o Setor, sem depender da origem.
     const legadoId = crypto.randomUUID()
     await db.insert(membros).values({ id: legadoId, nome: 'DCO legado', casaId: ctx.cas2Id, ativo: true })
     await db.insert(vinculosFuncionais).values({
@@ -485,10 +485,18 @@ describe('S06 - Convocações', () => {
       casaId: ctx.cas2Id, ativo: true,
     })
 
+    // Histórico da Casa anterior não é destinatário da convocação atual.
+    const historicoId = crypto.randomUUID()
+    await db.insert(vinculosFuncionais).values({
+      id: historicoId, membroId: legadoId, funcaoId: dcoId,
+      casaId: outraCasa, ativo: true,
+    })
+
     const dcos = await criarEPublicar(dcoId)
     expect(dcos.map(item => item.membroId)).toContain(dcoDaCasa)
     expect(dcos.map(item => item.membroId)).not.toContain(dcoOutraCasa)
-    expect(dcos.map(item => item.membroId)).not.toContain(legadoId)
+    expect(dcos.map(item => item.membroId)).toContain(legadoId)
+    expect(dcos.find(item => item.membroId === legadoId)?.evidencias.some(e => e.vinculoFuncionalId === historicoId)).toBe(false)
     expect(dcos.find(item => item.membroId === dcoDaCasa)?.evidencias)
       .toEqual(expect.arrayContaining([expect.objectContaining({ vinculoFuncionalId: vinculoDentro })]))
 
@@ -498,6 +506,63 @@ describe('S06 - Convocações', () => {
     expect(comuns[0].evidencias).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ vinculoFuncionalId: ctx.v3Id })])
     )
+  })
+
+  it('15bb. Sincronizar DCO legado após publicação preserva destinatários e é idempotente', async () => {
+    const ctx = await setupBaseData()
+    const dco = await db.select().from(funcoes).where(eq(funcoes.codigo, 'DCO')).get()
+    expect(dco).toBeDefined()
+    const eventoId = crypto.randomUUID()
+    await db.insert(eventos).values({
+      id: eventoId, titulo: 'Convocação de Setor para reconciliação', modalidade: 'ONLINE',
+      inicioEm: '2030-03-01T10:00:00.000Z', fimEm: '2030-03-01T11:00:00.000Z',
+      setorId: ctx.setId, ativo: true,
+    })
+    const resposta = await app.request('/api/v1/convocacoes', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventoId }) })
+    expect(resposta.status).toBe(201)
+    const { id } = await resposta.json()
+    expect((await app.request(`/api/v1/convocacoes/${id}/funcoes`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ funcaoId: dco!.id }) })).status).toBe(201)
+    expect((await app.request(`/api/v1/convocacoes/${id}/publicar`, { method: 'POST' })).status).toBe(200)
+    const membroLegado = crypto.randomUUID()
+    await db.insert(membros).values({ id: membroLegado, nome: 'DCO legado ativo', casaId: ctx.casId, ativo: true })
+    await db.insert(vinculosFuncionais).values({
+      id: crypto.randomUUID(), membroId: membroLegado, funcaoId: dco!.id,
+      casaId: ctx.casId, ativo: true,
+    })
+    for (let tentativa = 0; tentativa < 2; tentativa += 1) {
+      const res = await app.request(`/api/v1/convocacoes/${id}/sincronizar-dco`, { method: 'POST' })
+      expect(res.status).toBe(200)
+    }
+    const lista = await (await app.request(`/api/v1/convocacoes/${id}/destinatarios`)).json() as Array<{ membroId: string }>
+    expect(lista.filter(item => item.membroId === membroLegado)).toHaveLength(1)
+
+    // Mudança concorrente de Setor após a autorização inicial deve abortar o batch.
+    const outroSetorId = crypto.randomUUID()
+    const setorOriginal = await db.select().from(setores).where(eq(setores.id, ctx.setId)).get()
+    await db.insert(setores).values({
+      id: outroSetorId, nome: 'Setor alterado durante sincronização',
+      administracaoId: setorOriginal!.administracaoId,
+    })
+    const originalTransaction = db.transaction.bind(db)
+    let interceptado = false
+    db.transaction = (...args: any[]) => {
+      if (!interceptado) {
+        interceptado = true
+        sqlite.prepare('UPDATE eventos SET setor_id = ? WHERE id = ?').run(outroSetorId, eventoId)
+      }
+      return originalTransaction(...args)
+    }
+    try {
+      const res = await app.request(`/api/v1/convocacoes/${id}/sincronizar-dco`, { method: 'POST' })
+      expect(res.status).toBe(409)
+      expect(interceptado).toBe(true)
+    } finally {
+      db.transaction = originalTransaction
+    }
+    expect(sqlite.prepare("SELECT setor_id FROM eventos WHERE id = ?").get(eventoId))
+      .toMatchObject({ setor_id: outroSetorId })
   })
 
   it('15c. DCO: Casa, Administração, Regional e GT respeitam seus limites', async () => {

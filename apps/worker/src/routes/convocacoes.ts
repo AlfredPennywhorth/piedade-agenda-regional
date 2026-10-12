@@ -428,14 +428,14 @@ convocacoesRouter.post('/:id/publicar', async c => {
     eq(membros.ativo, true),
     inArray(vinculosFuncionais.funcaoId, funcaoIds),
   ]
-  const vinculoDco = and(eq(funcoes.codigo, 'DCO'), eq(vinculosFuncionais.origem, 'MEMBRO_AUTOMATICO'))
+  const vinculoDco = and(eq(funcoes.codigo, 'DCO'), eq(vinculosFuncionais.casaId, membros.casaId))
   if (evento.casaId) {
     const casasAtivas = db.select({ id: casas.id }).from(casas).where(eq(casas.ativo, true))
     // A regra de Casa ativa aplica-se ao DCO automático; vínculos comuns/manuais
     // mantêm a correspondência direta, sem herança territorial.
     conditions.push(eq(vinculosFuncionais.casaId, evento.casaId))
-    conditions.push(or(sql`NOT (${funcoes.codigo} = 'DCO' AND ${vinculosFuncionais.origem} IS 'MEMBRO_AUTOMATICO')`,
-      inArray(vinculosFuncionais.casaId, casasAtivas))!)
+    conditions.push(or(sql`${funcoes.codigo} != 'DCO'`,
+      and(eq(vinculosFuncionais.casaId, membros.casaId), inArray(vinculosFuncionais.casaId, casasAtivas)))!)
   } else if (evento.setorId) {
     const casasDoSetor = db.select({ id: casas.id }).from(casas)
       .innerJoin(setores, eq(setores.id, casas.setorId))
@@ -598,6 +598,74 @@ convocacoesRouter.post('/:id/publicar', async c => {
     }
     return c.json({ error: 'Falha ao materializar destinatários' }, 400)
   }
+})
+
+// Reconciliação idempotente de DCO em convocação já publicada.
+// Não altera RSVP, funções existentes ou evidências históricas.
+convocacoesRouter.post('/:id/sincronizar-dco', async c => {
+  const db = c.get('db')
+  const id = c.req.param('id')
+  const atorMembroId = c.get('membroId')
+  const convocacao = await db.select().from(convocacoes).where(eq(convocacoes.id, id)).get()
+  if (!convocacao) return c.json({ error: 'Convocação não encontrada' }, 404)
+  if (convocacao.status !== 'PUBLICADA' || !convocacao.ativo)
+    return c.json({ error: 'Somente convocações publicadas e ativas podem ser sincronizadas' }, 409)
+  const evento = await db.select().from(eventos).where(eq(eventos.id, convocacao.eventoId)).get()
+  if (!evento || !atorMembroId || !(await podeGerirConvocacao(db, atorMembroId, evento)))
+    return c.json({ error: 'Acesso não autorizado', code: 'FORBIDDEN' }, 403)
+  if (evento.abrangencia !== 'TERRITORIAL')
+    return c.json({ error: 'A sincronização DCO é exclusiva de eventos territoriais' }, 409)
+  const dco = await db.select({ id: funcoes.id }).from(funcoes)
+    .where(and(eq(funcoes.codigo, 'DCO'), eq(funcoes.ativo, true))).get()
+  if (!dco) return c.json({ error: 'Função DCO canônica indisponível' }, 409)
+  const convocouDco = await db.select({ id: convocacaoFuncoes.id }).from(convocacaoFuncoes)
+    .where(and(eq(convocacaoFuncoes.convocacaoId, id), eq(convocacaoFuncoes.funcaoId, dco.id))).get()
+  if (!convocouDco) return c.json({ error: 'Convocação não contém a função canônica DCO' }, 409)
+  const nowIso = new Date().toISOString()
+  const antes = await db.select({ total: sql<number>`count(*)` }).from(convocacaoDestinatarios)
+    .where(eq(convocacaoDestinatarios.convocacaoId, id)).get()
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+  try {
+    await executarOperacaoComAudit(db,
+      qdb => [
+        // Guarda atômica: cancelar/desativar ou remover a função após a leitura
+        // deve abortar o batch inteiro, inclusive a auditoria.
+        qdb.update(convocacoes).set({
+          status: sql`CASE WHEN ${convocacoes.status} = 'PUBLICADA'
+            AND ${convocacoes.ativo} = 1
+            AND EXISTS (SELECT 1 FROM ${eventos}
+              WHERE ${eventos.id} = ${convocacoes.eventoId}
+              AND ${eventos.ativo} = 1 AND ${eventos.abrangencia} = 'TERRITORIAL'
+              AND ${eventos.regionalId} IS ${evento.regionalId ?? null}
+              AND ${eventos.administracaoId} IS ${evento.administracaoId ?? null}
+              AND ${eventos.setorId} IS ${evento.setorId ?? null}
+              AND ${eventos.casaId} IS ${evento.casaId ?? null}
+              AND ${eventos.grupoTrabalhoId} IS ${evento.grupoTrabalhoId ?? null})
+            AND EXISTS (SELECT 1 FROM ${convocacaoFuncoes}
+              JOIN ${funcoes} ON ${funcoes.id} = ${convocacaoFuncoes.funcaoId}
+              WHERE ${convocacaoFuncoes.convocacaoId} = ${convocacoes.id}
+                AND ${funcoes.codigo} = 'DCO' AND ${funcoes.ativo} = 1)
+            THEN 'PUBLICADA' ELSE 'ABORT_OCC' END` as any,
+        }).where(eq(convocacoes.id, id)),
+        ...queriesSincronizacaoDcoAtual(qdb, nowIso, { convocacaoId: id }),
+      ],
+      {
+        acao: 'CONVOCACAO_DCO_SINCRONIZADA',
+      atorMembroId,
+      recursoTipo: 'CONVOCACAO',
+      recursoId: id,
+      escopoTipo,
+      escopoId,
+      contexto: { operacao: 'ADITIVA_IDEMPOTENTE' },
+      }
+    )
+  } catch {
+    return c.json({ error: 'Convocação alterada durante a sincronização; recarregue e tente novamente' }, 409)
+  }
+  const depois = await db.select({ total: sql<number>`count(*)` }).from(convocacaoDestinatarios)
+    .where(eq(convocacaoDestinatarios.convocacaoId, id)).get()
+  return c.json({ success: true, destinatariosAntes: antes?.total ?? 0,
+    destinatariosDepois: depois?.total ?? 0 })
 })
 
 convocacoesRouter.post('/:id/cancelar', async c => {

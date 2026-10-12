@@ -143,7 +143,17 @@ export async function prepararSincronizacaoConvocacoes(db: any, vinculo: any, as
 
   // Para membros novos ou transferidos, o vínculo ainda não existe no banco.
   // Resolve a Casa de destino diretamente para aplicar a mesma hierarquia da reativação.
-  const funcaoDco = vinculo.casaId && vinculo.origem === 'MEMBRO_AUTOMATICO'
+  const membroAtual = vinculo.casaId
+    ? await db.select({ casaId: membros.casaId }).from(membros)
+        .where(eq(membros.id, vinculo.membroId)).get()
+    : null
+  // Em criação/transferência automática, a Casa de destino ainda pode não estar persistida.
+  // Para legado manual, só há herança quando a Casa do vínculo é a Casa atual do membro.
+  const dcoElegivel = !!vinculo.casaId && (
+    vinculo.origem === 'MEMBRO_AUTOMATICO'
+    || (membroAtual?.casaId != null && membroAtual.casaId === vinculo.casaId)
+  )
+  const funcaoDco = dcoElegivel
     ? await db.select({ codigo: funcoes.codigo, ativo: funcoes.ativo })
         .from(funcoes).where(eq(funcoes.id, vinculo.funcaoId)).get()
     : null

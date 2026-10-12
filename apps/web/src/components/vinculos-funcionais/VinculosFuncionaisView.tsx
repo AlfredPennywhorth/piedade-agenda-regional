@@ -360,15 +360,17 @@ export function VinculosFuncionaisView() {
     const termo = buscaVinculo.trim().toLocaleLowerCase('pt-BR')
     return !termo || [getFuncaoNome(v), getMembroNome(v), renderNomeEscopo(v)].some(nome => nome.toLocaleLowerCase('pt-BR').includes(termo))
   })
-  // Cada cartão representa uma função no escopo específico, não uma linha por pessoa.
-  const gruposVinculos = Object.values(vinculosFiltrados.reduce<Record<string, { funcao: string; escopo: string; itens: VinculoFuncional[] }>>((grupos, v) => {
-    const escopo = renderNomeEscopo(v)
-    const chave = [v.funcaoId, v.regionalId, v.administracaoId, v.setorId, v.casaId, v.grupoTrabalhoId].join('|')
-    if (!grupos[chave]) grupos[chave] = { funcao: getFuncaoNome(v), escopo, itens: [] }
+  // A lista agrupa pela função, independentemente do escopo territorial de cada membro.
+  // O escopo permanece visível junto à pessoa para preservar o contexto do vínculo.
+  const gruposVinculos = Object.values(vinculosFiltrados.reduce<Record<string, { funcaoId: string; funcao: string; itens: VinculoFuncional[] }>>((grupos, v) => {
+    const chave = v.funcaoId
+    if (!grupos[chave]) grupos[chave] = { funcaoId: chave, funcao: getFuncaoNome(v), itens: [] }
     grupos[chave].itens.push(v)
     return grupos
-  }, {})).sort((a, b) => a.funcao.localeCompare(b.funcao, 'pt-BR', { sensitivity: 'base' }) || a.escopo.localeCompare(b.escopo, 'pt-BR'))
-  gruposVinculos.forEach(grupo => grupo.itens.sort((a, b) => getMembroNome(a).localeCompare(getMembroNome(b), 'pt-BR', { sensitivity: 'base' })))
+  }, {})).sort((a, b) => a.funcao.localeCompare(b.funcao, 'pt-BR', { sensitivity: 'base' }))
+  gruposVinculos.forEach(grupo => grupo.itens.sort((a, b) =>
+    getMembroNome(a).localeCompare(getMembroNome(b), 'pt-BR', { sensitivity: 'base' })
+    || renderNomeEscopo(a).localeCompare(renderNomeEscopo(b), 'pt-BR', { sensitivity: 'base' })))
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-5xl mx-auto">
@@ -745,23 +747,24 @@ export function VinculosFuncionaisView() {
             </select>
           </label>
         </div>
-        <p className="text-sm text-slate-600">{gruposVinculos.length} funções por escopo · {vinculosFiltrados.length} vínculos encontrados</p>
+        <p className="text-sm text-slate-600">{gruposVinculos.length} funções · {vinculosFiltrados.length} vínculos encontrados</p>
         {loading ? <p className="rounded-xl bg-white p-6 text-sm text-slate-500">Carregando vínculos funcionais...</p> :
           gruposVinculos.length === 0 ? <p className="rounded-xl bg-white p-6 text-sm text-slate-500">{vinculos.length === 0 ? "Nenhum vínculo funcional cadastrado até o momento." : "Nenhum vínculo corresponde aos filtros."}</p> :
           gruposVinculos.map(grupo => (
-            <details key={grupo.itens[0].id} className="rounded-xl border border-slate-200 bg-white shadow-sm">
+            <details key={grupo.funcaoId} className="rounded-xl border border-slate-200 bg-white shadow-sm">
               <summary className="cursor-pointer list-none p-4 flex flex-wrap items-center justify-between gap-3">
                 <span className="min-w-0">
                   <strong className="block text-slate-900">{grupo.funcao}</strong>
-                  <span className="text-xs text-slate-600">{grupo.escopo}</span>
+                  <span className="text-xs text-slate-600">Membros vinculados em todos os escopos filtrados</span>
                 </span>
-                <span className="rounded-full bg-brand-50 px-3 py-1 text-sm font-semibold text-brand-800">{grupo.itens.length} {grupo.itens.length === 1 ? 'membro' : 'membros'} ▾</span>
+                <span className="rounded-full bg-brand-50 px-3 py-1 text-sm font-semibold text-brand-800">{new Set(grupo.itens.map(v => v.membroId)).size} {new Set(grupo.itens.map(v => v.membroId)).size === 1 ? 'membro' : 'membros'} ▾</span>
               </summary>
               <ul className="divide-y divide-slate-100 border-t border-slate-100">
                 {grupo.itens.map(v => (
                   <li key={v.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
                     <div className="min-w-0">
                       <p className="font-medium text-slate-800">{getMembroNome(v)}</p>
+                      <p className="text-xs text-slate-600">{renderNomeEscopo(v)}</p>
                       <span className={v.ativo ? 'text-xs text-emerald-700' : 'text-xs text-slate-500'}>{v.ativo ? 'Ativo' : 'Inativo'}</span>
                     </div>
                     <div className="flex gap-2">
