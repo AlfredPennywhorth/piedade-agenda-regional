@@ -478,12 +478,9 @@ export function PortariaView() {
     (p.membro.casaNome && p.membro.casaNome.toLowerCase().includes(buscaNome.toLowerCase()))
   )
 
-  const participantesOrdenados = [...filtrados].sort((a, b) => {
-    const aCheck = a.checkin !== null
-    const bCheck = b.checkin !== null
-    if (aCheck === bCheck) return 0
-    return aCheck ? 1 : -1
-  })
+  const participantesOrdenados = [...filtrados].sort((a, b) =>
+    a.membro.nome.localeCompare(b.membro.nome, 'pt-BR', { sensitivity: 'base' })
+  )
 
 
   const handleCloseModal = () => {
