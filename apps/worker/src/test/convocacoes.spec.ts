@@ -565,6 +565,34 @@ describe('S06 - Convocações', () => {
       .toMatchObject({ setor_id: outroSetorId })
   })
 
+  it('15bc. Recusa sincronização de convocação DCO encerrada sem auditoria', async () => {
+    const ctx = await setupBaseData()
+    const dco = await db.select().from(funcoes).where(eq(funcoes.codigo, 'DCO')).get()
+    const eventoId = crypto.randomUUID()
+    await db.insert(eventos).values({
+      id: eventoId, titulo: 'Evento DCO encerrado', modalidade: 'ONLINE',
+      inicioEm: '2020-01-01T10:00:00.000Z', fimEm: '2020-01-01T11:00:00.000Z',
+      setorId: ctx.setId, ativo: true,
+    })
+    const created = await app.request('/api/v1/convocacoes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId }),
+    })
+    expect(created.status).toBe(201)
+    const { id } = await created.json()
+    expect((await app.request(`/api/v1/convocacoes/${id}/funcoes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ funcaoId: dco!.id }),
+    })).status).toBe(201)
+    expect((await app.request(`/api/v1/convocacoes/${id}/publicar`, { method: 'POST' })).status).toBe(200)
+    const response = await app.request(`/api/v1/convocacoes/${id}/sincronizar-dco`, { method: 'POST' })
+    expect(response.status).toBe(409)
+    expect((await response.json()).error).toMatch(/encerrada/)
+    const logs = await db.select().from(auditoriaLogs)
+      .where(and(eq(auditoriaLogs.recursoId, id), eq(auditoriaLogs.acao, 'CONVOCACAO_DCO_SINCRONIZADA'))).all()
+    expect(logs).toHaveLength(0)
+  })
+
   it('15c. DCO: Casa, Administração, Regional e GT respeitam seus limites', async () => {
     const ctx = await setupBaseData()
     const dco = await db.select().from(funcoes).where(eq(funcoes.codigo, 'DCO')).get()
