@@ -512,8 +512,14 @@ describe('S06 - Convocações', () => {
     const ctx = await setupBaseData()
     const dco = await db.select().from(funcoes).where(eq(funcoes.codigo, 'DCO')).get()
     expect(dco).toBeDefined()
+    const eventoId = crypto.randomUUID()
+    await db.insert(eventos).values({
+      id: eventoId, titulo: 'Convocação de Setor para reconciliação', modalidade: 'ONLINE',
+      inicioEm: '2030-03-01T10:00:00.000Z', fimEm: '2030-03-01T11:00:00.000Z',
+      setorId: ctx.setId, ativo: true,
+    })
     const resposta = await app.request('/api/v1/convocacoes', { method: 'POST',
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventoId: ctx.evSetorId }) })
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventoId }) })
     expect(resposta.status).toBe(201)
     const { id } = await resposta.json()
     expect((await app.request(`/api/v1/convocacoes/${id}/funcoes`, { method: 'POST',
