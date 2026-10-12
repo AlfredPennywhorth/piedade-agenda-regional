@@ -148,9 +148,9 @@ describe('PortariaView', () => {
     await waitFor(() => screen.getByRole('combobox'))
     mockFetchWithAuth.mockResolvedValueOnce({
       participantes: [
-        { convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Tiago', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-1', dataHoraCheckin: '2026-10-01T14:17:00Z', forma: 'MANUAL' } },
+        { convocacaoDestinatarioId: UUID_DEST1, membro: { id: UUID_M1, nome: 'Tiago', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-1', dataHoraCheckin: '2026-10-01T14:10:00Z', forma: 'MANUAL' } },
         { convocacaoDestinatarioId: UUID_DEST2, membro: { id: UUID_M2, nome: 'Rodrigo', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-2', dataHoraCheckin: '2026-10-01T14:16:00Z', forma: 'MANUAL' } },
-        { convocacaoDestinatarioId: UUID_DEST3, membro: { id: UUID_M3, nome: 'Andre', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-3', dataHoraCheckin: '2026-10-01T14:10:00Z', forma: 'MANUAL' } },
+        { convocacaoDestinatarioId: UUID_DEST3, membro: { id: UUID_M3, nome: 'Andre', casaNome: null }, rsvpResposta: null, checkin: { id: 'ck-3', dataHoraCheckin: '2026-10-01T14:17:00Z', forma: 'MANUAL' } },
         { convocacaoDestinatarioId: UUID_DEST4, membro: { id: UUID_M4, nome: 'Osmar', casaNome: null }, rsvpResposta: null, checkin: null }
       ]
     })
