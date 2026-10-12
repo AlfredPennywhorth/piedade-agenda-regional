@@ -755,7 +755,7 @@ export function ConvocacoesView({
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
         >
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
-          <span data-screen-code={actionConfirm.type === 'PUBLICAR' ? 'AGD-ADM-033' : actionConfirm.type === 'SINCRONIZAR_DCO' ? 'AGD-ADM-056' : 'AGD-ADM-034'} className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela {actionConfirm.type === 'PUBLICAR' ? 'AGD-ADM-033' : 'AGD-ADM-034'}</span>
+          <span data-screen-code={actionConfirm.type === 'PUBLICAR' ? 'AGD-ADM-033' : actionConfirm.type === 'SINCRONIZAR_DCO' ? 'AGD-ADM-059' : 'AGD-ADM-034'} className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela {actionConfirm.type === 'PUBLICAR' ? 'AGD-ADM-033' : 'AGD-ADM-034'}</span>
 
             <div className="p-6 border-b border-slate-200">
               <h2 id="confirm-dialog-title" className="text-xl font-bold text-slate-900">
