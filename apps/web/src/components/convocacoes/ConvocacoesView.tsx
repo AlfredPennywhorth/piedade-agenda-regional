@@ -80,6 +80,14 @@ export function ConvocacoesView({
 
   const handleActionConfirm = async () => {
     if (!actionConfirm) return
+    if (actionConfirm.type === 'SINCRONIZAR_DCO' &&
+        (!getEvento(actionConfirm.convocacao.eventoId)?.fimEm ||
+          new Date(getEvento(actionConfirm.convocacao.eventoId)!.fimEm).getTime() <= Date.now())) {
+      setActionConfirm(null)
+      setActionError(null)
+      setSyncFeedback('A reunião foi encerrada; a sincronização não está mais disponível.')
+      return
+    }
     setActionLoading(true)
     setActionError(null)
     
@@ -163,6 +171,17 @@ export function ConvocacoesView({
     const timeout = window.setTimeout(() => setAgoraMs(Date.now()), atraso)
     return () => window.clearTimeout(timeout)
   }, [eventosLookup, agoraMs])
+
+  useEffect(() => {
+    if (actionConfirm?.type !== 'SINCRONIZAR_DCO') return
+    const fimEm = getEvento(actionConfirm.convocacao.eventoId)?.fimEm
+    if (!fimEm || new Date(fimEm).getTime() <= agoraMs) {
+      setActionConfirm(null)
+      setActionError(null)
+      setSyncFeedback('A reunião foi encerrada; a sincronização não está mais disponível.')
+    }
+  }, [agoraMs, actionConfirm, eventosLookup])
+
 
 
   useEffect(() => {
