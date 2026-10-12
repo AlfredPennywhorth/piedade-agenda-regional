@@ -362,9 +362,9 @@ export function VinculosFuncionaisView() {
   })
   // A lista agrupa pela função, independentemente do escopo territorial de cada membro.
   // O escopo permanece visível junto à pessoa para preservar o contexto do vínculo.
-  const gruposVinculos = Object.values(vinculosFiltrados.reduce<Record<string, { funcao: string; itens: VinculoFuncional[] }>>((grupos, v) => {
+  const gruposVinculos = Object.values(vinculosFiltrados.reduce<Record<string, { funcaoId: string; funcao: string; itens: VinculoFuncional[] }>>((grupos, v) => {
     const chave = v.funcaoId
-    if (!grupos[chave]) grupos[chave] = { funcao: getFuncaoNome(v), itens: [] }
+    if (!grupos[chave]) grupos[chave] = { funcaoId: chave, funcao: getFuncaoNome(v), itens: [] }
     grupos[chave].itens.push(v)
     return grupos
   }, {})).sort((a, b) => a.funcao.localeCompare(b.funcao, 'pt-BR', { sensitivity: 'base' }))
@@ -751,13 +751,13 @@ export function VinculosFuncionaisView() {
         {loading ? <p className="rounded-xl bg-white p-6 text-sm text-slate-500">Carregando vínculos funcionais...</p> :
           gruposVinculos.length === 0 ? <p className="rounded-xl bg-white p-6 text-sm text-slate-500">{vinculos.length === 0 ? "Nenhum vínculo funcional cadastrado até o momento." : "Nenhum vínculo corresponde aos filtros."}</p> :
           gruposVinculos.map(grupo => (
-            <details key={grupo.itens[0].id} className="rounded-xl border border-slate-200 bg-white shadow-sm">
+            <details key={grupo.funcaoId} className="rounded-xl border border-slate-200 bg-white shadow-sm">
               <summary className="cursor-pointer list-none p-4 flex flex-wrap items-center justify-between gap-3">
                 <span className="min-w-0">
                   <strong className="block text-slate-900">{grupo.funcao}</strong>
                   <span className="text-xs text-slate-600">Membros vinculados em todos os escopos filtrados</span>
                 </span>
-                <span className="rounded-full bg-brand-50 px-3 py-1 text-sm font-semibold text-brand-800">{grupo.itens.length} {grupo.itens.length === 1 ? 'membro' : 'membros'} ▾</span>
+                <span className="rounded-full bg-brand-50 px-3 py-1 text-sm font-semibold text-brand-800">{new Set(grupo.itens.map(v => v.membroId)).size} {new Set(grupo.itens.map(v => v.membroId)).size === 1 ? 'membro' : 'membros'} ▾</span>
               </summary>
               <ul className="divide-y divide-slate-100 border-t border-slate-100">
                 {grupo.itens.map(v => (
