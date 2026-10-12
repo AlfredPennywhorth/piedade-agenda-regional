@@ -430,8 +430,9 @@ describe('S06 - Convocações', () => {
 
   it('15b. DCO: setor inclui Casas subordinadas, exclui outras e preserva funções comuns', async () => {
     const ctx = await setupBaseData()
-    const dcoId = crypto.randomUUID()
-    await db.insert(funcoes).values({ id: dcoId, nome: 'Diácono Casa de Oração', codigo: 'DCO', ativo: true })
+    const dco = await db.select().from(funcoes).where(eq(funcoes.codigo, 'DCO')).get()
+    expect(dco).toBeDefined()
+    const dcoId = dco!.id
 
     const dcoDaCasa = crypto.randomUUID()
     const dcoOutraCasa = crypto.randomUUID()
