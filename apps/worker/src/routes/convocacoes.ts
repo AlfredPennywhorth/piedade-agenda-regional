@@ -10,6 +10,7 @@ import {
   casas,
   setores,
   administracoes,
+  regionais,
   membros,
   funcoes,
   rsvp,
@@ -453,8 +454,9 @@ convocacoesRouter.post('/:id/publicar', async c => {
     const casasDaRegional = db.select({ id: casas.id }).from(casas)
       .innerJoin(setores, eq(setores.id, casas.setorId))
       .innerJoin(administracoes, eq(administracoes.id, setores.administracaoId))
+      .innerJoin(regionais, eq(regionais.id, administracoes.regionalId))
       .where(and(eq(administracoes.regionalId, evento.regionalId),
-        eq(administracoes.ativo, true), eq(setores.ativo, true), eq(casas.ativo, true)))
+        eq(regionais.ativo, true), eq(administracoes.ativo, true), eq(setores.ativo, true), eq(casas.ativo, true)))
     conditions.push(or(eq(vinculosFuncionais.regionalId, evento.regionalId),
       and(vinculoDco, inArray(vinculosFuncionais.casaId, casasDaRegional)))!)
   } else if (evento.grupoTrabalhoId) {
