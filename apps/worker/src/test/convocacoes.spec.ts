@@ -428,6 +428,67 @@ describe('S06 - Convocações', () => {
     expect(vinculoCasaIncluso).toBe(false)
   })
 
+  it('15b. DCO: setor inclui Casas subordinadas, exclui outras e preserva funções comuns', async () => {
+    const ctx = await setupBaseData()
+    const dcoId = crypto.randomUUID()
+    await db.insert(funcoes).values({ id: dcoId, nome: 'Diácono Casa de Oração', codigo: 'DCO', ativo: true })
+
+    const dcoDaCasa = crypto.randomUUID()
+    const dcoOutraCasa = crypto.randomUUID()
+    const outroSetor = crypto.randomUUID()
+    const outraCasa = crypto.randomUUID()
+    await db.insert(setores).values({ id: outroSetor, nome: 'Outro Setor', administracaoId: (await db.select().from(setores).where(eq(setores.id, ctx.setId)).get()).administracaoId })
+    await db.insert(casas).values({ id: outraCasa, nome: 'Casa fora do setor', setorId: outroSetor })
+    await db.insert(membros).values([
+      { id: dcoDaCasa, nome: 'DCO dentro do setor', casaId: ctx.casId, ativo: true },
+      { id: dcoOutraCasa, nome: 'DCO fora do setor', casaId: outraCasa, ativo: true },
+    ])
+    const vinculoDentro = crypto.randomUUID()
+    const vinculoFora = crypto.randomUUID()
+    await db.insert(vinculosFuncionais).values([
+      { id: vinculoDentro, membroId: dcoDaCasa, funcaoId: dcoId, casaId: ctx.casId, ativo: true, origem: 'MEMBRO_AUTOMATICO' },
+      { id: vinculoFora, membroId: dcoOutraCasa, funcaoId: dcoId, casaId: outraCasa, ativo: true, origem: 'MEMBRO_AUTOMATICO' },
+    ])
+
+    const criarEPublicar = async (funcaoId: string) => {
+      const eventoId = crypto.randomUUID()
+      await db.insert(eventos).values({
+        id: eventoId, titulo: 'Reunião Setor Centro', modalidade: 'ONLINE',
+        inicioEm: '2028-01-01T10:00:00.000Z', fimEm: '2028-01-01T11:00:00.000Z',
+        setorId: ctx.setId, ativo: true,
+      })
+      const resposta = await app.request('/api/v1/convocacoes', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventoId }),
+      })
+      expect(resposta.status).toBe(201)
+      const conv = await resposta.json()
+      const fun = await app.request(`/api/v1/convocacoes/${conv.id}/funcoes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ funcaoId }),
+      })
+      expect(fun.status).toBe(201)
+      const publicada = await app.request(`/api/v1/convocacoes/${conv.id}/publicar`, { method: 'POST' })
+      expect(publicada.status).toBe(200)
+      const destinatarios = await app.request(`/api/v1/convocacoes/${conv.id}/destinatarios`)
+      expect(destinatarios.status).toBe(200)
+      return await destinatarios.json() as Array<{ membroId: string; evidencias: Array<{ vinculoFuncionalId: string }> }>
+    }
+
+    const dcos = await criarEPublicar(dcoId)
+    expect(dcos.map(item => item.membroId)).toContain(dcoDaCasa)
+    expect(dcos.map(item => item.membroId)).not.toContain(dcoOutraCasa)
+    expect(dcos.find(item => item.membroId === dcoDaCasa)?.evidencias)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ vinculoFuncionalId: vinculoDentro })]))
+
+    const comuns = await criarEPublicar(ctx.f1Id)
+    expect(comuns).toHaveLength(1)
+    expect(comuns[0].membroId).toBe(ctx.mem1Id)
+    expect(comuns[0].evidencias).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ vinculoFuncionalId: ctx.v3Id })])
+    )
+  })
+
   it('18-19. alterações posteriores não alteram o snapshot gerado', async () => {
     const ctx = await setupBaseData()
     const convRes = await app.request('/api/v1/convocacoes', {
