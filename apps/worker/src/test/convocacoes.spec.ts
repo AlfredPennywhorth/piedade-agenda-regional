@@ -477,7 +477,7 @@ describe('S06 - Convocações', () => {
       return await destinatarios.json() as Array<{ membroId: string; evidencias: Array<{ vinculoFuncionalId: string }> }>
     }
 
-    // Vínculo DCO manual/legado na mesma hierarquia não pode herdar o Setor.
+    // Vínculo DCO legado na Casa atual deve herdar o Setor, sem depender da origem.
     const legadoId = crypto.randomUUID()
     await db.insert(membros).values({ id: legadoId, nome: 'DCO legado', casaId: ctx.cas2Id, ativo: true })
     await db.insert(vinculosFuncionais).values({
@@ -485,10 +485,18 @@ describe('S06 - Convocações', () => {
       casaId: ctx.cas2Id, ativo: true,
     })
 
+    // Histórico da Casa anterior não é destinatário da convocação atual.
+    const historicoId = crypto.randomUUID()
+    await db.insert(vinculosFuncionais).values({
+      id: historicoId, membroId: legadoId, funcaoId: dcoId,
+      casaId: outraCasa, ativo: true,
+    })
+
     const dcos = await criarEPublicar(dcoId)
     expect(dcos.map(item => item.membroId)).toContain(dcoDaCasa)
     expect(dcos.map(item => item.membroId)).not.toContain(dcoOutraCasa)
-    expect(dcos.map(item => item.membroId)).not.toContain(legadoId)
+    expect(dcos.map(item => item.membroId)).toContain(legadoId)
+    expect(dcos.find(item => item.membroId === legadoId)?.evidencias.some(e => e.vinculoFuncionalId === historicoId)).toBe(false)
     expect(dcos.find(item => item.membroId === dcoDaCasa)?.evidencias)
       .toEqual(expect.arrayContaining([expect.objectContaining({ vinculoFuncionalId: vinculoDentro })]))
 
