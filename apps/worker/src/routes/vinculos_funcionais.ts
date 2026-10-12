@@ -99,7 +99,7 @@ function escopoDoVinculo(vinculo: any): {
 
 function eventoCorrespondeAoVinculo(evento: any, vinculo: any, hierarquiaDco: {
   casaId: string; setorId: string; administracaoId: string; regionalId: string
-  casaAtiva: boolean; setorAtivo: boolean; administracaoAtiva: boolean
+  casaAtiva: boolean; setorAtivo: boolean; administracaoAtiva: boolean; regionalAtiva: boolean
 } | null, dcoAutomatico: boolean): boolean {
   // Apenas o DCO automático segue a hierarquia da Casa, respeitando os níveis ativos.
   // O evento de Setor não exige Administração ativa; o de Casa exige Casa ativa.
@@ -111,7 +111,8 @@ function eventoCorrespondeAoVinculo(evento: any, vinculo: any, hierarquiaDco: {
     if (evento.administracaoId) return hierarquiaDco.casaAtiva && hierarquiaDco.setorAtivo
       && hierarquiaDco.administracaoAtiva && evento.administracaoId === hierarquiaDco.administracaoId
     if (evento.regionalId) return hierarquiaDco.casaAtiva && hierarquiaDco.setorAtivo
-      && hierarquiaDco.administracaoAtiva && evento.regionalId === hierarquiaDco.regionalId
+      && hierarquiaDco.administracaoAtiva && hierarquiaDco.regionalAtiva
+      && evento.regionalId === hierarquiaDco.regionalId
     return false
   }
   if (vinculo.regionalId) return evento.regionalId === vinculo.regionalId
@@ -152,9 +153,11 @@ export async function prepararSincronizacaoConvocacoes(db: any, vinculo: any, as
         casaId: casas.id, setorId: setores.id,
         administracaoId: administracoes.id, regionalId: administracoes.regionalId,
         casaAtiva: casas.ativo, setorAtivo: setores.ativo, administracaoAtiva: administracoes.ativo,
+        regionalAtiva: regionais.ativo,
       }).from(casas)
         .innerJoin(setores, eq(setores.id, casas.setorId))
         .innerJoin(administracoes, eq(administracoes.id, setores.administracaoId))
+        .innerJoin(regionais, eq(regionais.id, administracoes.regionalId))
         .where(eq(casas.id, vinculo.casaId)).get()
     : null
   const hierarquiaDco = casaDco ?? null
