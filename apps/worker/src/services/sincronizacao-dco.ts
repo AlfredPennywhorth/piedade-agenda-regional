@@ -18,7 +18,7 @@ export function queriesSincronizacaoDcoAtual(
   const condicoes = and(
     eq(funcoes.codigo, 'DCO'),
     eq(funcoes.ativo, true),
-    eq(vinculosFuncionais.origem, 'MEMBRO_AUTOMATICO'),
+    // Vínculos DCO legados ativos são válidos apenas na Casa atual do membro.
     eq(vinculosFuncionais.ativo, true),
     eq(membros.ativo, true),
     eq(vinculosFuncionais.casaId, membros.casaId),
