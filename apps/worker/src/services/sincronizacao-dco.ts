@@ -39,18 +39,22 @@ export function queriesSincronizacaoDcoAtual(
       eq(eventos.id, convocacoes.eventoId),
       eq(eventos.abrangencia, 'TERRITORIAL'),
       or(
-        eq(eventos.casaId, vinculosFuncionais.casaId),
+        sql`(${eventos.casaId} = ${vinculosFuncionais.casaId} AND EXISTS (
+          SELECT 1 FROM ${casas} WHERE ${casas.id} = ${vinculosFuncionais.casaId} AND ${casas.ativo} = 1
+        ))`,
         sql`(${eventos.setorId} IS NOT NULL AND EXISTS (
           SELECT 1 FROM ${casas}
+          JOIN ${setores} ON ${setores.id} = ${casas.setorId}
           WHERE ${casas.id} = ${vinculosFuncionais.casaId}
-            AND ${casas.setorId} = ${eventos.setorId} AND ${casas.ativo} = 1
+            AND ${casas.setorId} = ${eventos.setorId} AND ${casas.ativo} = 1 AND ${setores.ativo} = 1
         ))`,
         sql`(${eventos.administracaoId} IS NOT NULL AND EXISTS (
           SELECT 1 FROM ${casas}
           JOIN ${setores} ON ${setores.id} = ${casas.setorId}
+          JOIN ${administracoes} ON ${administracoes.id} = ${setores.administracaoId}
           WHERE ${casas.id} = ${vinculosFuncionais.casaId}
             AND ${setores.administracaoId} = ${eventos.administracaoId}
-            AND ${casas.ativo} = 1 AND ${setores.ativo} = 1
+            AND ${casas.ativo} = 1 AND ${setores.ativo} = 1 AND ${administracoes.ativo} = 1
         ))`,
         sql`(${eventos.regionalId} IS NOT NULL AND EXISTS (
           SELECT 1 FROM ${casas}
