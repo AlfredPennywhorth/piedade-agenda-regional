@@ -512,7 +512,7 @@ membrosRouter.patch('/:id', async (c) => {
         }
       : null
     const sincronizacoesDco = novoVinculoDco && membroAtivoFinal
-      ? await prepararSincronizacaoConvocacoes(db, novoVinculoDco, true)
+      ? await prepararSincronizacaoConvocacoes(db, novoVinculoDco, true, casaFinalId)
       : []
 
     if (moveuCasa) {
