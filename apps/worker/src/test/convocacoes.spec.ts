@@ -151,6 +151,7 @@ describe('S06 - Convocações', () => {
       regId,
       setId,
       casId,
+      cas2Id,
       gtId,
       mem1Id,
       mem2Id,
