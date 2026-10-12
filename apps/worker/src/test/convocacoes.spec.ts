@@ -151,6 +151,7 @@ describe('S06 - Convocações', () => {
       regId,
       setId,
       casId,
+      cas2Id,
       gtId,
       mem1Id,
       mem2Id,
@@ -426,6 +427,197 @@ describe('S06 - Convocações', () => {
       d.evidencias.some((e: any) => e.vinculoFuncionalId === ctx.v3Id)
     )
     expect(vinculoCasaIncluso).toBe(false)
+  })
+
+  it('15b. DCO: setor inclui Casas subordinadas, exclui outras e preserva funções comuns', async () => {
+    const ctx = await setupBaseData()
+    const dco = await db.select().from(funcoes).where(eq(funcoes.codigo, 'DCO')).get()
+    expect(dco).toBeDefined()
+    const dcoId = dco!.id
+
+    const dcoDaCasa = crypto.randomUUID()
+    const dcoOutraCasa = crypto.randomUUID()
+    const outroSetor = crypto.randomUUID()
+    const outraCasa = crypto.randomUUID()
+    await db.insert(setores).values({ id: outroSetor, nome: 'Outro Setor', administracaoId: (await db.select().from(setores).where(eq(setores.id, ctx.setId)).get()).administracaoId })
+    await db.insert(casas).values({ id: outraCasa, nome: 'Casa fora do setor', setorId: outroSetor })
+    await db.insert(membros).values([
+      { id: dcoDaCasa, nome: 'DCO dentro do setor', casaId: ctx.casId, ativo: true },
+      { id: dcoOutraCasa, nome: 'DCO fora do setor', casaId: outraCasa, ativo: true },
+    ])
+    const vinculoDentro = crypto.randomUUID()
+    const vinculoFora = crypto.randomUUID()
+    await db.insert(vinculosFuncionais).values([
+      { id: vinculoDentro, membroId: dcoDaCasa, funcaoId: dcoId, casaId: ctx.casId, ativo: true, origem: 'MEMBRO_AUTOMATICO' },
+      { id: vinculoFora, membroId: dcoOutraCasa, funcaoId: dcoId, casaId: outraCasa, ativo: true, origem: 'MEMBRO_AUTOMATICO' },
+    ])
+
+    const criarEPublicar = async (funcaoId: string) => {
+      const eventoId = crypto.randomUUID()
+      await db.insert(eventos).values({
+        id: eventoId, titulo: 'Reunião Setor Centro', modalidade: 'ONLINE',
+        inicioEm: '2028-01-01T10:00:00.000Z', fimEm: '2028-01-01T11:00:00.000Z',
+        setorId: ctx.setId, ativo: true,
+      })
+      const resposta = await app.request('/api/v1/convocacoes', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventoId }),
+      })
+      expect(resposta.status).toBe(201)
+      const conv = await resposta.json()
+      const fun = await app.request(`/api/v1/convocacoes/${conv.id}/funcoes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ funcaoId }),
+      })
+      expect(fun.status).toBe(201)
+      const publicada = await app.request(`/api/v1/convocacoes/${conv.id}/publicar`, { method: 'POST' })
+      expect(publicada.status).toBe(200)
+      const destinatarios = await app.request(`/api/v1/convocacoes/${conv.id}/destinatarios`)
+      expect(destinatarios.status).toBe(200)
+      return await destinatarios.json() as Array<{ membroId: string; evidencias: Array<{ vinculoFuncionalId: string }> }>
+    }
+
+    // Vínculo DCO manual/legado na mesma hierarquia não pode herdar o Setor.
+    const legadoId = crypto.randomUUID()
+    await db.insert(membros).values({ id: legadoId, nome: 'DCO legado', casaId: ctx.cas2Id, ativo: true })
+    await db.insert(vinculosFuncionais).values({
+      id: crypto.randomUUID(), membroId: legadoId, funcaoId: dcoId,
+      casaId: ctx.cas2Id, ativo: true,
+    })
+
+    const dcos = await criarEPublicar(dcoId)
+    expect(dcos.map(item => item.membroId)).toContain(dcoDaCasa)
+    expect(dcos.map(item => item.membroId)).not.toContain(dcoOutraCasa)
+    expect(dcos.map(item => item.membroId)).not.toContain(legadoId)
+    expect(dcos.find(item => item.membroId === dcoDaCasa)?.evidencias)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ vinculoFuncionalId: vinculoDentro })]))
+
+    const comuns = await criarEPublicar(ctx.f1Id)
+    expect(comuns).toHaveLength(1)
+    expect(comuns[0].membroId).toBe(ctx.mem1Id)
+    expect(comuns[0].evidencias).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ vinculoFuncionalId: ctx.v3Id })])
+    )
+  })
+
+  it('15c. DCO: Casa, Administração, Regional e GT respeitam seus limites', async () => {
+    const ctx = await setupBaseData()
+    const dco = await db.select().from(funcoes).where(eq(funcoes.codigo, 'DCO')).get()
+    expect(dco).toBeDefined()
+    const adm = await db.select().from(administracoes).where(eq(administracoes.id,
+      (await db.select().from(setores).where(eq(setores.id, ctx.setId)).get()).administracaoId)).get()
+    const dcoId = dco!.id
+    const registroConta = sqlite.prepare('SELECT id FROM contas_acesso WHERE membro_id = ?').get(ctx.mem1Id) as { id: string }
+    for (const [tipo, id] of [['CASA', ctx.casId], ['ADMINISTRACAO', adm.id], ['REGIONAL', ctx.regId], ['GRUPO_TRABALHO', ctx.gtId]]) {
+      sqlite.prepare("INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, 'GESTOR_AGENDA', ?, ?)")
+        .run(crypto.randomUUID(), registroConta.id, tipo, id)
+    }
+    const outroRegional = crypto.randomUUID()
+    const outraAdmin = crypto.randomUUID()
+    const outroSetor = crypto.randomUUID()
+    const outraCasa = crypto.randomUUID()
+    await db.insert(regionais).values({ id: outroRegional, nome: 'Regional externa' })
+    await db.insert(administracoes).values({ id: outraAdmin, nome: 'Admin externa', regionalId: outroRegional })
+    await db.insert(setores).values({ id: outroSetor, nome: 'Setor externo', administracaoId: outraAdmin })
+    await db.insert(casas).values({ id: outraCasa, nome: 'Casa externa', setorId: outroSetor })
+    const membroDentro = crypto.randomUUID()
+    const membroFora = crypto.randomUUID()
+    await db.insert(membros).values([
+      { id: membroDentro, nome: 'DCO da Regional', casaId: ctx.casId, ativo: true },
+      { id: membroFora, nome: 'DCO de outra Regional', casaId: outraCasa, ativo: true },
+    ])
+    await db.insert(vinculosFuncionais).values([
+      { id: crypto.randomUUID(), membroId: membroDentro, funcaoId: dcoId, casaId: ctx.casId, ativo: true, origem: 'MEMBRO_AUTOMATICO' },
+      { id: crypto.randomUUID(), membroId: membroFora, funcaoId: dcoId, casaId: outraCasa, ativo: true, origem: 'MEMBRO_AUTOMATICO' },
+    ])
+    for (const [tipo, escopo] of [['casaId', ctx.casId], ['administracaoId', adm.id], ['regionalId', ctx.regId], ['grupoTrabalhoId', ctx.gtId]] as const) {
+      const evId = crypto.randomUUID()
+      await db.insert(eventos).values({
+        id: evId, titulo: 'DCO escopo ' + tipo, modalidade: 'ONLINE',
+        inicioEm: '2028-04-01T10:00:00.000Z', fimEm: '2028-04-01T11:00:00.000Z',
+        [tipo]: escopo, ativo: true,
+      })
+      const criado = await app.request('/api/v1/convocacoes', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventoId: evId }) })
+      expect(criado.status).toBe(201)
+      const { id: convId } = await criado.json()
+      expect((await app.request(`/api/v1/convocacoes/${convId}/funcoes`, { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ funcaoId: dcoId }) })).status).toBe(201)
+      const publicada = await app.request(`/api/v1/convocacoes/${convId}/publicar`, { method: 'POST' })
+      expect(publicada.status).toBe(200)
+      const destinos = await (await app.request(`/api/v1/convocacoes/${convId}/destinatarios`)).json() as Array<{ membroId: string }>
+      expect(destinos.map(d => d.membroId)).not.toContain(membroFora)
+      if (tipo === 'grupoTrabalhoId') {
+        expect(destinos).toHaveLength(0)
+      } else {
+        expect(destinos.map(d => d.membroId)).toContain(membroDentro)
+      }
+    }
+    // Mesmo com os níveis descendentes ativos, Regional inativa não expande DCO.
+    await db.update(regionais).set({ ativo: false }).where(eq(regionais.id, ctx.regId))
+    const eventoInativoId = crypto.randomUUID()
+    await db.insert(eventos).values({
+      id: eventoInativoId, titulo: 'Regional inativa DCO', modalidade: 'ONLINE',
+      inicioEm: '2028-05-01T10:00:00.000Z', fimEm: '2028-05-01T11:00:00.000Z',
+      regionalId: ctx.regId, ativo: true,
+    })
+    const criada = await app.request('/api/v1/convocacoes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId: eventoInativoId }),
+    })
+    expect(criada.status).toBe(201)
+    const { id: convocacaoId } = await criada.json()
+    expect((await app.request(`/api/v1/convocacoes/${convocacaoId}/funcoes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ funcaoId: dcoId }),
+    })).status).toBe(201)
+    expect((await app.request(`/api/v1/convocacoes/${convocacaoId}/publicar`, {
+      method: 'POST',
+    })).status).toBe(200)
+    const destinos = await (await app.request(`/api/v1/convocacoes/${convocacaoId}/destinatarios`)).json() as Array<{ membroId: string }>
+    expect(destinos.map(d => d.membroId)).not.toContain(membroDentro)
+  })
+
+  it('15d. DCO: Casa inativa não entra no snapshot e Setor dispensa Administração ativa', async () => {
+    const ctx = await setupBaseData()
+    const dco = await db.select().from(funcoes).where(eq(funcoes.codigo, 'DCO')).get()
+    expect(dco).toBeDefined()
+    const membroDco = crypto.randomUUID()
+    await db.insert(membros).values({ id: membroDco, nome: 'DCO da Casa', casaId: ctx.casId, ativo: true })
+    await db.insert(vinculosFuncionais).values({
+      id: crypto.randomUUID(), membroId: membroDco, funcaoId: dco!.id,
+      casaId: ctx.casId, origem: 'MEMBRO_AUTOMATICO', ativo: true,
+    })
+    const publicar = async (escopo: 'casaId' | 'setorId', id: string) => {
+      const eventoId = crypto.randomUUID()
+      await db.insert(eventos).values({
+        id: eventoId, titulo: 'Hierarquia ativa ' + escopo, modalidade: 'ONLINE',
+        inicioEm: '2028-06-01T10:00:00.000Z', fimEm: '2028-06-01T11:00:00.000Z',
+        [escopo]: id, ativo: true,
+      })
+      const resposta = await app.request('/api/v1/convocacoes', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventoId }),
+      })
+      expect(resposta.status).toBe(201)
+      const { id: convocacaoId } = await resposta.json()
+      expect((await app.request(`/api/v1/convocacoes/${convocacaoId}/funcoes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ funcaoId: dco!.id }),
+      })).status).toBe(201)
+      expect((await app.request(`/api/v1/convocacoes/${convocacaoId}/publicar`, {
+        method: 'POST',
+      })).status).toBe(200)
+      const respostaDestinos = await app.request(`/api/v1/convocacoes/${convocacaoId}/destinatarios`)
+      expect(respostaDestinos.status).toBe(200)
+      return (await respostaDestinos.json() as Array<{ membroId: string }>).map(d => d.membroId)
+    }
+    await db.update(casas).set({ ativo: false }).where(eq(casas.id, ctx.casId))
+    expect(await publicar('casaId', ctx.casId)).not.toContain(membroDco)
+    await db.update(casas).set({ ativo: true }).where(eq(casas.id, ctx.casId))
+    const setor = await db.select().from(setores).where(eq(setores.id, ctx.setId)).get()
+    await db.update(administracoes).set({ ativo: false }).where(eq(administracoes.id, setor!.administracaoId))
+    expect(await publicar('setorId', ctx.setId)).toContain(membroDco)
   })
 
   it('18-19. alterações posteriores não alteram o snapshot gerado', async () => {

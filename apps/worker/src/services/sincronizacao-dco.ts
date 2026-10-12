@@ -1,7 +1,8 @@
-import { and, eq, gt, sql } from 'drizzle-orm'
+import { and, eq, gt, or, sql } from 'drizzle-orm'
 import {
   convocacoes, convocacaoFuncoes, convocacaoDestinatarios,
   convocacaoDestinatarioEvidencias, eventos, funcoes, membros, vinculosFuncionais,
+  casas, setores, administracoes, regionais,
 } from '../db/schema'
 
 // UUID v4 gerado por linha pelo SQLite, sem materializar destinatários antes do batch.
@@ -36,7 +37,36 @@ export function queriesSincronizacaoDcoAtual(
     .innerJoin(convocacoes, eq(convocacoes.id, convocacaoFuncoes.convocacaoId))
     .innerJoin(eventos, and(
       eq(eventos.id, convocacoes.eventoId),
-      eq(eventos.casaId, vinculosFuncionais.casaId),
+      eq(eventos.abrangencia, 'TERRITORIAL'),
+      or(
+        sql`(${eventos.casaId} = ${vinculosFuncionais.casaId} AND EXISTS (
+          SELECT 1 FROM ${casas} WHERE ${casas.id} = ${vinculosFuncionais.casaId} AND ${casas.ativo} = 1
+        ))`,
+        sql`(${eventos.setorId} IS NOT NULL AND EXISTS (
+          SELECT 1 FROM ${casas}
+          JOIN ${setores} ON ${setores.id} = ${casas.setorId}
+          WHERE ${casas.id} = ${vinculosFuncionais.casaId}
+            AND ${casas.setorId} = ${eventos.setorId} AND ${casas.ativo} = 1 AND ${setores.ativo} = 1
+        ))`,
+        sql`(${eventos.administracaoId} IS NOT NULL AND EXISTS (
+          SELECT 1 FROM ${casas}
+          JOIN ${setores} ON ${setores.id} = ${casas.setorId}
+          JOIN ${administracoes} ON ${administracoes.id} = ${setores.administracaoId}
+          WHERE ${casas.id} = ${vinculosFuncionais.casaId}
+            AND ${setores.administracaoId} = ${eventos.administracaoId}
+            AND ${casas.ativo} = 1 AND ${setores.ativo} = 1 AND ${administracoes.ativo} = 1
+        ))`,
+        sql`(${eventos.regionalId} IS NOT NULL AND EXISTS (
+          SELECT 1 FROM ${casas}
+          JOIN ${setores} ON ${setores.id} = ${casas.setorId}
+          JOIN ${administracoes} ON ${administracoes.id} = ${setores.administracaoId}
+          JOIN ${regionais} ON ${regionais.id} = ${administracoes.regionalId}
+          WHERE ${casas.id} = ${vinculosFuncionais.casaId}
+            AND ${administracoes.regionalId} = ${eventos.regionalId}
+            AND ${casas.ativo} = 1 AND ${setores.ativo} = 1 AND ${administracoes.ativo} = 1
+            AND ${regionais.ativo} = 1
+        ))`,
+      ),
     ))
 
   return [

@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, inArray, sql, asc } from 'drizzle-orm'
+import { eq, and, or, inArray, sql, asc } from 'drizzle-orm'
 import {
   convocacoes,
   convocacaoFuncoes,
@@ -7,6 +7,10 @@ import {
   convocacaoDestinatarioEvidencias,
   eventos,
   vinculosFuncionais,
+  casas,
+  setores,
+  administracoes,
+  regionais,
   membros,
   funcoes,
   rsvp,
@@ -417,32 +421,47 @@ convocacoesRouter.post('/:id/publicar', async c => {
     return c.json({ error: 'Uma ou mais funções associadas estão inativas' }, 400)
   }
 
-  // Derivação dos destinatários
-  // Condições: vinculo ativo, membro ativo, escopo bate com evento, funcaoId IN funcaoIds
+  // A função DCO é vinculada à Casa, mas pode ser convocada por seus níveis superiores.
+  // Demais funções seguem exigindo vínculo explícito no escopo do evento.
   const conditions = [
     eq(vinculosFuncionais.ativo, true),
     eq(membros.ativo, true),
     inArray(vinculosFuncionais.funcaoId, funcaoIds),
   ]
-
-  const eventoExterno = evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL'
-  if (eventoExterno) {
-    if (!evento.regionalGestaoId) {
-      return c.json({
-        error: 'Evento externo sem Regional responsável não pode publicar convocação',
-        code: 'REGIONAL_GESTAO_AUSENTE',
-      }, 409)
-    }
-    conditions.push(eq(vinculosFuncionais.regionalId, evento.regionalGestaoId))
-  }
-
-  if (evento.regionalId) conditions.push(eq(vinculosFuncionais.regionalId, evento.regionalId))
-  if (evento.administracaoId)
-    conditions.push(eq(vinculosFuncionais.administracaoId, evento.administracaoId))
-  if (evento.setorId) conditions.push(eq(vinculosFuncionais.setorId, evento.setorId))
-  if (evento.casaId) conditions.push(eq(vinculosFuncionais.casaId, evento.casaId))
-  if (evento.grupoTrabalhoId)
+  const vinculoDco = and(eq(funcoes.codigo, 'DCO'), eq(vinculosFuncionais.origem, 'MEMBRO_AUTOMATICO'))
+  if (evento.casaId) {
+    const casasAtivas = db.select({ id: casas.id }).from(casas).where(eq(casas.ativo, true))
+    // A regra de Casa ativa aplica-se ao DCO automático; vínculos comuns/manuais
+    // mantêm a correspondência direta, sem herança territorial.
+    conditions.push(eq(vinculosFuncionais.casaId, evento.casaId))
+    conditions.push(or(sql`NOT (${funcoes.codigo} = 'DCO' AND ${vinculosFuncionais.origem} IS 'MEMBRO_AUTOMATICO')`,
+      inArray(vinculosFuncionais.casaId, casasAtivas))!)
+  } else if (evento.setorId) {
+    const casasDoSetor = db.select({ id: casas.id }).from(casas)
+      .innerJoin(setores, eq(setores.id, casas.setorId))
+      .where(and(eq(casas.setorId, evento.setorId), eq(casas.ativo, true), eq(setores.ativo, true)))
+    conditions.push(or(eq(vinculosFuncionais.setorId, evento.setorId),
+      and(vinculoDco, inArray(vinculosFuncionais.casaId, casasDoSetor)))!)
+  } else if (evento.administracaoId) {
+    const casasDaAdministracao = db.select({ id: casas.id }).from(casas)
+      .innerJoin(setores, eq(setores.id, casas.setorId))
+      .innerJoin(administracoes, eq(administracoes.id, setores.administracaoId))
+      .where(and(eq(setores.administracaoId, evento.administracaoId),
+        eq(administracoes.ativo, true), eq(setores.ativo, true), eq(casas.ativo, true)))
+    conditions.push(or(eq(vinculosFuncionais.administracaoId, evento.administracaoId),
+      and(vinculoDco, inArray(vinculosFuncionais.casaId, casasDaAdministracao)))!)
+  } else if (evento.regionalId) {
+    const casasDaRegional = db.select({ id: casas.id }).from(casas)
+      .innerJoin(setores, eq(setores.id, casas.setorId))
+      .innerJoin(administracoes, eq(administracoes.id, setores.administracaoId))
+      .innerJoin(regionais, eq(regionais.id, administracoes.regionalId))
+      .where(and(eq(administracoes.regionalId, evento.regionalId),
+        eq(regionais.ativo, true), eq(administracoes.ativo, true), eq(setores.ativo, true), eq(casas.ativo, true)))
+    conditions.push(or(eq(vinculosFuncionais.regionalId, evento.regionalId),
+      and(vinculoDco, inArray(vinculosFuncionais.casaId, casasDaRegional)))!)
+  } else if (evento.grupoTrabalhoId) {
     conditions.push(eq(vinculosFuncionais.grupoTrabalhoId, evento.grupoTrabalhoId))
+  }
 
   // Realiza query juntando vinculosFuncionais e membros
   const destinatariosValidos = await db
@@ -453,6 +472,7 @@ convocacoesRouter.post('/:id/publicar', async c => {
     })
     .from(vinculosFuncionais)
     .innerJoin(membros, eq(membros.id, vinculosFuncionais.membroId))
+    .innerJoin(funcoes, eq(funcoes.id, vinculosFuncionais.funcaoId))
     .where(and(...conditions))
     .all()
 
