@@ -555,6 +555,48 @@ describe('S06 - Convocações', () => {
     }
   })
 
+  it('15d. DCO: Casa inativa não entra no snapshot e Setor dispensa Administração ativa', async () => {
+    const ctx = await setupBaseData()
+    const dco = await db.select().from(funcoes).where(eq(funcoes.codigo, 'DCO')).get()
+    expect(dco).toBeDefined()
+    const membroDco = crypto.randomUUID()
+    await db.insert(membros).values({ id: membroDco, nome: 'DCO da Casa', casaId: ctx.casId, ativo: true })
+    await db.insert(vinculosFuncionais).values({
+      id: crypto.randomUUID(), membroId: membroDco, funcaoId: dco!.id,
+      casaId: ctx.casId, origem: 'MEMBRO_AUTOMATICO', ativo: true,
+    })
+    const publicar = async (escopo: 'casaId' | 'setorId', id: string) => {
+      const eventoId = crypto.randomUUID()
+      await db.insert(eventos).values({
+        id: eventoId, titulo: 'Hierarquia ativa ' + escopo, modalidade: 'ONLINE',
+        inicioEm: '2028-06-01T10:00:00.000Z', fimEm: '2028-06-01T11:00:00.000Z',
+        [escopo]: id, ativo: true,
+      })
+      const resposta = await app.request('/api/v1/convocacoes', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventoId }),
+      })
+      expect(resposta.status).toBe(201)
+      const { id: convocacaoId } = await resposta.json()
+      expect((await app.request(`/api/v1/convocacoes/${convocacaoId}/funcoes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ funcaoId: dco!.id }),
+      })).status).toBe(201)
+      expect((await app.request(`/api/v1/convocacoes/${convocacaoId}/publicar`, {
+        method: 'POST',
+      })).status).toBe(200)
+      const respostaDestinos = await app.request(`/api/v1/convocacoes/${convocacaoId}/destinatarios`)
+      expect(respostaDestinos.status).toBe(200)
+      return (await respostaDestinos.json() as Array<{ membroId: string }>).map(d => d.membroId)
+    }
+    await db.update(casas).set({ ativo: false }).where(eq(casas.id, ctx.casId))
+    expect(await publicar('casaId', ctx.casId)).not.toContain(membroDco)
+    await db.update(casas).set({ ativo: true }).where(eq(casas.id, ctx.casId))
+    const setor = await db.select().from(setores).where(eq(setores.id, ctx.setId)).get()
+    await db.update(administracoes).set({ ativo: false }).where(eq(administracoes.id, setor!.administracaoId))
+    expect(await publicar('setorId', ctx.setId)).toContain(membroDco)
+  })
+
   it('18-19. alterações posteriores não alteram o snapshot gerado', async () => {
     const ctx = await setupBaseData()
     const convRes = await app.request('/api/v1/convocacoes', {
