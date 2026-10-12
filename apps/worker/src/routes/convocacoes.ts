@@ -467,10 +467,6 @@ convocacoesRouter.post('/:id/publicar', async c => {
     .where(and(...conditions))
     .all()
 
-  if (destinatariosValidos.length === 0) {
-    return c.json({ error: 'Nenhum membro ativo encontrado para as funções e a abrangência selecionadas. Revise os vínculos antes de publicar.', code: 'CONVOCACAO_SEM_DESTINATARIOS' }, 409)
-  }
-
   const nowIso = new Date().toISOString()
 
   // Agrupar por membroId para criar destinatários lógicos únicos
