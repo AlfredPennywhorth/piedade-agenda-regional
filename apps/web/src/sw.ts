@@ -6,27 +6,8 @@ declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: (string | Precac
 // Precache resources injected by vite-plugin-pwa
 precacheAndRoute(self.__WB_MANIFEST || [])
 
-// Ponte de migração: o PWA antigo não conhece o aviso de atualização.
-// Na primeira instalação desta funcionalidade, mantém o comportamento anterior.
-// Em versões seguintes, o marcador persistente permite aguardar confirmação.
-const ponteCache = 'agenda-pwa-ponte-atualizacao-v1'
-self.addEventListener('install', event => {
-  event.waitUntil((async () => {
-    const cache = await caches.open(ponteCache)
-    if (!(await cache.match('/__pwa_ponte_instalada__'))) await self.skipWaiting()
-  })())
-})
-self.addEventListener('activate', event => {
-  event.waitUntil((async () => {
-    const cache = await caches.open(ponteCache)
-    await cache.put('/__pwa_ponte_instalada__', new Response('1'))
-  })())
-})
-
-// Atualizações seguintes dependem da confirmação do usuário.
-self.addEventListener('message', event => {
-  if (event.data?.type === 'SKIP_WAITING') void self.skipWaiting()
-})
+// Atualiza automaticamente o PWA, preservando o comportamento anterior.
+self.addEventListener('install', () => { void self.skipWaiting() })
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim())
