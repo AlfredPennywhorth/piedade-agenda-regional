@@ -134,9 +134,10 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
       item.membro.nome.toLocaleLowerCase('pt-BR').includes(termo) ||
       (item.membro.casaNome || '').toLocaleLowerCase('pt-BR').includes(termo)
     )
-    return [...filtrados].sort((a, b) =>
-      a.membro.nome.localeCompare(b.membro.nome, 'pt-BR', { sensitivity: 'base' })
-    )
+    return [...filtrados].sort((a, b) => {
+      const status = Number(a.checkin !== null) - Number(b.checkin !== null)
+      return status || a.membro.nome.localeCompare(b.membro.nome, 'pt-BR', { sensitivity: 'base' })
+    })
   }, [busca, participantes])
 
   const registrarManual = async (participante: Participante) => {
