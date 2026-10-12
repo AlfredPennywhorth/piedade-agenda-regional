@@ -2,7 +2,7 @@ import { and, eq, gt, or, sql } from 'drizzle-orm'
 import {
   convocacoes, convocacaoFuncoes, convocacaoDestinatarios,
   convocacaoDestinatarioEvidencias, eventos, funcoes, membros, vinculosFuncionais,
-  casas, setores, administracoes,
+  casas, setores, administracoes, regionais,
 } from '../db/schema'
 
 // UUID v4 gerado por linha pelo SQLite, sem materializar destinatários antes do batch.
@@ -60,9 +60,11 @@ export function queriesSincronizacaoDcoAtual(
           SELECT 1 FROM ${casas}
           JOIN ${setores} ON ${setores.id} = ${casas.setorId}
           JOIN ${administracoes} ON ${administracoes.id} = ${setores.administracaoId}
+          JOIN ${regionais} ON ${regionais.id} = ${administracoes.regionalId}
           WHERE ${casas.id} = ${vinculosFuncionais.casaId}
             AND ${administracoes.regionalId} = ${eventos.regionalId}
             AND ${casas.ativo} = 1 AND ${setores.ativo} = 1 AND ${administracoes.ativo} = 1
+            AND ${regionais.ativo} = 1
         ))`,
       ),
     ))
