@@ -130,10 +130,12 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
 
   const participantesFiltrados = useMemo(() => {
     const termo = busca.trim().toLocaleLowerCase('pt-BR')
-    if (!termo) return participantes
-    return participantes.filter(item =>
+    const filtrados = !termo ? participantes : participantes.filter(item =>
       item.membro.nome.toLocaleLowerCase('pt-BR').includes(termo) ||
       (item.membro.casaNome || '').toLocaleLowerCase('pt-BR').includes(termo)
+    )
+    return [...filtrados].sort((a, b) =>
+      a.membro.nome.localeCompare(b.membro.nome, 'pt-BR', { sensitivity: 'base' })
     )
   }, [busca, participantes])
 
