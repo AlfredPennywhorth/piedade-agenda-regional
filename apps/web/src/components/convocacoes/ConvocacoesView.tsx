@@ -74,6 +74,7 @@ export function ConvocacoesView({
   const [actionConfirm, setActionConfirm] = useState<{ type: 'PUBLICAR' | 'CANCELAR' | 'SINCRONIZAR_DCO', convocacao: Convocacao } | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null)
+  const [agoraMs, setAgoraMs] = useState(() => Date.now())
   const [actionError, setActionError] = useState<string | null>(null)
   const fluxoRetornoFocoRef = useRef<HTMLHeadingElement | null>(null)
 
@@ -150,6 +151,19 @@ export function ConvocacoesView({
   useEffect(() => {
     carregarDados()
   }, [])
+
+  // Mantém a ação coerente quando uma reunião termina sem recarregar a página.
+  useEffect(() => {
+    const fimMaisProximo = eventosLookup
+      .map(evento => new Date(evento.fimEm).getTime())
+      .filter(fim => Number.isFinite(fim) && fim > agoraMs)
+      .sort((a, b) => a - b)[0]
+    if (fimMaisProximo === undefined) return
+    const atraso = Math.max(1, Math.min(fimMaisProximo - Date.now() + 1, 2_147_483_647))
+    const timeout = window.setTimeout(() => setAgoraMs(Date.now()), atraso)
+    return () => window.clearTimeout(timeout)
+  }, [eventosLookup, agoraMs])
+
 
   useEffect(() => {
     if (!initialEventoId) return
@@ -615,7 +629,7 @@ export function ConvocacoesView({
                       Gerenciar Funções
                     </button>
                   )}
-                  {conv.status === 'PUBLICADA' && conv.possuiFuncaoDco === true && !!getEvento(conv.eventoId)?.fimEm && new Date(getEvento(conv.eventoId)!.fimEm).getTime() > Date.now() && getEvento(conv.eventoId)?.podeGerenciar !== false && (
+                  {conv.status === 'PUBLICADA' && conv.possuiFuncaoDco === true && !!getEvento(conv.eventoId)?.fimEm && new Date(getEvento(conv.eventoId)!.fimEm).getTime() > agoraMs && getEvento(conv.eventoId)?.podeGerenciar !== false && (
                     <button
                       onClick={() => { setSyncFeedback(null); setActionConfirm({ type: 'SINCRONIZAR_DCO', convocacao: conv }) }}
                       className="text-amber-700 hover:text-amber-900 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-amber-50"
