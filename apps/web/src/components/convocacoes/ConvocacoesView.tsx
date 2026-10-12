@@ -30,6 +30,7 @@ interface GrupoTrabalhoLookup {
   administracaoId?: string | null
   setorId?: string | null
 }
+type ConvocacaoComDco = Convocacao & { possuiFuncaoDco?: boolean }
 type FiltroStatus = 'ATIVAS' | 'RASCUNHO' | 'PUBLICADA' | 'CANCELADA' | 'TODAS'
 
 export function ConvocacoesView({
@@ -39,7 +40,7 @@ export function ConvocacoesView({
   initialEventoId?: string | null
   onFluxoConcluido?: () => void
 }) {
-  const [convocacoes, setConvocacoes] = useState<Convocacao[]>([])
+  const [convocacoes, setConvocacoes] = useState<ConvocacaoComDco[]>([])
   const [eventosLookup, setEventosLookup] = useState<EventoLookup[]>([])
   const [regionais, setRegionais] = useState<RegionalLookup[]>([])
   const [administracoes, setAdministracoes] = useState<AdministracaoLookup[]>([])
@@ -120,7 +121,7 @@ export function ConvocacoesView({
         casasData,
         gruposTrabalhoData,
       ] = await Promise.all([
-        fetchWithAuth<Convocacao[]>('/convocacoes'),
+        fetchWithAuth<ConvocacaoComDco[]>('/convocacoes'),
         fetchWithAuth<EventoLookup[]>('/eventos'),
         fetchWithAuth<RegionalLookup[]>('/regionais'),
         fetchWithAuth<AdministracaoLookup[]>('/administracoes'),
@@ -614,7 +615,7 @@ export function ConvocacoesView({
                       Gerenciar Funções
                     </button>
                   )}
-                  {conv.status === 'PUBLICADA' && getEvento(conv.eventoId)?.podeGerenciar !== false && (
+                  {conv.status === 'PUBLICADA' && conv.possuiFuncaoDco === true && getEvento(conv.eventoId)?.podeGerenciar !== false && (
                     <button
                       onClick={() => { setSyncFeedback(null); setActionConfirm({ type: 'SINCRONIZAR_DCO', convocacao: conv }) }}
                       className="text-amber-700 hover:text-amber-900 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-amber-50"
@@ -754,7 +755,7 @@ export function ConvocacoesView({
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
         >
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
-          <span data-screen-code={actionConfirm.type === 'PUBLICAR' ? 'AGD-ADM-033' : 'AGD-ADM-034'} className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela {actionConfirm.type === 'PUBLICAR' ? 'AGD-ADM-033' : 'AGD-ADM-034'}</span>
+          <span data-screen-code={actionConfirm.type === 'PUBLICAR' ? 'AGD-ADM-033' : actionConfirm.type === 'SINCRONIZAR_DCO' ? 'AGD-ADM-056' : 'AGD-ADM-034'} className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela {actionConfirm.type === 'PUBLICAR' ? 'AGD-ADM-033' : 'AGD-ADM-034'}</span>
 
             <div className="p-6 border-b border-slate-200">
               <h2 id="confirm-dialog-title" className="text-xl font-bold text-slate-900">
