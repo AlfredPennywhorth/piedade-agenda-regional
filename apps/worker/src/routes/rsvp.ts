@@ -201,6 +201,9 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
     return c.json(updated, 200)
 
   } catch (err: any) {
+    if (String(err?.message).includes('EVENTO_COM_RSVP_CONFIRMADO_NAO_PODE_MUDAR_ESCOPO')) {
+      return c.json({ error: 'Confirmação indisponível após mudança de escopo do evento', code: 'EVENTO_COM_RSVP_CONFIRMADO_NAO_PODE_MUDAR_ESCOPO' }, 409)
+    }
     if (err.issues) {
       return c.json({ error: err.issues }, 400)
     }
