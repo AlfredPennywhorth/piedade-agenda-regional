@@ -129,7 +129,7 @@ type SincronizacaoConvocacao = {
   destinatarioNovo: boolean
 }
 
-export async function prepararSincronizacaoConvocacoes(db: any, vinculo: any, assumirMembroAtivo = false): Promise<SincronizacaoConvocacao[]> {
+export async function prepararSincronizacaoConvocacoes(db: any, vinculo: any, assumirMembroAtivo = false, casaDestinoId?: string): Promise<SincronizacaoConvocacao[]> {
   if (!vinculo?.ativo) return []
 
   if (!assumirMembroAtivo) {
@@ -151,7 +151,7 @@ export async function prepararSincronizacaoConvocacoes(db: any, vinculo: any, as
   // Para legado manual, só há herança quando a Casa do vínculo é a Casa atual do membro.
   const dcoElegivel = !!vinculo.casaId && (
     vinculo.origem === 'MEMBRO_AUTOMATICO'
-    || (membroAtual?.casaId != null && membroAtual.casaId === vinculo.casaId)
+    || ((casaDestinoId ?? membroAtual?.casaId) != null && (casaDestinoId ?? membroAtual?.casaId) === vinculo.casaId)
   )
   const funcaoDco = dcoElegivel
     ? await db.select({ codigo: funcoes.codigo, ativo: funcoes.ativo })

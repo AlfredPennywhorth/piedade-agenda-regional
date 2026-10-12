@@ -67,12 +67,22 @@ async function podeGerirConvocacao(db: any, membroId: string, evento: any): Prom
 convocacoesRouter.get('/', async c => {
   const db = c.get('db')
   const condicao = await condicaoEventosVisiveis(db, c.get('contextoPermissoes'))
-  const data = await db.select({ convocacao: convocacoes })
+  const data = await db.select({
+    convocacao: convocacoes,
+    possuiFuncaoDco: sql<number>`EXISTS (
+      SELECT 1 FROM ${convocacaoFuncoes} cf
+      JOIN ${funcoes} f ON f.id = cf.funcao_id
+      WHERE cf.convocacao_id = ${convocacoes.id}
+      AND f.codigo = 'DCO' AND f.ativo = 1
+    )`,
+  })
     .from(convocacoes)
     .innerJoin(eventos, eq(convocacoes.eventoId, eventos.id))
     .where(condicao)
     .all()
-  return c.json(data.map((item: any) => item.convocacao))
+  return c.json(data.map((item: any) => ({
+    ...item.convocacao, possuiFuncaoDco: Boolean(item.possuiFuncaoDco),
+  })))
 })
 
 convocacoesRouter.get('/:id', async c => {
@@ -622,6 +632,7 @@ convocacoesRouter.post('/:id/sincronizar-dco', async c => {
     .where(and(eq(convocacaoFuncoes.convocacaoId, id), eq(convocacaoFuncoes.funcaoId, dco.id))).get()
   if (!convocouDco) return c.json({ error: 'Convocação não contém a função canônica DCO' }, 409)
   const nowIso = new Date().toISOString()
+  if (evento.fimEm <= nowIso) return c.json({ error: 'Convocação encerrada não pode ser sincronizada' }, 409)
   const antes = await db.select({ total: sql<number>`count(*)` }).from(convocacaoDestinatarios)
     .where(eq(convocacaoDestinatarios.convocacaoId, id)).get()
   const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
@@ -636,6 +647,7 @@ convocacoesRouter.post('/:id/sincronizar-dco', async c => {
             AND EXISTS (SELECT 1 FROM ${eventos}
               WHERE ${eventos.id} = ${convocacoes.eventoId}
               AND ${eventos.ativo} = 1 AND ${eventos.abrangencia} = 'TERRITORIAL'
+              AND julianday(${eventos.fimEm}) > julianday('now')
               AND ${eventos.regionalId} IS ${evento.regionalId ?? null}
               AND ${eventos.administracaoId} IS ${evento.administracaoId ?? null}
               AND ${eventos.setorId} IS ${evento.setorId ?? null}

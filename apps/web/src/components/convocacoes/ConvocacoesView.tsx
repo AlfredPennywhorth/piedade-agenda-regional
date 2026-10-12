@@ -30,6 +30,7 @@ interface GrupoTrabalhoLookup {
   administracaoId?: string | null
   setorId?: string | null
 }
+type ConvocacaoComDco = Convocacao & { possuiFuncaoDco?: boolean }
 type FiltroStatus = 'ATIVAS' | 'RASCUNHO' | 'PUBLICADA' | 'CANCELADA' | 'TODAS'
 
 export function ConvocacoesView({
@@ -39,7 +40,7 @@ export function ConvocacoesView({
   initialEventoId?: string | null
   onFluxoConcluido?: () => void
 }) {
-  const [convocacoes, setConvocacoes] = useState<Convocacao[]>([])
+  const [convocacoes, setConvocacoes] = useState<ConvocacaoComDco[]>([])
   const [eventosLookup, setEventosLookup] = useState<EventoLookup[]>([])
   const [regionais, setRegionais] = useState<RegionalLookup[]>([])
   const [administracoes, setAdministracoes] = useState<AdministracaoLookup[]>([])
@@ -70,19 +71,32 @@ export function ConvocacoesView({
   })
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
 
-  const [actionConfirm, setActionConfirm] = useState<{ type: 'PUBLICAR' | 'CANCELAR', convocacao: Convocacao } | null>(null)
+  const [actionConfirm, setActionConfirm] = useState<{ type: 'PUBLICAR' | 'CANCELAR' | 'SINCRONIZAR_DCO', convocacao: Convocacao } | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null)
+  const [agoraMs, setAgoraMs] = useState(() => Date.now())
   const [actionError, setActionError] = useState<string | null>(null)
   const fluxoRetornoFocoRef = useRef<HTMLHeadingElement | null>(null)
 
   const handleActionConfirm = async () => {
     if (!actionConfirm) return
+    if (actionConfirm.type === 'SINCRONIZAR_DCO' &&
+        (!getEvento(actionConfirm.convocacao.eventoId)?.fimEm ||
+          new Date(getEvento(actionConfirm.convocacao.eventoId)!.fimEm).getTime() <= Date.now())) {
+      setActionConfirm(null)
+      setActionError(null)
+      setSyncFeedback('A reunião foi encerrada; a sincronização não está mais disponível.')
+      return
+    }
     setActionLoading(true)
     setActionError(null)
     
     try {
       if (actionConfirm.type === 'PUBLICAR') {
         await postWithAuth(`/convocacoes/${actionConfirm.convocacao.id}/publicar`, {})
+      } else if (actionConfirm.type === 'SINCRONIZAR_DCO') {
+        const result = await postWithAuth<{ destinatariosAntes: number; destinatariosDepois: number }>(`/convocacoes/${actionConfirm.convocacao.id}/sincronizar-dco`, {})
+        setSyncFeedback(`Sincronização concluída: ${result.destinatariosAntes} antes, ${result.destinatariosDepois} depois. ${result.destinatariosDepois - result.destinatariosAntes} novo(s) destinatário(s).`)
       } else {
         await postWithAuth(`/convocacoes/${actionConfirm.convocacao.id}/cancelar`, {})
       }
@@ -116,7 +130,7 @@ export function ConvocacoesView({
         casasData,
         gruposTrabalhoData,
       ] = await Promise.all([
-        fetchWithAuth<Convocacao[]>('/convocacoes'),
+        fetchWithAuth<ConvocacaoComDco[]>('/convocacoes'),
         fetchWithAuth<EventoLookup[]>('/eventos'),
         fetchWithAuth<RegionalLookup[]>('/regionais'),
         fetchWithAuth<AdministracaoLookup[]>('/administracoes'),
@@ -145,6 +159,30 @@ export function ConvocacoesView({
   useEffect(() => {
     carregarDados()
   }, [])
+
+  // Mantém a ação coerente quando uma reunião termina sem recarregar a página.
+  useEffect(() => {
+    const fimMaisProximo = eventosLookup
+      .map(evento => new Date(evento.fimEm).getTime())
+      .filter(fim => Number.isFinite(fim) && fim > agoraMs)
+      .sort((a, b) => a - b)[0]
+    if (fimMaisProximo === undefined) return
+    const atraso = Math.max(1, Math.min(fimMaisProximo - Date.now() + 1, 2_147_483_647))
+    const timeout = window.setTimeout(() => setAgoraMs(Date.now()), atraso)
+    return () => window.clearTimeout(timeout)
+  }, [eventosLookup, agoraMs])
+
+  useEffect(() => {
+    if (actionConfirm?.type !== 'SINCRONIZAR_DCO') return
+    const fimEm = getEvento(actionConfirm.convocacao.eventoId)?.fimEm
+    if (!fimEm || new Date(fimEm).getTime() <= agoraMs) {
+      setActionConfirm(null)
+      setActionError(null)
+      setSyncFeedback('A reunião foi encerrada; a sincronização não está mais disponível.')
+    }
+  }, [agoraMs, actionConfirm, eventosLookup])
+
+
 
   useEffect(() => {
     if (!initialEventoId) return
@@ -610,6 +648,14 @@ export function ConvocacoesView({
                       Gerenciar Funções
                     </button>
                   )}
+                  {conv.status === 'PUBLICADA' && conv.possuiFuncaoDco === true && getEvento(conv.eventoId)?.abrangencia === 'TERRITORIAL' && !!getEvento(conv.eventoId)?.fimEm && new Date(getEvento(conv.eventoId)!.fimEm).getTime() > agoraMs && getEvento(conv.eventoId)?.podeGerenciar !== false && (
+                    <button
+                      onClick={() => { setSyncFeedback(null); setActionConfirm({ type: 'SINCRONIZAR_DCO', convocacao: conv }) }}
+                      className="text-amber-700 hover:text-amber-900 text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-amber-50"
+                    >
+                      Sincronizar Diáconos
+                    </button>
+                  )}
                   {conv.status === 'PUBLICADA' && (
                     <button
                       onClick={() => setAcompanhamentoConvocacaoId(conv.id)}
@@ -638,6 +684,13 @@ export function ConvocacoesView({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {syncFeedback && (
+        <div role="status" className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 flex items-center justify-between gap-3">
+          <span>{syncFeedback}</span>
+          <button type="button" onClick={() => setSyncFeedback(null)} aria-label="Fechar resultado da sincronização">Fechar</button>
         </div>
       )}
 
@@ -735,11 +788,11 @@ export function ConvocacoesView({
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
         >
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
-          <span data-screen-code={actionConfirm.type === 'PUBLICAR' ? 'AGD-ADM-033' : 'AGD-ADM-034'} className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela {actionConfirm.type === 'PUBLICAR' ? 'AGD-ADM-033' : 'AGD-ADM-034'}</span>
+          <span data-screen-code={actionConfirm.type === 'PUBLICAR' ? 'AGD-ADM-033' : actionConfirm.type === 'SINCRONIZAR_DCO' ? 'AGD-ADM-059' : 'AGD-ADM-034'} className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela {actionConfirm.type === 'PUBLICAR' ? 'AGD-ADM-033' : actionConfirm.type === 'SINCRONIZAR_DCO' ? 'AGD-ADM-059' : 'AGD-ADM-034'}</span>
 
             <div className="p-6 border-b border-slate-200">
               <h2 id="confirm-dialog-title" className="text-xl font-bold text-slate-900">
-                {actionConfirm.type === 'PUBLICAR' ? 'Publicar Convocação' : 'Cancelar Convocação'}
+                {actionConfirm.type === 'PUBLICAR' ? 'Publicar Convocação' : actionConfirm.type === 'SINCRONIZAR_DCO' ? 'Sincronizar Diáconos' : 'Cancelar Convocação'}
               </h2>
             </div>
             <div className="p-6 overflow-y-auto flex-1 text-slate-700">
@@ -752,6 +805,8 @@ export function ConvocacoesView({
                 <p>
                   Ao confirmar a publicação, os destinatários e suas evidências serão materializados e a edição ficará bloqueada.
                 </p>
+              ) : actionConfirm.type === 'SINCRONIZAR_DCO' ? (
+                <p>Adicionar os Diáconos elegíveis ainda ausentes desta convocação publicada? A operação não remove destinatários nem altera respostas RSVP existentes. Se a função DCO canônica não estiver vinculada, a operação será recusada.</p>
               ) : (
                 <p>
                   Ao cancelar a convocação, eventos futuros vinculados deixarão de valer, preservando o histórico.
@@ -771,7 +826,7 @@ export function ConvocacoesView({
                 type="button"
                 onClick={handleActionConfirm}
                 disabled={actionLoading}
-                className={`px-4 py-2 text-white font-medium rounded-lg shadow-sm transition-colors disabled:opacity-50 ${actionConfirm.type === 'PUBLICAR' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                className={`px-4 py-2 text-white font-medium rounded-lg shadow-sm transition-colors disabled:opacity-50 ${actionConfirm.type === 'CANCELAR' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
               >
                 {actionLoading ? 'Processando...' : 'Confirmar'}
               </button>
