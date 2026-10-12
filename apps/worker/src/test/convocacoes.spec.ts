@@ -508,6 +508,31 @@ describe('S06 - Convocações', () => {
     )
   })
 
+  it('15bb. Sincronizar DCO legado após publicação preserva destinatários e é idempotente', async () => {
+    const ctx = await setupBaseData()
+    const dco = await db.select().from(funcoes).where(eq(funcoes.codigo, 'DCO')).get()
+    expect(dco).toBeDefined()
+    const resposta = await app.request('/api/v1/convocacoes', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventoId: ctx.evSetorId }) })
+    expect(resposta.status).toBe(201)
+    const { id } = await resposta.json()
+    expect((await app.request(`/api/v1/convocacoes/${id}/funcoes`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ funcaoId: dco!.id }) })).status).toBe(201)
+    expect((await app.request(`/api/v1/convocacoes/${id}/publicar`, { method: 'POST' })).status).toBe(200)
+    const membroLegado = crypto.randomUUID()
+    await db.insert(membros).values({ id: membroLegado, nome: 'DCO legado ativo', casaId: ctx.casId, ativo: true })
+    await db.insert(vinculosFuncionais).values({
+      id: crypto.randomUUID(), membroId: membroLegado, funcaoId: dco!.id,
+      casaId: ctx.casId, ativo: true,
+    })
+    for (let tentativa = 0; tentativa < 2; tentativa += 1) {
+      const res = await app.request(`/api/v1/convocacoes/${id}/sincronizar-dco`, { method: 'POST' })
+      expect(res.status).toBe(200)
+    }
+    const lista = await (await app.request(`/api/v1/convocacoes/${id}/destinatarios`)).json() as Array<{ membroId: string }>
+    expect(lista.filter(item => item.membroId === membroLegado)).toHaveLength(1)
+  })
+
   it('15c. DCO: Casa, Administração, Regional e GT respeitam seus limites', async () => {
     const ctx = await setupBaseData()
     const dco = await db.select().from(funcoes).where(eq(funcoes.codigo, 'DCO')).get()
