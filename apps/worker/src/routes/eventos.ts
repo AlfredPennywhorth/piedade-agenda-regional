@@ -640,6 +640,9 @@ eventosRouter.patch('/:id', async (c) => {
     const updated = await db.select().from(eventos).where(eq(eventos.id, id)).get()
     return c.json(updated)
   } catch (err: any) {
+    if (String(err?.message).includes('EVENTO_ABRANGENCIA_DESTINO_INVALIDO')) {
+      return c.json({ error: 'A alteração do escopo ou destino não é permitida para este evento. Verifique os dados e vínculos existentes.', code: 'EVENTO_ABRANGENCIA_DESTINO_INVALIDO' }, 409)
+    }
     if (String(err?.message).includes('EVENTO_COM_RSVP_CONFIRMADO_NAO_PODE_MUDAR_ESCOPO')) {
       return c.json({ error: 'Evento com participação confirmada não pode mudar de escopo', code: 'EVENTO_COM_RSVP_CONFIRMADO_NAO_PODE_MUDAR_ESCOPO' }, 409)
     }
