@@ -553,6 +553,29 @@ describe('S06 - Convocações', () => {
         expect(destinos.map(d => d.membroId)).toContain(membroDentro)
       }
     }
+    // Mesmo com os níveis descendentes ativos, Regional inativa não expande DCO.
+    await db.update(regionais).set({ ativo: false }).where(eq(regionais.id, ctx.regId))
+    const eventoInativoId = crypto.randomUUID()
+    await db.insert(eventos).values({
+      id: eventoInativoId, titulo: 'Regional inativa DCO', modalidade: 'ONLINE',
+      inicioEm: '2028-05-01T10:00:00.000Z', fimEm: '2028-05-01T11:00:00.000Z',
+      regionalId: ctx.regId, ativo: true,
+    })
+    const criada = await app.request('/api/v1/convocacoes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId: eventoInativoId }),
+    })
+    expect(criada.status).toBe(201)
+    const { id: convocacaoId } = await criada.json()
+    expect((await app.request(`/api/v1/convocacoes/${convocacaoId}/funcoes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ funcaoId: dcoId }),
+    })).status).toBe(201)
+    expect((await app.request(`/api/v1/convocacoes/${convocacaoId}/publicar`, {
+      method: 'POST',
+    })).status).toBe(200)
+    const destinos = await (await app.request(`/api/v1/convocacoes/${convocacaoId}/destinatarios`)).json() as Array<{ membroId: string }>
+    expect(destinos.map(d => d.membroId)).not.toContain(membroDentro)
   })
 
   it('15d. DCO: Casa inativa não entra no snapshot e Setor dispensa Administração ativa', async () => {
