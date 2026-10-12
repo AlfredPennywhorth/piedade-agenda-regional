@@ -747,7 +747,7 @@ export function VinculosFuncionaisView() {
         </div>
         <p className="text-sm text-slate-600">{gruposVinculos.length} funções por escopo · {vinculosFiltrados.length} vínculos encontrados</p>
         {loading ? <p className="rounded-xl bg-white p-6 text-sm text-slate-500">Carregando vínculos funcionais...</p> :
-          gruposVinculos.length === 0 ? <p className="rounded-xl bg-white p-6 text-sm text-slate-500">Nenhum vínculo corresponde aos filtros.</p> :
+          gruposVinculos.length === 0 ? <p className="rounded-xl bg-white p-6 text-sm text-slate-500">{vinculos.length === 0 ? "Nenhum vínculo funcional cadastrado até o momento." : "Nenhum vínculo corresponde aos filtros."}</p> :
           gruposVinculos.map(grupo => (
             <details key={grupo.itens[0].id} className="rounded-xl border border-slate-200 bg-white shadow-sm">
               <summary className="cursor-pointer list-none p-4 flex flex-wrap items-center justify-between gap-3">
