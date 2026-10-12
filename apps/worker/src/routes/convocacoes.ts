@@ -427,19 +427,21 @@ convocacoesRouter.post('/:id/publicar', async c => {
     eq(membros.ativo, true),
     inArray(vinculosFuncionais.funcaoId, funcaoIds),
   ]
-  const vinculoDco = eq(funcoes.codigo, 'DCO')
+  const vinculoDco = and(eq(funcoes.codigo, 'DCO'), eq(vinculosFuncionais.origem, 'MEMBRO_AUTOMATICO'))
   if (evento.casaId) {
     conditions.push(eq(vinculosFuncionais.casaId, evento.casaId))
   } else if (evento.setorId) {
     const casasDoSetor = db.select({ id: casas.id }).from(casas)
-      .where(and(eq(casas.setorId, evento.setorId), eq(casas.ativo, true)))
+      .innerJoin(setores, eq(setores.id, casas.setorId))
+      .where(and(eq(casas.setorId, evento.setorId), eq(casas.ativo, true), eq(setores.ativo, true)))
     conditions.push(or(eq(vinculosFuncionais.setorId, evento.setorId),
       and(vinculoDco, inArray(vinculosFuncionais.casaId, casasDoSetor)))!)
   } else if (evento.administracaoId) {
     const casasDaAdministracao = db.select({ id: casas.id }).from(casas)
       .innerJoin(setores, eq(setores.id, casas.setorId))
+      .innerJoin(administracoes, eq(administracoes.id, setores.administracaoId))
       .where(and(eq(setores.administracaoId, evento.administracaoId),
-        eq(setores.ativo, true), eq(casas.ativo, true)))
+        eq(administracoes.ativo, true), eq(setores.ativo, true), eq(casas.ativo, true)))
     conditions.push(or(eq(vinculosFuncionais.administracaoId, evento.administracaoId),
       and(vinculoDco, inArray(vinculosFuncionais.casaId, casasDaAdministracao)))!)
   } else if (evento.regionalId) {
