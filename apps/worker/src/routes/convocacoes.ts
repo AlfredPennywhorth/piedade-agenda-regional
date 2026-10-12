@@ -600,6 +600,51 @@ convocacoesRouter.post('/:id/publicar', async c => {
   }
 })
 
+// Reconciliação idempotente de DCO em convocação já publicada.
+// Não altera RSVP, funções existentes ou evidências históricas.
+convocacoesRouter.post('/:id/sincronizar-dco', async c => {
+  const db = c.get('db')
+  const id = c.req.param('id')
+  const atorMembroId = c.get('membroId')
+  const convocacao = await db.select().from(convocacoes).where(eq(convocacoes.id, id)).get()
+  if (!convocacao) return c.json({ error: 'Convocação não encontrada' }, 404)
+  if (convocacao.status !== 'PUBLICADA' || !convocacao.ativo)
+    return c.json({ error: 'Somente convocações publicadas e ativas podem ser sincronizadas' }, 409)
+  const evento = await db.select().from(eventos).where(eq(eventos.id, convocacao.eventoId)).get()
+  if (!evento || !atorMembroId || !(await podeGerirConvocacao(db, atorMembroId, evento)))
+    return c.json({ error: 'Acesso não autorizado', code: 'FORBIDDEN' }, 403)
+  if (evento.abrangencia !== 'TERRITORIAL')
+    return c.json({ error: 'A sincronização DCO é exclusiva de eventos territoriais' }, 409)
+  const dco = await db.select({ id: funcoes.id }).from(funcoes)
+    .where(and(eq(funcoes.codigo, 'DCO'), eq(funcoes.ativo, true))).get()
+  if (!dco) return c.json({ error: 'Função DCO canônica indisponível' }, 409)
+  const convocouDco = await db.select({ id: convocacaoFuncoes.id }).from(convocacaoFuncoes)
+    .where(and(eq(convocacaoFuncoes.convocacaoId, id), eq(convocacaoFuncoes.funcaoId, dco.id))).get()
+  if (!convocouDco) return c.json({ error: 'Convocação não contém a função canônica DCO' }, 409)
+  const nowIso = new Date().toISOString()
+  const antes = await db.select({ total: sql<number>`count(*)` }).from(convocacaoDestinatarios)
+    .where(eq(convocacaoDestinatarios.convocacaoId, id)).get()
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+  await executarOperacaoComAudit(db,
+    qdb => [
+      ...queriesSincronizacaoDcoAtual(qdb, nowIso, { convocacaoId: id }),
+    ],
+    {
+      acao: 'CONVOCACAO_DCO_SINCRONIZADA',
+      atorMembroId,
+      recursoTipo: 'CONVOCACAO',
+      recursoId: id,
+      escopoTipo,
+      escopoId,
+      contexto: { operacao: 'ADITIVA_IDEMPOTENTE' },
+    }
+  )
+  const depois = await db.select({ total: sql<number>`count(*)` }).from(convocacaoDestinatarios)
+    .where(eq(convocacaoDestinatarios.convocacaoId, id)).get()
+  return c.json({ success: true, destinatariosAntes: antes?.total ?? 0,
+    destinatariosDepois: depois?.total ?? 0 })
+})
+
 convocacoesRouter.post('/:id/cancelar', async c => {
   const db = c.get('db')
   const id = c.req.param('id')
