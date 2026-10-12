@@ -647,7 +647,7 @@ convocacoesRouter.post('/:id/sincronizar-dco', async c => {
             AND EXISTS (SELECT 1 FROM ${eventos}
               WHERE ${eventos.id} = ${convocacoes.eventoId}
               AND ${eventos.ativo} = 1 AND ${eventos.abrangencia} = 'TERRITORIAL'
-              AND ${eventos.fimEm} > ${nowIso}
+              AND julianday(${eventos.fimEm}) > julianday('now')
               AND ${eventos.regionalId} IS ${evento.regionalId ?? null}
               AND ${eventos.administracaoId} IS ${evento.administracaoId ?? null}
               AND ${eventos.setorId} IS ${evento.setorId ?? null}
