@@ -14,7 +14,7 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'robots.txt'],
       manifest: {
         name: beta ? 'Agenda Regional São Paulo — Beta' : 'Agenda Regional São Paulo',
-        short_name: beta ? 'AgendaSP Beta' : 'AgendaSP'
+        short_name: beta ? 'AgendaSP Beta' : 'AgendaSP',
         description: 'Agenda Regional São Paulo — Gestão de reuniões e convocações',
         theme_color: '#1e3a5f',
         background_color: '#ffffff',
