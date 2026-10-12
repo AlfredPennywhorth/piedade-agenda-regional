@@ -8,23 +8,27 @@ export function PwaAtualizacao() {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
 
-    let editouFormulario = false
+    // Marca apenas formulários de edição; filtros fora de <form> não bloqueiam atualizações.
+    // O estado é mantido após submit: envio não comprova persistência da API.
+    const formulariosPendentes = new Set<HTMLFormElement>()
     let atualizarEmAndamento = false
     let possuiControlador = Boolean(navigator.serviceWorker.controller)
 
     const marcarEdicao = (event: Event) => {
       const alvo = event.target
-      if (alvo instanceof HTMLElement &&
-        (alvo.matches('input, textarea, select') || alvo.isContentEditable)) {
-        editouFormulario = true
-      }
+      if (!(alvo instanceof HTMLElement) ||
+        !(alvo.matches('input, textarea, select') || alvo.isContentEditable)) return
+      const formulario = alvo.closest('form')
+      if (formulario) formulariosPendentes.add(formulario)
     }
-    const aoEnviarFormulario = () => { editouFormulario = false }
 
     const podeRecarregar = () => {
-      const foco = document.activeElement
-      return !editouFormulario &&
-        !(foco instanceof HTMLElement && foco.matches('input, textarea, select, [contenteditable="true"]')) &&
+      // A navegação ou o fechamento do formulário descarta sua edição pendente.
+      // Não limpar no submit: validações/requisições assíncronas ainda podem falhar.
+      for (const formulario of formulariosPendentes) {
+        if (!formulario.isConnected) formulariosPendentes.delete(formulario)
+      }
+      return formulariosPendentes.size === 0 &&
         !document.querySelector('[role="dialog"], dialog[open]')
     }
 
@@ -54,7 +58,6 @@ export function PwaAtualizacao() {
 
     document.addEventListener('input', marcarEdicao, true)
     document.addEventListener('change', marcarEdicao, true)
-    document.addEventListener('submit', aoEnviarFormulario, true)
     navigator.serviceWorker.addEventListener('controllerchange', aoTrocarControlador)
     window.addEventListener('focus', verificarAtualizacao)
     document.addEventListener('visibilitychange', verificarAtualizacao)
@@ -64,7 +67,6 @@ export function PwaAtualizacao() {
     return () => {
       document.removeEventListener('input', marcarEdicao, true)
       document.removeEventListener('change', marcarEdicao, true)
-      document.removeEventListener('submit', aoEnviarFormulario, true)
       navigator.serviceWorker.removeEventListener('controllerchange', aoTrocarControlador)
       window.removeEventListener('focus', verificarAtualizacao)
       document.removeEventListener('visibilitychange', verificarAtualizacao)
