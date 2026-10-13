@@ -771,15 +771,34 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
       ? or(territorial, eq(eventos.regionalGestaoId, escopoId))!
       : territorial
   )
-  // Os filtros de data representam dias civis de America/Sao_Paulo (UTC-03
-  // nas datas operacionais atuais), enquanto inicioEm é persistido em UTC.
-  // Limite final exclusivo: meia-noite local do dia seguinte.
+  // Resolver as meias-noites locais com IANA: São Paulo teve UTC-02 em
+  // períodos históricos de horário de verão e UTC-03 nos anos atuais.
+  const formatoSaoPaulo = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit',
+    day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hourCycle: 'h23',
+  })
   const inicioDiaSaoPauloUtc = (dia: string): string => {
     const [ano, mes, data] = dia.split('-').map(Number)
-    return new Date(Date.UTC(ano, mes - 1, data, 3)).toISOString()
+    const alvo = Date.UTC(ano, mes - 1, data)
+    let instante = alvo + 3 * 60 * 60 * 1000
+    // O offset IANA é obtido para o próprio instante; duas passadas
+    // resolvem também a mudança de offset no entorno da meia-noite.
+    for (let tentativa = 0; tentativa < 3; tentativa++) {
+      const partes = Object.fromEntries(formatoSaoPaulo.formatToParts(new Date(instante))
+        .filter(p => p.type !== 'literal').map(p => [p.type, Number(p.value)]))
+      const local = Date.UTC(partes.year, partes.month - 1, partes.day,
+        partes.hour, partes.minute, partes.second)
+      instante += alvo - local
+    }
+    return new Date(instante).toISOString()
   }
   if (dataInicio) condicoes.push(gte(eventos.inicioEm, inicioDiaSaoPauloUtc(dataInicio)))
   if (dataFim) {
+    // 9999-12-31 não possui próximo dia no formato YYYY-MM-DD.
+    if (dataFim === '9999-12-31') {
+      return c.json({ error: 'Data final deve ser anterior a 9999-12-31' }, 400)
+    }
     const [ano, mes, dia] = dataFim.split('-').map(Number)
     const proximoDia = new Date(Date.UTC(ano, mes - 1, dia + 1))
       .toISOString().slice(0, 10)
