@@ -98,8 +98,8 @@ espacosLocaisRouter.post('/', async c => {
         atorMembroId: c.get('membroId') || null,
         recursoTipo: 'ESPACO_LOCAL',
         recursoId: id,
-        escopoTipo: 'GLOBAL',
-        escopoId: null,
+        escopoTipo: local.escopoTipo ?? 'GLOBAL',
+        escopoId: local.escopoId ?? null,
         contexto: { localId: parsed.localId, nome: parsed.nome },
       }
     )
@@ -147,8 +147,8 @@ espacosLocaisRouter.patch('/:id', async c => {
         atorMembroId: c.get('membroId') || null,
         recursoTipo: 'ESPACO_LOCAL',
         recursoId: id,
-        escopoTipo: 'GLOBAL',
-        escopoId: null,
+        escopoTipo: local.escopoTipo ?? 'GLOBAL',
+        escopoId: local.escopoId ?? null,
         contexto: { localId: parsed.localId ?? existing.localId, camposAlterados: Object.keys(parsed) },
       }
     )
