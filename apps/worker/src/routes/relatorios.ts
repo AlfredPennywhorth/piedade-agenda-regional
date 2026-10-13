@@ -771,27 +771,32 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
       ? or(territorial, eq(eventos.regionalGestaoId, escopoId))!
       : territorial
   )
-  // Resolver as meias-noites locais com IANA: São Paulo teve UTC-02 em
-  // períodos históricos de horário de verão e UTC-03 nos anos atuais.
-  const formatoSaoPaulo = new Intl.DateTimeFormat('en-CA', {
+  // Localize o primeiro instante de um dia civil em America/Sao_Paulo.
+  // Busca binária em UTC também funciona quando 00:00 local é inexistente
+  // (início do horário de verão), e não normaliza anos 0000–0099.
+  const dataCivilEmSaoPaulo = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit',
-    day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hourCycle: 'h23',
+    day: '2-digit', calendar: 'gregory',
   })
+  const diaLocal = (instante: number): string => {
+    const partes = Object.fromEntries(dataCivilEmSaoPaulo.formatToParts(new Date(instante))
+      .filter(parte => parte.type !== 'literal')
+      .map(parte => [parte.type, parte.value]))
+    return `${partes.year.padStart(4, '0')}-${partes.month}-${partes.day}`
+  }
   const inicioDiaSaoPauloUtc = (dia: string): string => {
-    const [ano, mes, data] = dia.split('-').map(Number)
-    const alvo = Date.UTC(ano, mes - 1, data)
-    let instante = alvo + 3 * 60 * 60 * 1000
-    // O offset IANA é obtido para o próprio instante; duas passadas
-    // resolvem também a mudança de offset no entorno da meia-noite.
-    for (let tentativa = 0; tentativa < 3; tentativa++) {
-      const partes = Object.fromEntries(formatoSaoPaulo.formatToParts(new Date(instante))
-        .filter(p => p.type !== 'literal').map(p => [p.type, Number(p.value)]))
-      const local = Date.UTC(partes.year, partes.month - 1, partes.day,
-        partes.hour, partes.minute, partes.second)
-      instante += alvo - local
+    // String ISO evita a regra especial de Date.UTC para anos 00–99.
+    const meiaNoiteUtc = Date.parse(`${dia}T00:00:00.000Z`)
+    // Janela suficiente para os offsets históricos de São Paulo.
+    let menor = meiaNoiteUtc - 36 * 60 * 60 * 1000
+    let maior = meiaNoiteUtc + 36 * 60 * 60 * 1000
+    // Primeiro milissegundo cuja data civil local é >= ao dia pedido.
+    while (menor < maior) {
+      const meio = menor + Math.floor((maior - menor) / 2)
+      if (diaLocal(meio) < dia) menor = meio + 1
+      else maior = meio
     }
-    return new Date(instante).toISOString()
+    return new Date(menor).toISOString()
   }
   if (dataInicio) condicoes.push(gte(eventos.inicioEm, inicioDiaSaoPauloUtc(dataInicio)))
   if (dataFim) {
@@ -799,9 +804,9 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
     if (dataFim === '9999-12-31') {
       return c.json({ error: 'Data final deve ser anterior a 9999-12-31' }, 400)
     }
-    const [ano, mes, dia] = dataFim.split('-').map(Number)
-    const proximoDia = new Date(Date.UTC(ano, mes - 1, dia + 1))
-      .toISOString().slice(0, 10)
+    const proximoDiaData = new Date(`${dataFim}T00:00:00.000Z`)
+    proximoDiaData.setUTCDate(proximoDiaData.getUTCDate() + 1)
+    const proximoDia = proximoDiaData.toISOString().slice(0, 10)
     condicoes.push(lt(eventos.inicioEm, inicioDiaSaoPauloUtc(proximoDia)))
   }
 
