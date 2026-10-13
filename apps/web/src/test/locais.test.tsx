@@ -25,7 +25,7 @@ describe('LocaisView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (rota: string) => {
-      if (rota === '/locais/escopos-autorizados') return { master: true, escopos: [] } as any
+      if (rota === '/locais/escopos-autorizados') return { master: true, escopos: [{ escopoTipo: 'REGIONAL', escopoId: 'regional-1', nome: 'Regional São Paulo' }] } as any
       return [] as any
     })
   })
@@ -96,7 +96,7 @@ describe('LocaisView', () => {
   it('deve exibir detalhes de um local em diálogo acessível', async () => {
     vi.mocked(apiClient.fetchWithAuth)
       .mockResolvedValueOnce(mockLocais) // list
-      .mockResolvedValueOnce({ master: true, escopos: [] }) // capabilities
+      .mockResolvedValueOnce({ master: true, escopos: [{ escopoTipo: 'REGIONAL', escopoId: 'regional-1', nome: 'Regional São Paulo' }] }) // capabilities
       .mockResolvedValueOnce({
         ...mockLocais[0],
         bairro: 'Centro',
@@ -135,6 +135,7 @@ describe('LocaisView', () => {
 
     const dialog = screen.getByRole('dialog', { name: /novo local/i })
     const { getByLabelText, getByRole } = within(dialog)
+    fireEvent.change(getByLabelText(/escopo institucional/i), { target: { value: 'REGIONAL:regional-1' } })
 
     fireEvent.change(getByLabelText(/nome/i), { target: { value: 'Novo Local' } })
     fireEvent.change(getByLabelText(/endereço/i), { target: { value: 'Av B' } })
@@ -342,7 +343,7 @@ describe('LocaisView', () => {
   it('deve editar um local via PATCH', async () => {
     vi.mocked(apiClient.fetchWithAuth)
       .mockResolvedValueOnce(mockLocais) // list
-      .mockResolvedValueOnce({ master: true, escopos: [] }) // capabilities
+      .mockResolvedValueOnce({ master: true, escopos: [{ escopoTipo: 'REGIONAL', escopoId: 'regional-1', nome: 'Regional São Paulo' }] }) // capabilities
       .mockResolvedValueOnce(mockLocais[0]) // GET detail for edit
       .mockResolvedValueOnce(mockLocais) // list after edit
     
