@@ -3,8 +3,24 @@ import { eq, isNull, or } from 'drizzle-orm'
 import { locais } from '../db/schema'
 import { LocalCreate, LocalUpdate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { eMasterSistema, podeGerenciarCadastroTerritorial, obterRegionalDoEscopo } from '../security/permissoes'
+import { eMasterSistema, podeGerenciarCadastroTerritorial, obterRegionalDoEscopo, obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
 import { executarOperacaoComAudit } from '../services/auditoria'
+
+async function localVisivel(db: any, contexto: any, local: any): Promise<boolean> {
+  if (eMasterSistema(contexto)) return true
+  if (local.proprietarioMembroId) return local.proprietarioMembroId === contexto.membroId
+  // Locais legados continuam na lista compartilhada até classificação pelo Master.
+  if (!local.escopoTipo || !local.escopoId) return true
+  const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+  const chaves: Record<string, Set<string>> = {
+    REGIONAL: visiveis.regionaisIds,
+    ADMINISTRACAO: visiveis.administracoesIds,
+    SETOR: visiveis.setoresIds,
+    CASA: visiveis.casasIds,
+    GRUPO_TRABALHO: visiveis.gruposTrabalhoIds,
+  }
+  return chaves[local.escopoTipo]?.has(local.escopoId) ?? false
+}
 
 export const locaisRouter = new Hono<any>()
 
@@ -14,7 +30,9 @@ locaisRouter.get('/', async (c) => {
   const db = c.get('db')
   const membroId = c.get('membroId')
   const data = await db.select().from(locais).where(or(isNull(locais.proprietarioMembroId), eq(locais.proprietarioMembroId, membroId))).all()
-  return c.json(data)
+  const contexto = c.get('contextoPermissoes')
+  const resultados = await Promise.all(data.map((local: any) => localVisivel(db, contexto, local)))
+  return c.json(data.filter((_: any, i: number) => resultados[i]))
 })
 
 // Escopos explicitamente atribuídos ao administrador; a API valida novamente na escrita.
@@ -32,7 +50,7 @@ locaisRouter.get('/:id', async (c) => {
   const id = c.req.param('id')
   const data = await db.select().from(locais).where(eq(locais.id, id)).get()
   
-  if (!data || (data.proprietarioMembroId && data.proprietarioMembroId !== c.get('membroId'))) return c.json({ error: 'Local não encontrado' }, 404)
+  if (!data || !await localVisivel(db, c.get('contextoPermissoes'), data)) return c.json({ error: 'Local não encontrado' }, 404)
   return c.json(data)
 })
 
