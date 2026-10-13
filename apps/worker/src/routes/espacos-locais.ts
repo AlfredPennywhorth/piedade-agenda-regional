@@ -44,7 +44,7 @@ espacosLocaisRouter.get('/', async c => {
   const visiveis = eMasterSistema(contexto) ? undefined : await obterEscoposTerritoriaisVisiveis(db, contexto)
   const autorizados = await Promise.all(localRows.map((local: any) => espacoVisivel(db, contexto, local, visiveis)))
   const idsPermitidos = new Set(localIds.filter((_: string, i: number) => autorizados[i]))
-  const referenciados = autorizados.every(Boolean) ? new Set<string>() : await espacosDeEventosVisiveis(db, contexto)
+  const referenciados = autorizados.every(Boolean) ? new Set<string>() : await espacosDeEventosVisiveis(db, contexto, data.filter((item: any) => !idsPermitidos.has(item.localId) && !item.proprietarioMembroId).map((item: any) => item.id))
   return c.json(data.filter((item: any) => idsPermitidos.has(item.localId) || (!item.proprietarioMembroId && referenciados.has(item.id))))
 })
 
@@ -54,7 +54,7 @@ espacosLocaisRouter.get('/:id', async c => {
   const local = item ? await db.select().from(locais).where(eq(locais.id, item.localId)).get() : null
   if (!item) return c.json({ error: 'Espaço não encontrado' }, 404)
   if (!await espacoVisivel(db, c.get('contextoPermissoes'), local)) {
-    const autorizados = item.proprietarioMembroId || local?.proprietarioMembroId ? new Set<string>() : await espacosDeEventosVisiveis(db, c.get('contextoPermissoes'))
+    const autorizados = item.proprietarioMembroId || local?.proprietarioMembroId ? new Set<string>() : await espacosDeEventosVisiveis(db, c.get('contextoPermissoes'), [item.id])
     if (!autorizados.has(item.id)) return c.json({ error: 'Espaço não encontrado' }, 404)
   }
   return c.json(item)
