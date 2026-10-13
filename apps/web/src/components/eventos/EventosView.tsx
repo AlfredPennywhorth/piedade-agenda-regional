@@ -1007,6 +1007,10 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       setCepRapidoMensagem('Aguarde a consulta do CEP terminar antes de criar o local.')
       return
     }
+    if (!formData.pessoal && (!tipoEscopo || !(tipoEscopo === 'regional' ? formData.regionalId : tipoEscopo === 'administracao' ? formData.administracaoId : tipoEscopo === 'setor' ? formData.setorId : tipoEscopo === 'casa' ? formData.casaId : tipoEscopo === 'grupoTrabalho' ? formData.grupoTrabalhoId : null))) {
+      setLocalRapidoErro('Selecione o escopo territorial da reunião antes de cadastrar o local.')
+      return
+    }
     const parsed = LocalCreate.safeParse({
       nome: localRapido.nome,
       endereco: localRapido.endereco,
