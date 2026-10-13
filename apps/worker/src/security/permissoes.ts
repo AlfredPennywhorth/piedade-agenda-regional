@@ -621,8 +621,10 @@ export async function podeGerenciarAgendaNoEscopo(
   // Administrador Regional pode gerir a Agenda apenas dentro da Regional administrada.
   if (podeAdministrarRegional(contexto, regionalAlvo)) return true
 
-  // Administradores territoriais administram também a Agenda no próprio escopo e descendentes.
-  if (await podeGerenciarCadastroTerritorial(db, contexto, escopoTipo, escopoId)) return true
+  // A autorização de cadastro de locais não concede gestão de GT legado.
+  // Para os demais escopos, permanece a gestão territorial administrativa.
+  if (escopoTipo !== 'GRUPO_TRABALHO' &&
+      await podeGerenciarCadastroTerritorial(db, contexto, escopoTipo, escopoId)) return true
 
   // Regra institucional: todo membro pode gerir automaticamente a Agenda da própria Casa.
   if (permitirCasaAutomatica && escopoTipo === 'CASA') {
