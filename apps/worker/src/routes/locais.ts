@@ -5,6 +5,7 @@ import { LocalCreate, LocalUpdate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, podeGerenciarCadastroTerritorial, obterRegionalDoEscopo, obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
 import { executarOperacaoComAudit } from '../services/auditoria'
+import { locaisDeEventosVisiveis } from '../security/locais-eventos'
 
 async function localVisivel(db: any, contexto: any, local: any, visiveisPrecarregados?: Awaited<ReturnType<typeof obterEscoposTerritoriaisVisiveis>>): Promise<boolean> {
   if (local.proprietarioMembroId) return local.proprietarioMembroId === contexto.membroId
@@ -33,7 +34,8 @@ locaisRouter.get('/', async (c) => {
   const contexto = c.get('contextoPermissoes')
   const visiveis = eMasterSistema(contexto) ? undefined : await obterEscoposTerritoriaisVisiveis(db, contexto)
   const resultados = await Promise.all(data.map((local: any) => localVisivel(db, contexto, local, visiveis)))
-  return c.json(data.filter((_: any, i: number) => resultados[i]))
+  const referenciados = resultados.every(Boolean) ? new Set<string>() : await locaisDeEventosVisiveis(db, contexto)
+  return c.json(data.filter((local: any, i: number) => resultados[i] || (!local.proprietarioMembroId && referenciados.has(local.id))))
 })
 
 // Escopos explicitamente atribuídos ao administrador; a API valida novamente na escrita.
@@ -90,7 +92,11 @@ locaisRouter.get('/:id', async (c) => {
   const id = c.req.param('id')
   const data = await db.select().from(locais).where(eq(locais.id, id)).get()
   
-  if (!data || !await localVisivel(db, c.get('contextoPermissoes'), data)) return c.json({ error: 'Local não encontrado' }, 404)
+  if (!data) return c.json({ error: 'Local não encontrado' }, 404)
+  if (!await localVisivel(db, c.get('contextoPermissoes'), data)) {
+    const autorizados = data.proprietarioMembroId ? new Set<string>() : await locaisDeEventosVisiveis(db, c.get('contextoPermissoes'))
+    if (!autorizados.has(data.id)) return c.json({ error: 'Local não encontrado' }, 404)
+  }
   return c.json(data)
 })
 
