@@ -1,10 +1,12 @@
 import { Hono } from 'hono'
 import { eq, and, or, gte, lt, lte, inArray } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, locais, espacosLocal, vinculosFuncionais, funcoes, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo } from '../security/permissoes'
-import { condicaoEventosVisiveis } from '../security/eventos'
+import { condicaoEscopo, condicaoEventosVisiveis } from '../security/eventos'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
+import { dataValidaRelatorio, inicioDiaSaoPauloUtc, limiteFinalExclusivoSaoPauloUtc } from './relatorios-periodo'
+import { lotesIds, consolidarUtilizacao, type OcorrenciaUtilizacao, type CadastroUtilizacao } from './relatorios-utilizacao'
 
 export const relatoriosRouter = new Hono<{ Variables: Variables }>()
 
@@ -725,5 +727,102 @@ relatoriosRouter.get('/agregado', async (c) => {
     mediaPresencaPorEvento,
     taxaPresencaGeral,
     eventos: eventosResumo
+  })
+})
+
+
+// GET /api/v1/relatorios/utilizacao-locais
+// Agrega ocorrências de eventos, não convocações nem linhas da série.
+relatoriosRouter.get('/utilizacao-locais', async c => {
+  const db = c.get('db')
+  const membroId = c.get('membroId')
+  if (!db || !membroId) return c.json({ error: 'Sessão ou banco indisponível' }, 500)
+
+  const escopoTipo = c.req.query('escopoTipo') as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO'
+  const escopoId = c.req.query('escopoId')
+  const dataInicio = c.req.query('dataInicio')
+  const dataFim = c.req.query('dataFim')
+  const escopos = ['REGIONAL', 'ADMINISTRACAO', 'SETOR', 'CASA', 'GRUPO_TRABALHO']
+  if (!escopos.includes(escopoTipo) || !escopoId || !dataValidaRelatorio(dataInicio) || !dataValidaRelatorio(dataFim) ||
+    (dataInicio && dataFim && dataInicio > dataFim)) {
+    return c.json({ error: 'Escopo ou período inválido' }, 400)
+  }
+  const autorizado = await eGestorRelatoriosAutorizadoParaEscopo(db, membroId, escopoTipo, escopoId)
+  if (!autorizado) return c.json({ error: 'Acesso não autorizado para este escopo' }, 403)
+
+  // Gestores regionais vinculados pela função legada também podem consultar
+  // eventos externos geridos pela sua Regional. A visibilidade geral da agenda
+  // não contempla esse vínculo para abrangências NACIONAL/INTERNACIONAL.
+  const gestorRegionalLegado = escopoTipo === 'REGIONAL' && !!(await db
+    .select({ id: vinculosFuncionais.id })
+    .from(vinculosFuncionais)
+    .innerJoin(funcoes, eq(vinculosFuncionais.funcaoId, funcoes.id))
+    .where(and(
+      eq(vinculosFuncionais.membroId, membroId),
+      eq(vinculosFuncionais.regionalId, escopoId),
+      eq(vinculosFuncionais.ativo, true),
+      eq(funcoes.ativo, true),
+      eq(funcoes.codigo, 'GESTOR_RELATORIOS'),
+    ))
+    .get())
+  const visibilidade = await condicaoEventosVisiveis(db, c.get('contextoPermissoes'))
+  const visibilidadeRelatorio = gestorRegionalLegado
+    ? or(visibilidade, and(
+        inArray(eventos.abrangencia, ['NACIONAL', 'INTERNACIONAL']),
+        eq(eventos.regionalGestaoId, escopoId),
+      ))!
+    : visibilidade
+  const condicoes = [
+    eq(eventos.ativo, true),
+    eq(eventos.pessoal, false),
+    visibilidadeRelatorio,
+  ]
+  const territorial = condicaoEscopo({
+    id: 'relatorio-utilizacao',
+    perfilCodigo: 'GESTOR_RELATORIOS',
+    escopoTipo,
+    escopoId,
+  })
+  if (!territorial) return c.json({ error: 'Escopo inválido' }, 400)
+  condicoes.push(
+    escopoTipo === 'REGIONAL'
+      ? or(territorial, eq(eventos.regionalGestaoId, escopoId))!
+      : territorial
+  )
+  if (dataInicio) condicoes.push(gte(eventos.inicioEm, inicioDiaSaoPauloUtc(dataInicio)))
+  if (dataFim) {
+    if (dataFim === '9999-12-31') {
+      return c.json({ error: 'Data final deve ser anterior a 9999-12-31' }, 400)
+    }
+    condicoes.push(lt(eventos.inicioEm, limiteFinalExclusivoSaoPauloUtc(dataFim)))
+  }
+
+  const ocorrencias: OcorrenciaUtilizacao[] = await db.select({
+    id: eventos.id, inicioEm: eventos.inicioEm, fimEm: eventos.fimEm,
+    localId: eventos.localId, espacoId: eventos.espacoId,
+  }).from(eventos).where(and(...condicoes)).all()
+
+  const idsLocal: string[] = [...new Set(ocorrencias.flatMap(e => e.localId ? [e.localId] : []))]
+  const idsEspaco: string[] = [...new Set(ocorrencias.flatMap(e => e.espacoId ? [e.espacoId] : []))]
+  const locaisEncontrados: CadastroUtilizacao[] = []
+  const espacosEncontrados: CadastroUtilizacao[] = []
+  // O D1 tem limite de parâmetros vinculados; manter lotes pequenos.
+  for (const lote of lotesIds(idsLocal)) {
+    const encontrados: CadastroUtilizacao[] = await db.select({
+      id: locais.id, nome: locais.nome, proprietarioMembroId: locais.proprietarioMembroId,
+    }).from(locais).where(inArray(locais.id, lote)).all()
+    locaisEncontrados.push(...encontrados)
+  }
+  for (const lote of lotesIds(idsEspaco)) {
+    const encontrados: CadastroUtilizacao[] = await db.select({
+      id: espacosLocal.id, nome: espacosLocal.nome,
+      proprietarioMembroId: espacosLocal.proprietarioMembroId,
+    }).from(espacosLocal).where(inArray(espacosLocal.id, lote)).all()
+    espacosEncontrados.push(...encontrados)
+  }
+  const resumo = consolidarUtilizacao(ocorrencias, locaisEncontrados, espacosEncontrados, membroId)
+  return c.json({
+    escopo: { escopoTipo, escopoId }, periodo: { dataInicio: dataInicio ?? null, dataFim: dataFim ?? null },
+    ...resumo,
   })
 })
