@@ -477,7 +477,8 @@ export function LocaisView() {
       setFormErrors({})
       setSaving(true)
 
-      const escopo = escoposCadastro.find(item => item.escopoTipo + ':' + item.escopoId === escopoSelecionado)
+      const escopoEncontrado = escoposCadastro.find(item => item.escopoTipo + ':' + item.escopoId === escopoSelecionado)
+      const escopo = escopoEncontrado ? { escopoTipo: escopoEncontrado.escopoTipo, escopoId: escopoEncontrado.escopoId } : null
       if (!editingId || (masterCadastro && editandoLegado)) {
         if (!escopo) {
           setError('Selecione um escopo institucional válido para salvar o local.')
