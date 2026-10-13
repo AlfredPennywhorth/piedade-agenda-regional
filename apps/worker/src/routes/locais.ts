@@ -21,7 +21,7 @@ locaisRouter.get('/', async (c) => {
 locaisRouter.get('/escopos-autorizados', async c => {
   const contexto = c.get('contextoPermissoes')
   const escopos = contexto.acessosAtivos
-    .filter((acesso: any) => acesso.perfilCodigo === 'ADMINISTRADOR_SISTEMA' &&
+    .filter((acesso: any) => ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) &&
       acesso.escopoTipo !== 'GLOBAL' && acesso.escopoId)
     .map((acesso: any) => ({ escopoTipo: acesso.escopoTipo, escopoId: acesso.escopoId }))
   return c.json({ master: eMasterSistema(contexto), escopos })
