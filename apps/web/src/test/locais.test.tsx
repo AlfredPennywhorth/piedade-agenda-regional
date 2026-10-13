@@ -344,7 +344,7 @@ describe('LocaisView', () => {
     vi.mocked(apiClient.fetchWithAuth)
       .mockResolvedValueOnce(mockLocais) // list
       .mockResolvedValueOnce({ master: true, escopos: [{ escopoTipo: 'REGIONAL', escopoId: 'regional-1', nome: 'Regional São Paulo' }] }) // capabilities
-      .mockResolvedValueOnce(mockLocais[0]) // GET detail for edit
+      .mockResolvedValueOnce({ ...mockLocais[0], escopoTipo: 'REGIONAL', escopoId: 'regional-1' }) // GET detail for edit
       .mockResolvedValueOnce(mockLocais) // list after edit
     
     vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({})
@@ -398,6 +398,7 @@ describe('LocaisView', () => {
 
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
       if (endpoint === '/locais') return locais as any
+      if (endpoint === '/locais/escopos-autorizados') return { master: true, escopos: [{ escopoTipo: 'REGIONAL', escopoId: 'regional-1', nome: 'Regional São Paulo' }] } as any
       if (endpoint === '/espacos-locais?localId=1') return respostaLocalA as any
       if (endpoint === '/espacos-locais?localId=2') {
         return [{ id: 'esp-b', localId: '2', nome: 'Sala B', ativo: true }] as any
