@@ -741,7 +741,7 @@ export function ContasAcessoView({
                 )}
 
                 {linkTemporario?.membroId === conta.membroId && (
-                  <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  <div role="status" data-pwa-protect-reload className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
                     <div className="space-y-3">
                       <p className="font-semibold">Link temporário gerado</p>
                       <p className="text-xs">
