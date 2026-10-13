@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, isNull, or } from 'drizzle-orm'
+import { and, eq, isNull, or } from 'drizzle-orm'
 import { locais, regionais, administracoes, setores, casas, gruposTrabalho, membros } from '../db/schema'
 import { LocalCreate, LocalUpdate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
@@ -31,7 +31,7 @@ async function setorDeOrigemAtivo(db: any, membroId: string | null | undefined) 
     .from(membros)
     .innerJoin(casas, eq(membros.casaId, casas.id))
     .innerJoin(setores, eq(casas.setorId, setores.id))
-    .where(eq(membros.id, membroId))
+    .where(and(eq(membros.id, membroId), eq(membros.ativo, true)))
     .get()
 }
 
