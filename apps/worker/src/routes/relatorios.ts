@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and, or, gte, lt, lte, inArray } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, locais, espacosLocal, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo } from '../security/permissoes'
 import { condicaoEventosVisiveis } from '../security/eventos'
@@ -725,5 +725,90 @@ relatoriosRouter.get('/agregado', async (c) => {
     mediaPresencaPorEvento,
     taxaPresencaGeral,
     eventos: eventosResumo
+  })
+})
+
+
+// GET /api/v1/relatorios/utilizacao-locais
+// Agrega ocorrências de eventos, não convocações nem linhas da série.
+relatoriosRouter.get('/utilizacao-locais', async c => {
+  const db = c.get('db')
+  const membroId = c.get('membroId')
+  if (!db || !membroId) return c.json({ error: 'Sessão ou banco indisponível' }, 500)
+
+  const escopoTipo = c.req.query('escopoTipo') as 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO'
+  const escopoId = c.req.query('escopoId')
+  const dataInicio = c.req.query('dataInicio')
+  const dataFim = c.req.query('dataFim')
+  const escopos = ['REGIONAL', 'ADMINISTRACAO', 'SETOR', 'CASA', 'GRUPO_TRABALHO']
+  const dataValida = (valor: string | undefined) => !valor || /^\d{4}-\d{2}-\d{2}$/.test(valor)
+  if (!escopos.includes(escopoTipo) || !escopoId || !dataValida(dataInicio) || !dataValida(dataFim) ||
+    (dataInicio && dataFim && dataInicio > dataFim)) {
+    return c.json({ error: 'Escopo ou período inválido' }, 400)
+  }
+  const autorizado = await eGestorRelatoriosAutorizadoParaEscopo(db, membroId, escopoTipo, escopoId)
+  if (!autorizado) return c.json({ error: 'Acesso não autorizado para este escopo' }, 403)
+
+  const condicoes = [
+    eq(eventos.ativo, true),
+    eq(eventos.pessoal, false),
+    await condicaoEventosVisiveis(db, c.get('contextoPermissoes')),
+  ]
+  switch (escopoTipo) {
+    case 'REGIONAL':
+      condicoes.push(or(eq(eventos.regionalId, escopoId), eq(eventos.regionalGestaoId, escopoId))!)
+      break
+    case 'ADMINISTRACAO': condicoes.push(eq(eventos.administracaoId, escopoId)); break
+    case 'SETOR': condicoes.push(eq(eventos.setorId, escopoId)); break
+    case 'CASA': condicoes.push(eq(eventos.casaId, escopoId)); break
+    case 'GRUPO_TRABALHO': condicoes.push(eq(eventos.grupoTrabalhoId, escopoId)); break
+  }
+  if (dataInicio) condicoes.push(gte(eventos.inicioEm, `${dataInicio}T00:00:00`))
+  if (dataFim) {
+    const fim = new Date(`${dataFim}T00:00:00.000Z`)
+    fim.setUTCDate(fim.getUTCDate() + 1)
+    condicoes.push(lt(eventos.inicioEm, fim.toISOString()))
+  }
+
+  const ocorrencias = await db.select({
+    id: eventos.id, inicioEm: eventos.inicioEm, fimEm: eventos.fimEm,
+    localId: eventos.localId, espacoId: eventos.espacoId,
+  }).from(eventos).where(and(...condicoes)).all()
+
+  const idsLocal = [...new Set(ocorrencias.map(e => e.localId).filter((id): id is string => !!id))]
+  const idsEspaco = [...new Set(ocorrencias.map(e => e.espacoId).filter((id): id is string => !!id))]
+  const locaisEncontrados = idsLocal.length ? await db.select({ id: locais.id, nome: locais.nome })
+    .from(locais).where(inArray(locais.id, idsLocal)).all() : []
+  const espacosEncontrados = idsEspaco.length ? await db.select({ id: espacosLocal.id, nome: espacosLocal.nome })
+    .from(espacosLocal).where(inArray(espacosLocal.id, idsEspaco)).all() : []
+  const nomesLocal = new Map(locaisEncontrados.map(l => [l.id, l.nome]))
+  const nomesEspaco = new Map(espacosEncontrados.map(e => [e.id, e.nome]))
+  const grupos = new Map<string, {
+    localId: string; localNome: string; espacoId: string | null; espacoNome: string | null;
+    totalEventos: number; minutosAgendados: number
+  }>()
+  for (const e of ocorrencias) {
+    if (!e.localId) continue // ONLINE e eventos externos sem local cadastrado.
+    const chave = JSON.stringify([e.localId, e.espacoId])
+    let item = grupos.get(chave)
+    if (!item) {
+      item = {
+        localId: e.localId, localNome: nomesLocal.get(e.localId) ?? 'Local não encontrado',
+        espacoId: e.espacoId, espacoNome: e.espacoId ? nomesEspaco.get(e.espacoId) ?? 'Espaço não encontrado' : null,
+        totalEventos: 0, minutosAgendados: 0,
+      }
+      grupos.set(chave, item)
+    }
+    item.totalEventos += 1
+    const duracao = new Date(e.fimEm).getTime() - new Date(e.inicioEm).getTime()
+    if (Number.isFinite(duracao) && duracao > 0) item.minutosAgendados += Math.round(duracao / 60000)
+  }
+  const ranking = [...grupos.values()].sort((a, b) =>
+    b.totalEventos - a.totalEventos || b.minutosAgendados - a.minutosAgendados ||
+    a.localNome.localeCompare(b.localNome, 'pt-BR'))
+  return c.json({
+    escopo: { escopoTipo, escopoId }, periodo: { dataInicio: dataInicio ?? null, dataFim: dataFim ?? null },
+    totalOcorrencias: ocorrencias.length, totalComLocal: ranking.reduce((n, item) => n + item.totalEventos, 0),
+    ranking,
   })
 })
