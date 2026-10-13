@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as apiClient from '../../api/apiClient'
 import { RelatoriosPresencaView } from './RelatoriosPresencaView'
 import { baixarCsv, montarCsv } from '../../utils/csv'
@@ -108,6 +108,9 @@ export function RelatoriosView() {
   const utilizacaoAtual = utilizacaoChave === chaveFiltrosUtilizacao ? utilizacao : null
   const [loadingUtilizacao, setLoadingUtilizacao] = useState(false)
   const [erroUtilizacao, setErroUtilizacao] = useState<string | null>(null)
+  const [erroUtilizacaoChave, setErroUtilizacaoChave] = useState<string | null>(null)
+  const erroUtilizacaoAtual = erroUtilizacaoChave === chaveFiltrosUtilizacao ? erroUtilizacao : null
+  const requisicaoUtilizacao = useRef(0)
 
   useEffect(() => {
     let ativo = true
@@ -175,15 +178,18 @@ export function RelatoriosView() {
 
   const carregarUtilizacao = async () => {
     const escopoIdNormalizado = escopoId.trim()
+    const numeroRequisicao = ++requisicaoUtilizacao.current
+    const chaveConsulta = chaveFiltrosUtilizacao
     if (!escopoIdNormalizado) {
+      setErroUtilizacaoChave(chaveConsulta)
       setErroUtilizacao('Informe o ID do escopo para consultar locais.')
       return
     }
     setLoadingUtilizacao(true)
     setErroUtilizacao(null)
+    setErroUtilizacaoChave(null)
     setUtilizacao(null)
     setUtilizacaoChave(null)
-    const chaveConsulta = chaveFiltrosUtilizacao
     try {
       const params = new URLSearchParams({ escopoTipo, escopoId: escopoIdNormalizado })
       if (dataInicio) params.set('dataInicio', dataInicio)
@@ -191,12 +197,16 @@ export function RelatoriosView() {
       const dados = await apiClient.fetchWithAuth<UtilizacaoLocaisData>(
         `/relatorios/utilizacao-locais?${params.toString()}`
       )
+      if (numeroRequisicao !== requisicaoUtilizacao.current) return
       setUtilizacao(dados)
       setUtilizacaoChave(chaveConsulta)
     } catch (erro) {
-      setErroUtilizacao(erro instanceof Error ? erro.message : 'Não foi possível consultar a utilização dos locais.')
+      if (numeroRequisicao === requisicaoUtilizacao.current) {
+        setErroUtilizacaoChave(chaveConsulta)
+        setErroUtilizacao(erro instanceof Error ? erro.message : 'Não foi possível consultar a utilização dos locais.')
+      }
     } finally {
-      setLoadingUtilizacao(false)
+      if (numeroRequisicao === requisicaoUtilizacao.current) setLoadingUtilizacao(false)
     }
   }
 
@@ -502,7 +512,7 @@ export function RelatoriosView() {
                 {loadingUtilizacao ? 'Consultando...' : 'Consultar utilização'}
               </button>
             </div>
-            {erroUtilizacao && <p role="alert" className="text-sm text-red-700">{erroUtilizacao}</p>}
+            {erroUtilizacaoAtual && <p role="alert" className="text-sm text-red-700">{erroUtilizacaoAtual}</p>}
             {utilizacaoAtual && (
               <>
                 <div className="flex flex-wrap justify-between gap-2 text-sm text-slate-700">
