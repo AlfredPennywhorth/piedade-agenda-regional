@@ -63,7 +63,7 @@ export function LocaisView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filtroBusca, setFiltroBusca] = useState('')
-  const [escoposCadastro, setEscoposCadastro] = useState<Array<{escopoTipo: string; escopoId: string}>>([])
+  const [escoposCadastro, setEscoposCadastro] = useState<Array<{escopoTipo: string; escopoId: string; nome: string}>>([])
   const [masterCadastro, setMasterCadastro] = useState(false)
   const [escopoSelecionado, setEscopoSelecionado] = useState('')
   const [editandoLegado, setEditandoLegado] = useState(false)
@@ -124,7 +124,7 @@ export function LocaisView() {
 
   useEffect(() => {
     fetchLocais()
-    apiClient.fetchWithAuth<{master: boolean; escopos: Array<{escopoTipo: string; escopoId: string}>}>('/locais/escopos-autorizados')
+    apiClient.fetchWithAuth<{master: boolean; escopos: Array<{escopoTipo: string; escopoId: string; nome: string}>}>('/locais/escopos-autorizados')
       .then(dados => { setMasterCadastro(dados.master); setEscoposCadastro(dados.escopos) })
       .catch(() => setError('Não foi possível consultar os escopos autorizados.'))
   }, [])
@@ -650,7 +650,7 @@ export function LocaisView() {
                     <option value="">Selecione um escopo</option>
                     {escoposCadastro.map(item => (
                       <option key={item.escopoTipo + item.escopoId} value={item.escopoTipo + ':' + item.escopoId}>
-                        {item.escopoTipo} — {item.escopoId}
+                        {item.escopoTipo} — {item.nome}
                       </option>
                     ))}
                   </select>
