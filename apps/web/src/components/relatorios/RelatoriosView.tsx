@@ -494,7 +494,7 @@ export function RelatoriosView() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="font-semibold text-slate-800">Utilização de locais e espaços</h3>
-                <p className="text-xs text-slate-500">Utiliza o escopo e período selecionados acima; considera eventos ativos com local cadastrado.</p>
+                <p className="text-xs text-slate-500">Utiliza o escopo e período selecionados acima. O total geral inclui eventos ativos do escopo; o ranking exibe apenas locais e espaços visíveis para você.</p>
               </div>
               <button type="button" onClick={() => void carregarUtilizacao()} disabled={loadingUtilizacao}
                 className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
@@ -505,14 +505,14 @@ export function RelatoriosView() {
             {utilizacaoAtual && (
               <>
                 <div className="flex flex-wrap justify-between gap-2 text-sm text-slate-700">
-                  <p>{utilizacaoAtual.totalComLocal} eventos com local, de {utilizacaoAtual.totalOcorrencias} eventos no escopo</p>
+                  <p>{utilizacaoAtual.totalComLocal} eventos em locais visíveis, de {utilizacaoAtual.totalOcorrencias} eventos no escopo</p>
                   <button type="button" onClick={exportarUtilizacao}
                     className="rounded border border-slate-300 px-3 py-1.5 font-medium hover:bg-slate-50">
                     Exportar CSV
                   </button>
                 </div>
                 {utilizacaoAtual.ranking.length === 0 ? (
-                  <p className="text-sm text-slate-500">Nenhum evento com local cadastrado no período.</p>
+                  <p className="text-sm text-slate-500">Nenhum evento com local ou espaço visível para incluir no ranking neste período. O total geral pode incluir eventos em locais particulares de outros membros.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-left text-sm">
