@@ -68,7 +68,7 @@ locaisRouter.post('/', async (c) => {
     const tipo = body.escopoTipo
     const escopoId = body.escopoId
     const tipos = ['REGIONAL', 'ADMINISTRACAO', 'SETOR', 'CASA', 'GRUPO_TRABALHO']
-    if ((!tipo || !escopoId) && !master) return c.json({ error: 'Informe um escopo territorial autorizado', code: 'ESCOPO_OBRIGATORIO' }, 403)
+    if ((!tipo || !escopoId) && !master) return c.json({ error: 'Informe um escopo territorial autorizado', code: 'FORBIDDEN' }, 403)
     if ((tipo || escopoId) && (!tipos.includes(tipo) || typeof escopoId !== 'string' || !escopoId.trim())) return c.json({ error: 'Escopo territorial inválido' }, 400)
     if (tipo && escopoId) {
       const existe = await obterRegionalDoEscopo(db, tipo, escopoId)
