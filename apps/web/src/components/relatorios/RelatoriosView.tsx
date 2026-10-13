@@ -106,7 +106,8 @@ export function RelatoriosView() {
   const [utilizacaoChave, setUtilizacaoChave] = useState<string | null>(null)
   const chaveFiltrosUtilizacao = JSON.stringify([escopoTipo, escopoId.trim(), dataInicio, dataFim])
   const utilizacaoAtual = utilizacaoChave === chaveFiltrosUtilizacao ? utilizacao : null
-  const [loadingUtilizacao, setLoadingUtilizacao] = useState(false)
+  const [loadingUtilizacaoChave, setLoadingUtilizacaoChave] = useState<string | null>(null)
+  const loadingUtilizacao = loadingUtilizacaoChave === chaveFiltrosUtilizacao
   const [erroUtilizacao, setErroUtilizacao] = useState<string | null>(null)
   const [erroUtilizacaoChave, setErroUtilizacaoChave] = useState<string | null>(null)
   const erroUtilizacaoAtual = erroUtilizacaoChave === chaveFiltrosUtilizacao ? erroUtilizacao : null
@@ -181,11 +182,12 @@ export function RelatoriosView() {
     const numeroRequisicao = ++requisicaoUtilizacao.current
     const chaveConsulta = chaveFiltrosUtilizacao
     if (!escopoIdNormalizado) {
+      setLoadingUtilizacaoChave(null)
       setErroUtilizacaoChave(chaveConsulta)
       setErroUtilizacao('Informe o ID do escopo para consultar locais.')
       return
     }
-    setLoadingUtilizacao(true)
+    setLoadingUtilizacaoChave(chaveConsulta)
     setErroUtilizacao(null)
     setErroUtilizacaoChave(null)
     setUtilizacao(null)
@@ -206,7 +208,7 @@ export function RelatoriosView() {
         setErroUtilizacao(erro instanceof Error ? erro.message : 'Não foi possível consultar a utilização dos locais.')
       }
     } finally {
-      if (numeroRequisicao === requisicaoUtilizacao.current) setLoadingUtilizacao(false)
+      if (numeroRequisicao === requisicaoUtilizacao.current) setLoadingUtilizacaoChave(null)
     }
   }
 
