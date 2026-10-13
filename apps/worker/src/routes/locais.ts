@@ -34,7 +34,7 @@ locaisRouter.get('/', async (c) => {
   const contexto = c.get('contextoPermissoes')
   const visiveis = eMasterSistema(contexto) ? undefined : await obterEscoposTerritoriaisVisiveis(db, contexto)
   const resultados = await Promise.all(data.map((local: any) => localVisivel(db, contexto, local, visiveis)))
-  const referenciados = resultados.every(Boolean) ? new Set<string>() : await locaisDeEventosVisiveis(db, contexto)
+  const referenciados = resultados.every(Boolean) ? new Set<string>() : await locaisDeEventosVisiveis(db, contexto, data.filter((local: any, i: number) => !resultados[i] && !local.proprietarioMembroId).map((local: any) => local.id))
   return c.json(data.filter((local: any, i: number) => resultados[i] || (!local.proprietarioMembroId && referenciados.has(local.id))))
 })
 
@@ -94,7 +94,7 @@ locaisRouter.get('/:id', async (c) => {
   
   if (!data) return c.json({ error: 'Local não encontrado' }, 404)
   if (!await localVisivel(db, c.get('contextoPermissoes'), data)) {
-    const autorizados = data.proprietarioMembroId ? new Set<string>() : await locaisDeEventosVisiveis(db, c.get('contextoPermissoes'))
+    const autorizados = data.proprietarioMembroId ? new Set<string>() : await locaisDeEventosVisiveis(db, c.get('contextoPermissoes'), [data.id])
     if (!autorizados.has(data.id)) return c.json({ error: 'Local não encontrado' }, 404)
   }
   return c.json(data)
