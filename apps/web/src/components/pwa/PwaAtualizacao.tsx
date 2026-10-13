@@ -40,7 +40,7 @@ export function PwaAtualizacao() {
         if (!editor.isConnected) editoresPendentes.delete(editor)
       }
       return editoresPendentes.size === 0 &&
-        !document.querySelector('[role="dialog"], dialog[open]')
+        !document.querySelector('[role="dialog"], dialog[open], [data-pwa-protect-reload]')
     }
 
     const aoTrocarControlador = () => {
