@@ -103,8 +103,7 @@ locaisRouter.patch('/:id', async (c) => {
     } else if (!await podeGerenciarCadastroTerritorial(db, contexto, existing.escopoTipo, existing.escopoId)) {
       return c.json({ error: 'Acesso não autorizado a este local', code: 'FORBIDDEN' }, 403)
     }
-    const entrada = await c.req.json()
-    if ('escopoTipo' in entrada || 'escopoId' in entrada) return c.json({ error: 'Escopo do local não pode ser alterado por esta operação' }, 400)
+    if ('escopoTipo' in body || 'escopoId' in body) return c.json({ error: 'Escopo do local não pode ser alterado por esta operação' }, 400)
 
     const atorMembroId = c.get('membroId') || null
     await executarOperacaoComAudit(
