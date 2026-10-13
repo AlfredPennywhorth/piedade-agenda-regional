@@ -113,14 +113,25 @@ locaisRouter.patch('/:id', async (c) => {
     } else if (!await podeGerenciarCadastroTerritorial(db, contexto, existing.escopoTipo, existing.escopoId)) {
       return c.json({ error: 'Acesso não autorizado a este local', code: 'FORBIDDEN' }, 403)
     }
-    if ('escopoTipo' in body || 'escopoId' in body) return c.json({ error: 'Escopo do local não pode ser alterado por esta operação' }, 400)
+    let escopoParaClassificar: { escopoTipo: 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO'; escopoId: string } | null = null
+    if ('escopoTipo' in body || 'escopoId' in body) {
+      const permitidos = ['REGIONAL', 'ADMINISTRACAO', 'SETOR', 'CASA', 'GRUPO_TRABALHO']
+      if (!eMasterSistema(contexto) || existing.escopoTipo || existing.escopoId) {
+        return c.json({ error: 'Somente o Master classifica um local institucional legado', code: 'FORBIDDEN' }, 403)
+      }
+      if (!permitidos.includes(body.escopoTipo) || typeof body.escopoId !== 'string' ||
+        !body.escopoId.trim() || !await obterRegionalDoEscopo(db, body.escopoTipo, body.escopoId)) {
+        return c.json({ error: 'Escopo territorial inválido' }, 400)
+      }
+      escopoParaClassificar = { escopoTipo: body.escopoTipo, escopoId: body.escopoId }
+    }
 
     const atorMembroId = c.get('membroId') || null
     await executarOperacaoComAudit(
       db,
       (qdb) => [
         qdb.update(locais)
-          .set({ ...parsed, updatedAt: new Date().toISOString() })
+          .set({ ...parsed, ...(escopoParaClassificar ?? {}), updatedAt: new Date().toISOString() })
           .where(eq(locais.id, id))
       ],
       {
