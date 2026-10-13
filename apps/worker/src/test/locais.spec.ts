@@ -38,12 +38,12 @@ describe('Locais API (S04)', () => {
     }))
     const autorizado = await criar('locais-auth-setor')
     expect(autorizado.status).toBe(201)
-    expect((await autorizado.json() as any).escopoId).toBe('locais-auth-setor')
+    const localCriado = await autorizado.json() as any
+    expect(localCriado.escopoId).toBe('locais-auth-setor')
 
-    const outraConta = await criarSessaoAutenticadaTeste(sqlite, 'locais-setor-alheio')
+    await criarSessaoAutenticadaTeste(sqlite, 'locais-setor-alheio')
     expect((await criar('locais-setor-alheio-setor')).status).toBe(403)
 
-    const localCriado = await autorizado.clone().json() as any
     const alterar = await app.request('/api/v1/locais/' + localCriado.id, mesclarAutorizacao(authToken, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: 'Tentativa de edição' }),
     }))
