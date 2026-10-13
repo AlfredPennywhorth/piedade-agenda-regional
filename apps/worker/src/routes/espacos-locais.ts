@@ -3,7 +3,7 @@ import { and, eq, isNull, or } from 'drizzle-orm'
 import { espacosLocal, locais } from '../db/schema'
 import { EspacoLocalCreate, EspacoLocalUpdate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { exigirMasterParaEscrita } from '../middleware/master-write'
+import { eMasterSistema, podeGerenciarCadastroTerritorial } from '../security/permissoes'
 import { executarOperacaoComAudit } from '../services/auditoria'
 
 export const espacosLocaisRouter = new Hono<any>()
@@ -57,12 +57,17 @@ espacosLocaisRouter.post('/particulares', async c => {
   }
 })
 
-espacosLocaisRouter.post('/', exigirMasterParaEscrita, async c => {
+espacosLocaisRouter.post('/', async c => {
   const db = c.get('db')
   try {
     const parsed = EspacoLocalCreate.parse(await c.req.json())
     const local = await db.select().from(locais).where(eq(locais.id, parsed.localId)).get()
     if (!local || local.proprietarioMembroId) return c.json({ error: 'Local institucional não encontrado' }, 404)
+    if (!local.escopoTipo || !local.escopoId) {
+      if (!eMasterSistema(c.get('contextoPermissoes'))) return c.json({ error: 'Somente o Master administra espaços de locais legados', code: 'FORBIDDEN' }, 403)
+    } else if (!await podeGerenciarCadastroTerritorial(db, c.get('contextoPermissoes'), local.escopoTipo, local.escopoId)) {
+      return c.json({ error: 'Sem permissão para administrar espaços deste local', code: 'FORBIDDEN' }, 403)
+    }
     const id = crypto.randomUUID()
     await executarOperacaoComAudit(
       db,
@@ -89,12 +94,19 @@ espacosLocaisRouter.post('/', exigirMasterParaEscrita, async c => {
   }
 })
 
-espacosLocaisRouter.patch('/:id', exigirMasterParaEscrita, async c => {
+espacosLocaisRouter.patch('/:id', async c => {
   const db = c.get('db')
   try {
     const id = c.req.param('id')
     const existing = await db.select().from(espacosLocal).where(eq(espacosLocal.id, id)).get()
     if (!existing || existing.proprietarioMembroId) return c.json({ error: 'Espaço institucional não encontrado' }, 404)
+    const local = await db.select().from(locais).where(eq(locais.id, existing.localId)).get()
+    if (!local || local.proprietarioMembroId) return c.json({ error: 'Local institucional não encontrado' }, 404)
+    if (!local.escopoTipo || !local.escopoId) {
+      if (!eMasterSistema(c.get('contextoPermissoes'))) return c.json({ error: 'Somente o Master administra espaços de locais legados', code: 'FORBIDDEN' }, 403)
+    } else if (!await podeGerenciarCadastroTerritorial(db, c.get('contextoPermissoes'), local.escopoTipo, local.escopoId)) {
+      return c.json({ error: 'Sem permissão para alterar este espaço', code: 'FORBIDDEN' }, 403)
+    }
     const parsed = EspacoLocalUpdate.parse(await c.req.json())
     if (parsed.localId && parsed.localId !== existing.localId) {
       return c.json(
