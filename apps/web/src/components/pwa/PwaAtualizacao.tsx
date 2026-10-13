@@ -10,7 +10,7 @@ export function PwaAtualizacao() {
 
     // Marca apenas formulários de edição; filtros fora de <form> não bloqueiam atualizações.
     // O estado é mantido após submit: envio não comprova persistência da API.
-    const formulariosPendentes = new Set<HTMLFormElement>()
+    const editoresPendentes = new Set<HTMLElement>()
     let atualizarEmAndamento = false
     let possuiControlador = Boolean(navigator.serviceWorker.controller)
 
@@ -18,17 +18,28 @@ export function PwaAtualizacao() {
       const alvo = event.target
       if (!(alvo instanceof HTMLElement) ||
         !(alvo.matches('input, textarea, select') || alvo.isContentEditable)) return
-      const formulario = alvo.closest('form')
-      if (formulario) formulariosPendentes.add(formulario)
+      const editor = alvo.closest<HTMLElement>('[data-pwa-editor], form')
+      if (editor) editoresPendentes.add(editor)
+    }
+
+    // Seleções por botão também modificam o estado do editor de Membros
+    // (pré-cadastro e modo de criação), mesmo sem evento de input/change.
+    const marcarSelecao = (event: MouseEvent) => {
+      const alvo = event.target
+      if (!(alvo instanceof Element)) return
+      const editor = alvo.closest<HTMLElement>('[data-pwa-editor]')
+      if (editor && alvo.closest('button:not([data-pwa-ignore-selection])')) {
+        editoresPendentes.add(editor)
+      }
     }
 
     const podeRecarregar = () => {
       // A navegação ou o fechamento do formulário descarta sua edição pendente.
       // Não limpar no submit: validações/requisições assíncronas ainda podem falhar.
-      for (const formulario of formulariosPendentes) {
-        if (!formulario.isConnected) formulariosPendentes.delete(formulario)
+      for (const editor of editoresPendentes) {
+        if (!editor.isConnected) editoresPendentes.delete(editor)
       }
-      return formulariosPendentes.size === 0 &&
+      return editoresPendentes.size === 0 &&
         !document.querySelector('[role="dialog"], dialog[open]')
     }
 
@@ -58,6 +69,7 @@ export function PwaAtualizacao() {
 
     document.addEventListener('input', marcarEdicao, true)
     document.addEventListener('change', marcarEdicao, true)
+    document.addEventListener('click', marcarSelecao, true)
     navigator.serviceWorker.addEventListener('controllerchange', aoTrocarControlador)
     window.addEventListener('focus', verificarAtualizacao)
     document.addEventListener('visibilitychange', verificarAtualizacao)
@@ -67,6 +79,7 @@ export function PwaAtualizacao() {
     return () => {
       document.removeEventListener('input', marcarEdicao, true)
       document.removeEventListener('change', marcarEdicao, true)
+      document.removeEventListener('click', marcarSelecao, true)
       navigator.serviceWorker.removeEventListener('controllerchange', aoTrocarControlador)
       window.removeEventListener('focus', verificarAtualizacao)
       document.removeEventListener('visibilitychange', verificarAtualizacao)
