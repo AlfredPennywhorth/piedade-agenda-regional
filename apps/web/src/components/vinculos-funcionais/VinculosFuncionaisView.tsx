@@ -775,10 +775,10 @@ export function VinculosFuncionaisView() {
           </label>
           <label className="text-sm text-slate-700">
             Casa de Oração
-            <select value={filtroCasaLista} onChange={e => setFiltroCasaLista(e.target.value)}
+            <select value={filtroCasaLista} disabled={!filtroSetorLista} onChange={e => setFiltroCasaLista(e.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-300 p-2">
               <option value="">Todas as Casas de Oração</option>
-              {[...casas].filter(c => !filtroSetorLista || c.setorId === filtroSetorLista)
+              {[...casas].filter(c => Boolean(filtroSetorLista) && c.setorId === filtroSetorLista)
                 .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(c => (
                 <option key={c.id} value={c.id}>{c.nome}</option>
               ))}
