@@ -32,6 +32,7 @@ export function VinculosFuncionaisView() {
   const [filtroStatusLista, setFiltroStatusLista] = useState<'todos' | 'ativos' | 'inativos'>('ativos')
   const [filtroTipoLista, setFiltroTipoLista] = useState<TipoEscopo>('')
   const [filtroSetorLista, setFiltroSetorLista] = useState('')
+  const [filtroCasaLista, setFiltroCasaLista] = useState('')
   const [filtroGtLista, setFiltroGtLista] = useState('')
   
   // Lookups
@@ -371,6 +372,7 @@ export function VinculosFuncionaisView() {
     const tipo = v.grupoTrabalhoId ? 'gt' : v.casaId ? 'casa' : v.setorId ? 'setor' : v.administracaoId ? 'administracao' : v.regionalId ? 'regional' : ''
     if (filtroTipoLista && tipo !== filtroTipoLista) return false
     if (filtroSetorLista && !membrosDoSetor.has(v.membroId)) return false
+    if (filtroCasaLista && membros.find(m => m.id === v.membroId)?.casaId !== filtroCasaLista) return false
     if (filtroGtLista && !membrosDoGt.has(v.membroId)) return false
     const termo = buscaVinculo.trim().toLocaleLowerCase('pt-BR')
     return !termo || [getFuncaoNome(v), getMembroNome(v), renderNomeEscopo(v)].some(nome => nome.toLocaleLowerCase('pt-BR').includes(termo))
@@ -743,7 +745,7 @@ export function VinculosFuncionaisView() {
       )}
 
       <section aria-label="Vínculos por função" className="space-y-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <label className="text-sm text-slate-700 sm:col-span-1">
             Buscar função ou membro
             <input value={buscaVinculo} onChange={e => setBuscaVinculo(e.target.value)}
@@ -763,11 +765,22 @@ export function VinculosFuncionaisView() {
           </label>
           <label className="text-sm text-slate-700">
             Setor
-            <select value={filtroSetorLista} onChange={e => setFiltroSetorLista(e.target.value)}
+            <select value={filtroSetorLista} onChange={e => { setFiltroSetorLista(e.target.value); setFiltroCasaLista('') }}
               className="mt-1 w-full rounded-lg border border-slate-300 p-2">
               <option value="">Todos os setores</option>
               {[...setores].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(s => (
                 <option key={s.id} value={s.id}>{s.nome}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm text-slate-700">
+            Casa de Oração
+            <select value={filtroCasaLista} onChange={e => setFiltroCasaLista(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2">
+              <option value="">Todas as Casas de Oração</option>
+              {[...casas].filter(c => !filtroSetorLista || c.setorId === filtroSetorLista)
+                .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(c => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
               ))}
             </select>
           </label>
@@ -844,7 +857,7 @@ export function VinculosFuncionaisView() {
               </div>
               <div>
                 <span className="text-xs font-semibold text-slate-500 block">{vinculoDetalhe.casaId ? "Casa de Oração:" : "Escopo:"}</span>
-                <span className="text-slate-700">{renderNomeEscopo(vinculoDetalhe)}</span>
+                <span className="text-slate-700">{vinculoDetalhe.casaId ? (vinculoDetalhe.casa?.nome || casas.find(c => c.id === vinculoDetalhe.casaId)?.nome || "Casa de Oração não encontrada") : renderNomeEscopo(vinculoDetalhe)}</span>
               </div>
               <div>
                 <span className="text-xs font-semibold text-slate-500 block">Status:</span>
