@@ -434,7 +434,7 @@ export async function podeGerenciarCadastroTerritorial(
   if (eMasterSistema(contexto)) return true
   if (!db || !escopoId) return false
   const admins = contexto.acessosAtivos.filter(acesso =>
-    acesso.perfilCodigo === 'ADMINISTRADOR_SISTEMA' &&
+    ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) &&
     acesso.escopoId !== null
   )
   if (!admins.length) return false
