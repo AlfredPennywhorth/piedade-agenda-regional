@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, fetchWithAuth, patchWithAuth, postWithAuth } from '../../api/apiClient'
 import { GerenciarAcessosPanel } from './GerenciarAcessosPanel'
 
@@ -89,10 +89,33 @@ interface ContasAcessoViewProps {
 // a proteção enquanto outra geração de link temporário ainda estiver pendente.
 let geracoesLinkEmAndamento = 0
 
+function protegerGeracaoLink(): () => void {
+  geracoesLinkEmAndamento += 1
+  document.documentElement.setAttribute('data-pwa-protect-reload', '')
+  let liberada = false
+  return () => {
+    if (liberada) return
+    liberada = true
+    geracoesLinkEmAndamento -= 1
+    if (geracoesLinkEmAndamento === 0) {
+      document.documentElement.removeAttribute('data-pwa-protect-reload')
+    }
+  }
+}
+
 export function ContasAcessoView({
   onPendenciasAtualizadas,
   podeGerenciarSessoes = false,
 }: ContasAcessoViewProps = {}) {
+  const protecoesDestaMontagem = useRef(new Set<() => void>())
+  useEffect(() => {
+    const protecoes = protecoesDestaMontagem.current
+    return () => {
+      for (const liberar of protecoes) liberar()
+      protecoes.clear()
+    }
+  }, [])
+
   const [contas, setContas] = useState<ContaAdministrada[]>([])
   const [carregando, setCarregando] = useState(true)
   const [processando, setProcessando] = useState<string | null>(null)
@@ -257,8 +280,8 @@ export function ContasAcessoView({
 
     // Proteção síncrona: cobre o intervalo entre clique e resposta da API,
     // antes mesmo de o link temporário aparecer na interface.
-    geracoesLinkEmAndamento += 1
-    document.documentElement.setAttribute('data-pwa-protect-reload', '')
+    const liberarProtecao = protegerGeracaoLink()
+    protecoesDestaMontagem.current.add(liberarProtecao)
     setProcessando(conta.membroId)
     setFeedback(null)
     try {
@@ -284,10 +307,8 @@ export function ContasAcessoView({
         mensagem: error instanceof ApiError ? error.message : 'Não foi possível gerar o link.',
       })
     } finally {
-      geracoesLinkEmAndamento -= 1
-      if (geracoesLinkEmAndamento === 0) {
-        document.documentElement.removeAttribute('data-pwa-protect-reload')
-      }
+      liberarProtecao()
+      protecoesDestaMontagem.current.delete(liberarProtecao)
       setProcessando(null)
     }
   }
