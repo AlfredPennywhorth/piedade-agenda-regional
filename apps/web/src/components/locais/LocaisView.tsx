@@ -61,6 +61,9 @@ export function LocaisView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filtroBusca, setFiltroBusca] = useState('')
+  const [escoposCadastro, setEscoposCadastro] = useState<Array<{escopoTipo: string; escopoId: string}>>([])
+  const [masterCadastro, setMasterCadastro] = useState(false)
+  const [escopoSelecionado, setEscopoSelecionado] = useState('')
   
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -118,6 +121,9 @@ export function LocaisView() {
 
   useEffect(() => {
     fetchLocais()
+    apiClient.fetchWithAuth<{master: boolean; escopos: Array<{escopoTipo: string; escopoId: string}>}>('/locais/escopos-autorizados')
+      .then(dados => { setMasterCadastro(dados.master); setEscoposCadastro(dados.escopos) })
+      .catch(() => setError('Não foi possível consultar os escopos autorizados.'))
   }, [])
 
   const locaisFiltrados = useMemo(() => {
@@ -152,6 +158,7 @@ export function LocaisView() {
     cepConsultaSeq.current += 1
     setConsultandoCep(false)
     setEditingId(null)
+    setEscopoSelecionado('')
     setFormData({
       nome: '',
       endereco: '',
@@ -467,7 +474,12 @@ export function LocaisView() {
       if (editingId) {
         await apiClient.patchWithAuth(`/locais/${editingId}`, parsed.data)
       } else {
-        await apiClient.postWithAuth('/locais', parsed.data)
+        const escopo = escoposCadastro.find(item => item.escopoTipo + ':' + item.escopoId === escopoSelecionado)
+        if (!masterCadastro && !escopo) {
+          setError('Selecione um escopo institucional autorizado para cadastrar o local.')
+          return
+        }
+        await apiClient.postWithAuth('/locais', { ...parsed.data, ...(escopo || {}) })
       }
 
       fecharFormulario()
@@ -616,6 +628,20 @@ export function LocaisView() {
               {error && (
                 <div role="alert" className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
                   {error}
+                </div>
+              )}
+              {!editingId && (masterCadastro || escoposCadastro.length > 0) && (
+                <div>
+                  <label htmlFor="escopo-local" className="block text-sm font-medium text-slate-700 mb-1">Escopo institucional {masterCadastro ? '(opcional para legados)' : '*'}</label>
+                  <select id="escopo-local" value={escopoSelecionado} onChange={e => setEscopoSelecionado(e.target.value)}
+                    required={!masterCadastro} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm">
+                    <option value="">Selecione um escopo</option>
+                    {escoposCadastro.map(item => (
+                      <option key={item.escopoTipo + item.escopoId} value={item.escopoTipo + ':' + item.escopoId}>
+                        {item.escopoTipo} — {item.escopoId}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
               <div className="space-y-4">
