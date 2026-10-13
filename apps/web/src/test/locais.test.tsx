@@ -24,6 +24,10 @@ const mockLocais = [
 describe('LocaisView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (rota: string) => {
+      if (rota === '/locais/escopos-autorizados') return { master: true, escopos: [] } as any
+      return [] as any
+    })
   })
 
   it('deve listar locais corretamente', async () => {
