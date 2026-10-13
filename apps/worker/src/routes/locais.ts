@@ -121,11 +121,10 @@ locaisRouter.post('/', async (c) => {
     const body = await c.req.json()
     const parsed = LocalCreate.parse(body)
     const contexto = c.get('contextoPermissoes')
-    const master = eMasterSistema(contexto)
     const tipo = body.escopoTipo
     const escopoId = body.escopoId
     const tipos = ['REGIONAL', 'ADMINISTRACAO', 'SETOR', 'CASA', 'GRUPO_TRABALHO']
-    if ((!tipo || !escopoId) && !master) return c.json({ error: 'Informe um escopo territorial autorizado', code: 'FORBIDDEN' }, 403)
+    if (!tipo || !escopoId) return c.json({ error: 'Informe um escopo territorial autorizado', code: 'FORBIDDEN' }, 403)
     if ((tipo || escopoId) && (!tipos.includes(tipo) || typeof escopoId !== 'string' || !escopoId.trim())) return c.json({ error: 'Escopo territorial inválido' }, 400)
     if (tipo && escopoId) {
       const existe = await obterRegionalDoEscopo(db, tipo, escopoId)
@@ -198,7 +197,7 @@ locaisRouter.patch('/:id', async (c) => {
         recursoId: id,
         escopoTipo: escopoParaClassificar?.escopoTipo ?? existing.escopoTipo ?? 'GLOBAL',
         escopoId: escopoParaClassificar?.escopoId ?? existing.escopoId ?? null,
-        contexto: { camposAlterados: Object.keys(parsed) },
+        contexto: { camposAlterados: [...Object.keys(parsed), ...(escopoParaClassificar ? ['escopoTipo', 'escopoId'] : [])] },
       }
     )
     const updated = await db.select().from(locais).where(eq(locais.id, id)).get()
