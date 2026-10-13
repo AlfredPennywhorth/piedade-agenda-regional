@@ -65,6 +65,8 @@ export function LocaisView() {
   const [filtroBusca, setFiltroBusca] = useState('')
   const [escoposCadastro, setEscoposCadastro] = useState<Array<{escopoTipo: string; escopoId: string; nome: string}>>([])
   const [masterCadastro, setMasterCadastro] = useState(false)
+  const [erroEscoposCadastro, setErroEscoposCadastro] = useState<string | null>(null)
+  const [carregandoEscopos, setCarregandoEscopos] = useState(true)
   const [escopoSelecionado, setEscopoSelecionado] = useState('')
   const [editandoLegado, setEditandoLegado] = useState(false)
   
@@ -125,8 +127,17 @@ export function LocaisView() {
   useEffect(() => {
     fetchLocais()
     apiClient.fetchWithAuth<{master: boolean; escopos: Array<{escopoTipo: string; escopoId: string; nome: string}>}>('/locais/escopos-autorizados')
-      .then(dados => { setMasterCadastro(dados.master); setEscoposCadastro(dados.escopos) })
-      .catch(() => { setMasterCadastro(false); setEscoposCadastro([]) })
+      .then(dados => {
+        setMasterCadastro(dados.master)
+        setEscoposCadastro(dados.escopos)
+        setErroEscoposCadastro(null)
+      })
+      .catch(() => {
+        setMasterCadastro(false)
+        setEscoposCadastro([])
+        setErroEscoposCadastro('Não foi possível consultar os escopos autorizados. Atualize a página e tente novamente.')
+      })
+      .finally(() => setCarregandoEscopos(false))
   }, [])
 
   const locaisFiltrados = useMemo(() => {
@@ -162,7 +173,8 @@ export function LocaisView() {
     setConsultandoCep(false)
     setEditingId(null)
     setEditandoLegado(false)
-    setEscopoSelecionado('')
+    const setoresAutorizados = escoposCadastro.filter(item => item.escopoTipo === 'SETOR')
+    setEscopoSelecionado(setoresAutorizados.length === 1 ? `SETOR:${setoresAutorizados[0].escopoId}` : '')
     setFormData({
       nome: '',
       endereco: '',
@@ -485,6 +497,7 @@ export function LocaisView() {
           return
         }
       }
+      setSaving(true)
       if (editingId) {
         await apiClient.patchWithAuth(`/locais/${editingId}`, masterCadastro && editandoLegado ? { ...parsed.data, ...escopo } : parsed.data)
       } else {
@@ -643,13 +656,13 @@ export function LocaisView() {
                   {error}
                 </div>
               )}
-              {(!editingId || (masterCadastro && editandoLegado)) && (masterCadastro || escoposCadastro.length > 0) && (
+              {(!editingId || (masterCadastro && editandoLegado)) && (
                 <div>
                   <label htmlFor="escopo-local" className="block text-sm font-medium text-slate-700 mb-1">{editingId ? 'Classificar local legado — escopo institucional *' : 'Escopo institucional *'}</label>
                   <select id="escopo-local" value={escopoSelecionado} onChange={e => setEscopoSelecionado(e.target.value)}
                     required className="w-full rounded-lg border border-slate-300 p-2.5 text-sm">
-                    <option value="">Selecione um escopo</option>
-                    {escoposCadastro.map(item => (
+                    <option value="">{carregandoEscopos ? "Carregando escopos..." : "Selecione um escopo"}</option>
+                    {[...escoposCadastro].sort((a, b) => (a.escopoTipo === "SETOR" ? -1 : 0) - (b.escopoTipo === "SETOR" ? -1 : 0) || a.nome.localeCompare(b.nome, "pt-BR")).map(item => (
                       <option key={item.escopoTipo + item.escopoId} value={item.escopoTipo + ':' + item.escopoId}>
                         {item.escopoTipo} — {item.nome}
                       </option>
