@@ -104,7 +104,7 @@ export function RelatoriosView() {
   const [erroAgregado, setErroAgregado] = useState<string | null>(null)
   const [utilizacao, setUtilizacao] = useState<UtilizacaoLocaisData | null>(null)
   const [utilizacaoChave, setUtilizacaoChave] = useState<string | null>(null)
-  const chaveFiltrosUtilizacao = JSON.stringify([escopoTipo, escopoId, dataInicio, dataFim])
+  const chaveFiltrosUtilizacao = JSON.stringify([escopoTipo, escopoId.trim(), dataInicio, dataFim])
   const utilizacaoAtual = utilizacaoChave === chaveFiltrosUtilizacao ? utilizacao : null
   const [loadingUtilizacao, setLoadingUtilizacao] = useState(false)
   const [erroUtilizacao, setErroUtilizacao] = useState<string | null>(null)
@@ -174,7 +174,8 @@ export function RelatoriosView() {
   }
 
   const carregarUtilizacao = async () => {
-    if (!escopoId) {
+    const escopoIdNormalizado = escopoId.trim()
+    if (!escopoIdNormalizado) {
       setErroUtilizacao('Informe o ID do escopo para consultar locais.')
       return
     }
@@ -184,7 +185,7 @@ export function RelatoriosView() {
     setUtilizacaoChave(null)
     const chaveConsulta = chaveFiltrosUtilizacao
     try {
-      const params = new URLSearchParams({ escopoTipo, escopoId })
+      const params = new URLSearchParams({ escopoTipo, escopoId: escopoIdNormalizado })
       if (dataInicio) params.set('dataInicio', dataInicio)
       if (dataFim) params.set('dataFim', dataFim)
       const dados = await apiClient.fetchWithAuth<UtilizacaoLocaisData>(
