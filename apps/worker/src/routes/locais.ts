@@ -17,6 +17,16 @@ locaisRouter.get('/', async (c) => {
   return c.json(data)
 })
 
+// Escopos explicitamente atribuídos ao administrador; a API valida novamente na escrita.
+locaisRouter.get('/escopos-autorizados', async c => {
+  const contexto = c.get('contextoPermissoes')
+  const escopos = contexto.acessosAtivos
+    .filter((acesso: any) => acesso.perfilCodigo === 'ADMINISTRADOR_SISTEMA' &&
+      acesso.escopoTipo !== 'GLOBAL' && acesso.escopoId)
+    .map((acesso: any) => ({ escopoTipo: acesso.escopoTipo, escopoId: acesso.escopoId }))
+  return c.json({ master: eMasterSistema(contexto), escopos })
+})
+
 locaisRouter.get('/:id', async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')
