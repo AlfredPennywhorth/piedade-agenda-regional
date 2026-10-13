@@ -421,6 +421,59 @@ export async function podeAdministrarEscopo(
   return !!regionalId && regionaisAdministradas(contexto).has(regionalId)
 }
 
+/**
+ * Verifica a concessão administrativa territorial sem ampliar o acesso a cadastros
+ * globais/legados. Usado exclusivamente para criação/edição de locais institucionais.
+ */
+export async function podeGerenciarCadastroTerritorial(
+  db: any,
+  contexto: ContextoPermissoes,
+  escopoTipo: 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+  escopoId: string
+): Promise<boolean> {
+  if (eMasterSistema(contexto)) return true
+  if (!db || !escopoId) return false
+  const admins = contexto.acessosAtivos.filter(acesso =>
+    acesso.perfilCodigo === 'ADMINISTRADOR_SISTEMA' &&
+    acesso.escopoId !== null
+  )
+  if (!admins.length) return false
+  if (admins.some(acesso => acesso.escopoTipo === escopoTipo && acesso.escopoId === escopoId)) return true
+
+  const regionalId = await obterRegionalDoEscopo(db, escopoTipo, escopoId)
+  if (!regionalId) return false
+  if (admins.some(acesso => acesso.escopoTipo === 'REGIONAL' && acesso.escopoId === regionalId)) return true
+
+  let administracaoId: string | null = null
+  let setorId: string | null = null
+  if (escopoTipo === 'ADMINISTRACAO') {
+    administracaoId = escopoId
+  } else if (escopoTipo === 'SETOR') {
+    setorId = escopoId
+  } else if (escopoTipo === 'CASA') {
+    const casa = await db.select({ setorId: schema.casas.setorId })
+      .from(schema.casas).where(eq(schema.casas.id, escopoId)).get()
+    setorId = casa?.setorId ?? null
+  } else if (escopoTipo === 'GRUPO_TRABALHO') {
+    const gt = await db.select({
+      administracaoId: schema.gruposTrabalho.administracaoId,
+      setorId: schema.gruposTrabalho.setorId,
+    }).from(schema.gruposTrabalho).where(eq(schema.gruposTrabalho.id, escopoId)).get()
+    administracaoId = gt?.administracaoId ?? null
+    setorId = gt?.setorId ?? null
+  }
+
+  if (setorId) {
+    if (admins.some(acesso => acesso.escopoTipo === 'SETOR' && acesso.escopoId === setorId)) return true
+    const setor = await db.select({ administracaoId: schema.setores.administracaoId })
+      .from(schema.setores).where(eq(schema.setores.id, setorId)).get()
+    administracaoId = setor?.administracaoId ?? null
+  }
+  return !!administracaoId && admins.some(acesso =>
+    acesso.escopoTipo === 'ADMINISTRACAO' && acesso.escopoId === administracaoId
+  )
+}
+
 export function temPerfil(contexto: ContextoPermissoes, perfilCodigo: string): boolean {
   return contexto.acessosAtivos.some(acesso => acesso.perfilCodigo === perfilCodigo)
 }
