@@ -901,7 +901,7 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
     a.localNome.localeCompare(b.localNome, 'pt-BR'))
   return c.json({
     escopo: { escopoTipo, escopoId }, periodo: { dataInicio: dataInicio ?? null, dataFim: dataFim ?? null },
-    totalOcorrencias: ocorrenciasVisiveis.length, totalComLocal: ranking.reduce((n, item) => n + item.totalEventos, 0),
+    totalOcorrencias: ocorrencias.length, totalComLocal: ranking.reduce((n, item) => n + item.totalEventos, 0),
     ranking,
   })
 })
