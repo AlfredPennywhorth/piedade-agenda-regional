@@ -96,6 +96,7 @@ describe('LocaisView', () => {
   it('deve exibir detalhes de um local em diálogo acessível', async () => {
     vi.mocked(apiClient.fetchWithAuth)
       .mockResolvedValueOnce(mockLocais) // list
+      .mockResolvedValueOnce({ master: true, escopos: [] }) // capabilities
       .mockResolvedValueOnce({
         ...mockLocais[0],
         bairro: 'Centro',
@@ -341,6 +342,7 @@ describe('LocaisView', () => {
   it('deve editar um local via PATCH', async () => {
     vi.mocked(apiClient.fetchWithAuth)
       .mockResolvedValueOnce(mockLocais) // list
+      .mockResolvedValueOnce({ master: true, escopos: [] }) // capabilities
       .mockResolvedValueOnce(mockLocais[0]) // GET detail for edit
       .mockResolvedValueOnce(mockLocais) // list after edit
     
