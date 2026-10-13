@@ -813,8 +813,7 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
     }).from(locais).where(inArray(locais.id, lote)).all()
     locaisEncontrados.push(...encontrados)
   }
-  for (let indice = 0; indice < idsEspaco.length; indice += tamanhoLote) {
-    const lote = idsEspaco.slice(indice, indice + tamanhoLote)
+  for (const lote of lotesIds(idsEspaco)) {
     const encontrados: CadastroUtilizacao[] = await db.select({
       id: espacosLocal.id, nome: espacosLocal.nome,
       proprietarioMembroId: espacosLocal.proprietarioMembroId,
