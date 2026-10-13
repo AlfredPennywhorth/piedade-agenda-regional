@@ -350,7 +350,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
     const administracao = screen.getByRole('combobox', { name: 'Administração' })
     fireEvent.change(administracao, { target: { value: ADMINISTRACAO_ID } })
 
-    const setor = screen.getByRole('combobox', { name: 'Setor Selecionado' })
+    const setor = screen.getByLabelText('Setor', { selector: '#filtro-setor-casa' })
     fireEvent.change(setor, { target: { value: SETOR_ID } })
 
     const casa = screen.getByRole('combobox', {
