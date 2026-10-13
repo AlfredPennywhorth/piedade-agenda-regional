@@ -18,6 +18,8 @@ interface Local {
   urlMaps?: string | null
   urlWaze?: string | null
   ativo: boolean
+  escopoTipo?: string | null
+  escopoId?: string | null
 }
 
 interface EspacoLocal {
@@ -64,6 +66,7 @@ export function LocaisView() {
   const [escoposCadastro, setEscoposCadastro] = useState<Array<{escopoTipo: string; escopoId: string}>>([])
   const [masterCadastro, setMasterCadastro] = useState(false)
   const [escopoSelecionado, setEscopoSelecionado] = useState('')
+  const [editandoLegado, setEditandoLegado] = useState(false)
   
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -158,6 +161,7 @@ export function LocaisView() {
     cepConsultaSeq.current += 1
     setConsultandoCep(false)
     setEditingId(null)
+    setEditandoLegado(false)
     setEscopoSelecionado('')
     setFormData({
       nome: '',
@@ -190,6 +194,8 @@ export function LocaisView() {
       setLoading(true)
       const data = await apiClient.fetchWithAuth<Local>(`/locais/${id}`)
       setEditingId(data.id)
+      setEditandoLegado(!data.escopoTipo && !data.escopoId)
+      setEscopoSelecionado(data.escopoTipo && data.escopoId ? `${data.escopoTipo}:${data.escopoId}` : '')
       setFormData({
         nome: data.nome,
         endereco: data.endereco,
@@ -471,11 +477,17 @@ export function LocaisView() {
       setFormErrors({})
       setSaving(true)
 
+      const escopo = escoposCadastro.find(item => item.escopoTipo + ':' + item.escopoId === escopoSelecionado)
+      if (!editingId || (masterCadastro && editandoLegado)) {
+        if (!escopo) {
+          setError('Selecione um escopo institucional válido para salvar o local.')
+          return
+        }
+      }
       if (editingId) {
-        await apiClient.patchWithAuth(`/locais/${editingId}`, parsed.data)
+        await apiClient.patchWithAuth(`/locais/${editingId}`, masterCadastro && editandoLegado ? { ...parsed.data, ...escopo } : parsed.data)
       } else {
-        const escopo = escoposCadastro.find(item => item.escopoTipo + ':' + item.escopoId === escopoSelecionado)
-        if (!masterCadastro && !escopo) {
+        if (!escopo) {
           setError('Selecione um escopo institucional autorizado para cadastrar o local.')
           return
         }
@@ -630,11 +642,11 @@ export function LocaisView() {
                   {error}
                 </div>
               )}
-              {!editingId && (masterCadastro || escoposCadastro.length > 0) && (
+              {(!editingId || (masterCadastro && editandoLegado)) && (masterCadastro || escoposCadastro.length > 0) && (
                 <div>
-                  <label htmlFor="escopo-local" className="block text-sm font-medium text-slate-700 mb-1">Escopo institucional {masterCadastro ? '(opcional para legados)' : '*'}</label>
+                  <label htmlFor="escopo-local" className="block text-sm font-medium text-slate-700 mb-1">{editingId ? 'Classificar local legado — escopo institucional *' : 'Escopo institucional *'}</label>
                   <select id="escopo-local" value={escopoSelecionado} onChange={e => setEscopoSelecionado(e.target.value)}
-                    required={!masterCadastro} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm">
+                    required className="w-full rounded-lg border border-slate-300 p-2.5 text-sm">
                     <option value="">Selecione um escopo</option>
                     {escoposCadastro.map(item => (
                       <option key={item.escopoTipo + item.escopoId} value={item.escopoTipo + ':' + item.escopoId}>
