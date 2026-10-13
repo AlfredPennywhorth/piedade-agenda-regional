@@ -23,6 +23,33 @@ describe('Locais API (S04)', () => {
     expect(sqlite.prepare("SELECT id FROM regionais WHERE id = 'locais-auth-regional'").get()).toBeTruthy()
   })
 
+  it('membro comum cadastra Local no Setor da própria Casa sem perfil elevado', async () => {
+    sqlite.prepare("DELETE FROM acessos_conta WHERE conta_acesso_id = ?").run('locais-auth-conta')
+    const escopos = await app.request('/api/v1/locais/escopos-autorizados', mesclarAutorizacao(authToken))
+    expect(escopos.status).toBe(200)
+    expect((await escopos.json() as any).escopos).toEqual(expect.arrayContaining([
+      expect.objectContaining({ escopoTipo: 'SETOR', escopoId: 'locais-auth-setor' }),
+    ]))
+
+    const body = { nome: 'Auditório da comunidade', endereco: 'Rua Um', numero: '10', cidade: 'São Paulo', uf: 'SP' }
+    const criar = (escopoId: string) => app.request('/api/v1/locais', mesclarAutorizacao(authToken, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...body, escopoTipo: 'SETOR', escopoId }),
+    }))
+    const autorizado = await criar('locais-auth-setor')
+    expect(autorizado.status).toBe(201)
+    expect((await autorizado.json() as any).escopoId).toBe('locais-auth-setor')
+
+    const outraConta = await criarSessaoAutenticadaTeste(sqlite, 'locais-setor-alheio')
+    expect((await criar('locais-setor-alheio-setor')).status).toBe(403)
+
+    const localCriado = await autorizado.clone().json() as any
+    const alterar = await app.request('/api/v1/locais/' + localCriado.id, mesclarAutorizacao(authToken, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: 'Tentativa de edição' }),
+    }))
+    expect(alterar.status).toBe(403)
+  })
+
   it('local particular pertence ao criador e não é visível nem ao outro Master', async () => {
     const segundo = await criarSessaoAutenticadaTeste(sqlite, 'locais-outra-conta')
     const payload = { nome: 'Minha sala particular', endereco: 'Rua Particular', numero: '15', cidade: 'São Paulo', uf: 'SP' }
