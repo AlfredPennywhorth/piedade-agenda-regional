@@ -788,14 +788,24 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
 
   const idsLocal: string[] = [...new Set(ocorrencias.flatMap(e => e.localId ? [e.localId] : []))]
   const idsEspaco: string[] = [...new Set(ocorrencias.flatMap(e => e.espacoId ? [e.espacoId] : []))]
-  const locaisEncontrados: Array<{ id: string; nome: string }> = idsLocal.length
-    ? await db.select({ id: locais.id, nome: locais.nome })
+  const locaisEncontrados: Array<{ id: string; nome: string; proprietarioMembroId: string | null }> = idsLocal.length
+    ? await db.select({ id: locais.id, nome: locais.nome, proprietarioMembroId: locais.proprietarioMembroId })
       .from(locais).where(inArray(locais.id, idsLocal)).all()
     : []
-  const espacosEncontrados: Array<{ id: string; nome: string }> = idsEspaco.length
-    ? await db.select({ id: espacosLocal.id, nome: espacosLocal.nome })
+  const espacosEncontrados: Array<{ id: string; nome: string; proprietarioMembroId: string | null }> = idsEspaco.length
+    ? await db.select({ id: espacosLocal.id, nome: espacosLocal.nome, proprietarioMembroId: espacosLocal.proprietarioMembroId })
       .from(espacosLocal).where(inArray(espacosLocal.id, idsEspaco)).all()
     : []
+  // A visibilidade institucional do evento não concede acesso ao cadastro particular
+  // do local ou espaço. Não exponha nem os IDs privados no ranking/CSV.
+  const locaisPrivados = new Set(locaisEncontrados
+    .filter(l => l.proprietarioMembroId && l.proprietarioMembroId !== membroId).map(l => l.id))
+  const espacosPrivados = new Set(espacosEncontrados
+    .filter(e => e.proprietarioMembroId && e.proprietarioMembroId !== membroId).map(e => e.id))
+  const ocorrenciasVisiveis = ocorrencias.filter(e =>
+    (!e.localId || !locaisPrivados.has(e.localId)) &&
+    (!e.espacoId || !espacosPrivados.has(e.espacoId))
+  )
   const nomesLocal = new Map<string, string>(locaisEncontrados.map(l => [l.id, l.nome]))
   const nomesEspaco = new Map<string, string>(espacosEncontrados.map(e => [e.id, e.nome]))
   type ResumoUtilizacao = {
@@ -803,7 +813,7 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
     totalEventos: number; minutosAgendados: number
   }
   const grupos = new Map<string, ResumoUtilizacao>()
-  for (const e of ocorrencias) {
+  for (const e of ocorrenciasVisiveis) {
     if (!e.localId) continue // ONLINE e eventos sem local cadastrado.
     const chave = JSON.stringify([e.localId, e.espacoId])
     let item = grupos.get(chave)
@@ -824,7 +834,7 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
     a.localNome.localeCompare(b.localNome, 'pt-BR'))
   return c.json({
     escopo: { escopoTipo, escopoId }, periodo: { dataInicio: dataInicio ?? null, dataFim: dataFim ?? null },
-    totalOcorrencias: ocorrencias.length, totalComLocal: ranking.reduce((n, item) => n + item.totalEventos, 0),
+    totalOcorrencias: ocorrenciasVisiveis.length, totalComLocal: ranking.reduce((n, item) => n + item.totalEventos, 0),
     ranking,
   })
 })
