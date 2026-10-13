@@ -51,18 +51,35 @@ locaisRouter.get('/escopos-autorizados', async c => {
   for (const acesso of credenciais) adicionar(acesso.escopoTipo, acesso.escopoId)
   if (eMasterSistema(contexto) || credenciais.length) {
     const db = c.get('db')
-    const candidatos: Array<{ tipo: 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO'; ids: string[] }> = [
-      { tipo: 'REGIONAL', ids: (await db.select({ id: regionais.id }).from(regionais).all()).map((x: any) => x.id) },
-      { tipo: 'ADMINISTRACAO', ids: (await db.select({ id: administracoes.id }).from(administracoes).all()).map((x: any) => x.id) },
-      { tipo: 'SETOR', ids: (await db.select({ id: setores.id }).from(setores).all()).map((x: any) => x.id) },
-      { tipo: 'CASA', ids: (await db.select({ id: casas.id }).from(casas).all()).map((x: any) => x.id) },
-      { tipo: 'GRUPO_TRABALHO', ids: (await db.select({ id: gruposTrabalho.id }).from(gruposTrabalho).all()).map((x: any) => x.id) },
-    ]
-    for (const grupo of candidatos) {
-      for (const id of grupo.ids) {
-        if (await podeGerenciarCadastroTerritorial(db, contexto, grupo.tipo, id)) adicionar(grupo.tipo, id)
-      }
-    }
+    const master = eMasterSistema(contexto)
+    const regionaisGeridas = new Set<string>(credenciais.filter((a: any) => a.escopoTipo === 'REGIONAL').map((a: any) => a.escopoId))
+    const admsGeridas = new Set<string>(credenciais.filter((a: any) => a.escopoTipo === 'ADMINISTRACAO').map((a: any) => a.escopoId))
+    const setoresGeridos = new Set<string>(credenciais.filter((a: any) => a.escopoTipo === 'SETOR').map((a: any) => a.escopoId))
+    const casasGeridas = new Set<string>(credenciais.filter((a: any) => a.escopoTipo === 'CASA').map((a: any) => a.escopoId))
+    const gtsGeridos = new Set<string>(credenciais.filter((a: any) => a.escopoTipo === 'GRUPO_TRABALHO').map((a: any) => a.escopoId))
+    const [regionaisRows, admsRows, setoresRows, casasRows, gtsRows] = await Promise.all([
+      db.select({ id: regionais.id }).from(regionais).all(),
+      db.select({ id: administracoes.id, regionalId: administracoes.regionalId }).from(administracoes).all(),
+      db.select({ id: setores.id, administracaoId: setores.administracaoId }).from(setores).all(),
+      db.select({ id: casas.id, setorId: casas.setorId }).from(casas).all(),
+      db.select({ id: gruposTrabalho.id, regionalId: gruposTrabalho.regionalId, administracaoId: gruposTrabalho.administracaoId, setorId: gruposTrabalho.setorId }).from(gruposTrabalho).all(),
+    ])
+    const admRegional = new Map<string, string>(admsRows.map((a: any) => [a.id, a.regionalId]))
+    const setorAdm = new Map<string, string>(setoresRows.map((a: any) => [a.id, a.administracaoId]))
+    const podeAdm = (id: string) => master || admsGeridas.has(id) || regionaisGeridas.has(admRegional.get(id) ?? '')
+    const podeSetor = (id: string) => master || setoresGeridos.has(id) || podeAdm(setorAdm.get(id) ?? '')
+    if (master) regionaisRows.forEach((a: any) => adicionar('REGIONAL', a.id))
+    admsRows.forEach((a: any) => { if (podeAdm(a.id)) adicionar('ADMINISTRACAO', a.id) })
+    setoresRows.forEach((a: any) => { if (podeSetor(a.id)) adicionar('SETOR', a.id) })
+    casasRows.forEach((a: any) => { if (master || casasGeridas.has(a.id) || podeSetor(a.setorId)) adicionar('CASA', a.id) })
+    gtsRows.forEach((gt: any) => {
+      const admId = gt.administracaoId || (gt.setorId ? setorAdm.get(gt.setorId) : null)
+      const regionalId = gt.regionalId || (admId ? admRegional.get(admId) : null)
+      if (master || gtsGeridos.has(gt.id) ||
+        (gt.setorId && setoresGeridos.has(gt.setorId)) ||
+        (admId && admsGeridas.has(admId)) ||
+        (regionalId && regionaisGeridas.has(regionalId))) adicionar('GRUPO_TRABALHO', gt.id)
+    })
   }
   return c.json({ master: eMasterSistema(contexto), escopos })
 })
