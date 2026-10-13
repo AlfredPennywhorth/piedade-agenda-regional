@@ -771,11 +771,19 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
       ? or(territorial, eq(eventos.regionalGestaoId, escopoId))!
       : territorial
   )
-  if (dataInicio) condicoes.push(gte(eventos.inicioEm, `${dataInicio}T00:00:00`))
+  // Os filtros de data representam dias civis de America/Sao_Paulo (UTC-03
+  // nas datas operacionais atuais), enquanto inicioEm é persistido em UTC.
+  // Limite final exclusivo: meia-noite local do dia seguinte.
+  const inicioDiaSaoPauloUtc = (dia: string): string => {
+    const [ano, mes, data] = dia.split('-').map(Number)
+    return new Date(Date.UTC(ano, mes - 1, data, 3)).toISOString()
+  }
+  if (dataInicio) condicoes.push(gte(eventos.inicioEm, inicioDiaSaoPauloUtc(dataInicio)))
   if (dataFim) {
-    const fim = new Date(`${dataFim}T00:00:00.000Z`)
-    fim.setUTCDate(fim.getUTCDate() + 1)
-    condicoes.push(lt(eventos.inicioEm, fim.toISOString()))
+    const [ano, mes, dia] = dataFim.split('-').map(Number)
+    const proximoDia = new Date(Date.UTC(ano, mes - 1, dia + 1))
+      .toISOString().slice(0, 10)
+    condicoes.push(lt(eventos.inicioEm, inicioDiaSaoPauloUtc(proximoDia)))
   }
 
   type OcorrenciaLocal = {
