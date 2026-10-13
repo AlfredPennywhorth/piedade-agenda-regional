@@ -744,6 +744,7 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
   const dataValida = (valor: string | undefined) => {
     if (!valor) return true
     if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false
+    if (valor.startsWith('0000-')) return false // Intl usa ano de era, não ano astronômico ISO 0000
     const data = new Date(`${valor}T00:00:00.000Z`)
     return Number.isFinite(data.getTime()) && data.toISOString().slice(0, 10) === valor
   }
