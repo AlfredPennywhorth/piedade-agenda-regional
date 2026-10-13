@@ -797,31 +797,27 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
     condicoes.push(lt(eventos.inicioEm, limiteFinalExclusivoSaoPauloUtc(dataFim)))
   }
 
-  type OcorrenciaLocal = {
-    id: string; inicioEm: string; fimEm: string; localId: string | null; espacoId: string | null
-  }
-  const ocorrencias: OcorrenciaLocal[] = await db.select({
+  const ocorrencias: OcorrenciaUtilizacao[] = await db.select({
     id: eventos.id, inicioEm: eventos.inicioEm, fimEm: eventos.fimEm,
     localId: eventos.localId, espacoId: eventos.espacoId,
   }).from(eventos).where(and(...condicoes)).all()
 
   const idsLocal: string[] = [...new Set(ocorrencias.flatMap(e => e.localId ? [e.localId] : []))]
   const idsEspaco: string[] = [...new Set(ocorrencias.flatMap(e => e.espacoId ? [e.espacoId] : []))]
-  type LocalRelatorio = { id: string; nome: string; proprietarioMembroId: string | null }
-  const locaisEncontrados: LocalRelatorio[] = []
-  const espacosEncontrados: LocalRelatorio[] = []
+  const locaisEncontrados: CadastroUtilizacao[] = []
+  const espacosEncontrados: CadastroUtilizacao[] = []
   // O D1 tem limite de parâmetros vinculados; manter lotes pequenos.
   const tamanhoLote = 80
   for (let indice = 0; indice < idsLocal.length; indice += tamanhoLote) {
     const lote = idsLocal.slice(indice, indice + tamanhoLote)
-    const encontrados: LocalRelatorio[] = await db.select({
+    const encontrados: CadastroUtilizacao[] = await db.select({
       id: locais.id, nome: locais.nome, proprietarioMembroId: locais.proprietarioMembroId,
     }).from(locais).where(inArray(locais.id, lote)).all()
     locaisEncontrados.push(...encontrados)
   }
   for (let indice = 0; indice < idsEspaco.length; indice += tamanhoLote) {
     const lote = idsEspaco.slice(indice, indice + tamanhoLote)
-    const encontrados: LocalRelatorio[] = await db.select({
+    const encontrados: CadastroUtilizacao[] = await db.select({
       id: espacosLocal.id, nome: espacosLocal.nome,
       proprietarioMembroId: espacosLocal.proprietarioMembroId,
     }).from(espacosLocal).where(inArray(espacosLocal.id, lote)).all()
