@@ -807,9 +807,7 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
   const locaisEncontrados: CadastroUtilizacao[] = []
   const espacosEncontrados: CadastroUtilizacao[] = []
   // O D1 tem limite de parâmetros vinculados; manter lotes pequenos.
-  const tamanhoLote = lotesIds(idsLocal).length ? 80 : 80
-  for (let indice = 0; indice < idsLocal.length; indice += tamanhoLote) {
-    const lote = idsLocal.slice(indice, indice + tamanhoLote)
+  for (const lote of lotesIds(idsLocal)) {
     const encontrados: CadastroUtilizacao[] = await db.select({
       id: locais.id, nome: locais.nome, proprietarioMembroId: locais.proprietarioMembroId,
     }).from(locais).where(inArray(locais.id, lote)).all()
