@@ -38,7 +38,7 @@ espacosLocaisRouter.get('/', async c => {
     a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id)
   )
   const contexto = c.get('contextoPermissoes')
-  const localIds = [...new Set(data.map((item: any) => item.localId))]
+  const localIds: string[] = [...new Set<string>(data.map((item: any) => String(item.localId)))]
   const localRows = await Promise.all(localIds.map((id: string) => db.select().from(locais).where(eq(locais.id, id)).get()))
   const autorizados = await Promise.all(localRows.map((local: any) => espacoVisivel(db, contexto, local)))
   const idsPermitidos = new Set(localIds.filter((_: string, i: number) => autorizados[i]))
