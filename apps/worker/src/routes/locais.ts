@@ -3,7 +3,7 @@ import { eq, isNull, or } from 'drizzle-orm'
 import { locais } from '../db/schema'
 import { LocalCreate, LocalUpdate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { exigirMasterParaEscrita } from '../middleware/master-write'
+import { eMasterSistema, podeGerenciarCadastroTerritorial, obterRegionalDoEscopo } from '../security/permissoes'
 import { executarOperacaoComAudit } from '../services/auditoria'
 
 export const locaisRouter = new Hono<any>()
@@ -48,17 +48,29 @@ locaisRouter.post('/particulares', async c => {
   }
 })
 
-locaisRouter.post('/', exigirMasterParaEscrita, async (c) => {
+locaisRouter.post('/', async (c) => {
   const db = c.get('db')
   try {
     const body = await c.req.json()
     const parsed = LocalCreate.parse(body)
-    
+    const contexto = c.get('contextoPermissoes')
+    const master = eMasterSistema(contexto)
+    const tipo = body.escopoTipo
+    const escopoId = body.escopoId
+    const tipos = ['REGIONAL', 'ADMINISTRACAO', 'SETOR', 'CASA', 'GRUPO_TRABALHO']
+    if ((!tipo || !escopoId) && !master) return c.json({ error: 'Informe um escopo territorial autorizado', code: 'ESCOPO_OBRIGATORIO' }, 403)
+    if ((tipo || escopoId) && (!tipos.includes(tipo) || typeof escopoId !== 'string' || !escopoId.trim())) return c.json({ error: 'Escopo territorial inválido' }, 400)
+    if (tipo && escopoId) {
+      const existe = await obterRegionalDoEscopo(db, tipo, escopoId)
+      if (!existe) return c.json({ error: 'Escopo territorial não encontrado' }, 400)
+      if (!await podeGerenciarCadastroTerritorial(db, contexto, tipo, escopoId)) return c.json({ error: 'Sem permissão para cadastrar neste escopo', code: 'FORBIDDEN' }, 403)
+    }
+
     const id = crypto.randomUUID()
     const atorMembroId = c.get('membroId') || null
     await executarOperacaoComAudit(
       db,
-      (qdb) => [qdb.insert(locais).values({ id, ...parsed })],
+      (qdb) => [qdb.insert(locais).values({ id, ...parsed, escopoTipo: tipo ?? null, escopoId: escopoId ?? null })],
       {
         acao: 'LOCAL_CRIADO',
         atorMembroId,
@@ -76,7 +88,7 @@ locaisRouter.post('/', exigirMasterParaEscrita, async (c) => {
   }
 })
 
-locaisRouter.patch('/:id', exigirMasterParaEscrita, async (c) => {
+locaisRouter.patch('/:id', async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')
   try {
@@ -85,6 +97,14 @@ locaisRouter.patch('/:id', exigirMasterParaEscrita, async (c) => {
     
     const existing = await db.select().from(locais).where(eq(locais.id, id)).get()
     if (!existing || existing.proprietarioMembroId) return c.json({ error: 'Local institucional não encontrado' }, 404)
+    const contexto = c.get('contextoPermissoes')
+    if (!existing.escopoTipo || !existing.escopoId) {
+      if (!eMasterSistema(contexto)) return c.json({ error: 'Somente o Master altera locais legados sem escopo', code: 'FORBIDDEN' }, 403)
+    } else if (!await podeGerenciarCadastroTerritorial(db, contexto, existing.escopoTipo, existing.escopoId)) {
+      return c.json({ error: 'Acesso não autorizado a este local', code: 'FORBIDDEN' }, 403)
+    }
+    const entrada = await c.req.json()
+    if ('escopoTipo' in entrada || 'escopoId' in entrada) return c.json({ error: 'Escopo do local não pode ser alterado por esta operação' }, 400)
 
     const atorMembroId = c.get('membroId') || null
     await executarOperacaoComAudit(
