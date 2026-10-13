@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, isNull, or } from 'drizzle-orm'
-import { locais } from '../db/schema'
+import { locais, regionais, administracoes, setores, casas, gruposTrabalho } from '../db/schema'
 import { LocalCreate, LocalUpdate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, podeGerenciarCadastroTerritorial, obterRegionalDoEscopo, obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
@@ -38,10 +38,31 @@ locaisRouter.get('/', async (c) => {
 // Escopos explicitamente atribuídos ao administrador; a API valida novamente na escrita.
 locaisRouter.get('/escopos-autorizados', async c => {
   const contexto = c.get('contextoPermissoes')
-  const escopos = contexto.acessosAtivos
-    .filter((acesso: any) => ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) &&
-      acesso.escopoTipo !== 'GLOBAL' && acesso.escopoId)
-    .map((acesso: any) => ({ escopoTipo: acesso.escopoTipo, escopoId: acesso.escopoId }))
+  const credenciais = contexto.acessosAtivos.filter((acesso: any) =>
+    ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) &&
+    acesso.escopoTipo !== 'GLOBAL' && acesso.escopoId)
+  const escopos: Array<{ escopoTipo: string; escopoId: string }> = []
+  const vistos = new Set<string>()
+  const adicionar = (tipo: string, id: string) => {
+    const chave = tipo + ':' + id
+    if (!vistos.has(chave)) { vistos.add(chave); escopos.push({ escopoTipo: tipo, escopoId: id }) }
+  }
+  for (const acesso of credenciais) adicionar(acesso.escopoTipo, acesso.escopoId)
+  if (eMasterSistema(contexto) || credenciais.length) {
+    const db = c.get('db')
+    const candidatos: Array<{ tipo: 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO'; ids: string[] }> = [
+      { tipo: 'REGIONAL', ids: (await db.select({ id: regionais.id }).from(regionais).all()).map((x: any) => x.id) },
+      { tipo: 'ADMINISTRACAO', ids: (await db.select({ id: administracoes.id }).from(administracoes).all()).map((x: any) => x.id) },
+      { tipo: 'SETOR', ids: (await db.select({ id: setores.id }).from(setores).all()).map((x: any) => x.id) },
+      { tipo: 'CASA', ids: (await db.select({ id: casas.id }).from(casas).all()).map((x: any) => x.id) },
+      { tipo: 'GRUPO_TRABALHO', ids: (await db.select({ id: gruposTrabalho.id }).from(gruposTrabalho).all()).map((x: any) => x.id) },
+    ]
+    for (const grupo of candidatos) {
+      for (const id of grupo.ids) {
+        if (await podeGerenciarCadastroTerritorial(db, contexto, grupo.tipo, id)) adicionar(grupo.tipo, id)
+      }
+    }
+  }
   return c.json({ master: eMasterSistema(contexto), escopos })
 })
 
