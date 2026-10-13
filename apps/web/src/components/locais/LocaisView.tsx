@@ -126,7 +126,7 @@ export function LocaisView() {
     fetchLocais()
     apiClient.fetchWithAuth<{master: boolean; escopos: Array<{escopoTipo: string; escopoId: string; nome: string}>}>('/locais/escopos-autorizados')
       .then(dados => { setMasterCadastro(dados.master); setEscoposCadastro(dados.escopos) })
-      .catch(() => setError('Não foi possível consultar os escopos autorizados.'))
+      .catch(() => { setMasterCadastro(false); setEscoposCadastro([]) })
   }, [])
 
   const locaisFiltrados = useMemo(() => {
