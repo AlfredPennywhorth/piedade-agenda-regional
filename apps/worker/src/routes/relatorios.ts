@@ -770,25 +770,33 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
     condicoes.push(lt(eventos.inicioEm, fim.toISOString()))
   }
 
-  const ocorrencias = await db.select({
+  type OcorrenciaLocal = {
+    id: string; inicioEm: string; fimEm: string; localId: string | null; espacoId: string | null
+  }
+  const ocorrencias: OcorrenciaLocal[] = await db.select({
     id: eventos.id, inicioEm: eventos.inicioEm, fimEm: eventos.fimEm,
     localId: eventos.localId, espacoId: eventos.espacoId,
   }).from(eventos).where(and(...condicoes)).all()
 
-  const idsLocal = [...new Set(ocorrencias.map(e => e.localId).filter((id): id is string => !!id))]
-  const idsEspaco = [...new Set(ocorrencias.map(e => e.espacoId).filter((id): id is string => !!id))]
-  const locaisEncontrados = idsLocal.length ? await db.select({ id: locais.id, nome: locais.nome })
-    .from(locais).where(inArray(locais.id, idsLocal)).all() : []
-  const espacosEncontrados = idsEspaco.length ? await db.select({ id: espacosLocal.id, nome: espacosLocal.nome })
-    .from(espacosLocal).where(inArray(espacosLocal.id, idsEspaco)).all() : []
-  const nomesLocal = new Map(locaisEncontrados.map(l => [l.id, l.nome]))
-  const nomesEspaco = new Map(espacosEncontrados.map(e => [e.id, e.nome]))
-  const grupos = new Map<string, {
+  const idsLocal: string[] = [...new Set(ocorrencias.flatMap(e => e.localId ? [e.localId] : []))]
+  const idsEspaco: string[] = [...new Set(ocorrencias.flatMap(e => e.espacoId ? [e.espacoId] : []))]
+  const locaisEncontrados: Array<{ id: string; nome: string }> = idsLocal.length
+    ? await db.select({ id: locais.id, nome: locais.nome })
+      .from(locais).where(inArray(locais.id, idsLocal)).all()
+    : []
+  const espacosEncontrados: Array<{ id: string; nome: string }> = idsEspaco.length
+    ? await db.select({ id: espacosLocal.id, nome: espacosLocal.nome })
+      .from(espacosLocal).where(inArray(espacosLocal.id, idsEspaco)).all()
+    : []
+  const nomesLocal = new Map<string, string>(locaisEncontrados.map(l => [l.id, l.nome]))
+  const nomesEspaco = new Map<string, string>(espacosEncontrados.map(e => [e.id, e.nome]))
+  type ResumoUtilizacao = {
     localId: string; localNome: string; espacoId: string | null; espacoNome: string | null;
     totalEventos: number; minutosAgendados: number
-  }>()
+  }
+  const grupos = new Map<string, ResumoUtilizacao>()
   for (const e of ocorrencias) {
-    if (!e.localId) continue // ONLINE e eventos externos sem local cadastrado.
+    if (!e.localId) continue // ONLINE e eventos sem local cadastrado.
     const chave = JSON.stringify([e.localId, e.espacoId])
     let item = grupos.get(chave)
     if (!item) {
