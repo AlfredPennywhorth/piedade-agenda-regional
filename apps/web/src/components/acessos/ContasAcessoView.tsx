@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ApiError, fetchWithAuth, patchWithAuth, postWithAuth } from '../../api/apiClient'
 import { GerenciarAcessosPanel } from './GerenciarAcessosPanel'
 
@@ -85,6 +85,10 @@ interface ContasAcessoViewProps {
   podeGerenciarSessoes?: boolean
 }
 
+// Contador compartilhado entre montagens: uma requisição antiga não pode liberar
+// a proteção enquanto outra geração de link temporário ainda estiver pendente.
+let geracoesLinkEmAndamento = 0
+
 export function ContasAcessoView({
   onPendenciasAtualizadas,
   podeGerenciarSessoes = false,
@@ -92,7 +96,6 @@ export function ContasAcessoView({
   const [contas, setContas] = useState<ContaAdministrada[]>([])
   const [carregando, setCarregando] = useState(true)
   const [processando, setProcessando] = useState<string | null>(null)
-  const geracoesLinkEmAndamento = useRef(0)
   const [erroGlobal, setErroGlobal] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<FeedbackConta | null>(null)
   const [linkTemporario, setLinkTemporario] = useState<LinkTemporarioContextual | null>(null)
@@ -254,7 +257,7 @@ export function ContasAcessoView({
 
     // Proteção síncrona: cobre o intervalo entre clique e resposta da API,
     // antes mesmo de o link temporário aparecer na interface.
-    geracoesLinkEmAndamento.current += 1
+    geracoesLinkEmAndamento += 1
     document.documentElement.setAttribute('data-pwa-protect-reload', '')
     setProcessando(conta.membroId)
     setFeedback(null)
@@ -281,8 +284,8 @@ export function ContasAcessoView({
         mensagem: error instanceof ApiError ? error.message : 'Não foi possível gerar o link.',
       })
     } finally {
-      geracoesLinkEmAndamento.current -= 1
-      if (geracoesLinkEmAndamento.current === 0) {
+      geracoesLinkEmAndamento -= 1
+      if (geracoesLinkEmAndamento === 0) {
         document.documentElement.removeAttribute('data-pwa-protect-reload')
       }
       setProcessando(null)
