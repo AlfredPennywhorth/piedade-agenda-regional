@@ -3,7 +3,7 @@ import { eq, and, or, gte, lt, lte, inArray } from 'drizzle-orm'
 import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, locais, espacosLocal, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo } from '../security/permissoes'
-import { condicaoEventosVisiveis } from '../security/eventos'
+import { condicaoEscopo, condicaoEventosVisiveis } from '../security/eventos'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
 
 export const relatoriosRouter = new Hono<{ Variables: Variables }>()
@@ -741,7 +741,12 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
   const dataInicio = c.req.query('dataInicio')
   const dataFim = c.req.query('dataFim')
   const escopos = ['REGIONAL', 'ADMINISTRACAO', 'SETOR', 'CASA', 'GRUPO_TRABALHO']
-  const dataValida = (valor: string | undefined) => !valor || /^\d{4}-\d{2}-\d{2}$/.test(valor)
+  const dataValida = (valor: string | undefined) => {
+    if (!valor) return true
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(valor)) return false
+    const data = new Date(`${valor}T00:00:00.000Z`)
+    return Number.isFinite(data.getTime()) && data.toISOString().slice(0, 10) === valor
+  }
   if (!escopos.includes(escopoTipo) || !escopoId || !dataValida(dataInicio) || !dataValida(dataFim) ||
     (dataInicio && dataFim && dataInicio > dataFim)) {
     return c.json({ error: 'Escopo ou período inválido' }, 400)
@@ -754,15 +759,18 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
     eq(eventos.pessoal, false),
     await condicaoEventosVisiveis(db, c.get('contextoPermissoes')),
   ]
-  switch (escopoTipo) {
-    case 'REGIONAL':
-      condicoes.push(or(eq(eventos.regionalId, escopoId), eq(eventos.regionalGestaoId, escopoId))!)
-      break
-    case 'ADMINISTRACAO': condicoes.push(eq(eventos.administracaoId, escopoId)); break
-    case 'SETOR': condicoes.push(eq(eventos.setorId, escopoId)); break
-    case 'CASA': condicoes.push(eq(eventos.casaId, escopoId)); break
-    case 'GRUPO_TRABALHO': condicoes.push(eq(eventos.grupoTrabalhoId, escopoId)); break
-  }
+  const territorial = condicaoEscopo({
+    id: 'relatorio-utilizacao',
+    perfilCodigo: 'GESTOR_RELATORIOS',
+    escopoTipo,
+    escopoId,
+  })
+  if (!territorial) return c.json({ error: 'Escopo inválido' }, 400)
+  condicoes.push(
+    escopoTipo === 'REGIONAL'
+      ? or(territorial, eq(eventos.regionalGestaoId, escopoId))!
+      : territorial
+  )
   if (dataInicio) condicoes.push(gte(eventos.inicioEm, `${dataInicio}T00:00:00`))
   if (dataFim) {
     const fim = new Date(`${dataFim}T00:00:00.000Z`)
