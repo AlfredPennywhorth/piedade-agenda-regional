@@ -3,8 +3,22 @@ import { and, eq, isNull, or } from 'drizzle-orm'
 import { espacosLocal, locais } from '../db/schema'
 import { EspacoLocalCreate, EspacoLocalUpdate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { eMasterSistema, podeGerenciarCadastroTerritorial } from '../security/permissoes'
+import { eMasterSistema, podeGerenciarCadastroTerritorial, obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
 import { executarOperacaoComAudit } from '../services/auditoria'
+
+async function espacoVisivel(db: any, contexto: any, local: any): Promise<boolean> {
+  if (!local) return false
+  if (eMasterSistema(contexto)) return true
+  if (local.proprietarioMembroId) return local.proprietarioMembroId === contexto.membroId
+  if (!local.escopoTipo || !local.escopoId) return true
+  const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+  const grupos: Record<string, Set<string>> = {
+    REGIONAL: visiveis.regionaisIds, ADMINISTRACAO: visiveis.administracoesIds,
+    SETOR: visiveis.setoresIds, CASA: visiveis.casasIds,
+    GRUPO_TRABALHO: visiveis.gruposTrabalhoIds,
+  }
+  return grupos[local.escopoTipo]?.has(local.escopoId) ?? false
+}
 
 export const espacosLocaisRouter = new Hono<any>()
 
@@ -23,13 +37,19 @@ espacosLocaisRouter.get('/', async c => {
   data.sort((a: typeof espacosLocal.$inferSelect, b: typeof espacosLocal.$inferSelect) =>
     a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id)
   )
-  return c.json(data)
+  const contexto = c.get('contextoPermissoes')
+  const localIds = [...new Set(data.map((item: any) => item.localId))]
+  const localRows = await Promise.all(localIds.map((id: string) => db.select().from(locais).where(eq(locais.id, id)).get()))
+  const autorizados = await Promise.all(localRows.map((local: any) => espacoVisivel(db, contexto, local)))
+  const idsPermitidos = new Set(localIds.filter((_: string, i: number) => autorizados[i]))
+  return c.json(data.filter((item: any) => idsPermitidos.has(item.localId)))
 })
 
 espacosLocaisRouter.get('/:id', async c => {
   const db = c.get('db')
   const item = await db.select().from(espacosLocal).where(eq(espacosLocal.id, c.req.param('id'))).get()
-  if (!item || (item.proprietarioMembroId && item.proprietarioMembroId !== c.get('membroId'))) return c.json({ error: 'Espaço não encontrado' }, 404)
+  const local = item ? await db.select().from(locais).where(eq(locais.id, item.localId)).get() : null
+  if (!item || !await espacoVisivel(db, c.get('contextoPermissoes'), local)) return c.json({ error: 'Espaço não encontrado' }, 404)
   return c.json(item)
 })
 
