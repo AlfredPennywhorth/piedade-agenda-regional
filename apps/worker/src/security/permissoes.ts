@@ -438,10 +438,9 @@ export async function podeGerenciarCadastroTerritorial(
     acesso.escopoId !== null
   )
   if (!admins.length) return false
-  if (admins.some(acesso => acesso.escopoTipo === escopoTipo && acesso.escopoId === escopoId)) return true
-
   const regionalId = await obterRegionalDoEscopo(db, escopoTipo, escopoId)
   if (!regionalId) return false
+  if (admins.some(acesso => acesso.escopoTipo === escopoTipo && acesso.escopoId === escopoId)) return true
   if (admins.some(acesso => acesso.escopoTipo === 'REGIONAL' && acesso.escopoId === regionalId)) return true
 
   let administracaoId: string | null = null
