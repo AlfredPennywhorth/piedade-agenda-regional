@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and, or, gte, lt, lte, inArray } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, locais, espacosLocal, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, locais, espacosLocal, vinculosFuncionais, funcoes, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo } from '../security/permissoes'
 import { condicaoEscopo, condicaoEventosVisiveis } from '../security/eventos'
@@ -755,10 +755,32 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
   const autorizado = await eGestorRelatoriosAutorizadoParaEscopo(db, membroId, escopoTipo, escopoId)
   if (!autorizado) return c.json({ error: 'Acesso não autorizado para este escopo' }, 403)
 
+  // Gestores regionais vinculados pela função legada também podem consultar
+  // eventos externos geridos pela sua Regional. A visibilidade geral da agenda
+  // não contempla esse vínculo para abrangências NACIONAL/INTERNACIONAL.
+  const gestorRegionalLegado = escopoTipo === 'REGIONAL' && !!(await db
+    .select({ id: vinculosFuncionais.id })
+    .from(vinculosFuncionais)
+    .innerJoin(funcoes, eq(vinculosFuncionais.funcaoId, funcoes.id))
+    .where(and(
+      eq(vinculosFuncionais.membroId, membroId),
+      eq(vinculosFuncionais.regionalId, escopoId),
+      eq(vinculosFuncionais.ativo, true),
+      eq(funcoes.ativo, true),
+      eq(funcoes.codigo, 'GESTOR_RELATORIOS'),
+    ))
+    .get())
+  const visibilidade = await condicaoEventosVisiveis(db, c.get('contextoPermissoes'))
+  const visibilidadeRelatorio = gestorRegionalLegado
+    ? or(visibilidade, and(
+        inArray(eventos.abrangencia, ['NACIONAL', 'INTERNACIONAL']),
+        eq(eventos.regionalGestaoId, escopoId),
+      ))!
+    : visibilidade
   const condicoes = [
     eq(eventos.ativo, true),
     eq(eventos.pessoal, false),
-    await condicaoEventosVisiveis(db, c.get('contextoPermissoes')),
+    visibilidadeRelatorio,
   ]
   const territorial = condicaoEscopo({
     id: 'relatorio-utilizacao',
