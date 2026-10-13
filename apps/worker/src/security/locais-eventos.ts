@@ -15,10 +15,18 @@ async function referenciasVisiveis(
   if (ids.length === 0) return new Set<string>()
   const condicao = await condicaoEventosVisiveis(db, contexto)
   const autorizados = new Set<string>()
-  // Um candidato por consulta: a condição de visibilidade pode conter muitos
-  // parâmetros de vínculos operacionais legados. Não somamos 80 IDs a eles.
-  for (let i = 0; i < ids.length; i += 1) {
-    const lote = ids.slice(i, i + 1)
+  // O predicado de visibilidade varia conforme os vínculos legados da conta.
+  // Contamos os bindings gerados pelo Drizzle antes de dimensionar cada lote,
+  // respeitando o teto de 100 parâmetros do Cloudflare D1.
+  const consultaBase = db.selectDistinct({ id: coluna }).from(eventos)
+    .where(and(inArray(coluna, [ids[0]]), condicao))
+  const parametrosFixos = consultaBase.toSQL().params.length - 1
+  const tamanhoLote = Math.min(80, 100 - parametrosFixos)
+  if (tamanhoLote < 1) {
+    throw new Error('Condição de visibilidade excede o limite de parâmetros do D1')
+  }
+  for (let i = 0; i < ids.length; i += tamanhoLote) {
+    const lote = ids.slice(i, i + tamanhoLote)
     const registros: Array<{ id: string | null }> = await db.selectDistinct({ id: coluna })
       .from(eventos)
       .where(and(inArray(coluna, lote), condicao)).all()
