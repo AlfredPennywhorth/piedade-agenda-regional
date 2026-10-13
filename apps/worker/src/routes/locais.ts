@@ -31,7 +31,7 @@ async function setorDeOrigemAtivo(db: any, membroId: string | null | undefined) 
     .from(membros)
     .innerJoin(casas, eq(membros.casaId, casas.id))
     .innerJoin(setores, eq(casas.setorId, setores.id))
-    .where(and(eq(membros.id, membroId), eq(membros.ativo, true)))
+    .where(and(eq(membros.id, membroId), eq(membros.ativo, true), eq(casas.ativo, true), eq(setores.ativo, true)))
     .get()
 }
 
