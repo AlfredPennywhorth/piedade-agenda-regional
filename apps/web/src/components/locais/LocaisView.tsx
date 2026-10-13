@@ -140,6 +140,14 @@ export function LocaisView() {
       .finally(() => setCarregandoEscopos(false))
   }, [])
 
+  useEffect(() => {
+    if (!formOpen || editingId || carregandoEscopos) return
+    const setores = escoposCadastro.filter(item => item.escopoTipo === 'SETOR')
+    if (setores.length === 1) {
+      setEscopoSelecionado(atual => atual || `SETOR:${setores[0].escopoId}`)
+    }
+  }, [formOpen, editingId, carregandoEscopos, escoposCadastro])
+
   const locaisFiltrados = useMemo(() => {
     const termo = filtroBusca.trim().toLocaleLowerCase('pt-BR')
     if (!termo) return locais
@@ -668,6 +676,9 @@ export function LocaisView() {
                       </option>
                     ))}
                   </select>
+                  {erroEscoposCadastro && <p role="alert" className="mt-2 text-sm text-red-700">{erroEscoposCadastro}</p>}
+                  {!carregandoEscopos && !erroEscoposCadastro && escoposCadastro.length === 0 &&
+                    <p role="status" className="mt-2 text-sm text-amber-800">Nenhum escopo institucional disponível. Verifique se sua Casa de Oração e Setor de origem estão cadastrados.</p>}
                 </div>
               )}
               <div className="space-y-4">
