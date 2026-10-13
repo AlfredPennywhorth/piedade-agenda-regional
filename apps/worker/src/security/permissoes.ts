@@ -377,6 +377,28 @@ export async function obterEscoposTerritoriaisVisiveis(
     }
   }
 
+  // GTs ligados a uma Administração ou a um Setor também são descendentes
+  // para as credenciais de gestão nesses níveis; não conceder GTs de escopos irmãos.
+  const acessosGestao = contexto.acessosAtivos.filter(acesso =>
+    ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) && acesso.escopoId)
+  const regionaisGeridas = new Set(acessosGestao.filter(a => a.escopoTipo === 'REGIONAL').map(a => a.escopoId))
+  const admsGeridas = new Set(acessosGestao.filter(a => a.escopoTipo === 'ADMINISTRACAO').map(a => a.escopoId))
+  const setoresGeridos = new Set(acessosGestao.filter(a => a.escopoTipo === 'SETOR').map(a => a.escopoId))
+  if (regionaisGeridas.size || admsGeridas.size || setoresGeridos.size) {
+    const gts = await db.select({
+      id: schema.gruposTrabalho.id,
+      regionalId: schema.gruposTrabalho.regionalId,
+      administracaoId: schema.gruposTrabalho.administracaoId,
+      setorId: schema.gruposTrabalho.setorId,
+    }).from(schema.gruposTrabalho).all()
+    for (const gt of gts) {
+      if ((gt.regionalId && regionaisGeridas.has(gt.regionalId)) ||
+          (gt.administracaoId && admsGeridas.has(gt.administracaoId)) ||
+          (gt.setorId && setoresGeridos.has(gt.setorId))) {
+        resultado.gruposTrabalhoIds.add(gt.id)
+      }
+    }
+  }
   return resultado
 }
 
@@ -419,6 +441,58 @@ export async function podeAdministrarEscopo(
   if (eMasterSistema(contexto)) return true
   const regionalId = await obterRegionalDoEscopo(db, escopoTipo, escopoId)
   return !!regionalId && regionaisAdministradas(contexto).has(regionalId)
+}
+
+/**
+ * Verifica a concessão administrativa territorial sem ampliar o acesso a cadastros
+ * globais/legados. Usado exclusivamente para criação/edição de locais institucionais.
+ */
+export async function podeGerenciarCadastroTerritorial(
+  db: any,
+  contexto: ContextoPermissoes,
+  escopoTipo: 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+  escopoId: string
+): Promise<boolean> {
+  if (eMasterSistema(contexto)) return true
+  if (!db || !escopoId) return false
+  const admins = contexto.acessosAtivos.filter(acesso =>
+    ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) &&
+    acesso.escopoId !== null
+  )
+  if (!admins.length) return false
+  const regionalId = await obterRegionalDoEscopo(db, escopoTipo, escopoId)
+  if (!regionalId) return false
+  if (admins.some(acesso => acesso.escopoTipo === escopoTipo && acesso.escopoId === escopoId)) return true
+  if (admins.some(acesso => acesso.escopoTipo === 'REGIONAL' && acesso.escopoId === regionalId)) return true
+
+  let administracaoId: string | null = null
+  let setorId: string | null = null
+  if (escopoTipo === 'ADMINISTRACAO') {
+    administracaoId = escopoId
+  } else if (escopoTipo === 'SETOR') {
+    setorId = escopoId
+  } else if (escopoTipo === 'CASA') {
+    const casa = await db.select({ setorId: schema.casas.setorId })
+      .from(schema.casas).where(eq(schema.casas.id, escopoId)).get()
+    setorId = casa?.setorId ?? null
+  } else if (escopoTipo === 'GRUPO_TRABALHO') {
+    const gt = await db.select({
+      administracaoId: schema.gruposTrabalho.administracaoId,
+      setorId: schema.gruposTrabalho.setorId,
+    }).from(schema.gruposTrabalho).where(eq(schema.gruposTrabalho.id, escopoId)).get()
+    administracaoId = gt?.administracaoId ?? null
+    setorId = gt?.setorId ?? null
+  }
+
+  if (setorId) {
+    if (admins.some(acesso => acesso.escopoTipo === 'SETOR' && acesso.escopoId === setorId)) return true
+    const setor = await db.select({ administracaoId: schema.setores.administracaoId })
+      .from(schema.setores).where(eq(schema.setores.id, setorId)).get()
+    administracaoId = setor?.administracaoId ?? null
+  }
+  return !!administracaoId && admins.some(acesso =>
+    acesso.escopoTipo === 'ADMINISTRACAO' && acesso.escopoId === administracaoId
+  )
 }
 
 export function temPerfil(contexto: ContextoPermissoes, perfilCodigo: string): boolean {
@@ -546,6 +620,11 @@ export async function podeGerenciarAgendaNoEscopo(
 
   // Administrador Regional pode gerir a Agenda apenas dentro da Regional administrada.
   if (podeAdministrarRegional(contexto, regionalAlvo)) return true
+
+  // A autorização de cadastro de locais não concede gestão de GT legado.
+  // Para os demais escopos, permanece a gestão territorial administrativa.
+  if (escopoTipo !== 'GRUPO_TRABALHO' &&
+      await podeGerenciarCadastroTerritorial(db, contexto, escopoTipo, escopoId)) return true
 
   // Regra institucional: todo membro pode gerir automaticamente a Agenda da própria Casa.
   if (permitirCasaAutomatica && escopoTipo === 'CASA') {

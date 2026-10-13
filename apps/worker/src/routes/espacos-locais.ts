@@ -3,8 +3,23 @@ import { and, eq, isNull, or } from 'drizzle-orm'
 import { espacosLocal, locais } from '../db/schema'
 import { EspacoLocalCreate, EspacoLocalUpdate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { exigirMasterParaEscrita } from '../middleware/master-write'
+import { eMasterSistema, podeGerenciarCadastroTerritorial, obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
 import { executarOperacaoComAudit } from '../services/auditoria'
+import { espacosDeEventosVisiveis } from '../security/locais-eventos'
+
+async function espacoVisivel(db: any, contexto: any, local: any, visiveisPrecarregados?: Awaited<ReturnType<typeof obterEscoposTerritoriaisVisiveis>>): Promise<boolean> {
+  if (!local) return false
+  if (local.proprietarioMembroId) return local.proprietarioMembroId === contexto.membroId
+  if (eMasterSistema(contexto)) return true
+  if (!local.escopoTipo || !local.escopoId) return true
+  const visiveis = visiveisPrecarregados ?? await obterEscoposTerritoriaisVisiveis(db, contexto)
+  const grupos: Record<string, Set<string>> = {
+    REGIONAL: visiveis.regionaisIds, ADMINISTRACAO: visiveis.administracoesIds,
+    SETOR: visiveis.setoresIds, CASA: visiveis.casasIds,
+    GRUPO_TRABALHO: visiveis.gruposTrabalhoIds,
+  }
+  return grupos[local.escopoTipo]?.has(local.escopoId) ?? false
+}
 
 export const espacosLocaisRouter = new Hono<any>()
 
@@ -23,13 +38,25 @@ espacosLocaisRouter.get('/', async c => {
   data.sort((a: typeof espacosLocal.$inferSelect, b: typeof espacosLocal.$inferSelect) =>
     a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id)
   )
-  return c.json(data)
+  const contexto = c.get('contextoPermissoes')
+  const localIds: string[] = [...new Set<string>(data.map((item: any) => String(item.localId)))]
+  const localRows = await Promise.all(localIds.map((id: string) => db.select().from(locais).where(eq(locais.id, id)).get()))
+  const visiveis = eMasterSistema(contexto) ? undefined : await obterEscoposTerritoriaisVisiveis(db, contexto)
+  const autorizados = await Promise.all(localRows.map((local: any) => espacoVisivel(db, contexto, local, visiveis)))
+  const idsPermitidos = new Set(localIds.filter((_: string, i: number) => autorizados[i]))
+  const referenciados = autorizados.every(Boolean) ? new Set<string>() : await espacosDeEventosVisiveis(db, contexto, data.filter((item: any) => !idsPermitidos.has(item.localId) && !item.proprietarioMembroId).map((item: any) => item.id))
+  return c.json(data.filter((item: any) => idsPermitidos.has(item.localId) || (!item.proprietarioMembroId && referenciados.has(item.id))))
 })
 
 espacosLocaisRouter.get('/:id', async c => {
   const db = c.get('db')
   const item = await db.select().from(espacosLocal).where(eq(espacosLocal.id, c.req.param('id'))).get()
-  if (!item || (item.proprietarioMembroId && item.proprietarioMembroId !== c.get('membroId'))) return c.json({ error: 'Espaço não encontrado' }, 404)
+  const local = item ? await db.select().from(locais).where(eq(locais.id, item.localId)).get() : null
+  if (!item) return c.json({ error: 'Espaço não encontrado' }, 404)
+  if (!await espacoVisivel(db, c.get('contextoPermissoes'), local)) {
+    const autorizados = item.proprietarioMembroId || local?.proprietarioMembroId ? new Set<string>() : await espacosDeEventosVisiveis(db, c.get('contextoPermissoes'), [item.id])
+    if (!autorizados.has(item.id)) return c.json({ error: 'Espaço não encontrado' }, 404)
+  }
   return c.json(item)
 })
 
@@ -57,12 +84,17 @@ espacosLocaisRouter.post('/particulares', async c => {
   }
 })
 
-espacosLocaisRouter.post('/', exigirMasterParaEscrita, async c => {
+espacosLocaisRouter.post('/', async c => {
   const db = c.get('db')
   try {
     const parsed = EspacoLocalCreate.parse(await c.req.json())
     const local = await db.select().from(locais).where(eq(locais.id, parsed.localId)).get()
     if (!local || local.proprietarioMembroId) return c.json({ error: 'Local institucional não encontrado' }, 404)
+    if (!local.escopoTipo || !local.escopoId) {
+      if (!eMasterSistema(c.get('contextoPermissoes'))) return c.json({ error: 'Somente o Master administra espaços de locais legados', code: 'FORBIDDEN' }, 403)
+    } else if (!await podeGerenciarCadastroTerritorial(db, c.get('contextoPermissoes'), local.escopoTipo, local.escopoId)) {
+      return c.json({ error: 'Sem permissão para administrar espaços deste local', code: 'FORBIDDEN' }, 403)
+    }
     const id = crypto.randomUUID()
     await executarOperacaoComAudit(
       db,
@@ -72,8 +104,8 @@ espacosLocaisRouter.post('/', exigirMasterParaEscrita, async c => {
         atorMembroId: c.get('membroId') || null,
         recursoTipo: 'ESPACO_LOCAL',
         recursoId: id,
-        escopoTipo: 'GLOBAL',
-        escopoId: null,
+        escopoTipo: local.escopoTipo ?? 'GLOBAL',
+        escopoId: local.escopoId ?? null,
         contexto: { localId: parsed.localId, nome: parsed.nome },
       }
     )
@@ -89,12 +121,19 @@ espacosLocaisRouter.post('/', exigirMasterParaEscrita, async c => {
   }
 })
 
-espacosLocaisRouter.patch('/:id', exigirMasterParaEscrita, async c => {
+espacosLocaisRouter.patch('/:id', async c => {
   const db = c.get('db')
   try {
     const id = c.req.param('id')
     const existing = await db.select().from(espacosLocal).where(eq(espacosLocal.id, id)).get()
     if (!existing || existing.proprietarioMembroId) return c.json({ error: 'Espaço institucional não encontrado' }, 404)
+    const local = await db.select().from(locais).where(eq(locais.id, existing.localId)).get()
+    if (!local || local.proprietarioMembroId) return c.json({ error: 'Local institucional não encontrado' }, 404)
+    if (!local.escopoTipo || !local.escopoId) {
+      if (!eMasterSistema(c.get('contextoPermissoes'))) return c.json({ error: 'Somente o Master administra espaços de locais legados', code: 'FORBIDDEN' }, 403)
+    } else if (!await podeGerenciarCadastroTerritorial(db, c.get('contextoPermissoes'), local.escopoTipo, local.escopoId)) {
+      return c.json({ error: 'Sem permissão para alterar este espaço', code: 'FORBIDDEN' }, 403)
+    }
     const parsed = EspacoLocalUpdate.parse(await c.req.json())
     if (parsed.localId && parsed.localId !== existing.localId) {
       return c.json(
@@ -114,8 +153,8 @@ espacosLocaisRouter.patch('/:id', exigirMasterParaEscrita, async c => {
         atorMembroId: c.get('membroId') || null,
         recursoTipo: 'ESPACO_LOCAL',
         recursoId: id,
-        escopoTipo: 'GLOBAL',
-        escopoId: null,
+        escopoTipo: local.escopoTipo ?? 'GLOBAL',
+        escopoId: local.escopoId ?? null,
         contexto: { localId: parsed.localId ?? existing.localId, camposAlterados: Object.keys(parsed) },
       }
     )

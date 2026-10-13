@@ -24,6 +24,10 @@ const mockLocais = [
 describe('LocaisView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (rota: string) => {
+      if (rota === '/locais/escopos-autorizados') return { master: true, escopos: [{ escopoTipo: 'REGIONAL', escopoId: 'regional-1', nome: 'Regional São Paulo' }] } as any
+      return [] as any
+    })
   })
 
   it('deve listar locais corretamente', async () => {
@@ -92,6 +96,7 @@ describe('LocaisView', () => {
   it('deve exibir detalhes de um local em diálogo acessível', async () => {
     vi.mocked(apiClient.fetchWithAuth)
       .mockResolvedValueOnce(mockLocais) // list
+      .mockResolvedValueOnce({ master: true, escopos: [{ escopoTipo: 'REGIONAL', escopoId: 'regional-1', nome: 'Regional São Paulo' }] }) // capabilities
       .mockResolvedValueOnce({
         ...mockLocais[0],
         bairro: 'Centro',
@@ -130,6 +135,7 @@ describe('LocaisView', () => {
 
     const dialog = screen.getByRole('dialog', { name: /novo local/i })
     const { getByLabelText, getByRole } = within(dialog)
+    fireEvent.change(getByLabelText(/escopo institucional/i), { target: { value: 'REGIONAL:regional-1' } })
 
     fireEvent.change(getByLabelText(/nome/i), { target: { value: 'Novo Local' } })
     fireEvent.change(getByLabelText(/endereço/i), { target: { value: 'Av B' } })
@@ -337,7 +343,8 @@ describe('LocaisView', () => {
   it('deve editar um local via PATCH', async () => {
     vi.mocked(apiClient.fetchWithAuth)
       .mockResolvedValueOnce(mockLocais) // list
-      .mockResolvedValueOnce(mockLocais[0]) // GET detail for edit
+      .mockResolvedValueOnce({ master: true, escopos: [{ escopoTipo: 'REGIONAL', escopoId: 'regional-1', nome: 'Regional São Paulo' }] }) // capabilities
+      .mockResolvedValueOnce({ ...mockLocais[0], escopoTipo: 'REGIONAL', escopoId: 'regional-1' }) // GET detail for edit
       .mockResolvedValueOnce(mockLocais) // list after edit
     
     vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({})
@@ -391,6 +398,7 @@ describe('LocaisView', () => {
 
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
       if (endpoint === '/locais') return locais as any
+      if (endpoint === '/locais/escopos-autorizados') return { master: true, escopos: [{ escopoTipo: 'REGIONAL', escopoId: 'regional-1', nome: 'Regional São Paulo' }] } as any
       if (endpoint === '/espacos-locais?localId=1') return respostaLocalA as any
       if (endpoint === '/espacos-locais?localId=2') {
         return [{ id: 'esp-b', localId: '2', nome: 'Sala B', ativo: true }] as any

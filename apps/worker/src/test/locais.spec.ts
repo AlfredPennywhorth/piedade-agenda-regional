@@ -19,6 +19,8 @@ describe('Locais API (S04)', () => {
     db = drizzle(sqlite)
     app = createApp(db)
     authToken = (await criarSessaoAutenticadaTeste(sqlite, 'locais-auth')).token
+    // Escopo territorial existente para todas as criações institucionais dos testes.
+    expect(sqlite.prepare("SELECT id FROM regionais WHERE id = 'locais-auth-regional'").get()).toBeTruthy()
   })
 
   it('local particular pertence ao criador e não é visível nem ao outro Master', async () => {
@@ -66,7 +68,7 @@ describe('Locais API (S04)', () => {
     const res = await app.request('/api/v1/locais', mesclarAutorizacao(authToken, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ ...payload, escopoTipo: 'REGIONAL', escopoId: 'locais-auth-regional' })
     }))
 
     expect(res.status).toBe(201)
@@ -87,7 +89,7 @@ describe('Locais API (S04)', () => {
     const createRes = await app.request('/api/v1/locais', mesclarAutorizacao(authToken, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ ...payload, escopoTipo: 'REGIONAL', escopoId: 'locais-auth-regional' })
     }))
     const { id } = await createRes.json()
 
@@ -102,7 +104,7 @@ describe('Locais API (S04)', () => {
     const createRes = await app.request('/api/v1/locais', mesclarAutorizacao(authToken, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ ...payload, escopoTipo: 'REGIONAL', escopoId: 'locais-auth-regional' })
     }))
     const { id } = await createRes.json()
 
@@ -128,7 +130,7 @@ describe('Locais API (S04)', () => {
     const createRes = await app.request('/api/v1/locais', mesclarAutorizacao(authToken, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ ...payload, escopoTipo: 'REGIONAL', escopoId: 'locais-auth-regional' })
     }))
     const { id } = await createRes.json()
 
@@ -152,7 +154,7 @@ describe('Locais API (S04)', () => {
     const res = await app.request('/api/v1/locais', mesclarAutorizacao(authToken, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ ...payload, escopoTipo: 'REGIONAL', escopoId: 'locais-auth-regional' })
     }))
 
     expect(res.status).toBe(400)
@@ -166,6 +168,7 @@ describe('Locais API (S04)', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        escopoTipo: 'REGIONAL', escopoId: 'locais-auth-regional',
         nome: 'Local Teste',
         endereco: 'Rua Teste',
         numero: '123',
@@ -182,6 +185,7 @@ describe('Locais API (S04)', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        escopoTipo: 'REGIONAL', escopoId: 'locais-auth-regional',
         nome: 'Local Teste',
         endereco: 'Rua Teste',
         numero: '123',
@@ -198,6 +202,7 @@ describe('Locais API (S04)', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        escopoTipo: 'REGIONAL', escopoId: 'locais-auth-regional',
         nome: 'Local Teste',
         endereco: 'Rua Teste',
         numero: '123',

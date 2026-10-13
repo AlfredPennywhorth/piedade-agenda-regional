@@ -303,6 +303,10 @@ export function SerieFormModal({
       setCepRapidoMensagem('Aguarde a consulta do CEP terminar antes de criar o local.')
       return
     }
+    if ((!tipoEscopo || !(tipoEscopo === 'regional' ? formData.regionalId : tipoEscopo === 'administracao' ? formData.administracaoId : tipoEscopo === 'setor' ? formData.setorId : tipoEscopo === 'casa' ? formData.casaId : tipoEscopo === 'grupoTrabalho' ? formData.grupoTrabalhoId : null))) {
+      setLocalRapidoErro('Selecione o escopo territorial da reunião antes de cadastrar o local.')
+      return
+    }
     const parsed = LocalCreate.safeParse({
       nome: localRapido.nome,
       endereco: localRapido.endereco,
@@ -327,7 +331,7 @@ export function SerieFormModal({
     setSalvandoLocalRapido(true)
     setLocalRapidoErro(null)
     try {
-      const criado = await postWithAuth<{ id: string; nome: string }>('/locais', parsed.data)
+      const criado = await postWithAuth<{ id: string; nome: string }>('/locais', { ...parsed.data, escopoTipo: tipoEscopo === 'grupoTrabalho' ? 'GRUPO_TRABALHO' : tipoEscopo.toUpperCase(), escopoId: tipoEscopo === 'regional' ? formData.regionalId : tipoEscopo === 'administracao' ? formData.administracaoId : tipoEscopo === 'setor' ? formData.setorId : tipoEscopo === 'casa' ? formData.casaId : tipoEscopo === 'grupoTrabalho' ? formData.grupoTrabalhoId : null })
       setLocaisRapidos(atuais => [...atuais.filter(item => item.id !== criado.id), criado])
       setFormData(atual => ({ ...atual, localId: criado.id, espacoId: '' }))
       fecharLocalRapido()
