@@ -1031,7 +1031,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     setSalvandoLocalRapido(true)
     setLocalRapidoErro(null)
     try {
-      const criado = await postWithAuth<Local>(formData.pessoal ? '/locais/particulares' : '/locais', formData.pessoal ? parsed.data : { ...parsed.data, escopoTipo: tipoEscopo === 'grupoTrabalho' ? 'GRUPO_TRABALHO' : tipoEscopo?.toUpperCase(), escopoId: formData.regionalId || formData.administracaoId || formData.setorId || formData.casaId || formData.grupoTrabalhoId })
+      const criado = await postWithAuth<Local>(formData.pessoal ? '/locais/particulares' : '/locais', formData.pessoal ? parsed.data : { ...parsed.data, escopoTipo: tipoEscopo === 'grupoTrabalho' ? 'GRUPO_TRABALHO' : tipoEscopo?.toUpperCase(), escopoId: tipoEscopo === 'regional' ? formData.regionalId : tipoEscopo === 'administracao' ? formData.administracaoId : tipoEscopo === 'setor' ? formData.setorId : tipoEscopo === 'casa' ? formData.casaId : tipoEscopo === 'grupoTrabalho' ? formData.grupoTrabalhoId : null })
       setLocais(atuais => [...atuais.filter(item => item.id !== criado.id), criado]
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
       setFormData(atual => ({ ...atual, localId: criado.id, espacoId: '' }))
