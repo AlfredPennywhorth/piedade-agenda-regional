@@ -5,6 +5,7 @@ import { EspacoLocalCreate, EspacoLocalUpdate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, podeGerenciarCadastroTerritorial, obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
 import { executarOperacaoComAudit } from '../services/auditoria'
+import { espacosDeEventosVisiveis } from '../security/locais-eventos'
 
 async function espacoVisivel(db: any, contexto: any, local: any, visiveisPrecarregados?: Awaited<ReturnType<typeof obterEscoposTerritoriaisVisiveis>>): Promise<boolean> {
   if (!local) return false
@@ -43,14 +44,19 @@ espacosLocaisRouter.get('/', async c => {
   const visiveis = eMasterSistema(contexto) ? undefined : await obterEscoposTerritoriaisVisiveis(db, contexto)
   const autorizados = await Promise.all(localRows.map((local: any) => espacoVisivel(db, contexto, local, visiveis)))
   const idsPermitidos = new Set(localIds.filter((_: string, i: number) => autorizados[i]))
-  return c.json(data.filter((item: any) => idsPermitidos.has(item.localId)))
+  const referenciados = autorizados.every(Boolean) ? new Set<string>() : await espacosDeEventosVisiveis(db, contexto)
+  return c.json(data.filter((item: any) => idsPermitidos.has(item.localId) || (!item.proprietarioMembroId && referenciados.has(item.id))))
 })
 
 espacosLocaisRouter.get('/:id', async c => {
   const db = c.get('db')
   const item = await db.select().from(espacosLocal).where(eq(espacosLocal.id, c.req.param('id'))).get()
   const local = item ? await db.select().from(locais).where(eq(locais.id, item.localId)).get() : null
-  if (!item || !await espacoVisivel(db, c.get('contextoPermissoes'), local)) return c.json({ error: 'Espaço não encontrado' }, 404)
+  if (!item) return c.json({ error: 'Espaço não encontrado' }, 404)
+  if (!await espacoVisivel(db, c.get('contextoPermissoes'), local)) {
+    const autorizados = item.proprietarioMembroId || local?.proprietarioMembroId ? new Set<string>() : await espacosDeEventosVisiveis(db, c.get('contextoPermissoes'))
+    if (!autorizados.has(item.id)) return c.json({ error: 'Espaço não encontrado' }, 404)
+  }
   return c.json(item)
 })
 
