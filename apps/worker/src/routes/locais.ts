@@ -6,12 +6,12 @@ import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, podeGerenciarCadastroTerritorial, obterRegionalDoEscopo, obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
 import { executarOperacaoComAudit } from '../services/auditoria'
 
-async function localVisivel(db: any, contexto: any, local: any): Promise<boolean> {
+async function localVisivel(db: any, contexto: any, local: any, visiveisPrecarregados?: Awaited<ReturnType<typeof obterEscoposTerritoriaisVisiveis>>): Promise<boolean> {
   if (eMasterSistema(contexto)) return true
   if (local.proprietarioMembroId) return local.proprietarioMembroId === contexto.membroId
   // Locais legados continuam na lista compartilhada até classificação pelo Master.
   if (!local.escopoTipo || !local.escopoId) return true
-  const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+  const visiveis = visiveisPrecarregados ?? await obterEscoposTerritoriaisVisiveis(db, contexto)
   const chaves: Record<string, Set<string>> = {
     REGIONAL: visiveis.regionaisIds,
     ADMINISTRACAO: visiveis.administracoesIds,
@@ -31,7 +31,8 @@ locaisRouter.get('/', async (c) => {
   const membroId = c.get('membroId')
   const data = await db.select().from(locais).where(or(isNull(locais.proprietarioMembroId), eq(locais.proprietarioMembroId, membroId))).all()
   const contexto = c.get('contextoPermissoes')
-  const resultados = await Promise.all(data.map((local: any) => localVisivel(db, contexto, local)))
+  const visiveis = eMasterSistema(contexto) ? undefined : await obterEscoposTerritoriaisVisiveis(db, contexto)
+  const resultados = await Promise.all(data.map((local: any) => localVisivel(db, contexto, local, visiveis)))
   return c.json(data.filter((_: any, i: number) => resultados[i]))
 })
 
