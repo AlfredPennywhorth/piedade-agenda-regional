@@ -15,8 +15,10 @@ async function referenciasVisiveis(
   if (ids.length === 0) return new Set<string>()
   const condicao = await condicaoEventosVisiveis(db, contexto)
   const autorizados = new Set<string>()
-  for (let i = 0; i < ids.length; i += 80) {
-    const lote = ids.slice(i, i + 80)
+  // Um candidato por consulta: a condição de visibilidade pode conter muitos
+  // parâmetros de vínculos operacionais legados. Não somamos 80 IDs a eles.
+  for (let i = 0; i < ids.length; i += 1) {
+    const lote = ids.slice(i, i + 1)
     const registros: Array<{ id: string | null }> = await db.selectDistinct({ id: coluna })
       .from(eventos)
       .where(and(inArray(coluna, lote), condicao)).all()
