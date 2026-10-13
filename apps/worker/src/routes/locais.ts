@@ -7,8 +7,8 @@ import { eMasterSistema, podeGerenciarCadastroTerritorial, obterRegionalDoEscopo
 import { executarOperacaoComAudit } from '../services/auditoria'
 
 async function localVisivel(db: any, contexto: any, local: any, visiveisPrecarregados?: Awaited<ReturnType<typeof obterEscoposTerritoriaisVisiveis>>): Promise<boolean> {
-  if (eMasterSistema(contexto)) return true
   if (local.proprietarioMembroId) return local.proprietarioMembroId === contexto.membroId
+  if (eMasterSistema(contexto)) return true
   // Locais legados continuam na lista compartilhada até classificação pelo Master.
   if (!local.escopoTipo || !local.escopoId) return true
   const visiveis = visiveisPrecarregados ?? await obterEscoposTerritoriaisVisiveis(db, contexto)
