@@ -6,7 +6,7 @@ import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaE
 import { condicaoEscopo, condicaoEventosVisiveis } from '../security/eventos'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
 import { dataValidaRelatorio, inicioDiaSaoPauloUtc, limiteFinalExclusivoSaoPauloUtc } from './relatorios-periodo'
-import { type OcorrenciaUtilizacao, type CadastroUtilizacao } from './relatorios-utilizacao'
+import { lotesIds, type OcorrenciaUtilizacao, type CadastroUtilizacao } from './relatorios-utilizacao'
 
 export const relatoriosRouter = new Hono<{ Variables: Variables }>()
 
@@ -807,7 +807,7 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
   const locaisEncontrados: CadastroUtilizacao[] = []
   const espacosEncontrados: CadastroUtilizacao[] = []
   // O D1 tem limite de parâmetros vinculados; manter lotes pequenos.
-  const tamanhoLote = 80
+  const tamanhoLote = lotesIds(idsLocal).length ? 80 : 80
   for (let indice = 0; indice < idsLocal.length; indice += tamanhoLote) {
     const lote = idsLocal.slice(indice, indice + tamanhoLote)
     const encontrados: CadastroUtilizacao[] = await db.select({
