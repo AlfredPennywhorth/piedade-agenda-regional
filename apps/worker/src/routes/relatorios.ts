@@ -5,6 +5,7 @@ import { authMiddleware, Variables } from '../middleware/auth'
 import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo } from '../security/permissoes'
 import { condicaoEscopo, condicaoEventosVisiveis } from '../security/eventos'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
+import { dataValidaRelatorio, inicioDiaSaoPauloUtc, limiteFinalExclusivoSaoPauloUtc } from './relatorios-periodo'
 
 export const relatoriosRouter = new Hono<{ Variables: Variables }>()
 
@@ -741,14 +742,7 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
   const dataInicio = c.req.query('dataInicio')
   const dataFim = c.req.query('dataFim')
   const escopos = ['REGIONAL', 'ADMINISTRACAO', 'SETOR', 'CASA', 'GRUPO_TRABALHO']
-  const dataValida = (valor: string | undefined) => {
-    if (!valor) return true
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false
-    if (valor.startsWith('0000-') || valor.startsWith('0001-')) return false // Evita comparação ambígua na fronteira entre eras
-    const data = new Date(`${valor}T00:00:00.000Z`)
-    return Number.isFinite(data.getTime()) && data.toISOString().slice(0, 10) === valor
-  }
-  if (!escopos.includes(escopoTipo) || !escopoId || !dataValida(dataInicio) || !dataValida(dataFim) ||
+  if (!escopos.includes(escopoTipo) || !escopoId || !dataValidaRelatorio(dataInicio) || !dataValidaRelatorio(dataFim) ||
     (dataInicio && dataFim && dataInicio > dataFim)) {
     return c.json({ error: 'Escopo ou período inválido' }, 400)
   }
@@ -794,43 +788,12 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
       ? or(territorial, eq(eventos.regionalGestaoId, escopoId))!
       : territorial
   )
-  // Localize o primeiro instante de um dia civil em America/Sao_Paulo.
-  // Busca binária em UTC também funciona quando 00:00 local é inexistente
-  // (início do horário de verão), e não normaliza anos 0000–0099.
-  const dataCivilEmSaoPaulo = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit',
-    day: '2-digit', calendar: 'gregory',
-  })
-  const diaLocal = (instante: number): string => {
-    const partes = Object.fromEntries(dataCivilEmSaoPaulo.formatToParts(new Date(instante))
-      .filter(parte => parte.type !== 'literal')
-      .map(parte => [parte.type, parte.value]))
-    return `${partes.year.padStart(4, '0')}-${partes.month}-${partes.day}`
-  }
-  const inicioDiaSaoPauloUtc = (dia: string): string => {
-    // String ISO evita a regra especial de Date.UTC para anos 00–99.
-    const meiaNoiteUtc = Date.parse(`${dia}T00:00:00.000Z`)
-    // Janela suficiente para os offsets históricos de São Paulo.
-    let menor = meiaNoiteUtc - 36 * 60 * 60 * 1000
-    let maior = meiaNoiteUtc + 36 * 60 * 60 * 1000
-    // Primeiro milissegundo cuja data civil local é >= ao dia pedido.
-    while (menor < maior) {
-      const meio = menor + Math.floor((maior - menor) / 2)
-      if (diaLocal(meio) < dia) menor = meio + 1
-      else maior = meio
-    }
-    return new Date(menor).toISOString()
-  }
   if (dataInicio) condicoes.push(gte(eventos.inicioEm, inicioDiaSaoPauloUtc(dataInicio)))
   if (dataFim) {
-    // 9999-12-31 não possui próximo dia no formato YYYY-MM-DD.
     if (dataFim === '9999-12-31') {
       return c.json({ error: 'Data final deve ser anterior a 9999-12-31' }, 400)
     }
-    const proximoDiaData = new Date(`${dataFim}T00:00:00.000Z`)
-    proximoDiaData.setUTCDate(proximoDiaData.getUTCDate() + 1)
-    const proximoDia = proximoDiaData.toISOString().slice(0, 10)
-    condicoes.push(lt(eventos.inicioEm, inicioDiaSaoPauloUtc(proximoDia)))
+    condicoes.push(lt(eventos.inicioEm, limiteFinalExclusivoSaoPauloUtc(dataFim)))
   }
 
   type OcorrenciaLocal = {
