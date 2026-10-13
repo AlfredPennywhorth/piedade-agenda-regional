@@ -788,14 +788,26 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
 
   const idsLocal: string[] = [...new Set(ocorrencias.flatMap(e => e.localId ? [e.localId] : []))]
   const idsEspaco: string[] = [...new Set(ocorrencias.flatMap(e => e.espacoId ? [e.espacoId] : []))]
-  const locaisEncontrados: Array<{ id: string; nome: string; proprietarioMembroId: string | null }> = idsLocal.length
-    ? await db.select({ id: locais.id, nome: locais.nome, proprietarioMembroId: locais.proprietarioMembroId })
-      .from(locais).where(inArray(locais.id, idsLocal)).all()
-    : []
-  const espacosEncontrados: Array<{ id: string; nome: string; proprietarioMembroId: string | null }> = idsEspaco.length
-    ? await db.select({ id: espacosLocal.id, nome: espacosLocal.nome, proprietarioMembroId: espacosLocal.proprietarioMembroId })
-      .from(espacosLocal).where(inArray(espacosLocal.id, idsEspaco)).all()
-    : []
+  type LocalRelatorio = { id: string; nome: string; proprietarioMembroId: string | null }
+  const locaisEncontrados: LocalRelatorio[] = []
+  const espacosEncontrados: LocalRelatorio[] = []
+  // O D1 tem limite de parâmetros vinculados; manter lotes pequenos.
+  const tamanhoLote = 80
+  for (let indice = 0; indice < idsLocal.length; indice += tamanhoLote) {
+    const lote = idsLocal.slice(indice, indice + tamanhoLote)
+    const encontrados: LocalRelatorio[] = await db.select({
+      id: locais.id, nome: locais.nome, proprietarioMembroId: locais.proprietarioMembroId,
+    }).from(locais).where(inArray(locais.id, lote)).all()
+    locaisEncontrados.push(...encontrados)
+  }
+  for (let indice = 0; indice < idsEspaco.length; indice += tamanhoLote) {
+    const lote = idsEspaco.slice(indice, indice + tamanhoLote)
+    const encontrados: LocalRelatorio[] = await db.select({
+      id: espacosLocal.id, nome: espacosLocal.nome,
+      proprietarioMembroId: espacosLocal.proprietarioMembroId,
+    }).from(espacosLocal).where(inArray(espacosLocal.id, lote)).all()
+    espacosEncontrados.push(...encontrados)
+  }
   // A visibilidade institucional do evento não concede acesso ao cadastro particular
   // do local ou espaço. Não exponha nem os IDs privados no ranking/CSV.
   const locaisPrivados = new Set(locaisEncontrados
