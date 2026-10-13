@@ -103,6 +103,9 @@ export function RelatoriosView() {
   const [loadingAgregado, setLoadingAgregado] = useState(false)
   const [erroAgregado, setErroAgregado] = useState<string | null>(null)
   const [utilizacao, setUtilizacao] = useState<UtilizacaoLocaisData | null>(null)
+  const [utilizacaoChave, setUtilizacaoChave] = useState<string | null>(null)
+  const chaveFiltrosUtilizacao = JSON.stringify([escopoTipo, escopoId, dataInicio, dataFim])
+  const utilizacaoAtual = utilizacaoChave === chaveFiltrosUtilizacao ? utilizacao : null
   const [loadingUtilizacao, setLoadingUtilizacao] = useState(false)
   const [erroUtilizacao, setErroUtilizacao] = useState<string | null>(null)
 
@@ -178,6 +181,8 @@ export function RelatoriosView() {
     setLoadingUtilizacao(true)
     setErroUtilizacao(null)
     setUtilizacao(null)
+    setUtilizacaoChave(null)
+    const chaveConsulta = chaveFiltrosUtilizacao
     try {
       const params = new URLSearchParams({ escopoTipo, escopoId })
       if (dataInicio) params.set('dataInicio', dataInicio)
@@ -186,6 +191,7 @@ export function RelatoriosView() {
         `/relatorios/utilizacao-locais?${params.toString()}`
       )
       setUtilizacao(dados)
+      setUtilizacaoChave(chaveConsulta)
     } catch (erro) {
       setErroUtilizacao(erro instanceof Error ? erro.message : 'Não foi possível consultar a utilização dos locais.')
     } finally {
@@ -194,10 +200,10 @@ export function RelatoriosView() {
   }
 
   const exportarUtilizacao = () => {
-    if (!utilizacao) return
+    if (!utilizacaoAtual) return
     baixarCsv('utilizacao-locais.csv', montarCsv(
       ['Local', 'Espaço', 'Eventos', 'Horas agendadas'],
-      utilizacao.ranking.map(item => [
+      utilizacaoAtual.ranking.map(item => [
         item.localNome, item.espacoNome ?? 'Sem espaço', item.totalEventos,
         (item.minutosAgendados / 60).toFixed(2).replace('.', ','),
       ])
@@ -496,16 +502,16 @@ export function RelatoriosView() {
               </button>
             </div>
             {erroUtilizacao && <p role="alert" className="text-sm text-red-700">{erroUtilizacao}</p>}
-            {utilizacao && (
+            {utilizacaoAtual && (
               <>
                 <div className="flex flex-wrap justify-between gap-2 text-sm text-slate-700">
-                  <p>{utilizacao.totalComLocal} eventos com local, de {utilizacao.totalOcorrencias} eventos no escopo</p>
+                  <p>{utilizacaoAtual.totalComLocal} eventos com local, de {utilizacaoAtual.totalOcorrencias} eventos no escopo</p>
                   <button type="button" onClick={exportarUtilizacao}
                     className="rounded border border-slate-300 px-3 py-1.5 font-medium hover:bg-slate-50">
                     Exportar CSV
                   </button>
                 </div>
-                {utilizacao.ranking.length === 0 ? (
+                {utilizacaoAtual.ranking.length === 0 ? (
                   <p className="text-sm text-slate-500">Nenhum evento com local cadastrado no período.</p>
                 ) : (
                   <div className="overflow-x-auto">
@@ -517,7 +523,7 @@ export function RelatoriosView() {
                         <th scope="col" className="p-2">Horas</th>
                       </tr></thead>
                       <tbody>
-                        {utilizacao.ranking.map(item => (
+                        {utilizacaoAtual.ranking.map(item => (
                           <tr key={`${item.localId}:${item.espacoId ?? ''}`} className="border-b border-slate-100">
                             <td className="p-2">{item.localNome}</td>
                             <td className="p-2">{item.espacoNome ?? 'Sem espaço'}</td>
