@@ -1,20 +1,34 @@
-import { and, eq, isNotNull } from 'drizzle-orm'
+import { and, inArray } from 'drizzle-orm'
 import { eventos } from '../db/schema'
 import { condicaoEventosVisiveis } from './eventos'
 import type { ContextoPermissoes } from './permissoes'
 
-// Somente referências de eventos que a própria API de Eventos autoriza consultar.
-// Não concede direito de editar os cadastros territoriais nem revela locais particulares.
-export async function locaisDeEventosVisiveis(db: any, contexto: ContextoPermissoes): Promise<Set<string>> {
+// Limita a busca às referências candidatas; não carrega eventos históricos inteiros.
+// A permissão é exclusivamente de leitura para recursos referenciados por eventos visíveis.
+async function referenciasVisiveis(
+  db: any,
+  contexto: ContextoPermissoes,
+  coluna: typeof eventos.localId | typeof eventos.espacoId,
+  candidatos: string[]
+): Promise<Set<string>> {
+  const ids = [...new Set(candidatos)].filter(Boolean)
+  if (ids.length === 0) return new Set<string>()
   const condicao = await condicaoEventosVisiveis(db, contexto)
-  const referencias = await db.select({ id: eventos.localId }).from(eventos)
-    .where(and(isNotNull(eventos.localId), condicao)).all()
-  return new Set<string>(referencias.map((item: { id: string | null }) => item.id).filter((id: string | null): id is string => Boolean(id)))
+  const autorizados = new Set<string>()
+  for (let i = 0; i < ids.length; i += 80) {
+    const lote = ids.slice(i, i + 80)
+    const registros: Array<{ id: string | null }> = await db.selectDistinct({ id: coluna })
+      .from(eventos)
+      .where(and(inArray(coluna, lote), condicao)).all()
+    for (const registro of registros) if (registro.id) autorizados.add(registro.id)
+  }
+  return autorizados
 }
 
-export async function espacosDeEventosVisiveis(db: any, contexto: ContextoPermissoes): Promise<Set<string>> {
-  const condicao = await condicaoEventosVisiveis(db, contexto)
-  const referencias = await db.select({ id: eventos.espacoId }).from(eventos)
-    .where(and(isNotNull(eventos.espacoId), condicao)).all()
-  return new Set<string>(referencias.map((item: { id: string | null }) => item.id).filter((id: string | null): id is string => Boolean(id)))
+export function locaisDeEventosVisiveis(db: any, contexto: ContextoPermissoes, candidatos: string[]): Promise<Set<string>> {
+  return referenciasVisiveis(db, contexto, eventos.localId, candidatos)
+}
+
+export function espacosDeEventosVisiveis(db: any, contexto: ContextoPermissoes, candidatos: string[]): Promise<Set<string>> {
+  return referenciasVisiveis(db, contexto, eventos.espacoId, candidatos)
 }
