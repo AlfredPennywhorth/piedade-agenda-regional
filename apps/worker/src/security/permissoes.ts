@@ -377,6 +377,28 @@ export async function obterEscoposTerritoriaisVisiveis(
     }
   }
 
+  // GTs ligados a uma Administração ou a um Setor também são descendentes
+  // para as credenciais de gestão nesses níveis; não conceder GTs de escopos irmãos.
+  const acessosGestao = contexto.acessosAtivos.filter(acesso =>
+    ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) && acesso.escopoId)
+  const regionaisGeridas = new Set(acessosGestao.filter(a => a.escopoTipo === 'REGIONAL').map(a => a.escopoId))
+  const admsGeridas = new Set(acessosGestao.filter(a => a.escopoTipo === 'ADMINISTRACAO').map(a => a.escopoId))
+  const setoresGeridos = new Set(acessosGestao.filter(a => a.escopoTipo === 'SETOR').map(a => a.escopoId))
+  if (regionaisGeridas.size || admsGeridas.size || setoresGeridos.size) {
+    const gts = await db.select({
+      id: schema.gruposTrabalho.id,
+      regionalId: schema.gruposTrabalho.regionalId,
+      administracaoId: schema.gruposTrabalho.administracaoId,
+      setorId: schema.gruposTrabalho.setorId,
+    }).from(schema.gruposTrabalho).all()
+    for (const gt of gts) {
+      if ((gt.regionalId && regionaisGeridas.has(gt.regionalId)) ||
+          (gt.administracaoId && admsGeridas.has(gt.administracaoId)) ||
+          (gt.setorId && setoresGeridos.has(gt.setorId))) {
+        resultado.gruposTrabalhoIds.add(gt.id)
+      }
+    }
+  }
   return resultado
 }
 
