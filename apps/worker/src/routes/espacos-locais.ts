@@ -8,8 +8,8 @@ import { executarOperacaoComAudit } from '../services/auditoria'
 
 async function espacoVisivel(db: any, contexto: any, local: any, visiveisPrecarregados?: Awaited<ReturnType<typeof obterEscoposTerritoriaisVisiveis>>): Promise<boolean> {
   if (!local) return false
-  if (eMasterSistema(contexto)) return true
   if (local.proprietarioMembroId) return local.proprietarioMembroId === contexto.membroId
+  if (eMasterSistema(contexto)) return true
   if (!local.escopoTipo || !local.escopoId) return true
   const visiveis = visiveisPrecarregados ?? await obterEscoposTerritoriaisVisiveis(db, contexto)
   const grupos: Record<string, Set<string>> = {
