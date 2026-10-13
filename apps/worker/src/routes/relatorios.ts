@@ -6,7 +6,7 @@ import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaE
 import { condicaoEscopo, condicaoEventosVisiveis } from '../security/eventos'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
 import { dataValidaRelatorio, inicioDiaSaoPauloUtc, limiteFinalExclusivoSaoPauloUtc } from './relatorios-periodo'
-import { lotesIds, type OcorrenciaUtilizacao, type CadastroUtilizacao } from './relatorios-utilizacao'
+import { lotesIds, consolidarUtilizacao, type OcorrenciaUtilizacao, type CadastroUtilizacao } from './relatorios-utilizacao'
 
 export const relatoriosRouter = new Hono<{ Variables: Variables }>()
 
@@ -820,45 +820,9 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
     }).from(espacosLocal).where(inArray(espacosLocal.id, lote)).all()
     espacosEncontrados.push(...encontrados)
   }
-  // A visibilidade institucional do evento não concede acesso ao cadastro particular
-  // do local ou espaço. Não exponha nem os IDs privados no ranking/CSV.
-  const locaisPrivados = new Set(locaisEncontrados
-    .filter(l => l.proprietarioMembroId && l.proprietarioMembroId !== membroId).map(l => l.id))
-  const espacosPrivados = new Set(espacosEncontrados
-    .filter(e => e.proprietarioMembroId && e.proprietarioMembroId !== membroId).map(e => e.id))
-  const ocorrenciasVisiveis = ocorrencias.filter(e =>
-    (!e.localId || !locaisPrivados.has(e.localId)) &&
-    (!e.espacoId || !espacosPrivados.has(e.espacoId))
-  )
-  const nomesLocal = new Map<string, string>(locaisEncontrados.map(l => [l.id, l.nome]))
-  const nomesEspaco = new Map<string, string>(espacosEncontrados.map(e => [e.id, e.nome]))
-  type ResumoUtilizacao = {
-    localId: string; localNome: string; espacoId: string | null; espacoNome: string | null;
-    totalEventos: number; minutosAgendados: number
-  }
-  const grupos = new Map<string, ResumoUtilizacao>()
-  for (const e of ocorrenciasVisiveis) {
-    if (!e.localId) continue // ONLINE e eventos sem local cadastrado.
-    const chave = JSON.stringify([e.localId, e.espacoId])
-    let item = grupos.get(chave)
-    if (!item) {
-      item = {
-        localId: e.localId, localNome: nomesLocal.get(e.localId) ?? 'Local não encontrado',
-        espacoId: e.espacoId, espacoNome: e.espacoId ? nomesEspaco.get(e.espacoId) ?? 'Espaço não encontrado' : null,
-        totalEventos: 0, minutosAgendados: 0,
-      }
-      grupos.set(chave, item)
-    }
-    item.totalEventos += 1
-    const duracao = new Date(e.fimEm).getTime() - new Date(e.inicioEm).getTime()
-    if (Number.isFinite(duracao) && duracao > 0) item.minutosAgendados += Math.round(duracao / 60000)
-  }
-  const ranking = [...grupos.values()].sort((a, b) =>
-    b.totalEventos - a.totalEventos || b.minutosAgendados - a.minutosAgendados ||
-    a.localNome.localeCompare(b.localNome, 'pt-BR'))
+  const resumo = consolidarUtilizacao(ocorrencias, locaisEncontrados, espacosEncontrados, membroId)
   return c.json({
     escopo: { escopoTipo, escopoId }, periodo: { dataInicio: dataInicio ?? null, dataFim: dataFim ?? null },
-    totalOcorrencias: ocorrencias.length, totalComLocal: ranking.reduce((n, item) => n + item.totalEventos, 0),
-    ranking,
+    ...resumo,
   })
 })
