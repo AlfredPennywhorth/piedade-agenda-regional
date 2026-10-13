@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, fetchWithAuth, patchWithAuth, postWithAuth } from '../../api/apiClient'
 import { GerenciarAcessosPanel } from './GerenciarAcessosPanel'
 
@@ -85,10 +85,37 @@ interface ContasAcessoViewProps {
   podeGerenciarSessoes?: boolean
 }
 
+// Contador compartilhado entre montagens: uma requisição antiga não pode liberar
+// a proteção enquanto outra geração de link temporário ainda estiver pendente.
+let geracoesLinkEmAndamento = 0
+
+function protegerGeracaoLink(): () => void {
+  geracoesLinkEmAndamento += 1
+  document.documentElement.setAttribute('data-pwa-protect-reload', '')
+  let liberada = false
+  return () => {
+    if (liberada) return
+    liberada = true
+    geracoesLinkEmAndamento -= 1
+    if (geracoesLinkEmAndamento === 0) {
+      document.documentElement.removeAttribute('data-pwa-protect-reload')
+    }
+  }
+}
+
 export function ContasAcessoView({
   onPendenciasAtualizadas,
   podeGerenciarSessoes = false,
 }: ContasAcessoViewProps = {}) {
+  const protecoesDestaMontagem = useRef(new Set<() => void>())
+  useEffect(() => {
+    const protecoes = protecoesDestaMontagem.current
+    return () => {
+      for (const liberar of protecoes) liberar()
+      protecoes.clear()
+    }
+  }, [])
+
   const [contas, setContas] = useState<ContaAdministrada[]>([])
   const [carregando, setCarregando] = useState(true)
   const [processando, setProcessando] = useState<string | null>(null)
@@ -251,6 +278,10 @@ export function ContasAcessoView({
       return
     }
 
+    // Proteção síncrona: cobre o intervalo entre clique e resposta da API,
+    // antes mesmo de o link temporário aparecer na interface.
+    const liberarProtecao = protegerGeracaoLink()
+    protecoesDestaMontagem.current.add(liberarProtecao)
     setProcessando(conta.membroId)
     setFeedback(null)
     try {
@@ -276,6 +307,8 @@ export function ContasAcessoView({
         mensagem: error instanceof ApiError ? error.message : 'Não foi possível gerar o link.',
       })
     } finally {
+      liberarProtecao()
+      protecoesDestaMontagem.current.delete(liberarProtecao)
       setProcessando(null)
     }
   }
@@ -741,7 +774,7 @@ export function ContasAcessoView({
                 )}
 
                 {linkTemporario?.membroId === conta.membroId && (
-                  <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  <div role="status" data-pwa-protect-reload className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
                     <div className="space-y-3">
                       <p className="font-semibold">Link temporário gerado</p>
                       <p className="text-xs">
