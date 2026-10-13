@@ -6,6 +6,7 @@ import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaE
 import { condicaoEscopo, condicaoEventosVisiveis } from '../security/eventos'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
 import { dataValidaRelatorio, inicioDiaSaoPauloUtc, limiteFinalExclusivoSaoPauloUtc } from './relatorios-periodo'
+import { consolidarUtilizacao, lotesIds, type OcorrenciaUtilizacao, type CadastroUtilizacao } from './relatorios-utilizacao'
 
 export const relatoriosRouter = new Hono<{ Variables: Variables }>()
 
