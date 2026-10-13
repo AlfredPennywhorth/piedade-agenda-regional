@@ -6,12 +6,12 @@ import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, podeGerenciarCadastroTerritorial, obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
 import { executarOperacaoComAudit } from '../services/auditoria'
 
-async function espacoVisivel(db: any, contexto: any, local: any): Promise<boolean> {
+async function espacoVisivel(db: any, contexto: any, local: any, visiveisPrecarregados?: Awaited<ReturnType<typeof obterEscoposTerritoriaisVisiveis>>): Promise<boolean> {
   if (!local) return false
   if (eMasterSistema(contexto)) return true
   if (local.proprietarioMembroId) return local.proprietarioMembroId === contexto.membroId
   if (!local.escopoTipo || !local.escopoId) return true
-  const visiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+  const visiveis = visiveisPrecarregados ?? await obterEscoposTerritoriaisVisiveis(db, contexto)
   const grupos: Record<string, Set<string>> = {
     REGIONAL: visiveis.regionaisIds, ADMINISTRACAO: visiveis.administracoesIds,
     SETOR: visiveis.setoresIds, CASA: visiveis.casasIds,
@@ -40,7 +40,8 @@ espacosLocaisRouter.get('/', async c => {
   const contexto = c.get('contextoPermissoes')
   const localIds: string[] = [...new Set<string>(data.map((item: any) => String(item.localId)))]
   const localRows = await Promise.all(localIds.map((id: string) => db.select().from(locais).where(eq(locais.id, id)).get()))
-  const autorizados = await Promise.all(localRows.map((local: any) => espacoVisivel(db, contexto, local)))
+  const visiveis = eMasterSistema(contexto) ? undefined : await obterEscoposTerritoriaisVisiveis(db, contexto)
+  const autorizados = await Promise.all(localRows.map((local: any) => espacoVisivel(db, contexto, local, visiveis)))
   const idsPermitidos = new Set(localIds.filter((_: string, i: number) => autorizados[i]))
   return c.json(data.filter((item: any) => idsPermitidos.has(item.localId)))
 })
