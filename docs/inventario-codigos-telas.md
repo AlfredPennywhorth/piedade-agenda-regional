@@ -61,6 +61,7 @@ Subtelas de Séries, Convocações, Administração, Portaria, Relatórios, Meu 
 | AGD-ADM-032 | Editar Rascunho de Convocação | Editar | AGD-ADM-014 |
 | AGD-ADM-033 | Publicar Convocação | Confirmação | AGD-ADM-014 |
 | AGD-ADM-034 | Cancelar Convocação | Confirmação | AGD-ADM-014 |
+| AGD-ADM-059 | Sincronizar Diáconos da Convocação | Confirmação | AGD-ADM-014 |
 
 Nota: a numeração mantém todos os códigos de telas publicados previamente. Os identificadores aparecem discretamente na superfície secundária correspondente, além do código da aba pai.
 

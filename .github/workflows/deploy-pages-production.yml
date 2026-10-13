@@ -84,6 +84,9 @@ jobs:
       - name: Build frontend for production
         env:
           VITE_API_URL: ${{ vars.PROD_API_URL }}
+          VITE_APP_ENV: production
+          VITE_APP_VERSION: 1.1.0
+          VITE_BUILD_SHA: ${{ github.sha }}
         run: pnpm --filter @piedade/web build
 
       - name: Ensure main is the Pages production branch

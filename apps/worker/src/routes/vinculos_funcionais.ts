@@ -97,7 +97,24 @@ function escopoDoVinculo(vinculo: any): {
   return null
 }
 
-function eventoCorrespondeAoVinculo(evento: any, vinculo: any): boolean {
+function eventoCorrespondeAoVinculo(evento: any, vinculo: any, hierarquiaDco: {
+  casaId: string; setorId: string; administracaoId: string; regionalId: string
+  casaAtiva: boolean; setorAtivo: boolean; administracaoAtiva: boolean; regionalAtiva: boolean
+} | null, dcoAutomatico: boolean): boolean {
+  // Apenas o DCO automático segue a hierarquia da Casa, respeitando os níveis ativos.
+  // O evento de Setor não exige Administração ativa; o de Casa exige Casa ativa.
+  if (dcoAutomatico) {
+    if (!hierarquiaDco || evento.abrangencia !== 'TERRITORIAL' || evento.grupoTrabalhoId) return false
+    if (evento.casaId) return hierarquiaDco.casaAtiva && evento.casaId === hierarquiaDco.casaId
+    if (evento.setorId) return hierarquiaDco.casaAtiva && hierarquiaDco.setorAtivo
+      && evento.setorId === hierarquiaDco.setorId
+    if (evento.administracaoId) return hierarquiaDco.casaAtiva && hierarquiaDco.setorAtivo
+      && hierarquiaDco.administracaoAtiva && evento.administracaoId === hierarquiaDco.administracaoId
+    if (evento.regionalId) return hierarquiaDco.casaAtiva && hierarquiaDco.setorAtivo
+      && hierarquiaDco.administracaoAtiva && hierarquiaDco.regionalAtiva
+      && evento.regionalId === hierarquiaDco.regionalId
+    return false
+  }
   if (vinculo.regionalId) return evento.regionalId === vinculo.regionalId
   if (vinculo.administracaoId) return evento.administracaoId === vinculo.administracaoId
   if (vinculo.setorId) return evento.setorId === vinculo.setorId
@@ -112,7 +129,7 @@ type SincronizacaoConvocacao = {
   destinatarioNovo: boolean
 }
 
-export async function prepararSincronizacaoConvocacoes(db: any, vinculo: any, assumirMembroAtivo = false): Promise<SincronizacaoConvocacao[]> {
+export async function prepararSincronizacaoConvocacoes(db: any, vinculo: any, assumirMembroAtivo = false, casaDestinoId?: string): Promise<SincronizacaoConvocacao[]> {
   if (!vinculo?.ativo) return []
 
   if (!assumirMembroAtivo) {
@@ -123,6 +140,37 @@ export async function prepararSincronizacaoConvocacoes(db: any, vinculo: any, as
       .get()
     if (!membro?.ativo) return []
   }
+
+  // Para membros novos ou transferidos, o vínculo ainda não existe no banco.
+  // Resolve a Casa de destino diretamente para aplicar a mesma hierarquia da reativação.
+  const membroAtual = vinculo.casaId
+    ? await db.select({ casaId: membros.casaId }).from(membros)
+        .where(eq(membros.id, vinculo.membroId)).get()
+    : null
+  // Em criação/transferência automática, a Casa de destino ainda pode não estar persistida.
+  // Para legado manual, só há herança quando a Casa do vínculo é a Casa atual do membro.
+  const dcoElegivel = !!vinculo.casaId && (
+    vinculo.origem === 'MEMBRO_AUTOMATICO'
+    || ((casaDestinoId ?? membroAtual?.casaId) != null && (casaDestinoId ?? membroAtual?.casaId) === vinculo.casaId)
+  )
+  const funcaoDco = dcoElegivel
+    ? await db.select({ codigo: funcoes.codigo, ativo: funcoes.ativo })
+        .from(funcoes).where(eq(funcoes.id, vinculo.funcaoId)).get()
+    : null
+  const dcoAutomatico = funcaoDco?.codigo === 'DCO' && funcaoDco.ativo
+  const casaDco = dcoAutomatico
+    ? await db.select({
+        casaId: casas.id, setorId: setores.id,
+        administracaoId: administracoes.id, regionalId: administracoes.regionalId,
+        casaAtiva: casas.ativo, setorAtivo: setores.ativo, administracaoAtiva: administracoes.ativo,
+        regionalAtiva: regionais.ativo,
+      }).from(casas)
+        .innerJoin(setores, eq(setores.id, casas.setorId))
+        .innerJoin(administracoes, eq(administracoes.id, setores.administracaoId))
+        .innerJoin(regionais, eq(regionais.id, administracoes.regionalId))
+        .where(eq(casas.id, vinculo.casaId)).get()
+    : null
+  const hierarquiaDco = casaDco ?? null
 
   const agoraIso = new Date().toISOString()
   const candidatas = await db
@@ -151,7 +199,7 @@ export async function prepararSincronizacaoConvocacoes(db: any, vinculo: any, as
 
   const resultado: SincronizacaoConvocacao[] = []
   for (const candidata of candidatas) {
-    if (!eventoCorrespondeAoVinculo(candidata.evento, vinculo)) continue
+    if (!eventoCorrespondeAoVinculo(candidata.evento, vinculo, hierarquiaDco, !!dcoAutomatico)) continue
 
     const existente = await db
       .select({ id: convocacaoDestinatarios.id })

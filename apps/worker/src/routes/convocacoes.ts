@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, inArray, sql, asc } from 'drizzle-orm'
+import { eq, and, or, inArray, sql, asc } from 'drizzle-orm'
 import {
   convocacoes,
   convocacaoFuncoes,
@@ -7,6 +7,10 @@ import {
   convocacaoDestinatarioEvidencias,
   eventos,
   vinculosFuncionais,
+  casas,
+  setores,
+  administracoes,
+  regionais,
   membros,
   funcoes,
   rsvp,
@@ -63,12 +67,22 @@ async function podeGerirConvocacao(db: any, membroId: string, evento: any): Prom
 convocacoesRouter.get('/', async c => {
   const db = c.get('db')
   const condicao = await condicaoEventosVisiveis(db, c.get('contextoPermissoes'))
-  const data = await db.select({ convocacao: convocacoes })
+  const data = await db.select({
+    convocacao: convocacoes,
+    possuiFuncaoDco: sql<number>`EXISTS (
+      SELECT 1 FROM ${convocacaoFuncoes} cf
+      JOIN ${funcoes} f ON f.id = cf.funcao_id
+      WHERE cf.convocacao_id = ${convocacoes.id}
+      AND f.codigo = 'DCO' AND f.ativo = 1
+    )`,
+  })
     .from(convocacoes)
     .innerJoin(eventos, eq(convocacoes.eventoId, eventos.id))
     .where(condicao)
     .all()
-  return c.json(data.map((item: any) => item.convocacao))
+  return c.json(data.map((item: any) => ({
+    ...item.convocacao, possuiFuncaoDco: Boolean(item.possuiFuncaoDco),
+  })))
 })
 
 convocacoesRouter.get('/:id', async c => {
@@ -417,32 +431,47 @@ convocacoesRouter.post('/:id/publicar', async c => {
     return c.json({ error: 'Uma ou mais funções associadas estão inativas' }, 400)
   }
 
-  // Derivação dos destinatários
-  // Condições: vinculo ativo, membro ativo, escopo bate com evento, funcaoId IN funcaoIds
+  // A função DCO é vinculada à Casa, mas pode ser convocada por seus níveis superiores.
+  // Demais funções seguem exigindo vínculo explícito no escopo do evento.
   const conditions = [
     eq(vinculosFuncionais.ativo, true),
     eq(membros.ativo, true),
     inArray(vinculosFuncionais.funcaoId, funcaoIds),
   ]
-
-  const eventoExterno = evento.abrangencia === 'NACIONAL' || evento.abrangencia === 'INTERNACIONAL'
-  if (eventoExterno) {
-    if (!evento.regionalGestaoId) {
-      return c.json({
-        error: 'Evento externo sem Regional responsável não pode publicar convocação',
-        code: 'REGIONAL_GESTAO_AUSENTE',
-      }, 409)
-    }
-    conditions.push(eq(vinculosFuncionais.regionalId, evento.regionalGestaoId))
-  }
-
-  if (evento.regionalId) conditions.push(eq(vinculosFuncionais.regionalId, evento.regionalId))
-  if (evento.administracaoId)
-    conditions.push(eq(vinculosFuncionais.administracaoId, evento.administracaoId))
-  if (evento.setorId) conditions.push(eq(vinculosFuncionais.setorId, evento.setorId))
-  if (evento.casaId) conditions.push(eq(vinculosFuncionais.casaId, evento.casaId))
-  if (evento.grupoTrabalhoId)
+  const vinculoDco = and(eq(funcoes.codigo, 'DCO'), eq(vinculosFuncionais.casaId, membros.casaId))
+  if (evento.casaId) {
+    const casasAtivas = db.select({ id: casas.id }).from(casas).where(eq(casas.ativo, true))
+    // A regra de Casa ativa aplica-se ao DCO automático; vínculos comuns/manuais
+    // mantêm a correspondência direta, sem herança territorial.
+    conditions.push(eq(vinculosFuncionais.casaId, evento.casaId))
+    conditions.push(or(sql`${funcoes.codigo} != 'DCO'`,
+      and(eq(vinculosFuncionais.casaId, membros.casaId), inArray(vinculosFuncionais.casaId, casasAtivas)))!)
+  } else if (evento.setorId) {
+    const casasDoSetor = db.select({ id: casas.id }).from(casas)
+      .innerJoin(setores, eq(setores.id, casas.setorId))
+      .where(and(eq(casas.setorId, evento.setorId), eq(casas.ativo, true), eq(setores.ativo, true)))
+    conditions.push(or(eq(vinculosFuncionais.setorId, evento.setorId),
+      and(vinculoDco, inArray(vinculosFuncionais.casaId, casasDoSetor)))!)
+  } else if (evento.administracaoId) {
+    const casasDaAdministracao = db.select({ id: casas.id }).from(casas)
+      .innerJoin(setores, eq(setores.id, casas.setorId))
+      .innerJoin(administracoes, eq(administracoes.id, setores.administracaoId))
+      .where(and(eq(setores.administracaoId, evento.administracaoId),
+        eq(administracoes.ativo, true), eq(setores.ativo, true), eq(casas.ativo, true)))
+    conditions.push(or(eq(vinculosFuncionais.administracaoId, evento.administracaoId),
+      and(vinculoDco, inArray(vinculosFuncionais.casaId, casasDaAdministracao)))!)
+  } else if (evento.regionalId) {
+    const casasDaRegional = db.select({ id: casas.id }).from(casas)
+      .innerJoin(setores, eq(setores.id, casas.setorId))
+      .innerJoin(administracoes, eq(administracoes.id, setores.administracaoId))
+      .innerJoin(regionais, eq(regionais.id, administracoes.regionalId))
+      .where(and(eq(administracoes.regionalId, evento.regionalId),
+        eq(regionais.ativo, true), eq(administracoes.ativo, true), eq(setores.ativo, true), eq(casas.ativo, true)))
+    conditions.push(or(eq(vinculosFuncionais.regionalId, evento.regionalId),
+      and(vinculoDco, inArray(vinculosFuncionais.casaId, casasDaRegional)))!)
+  } else if (evento.grupoTrabalhoId) {
     conditions.push(eq(vinculosFuncionais.grupoTrabalhoId, evento.grupoTrabalhoId))
+  }
 
   // Realiza query juntando vinculosFuncionais e membros
   const destinatariosValidos = await db
@@ -453,6 +482,7 @@ convocacoesRouter.post('/:id/publicar', async c => {
     })
     .from(vinculosFuncionais)
     .innerJoin(membros, eq(membros.id, vinculosFuncionais.membroId))
+    .innerJoin(funcoes, eq(funcoes.id, vinculosFuncionais.funcaoId))
     .where(and(...conditions))
     .all()
 
@@ -578,6 +608,76 @@ convocacoesRouter.post('/:id/publicar', async c => {
     }
     return c.json({ error: 'Falha ao materializar destinatários' }, 400)
   }
+})
+
+// Reconciliação idempotente de DCO em convocação já publicada.
+// Não altera RSVP, funções existentes ou evidências históricas.
+convocacoesRouter.post('/:id/sincronizar-dco', async c => {
+  const db = c.get('db')
+  const id = c.req.param('id')
+  const atorMembroId = c.get('membroId')
+  const convocacao = await db.select().from(convocacoes).where(eq(convocacoes.id, id)).get()
+  if (!convocacao) return c.json({ error: 'Convocação não encontrada' }, 404)
+  if (convocacao.status !== 'PUBLICADA' || !convocacao.ativo)
+    return c.json({ error: 'Somente convocações publicadas e ativas podem ser sincronizadas' }, 409)
+  const evento = await db.select().from(eventos).where(eq(eventos.id, convocacao.eventoId)).get()
+  if (!evento || !atorMembroId || !(await podeGerirConvocacao(db, atorMembroId, evento)))
+    return c.json({ error: 'Acesso não autorizado', code: 'FORBIDDEN' }, 403)
+  if (evento.abrangencia !== 'TERRITORIAL')
+    return c.json({ error: 'A sincronização DCO é exclusiva de eventos territoriais' }, 409)
+  const dco = await db.select({ id: funcoes.id }).from(funcoes)
+    .where(and(eq(funcoes.codigo, 'DCO'), eq(funcoes.ativo, true))).get()
+  if (!dco) return c.json({ error: 'Função DCO canônica indisponível' }, 409)
+  const convocouDco = await db.select({ id: convocacaoFuncoes.id }).from(convocacaoFuncoes)
+    .where(and(eq(convocacaoFuncoes.convocacaoId, id), eq(convocacaoFuncoes.funcaoId, dco.id))).get()
+  if (!convocouDco) return c.json({ error: 'Convocação não contém a função canônica DCO' }, 409)
+  const nowIso = new Date().toISOString()
+  if (evento.fimEm <= nowIso) return c.json({ error: 'Convocação encerrada não pode ser sincronizada' }, 409)
+  const antes = await db.select({ total: sql<number>`count(*)` }).from(convocacaoDestinatarios)
+    .where(eq(convocacaoDestinatarios.convocacaoId, id)).get()
+  const { escopoTipo, escopoId } = extrairEscopoDoEvento(evento)
+  try {
+    await executarOperacaoComAudit(db,
+      qdb => [
+        // Guarda atômica: cancelar/desativar ou remover a função após a leitura
+        // deve abortar o batch inteiro, inclusive a auditoria.
+        qdb.update(convocacoes).set({
+          status: sql`CASE WHEN ${convocacoes.status} = 'PUBLICADA'
+            AND ${convocacoes.ativo} = 1
+            AND EXISTS (SELECT 1 FROM ${eventos}
+              WHERE ${eventos.id} = ${convocacoes.eventoId}
+              AND ${eventos.ativo} = 1 AND ${eventos.abrangencia} = 'TERRITORIAL'
+              AND julianday(${eventos.fimEm}) > julianday('now')
+              AND ${eventos.regionalId} IS ${evento.regionalId ?? null}
+              AND ${eventos.administracaoId} IS ${evento.administracaoId ?? null}
+              AND ${eventos.setorId} IS ${evento.setorId ?? null}
+              AND ${eventos.casaId} IS ${evento.casaId ?? null}
+              AND ${eventos.grupoTrabalhoId} IS ${evento.grupoTrabalhoId ?? null})
+            AND EXISTS (SELECT 1 FROM ${convocacaoFuncoes}
+              JOIN ${funcoes} ON ${funcoes.id} = ${convocacaoFuncoes.funcaoId}
+              WHERE ${convocacaoFuncoes.convocacaoId} = ${convocacoes.id}
+                AND ${funcoes.codigo} = 'DCO' AND ${funcoes.ativo} = 1)
+            THEN 'PUBLICADA' ELSE 'ABORT_OCC' END` as any,
+        }).where(eq(convocacoes.id, id)),
+        ...queriesSincronizacaoDcoAtual(qdb, nowIso, { convocacaoId: id }),
+      ],
+      {
+        acao: 'CONVOCACAO_DCO_SINCRONIZADA',
+      atorMembroId,
+      recursoTipo: 'CONVOCACAO',
+      recursoId: id,
+      escopoTipo,
+      escopoId,
+      contexto: { operacao: 'ADITIVA_IDEMPOTENTE' },
+      }
+    )
+  } catch {
+    return c.json({ error: 'Convocação alterada durante a sincronização; recarregue e tente novamente' }, 409)
+  }
+  const depois = await db.select({ total: sql<number>`count(*)` }).from(convocacaoDestinatarios)
+    .where(eq(convocacaoDestinatarios.convocacaoId, id)).get()
+  return c.json({ success: true, destinatariosAntes: antes?.total ?? 0,
+    destinatariosDepois: depois?.total ?? 0 })
 })
 
 convocacoesRouter.post('/:id/cancelar', async c => {
