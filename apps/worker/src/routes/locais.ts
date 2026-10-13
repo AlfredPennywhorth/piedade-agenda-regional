@@ -67,7 +67,9 @@ locaisRouter.get('/escopos-autorizados', async c => {
     const setorAdm = new Map<string, string>(setoresRows.map((a: any) => [a.id, a.administracaoId]))
     const podeAdm = (id: string) => master || admsGeridas.has(id) || regionaisGeridas.has(admRegional.get(id) ?? '')
     const podeSetor = (id: string) => master || setoresGeridos.has(id) || podeAdm(setorAdm.get(id) ?? '')
-    if (master) regionaisRows.forEach((a: any) => adicionar('REGIONAL', a.id, a.nome))
+    regionaisRows.forEach((a: any) => {
+      if (master || regionaisGeridas.has(a.id)) adicionar('REGIONAL', a.id, a.nome)
+    })
     admsRows.forEach((a: any) => { if (podeAdm(a.id)) adicionar('ADMINISTRACAO', a.id, a.nome) })
     setoresRows.forEach((a: any) => { if (podeSetor(a.id)) adicionar('SETOR', a.id, a.nome) })
     casasRows.forEach((a: any) => { if (master || casasGeridas.has(a.id) || podeSetor(a.setorId)) adicionar('CASA', a.id, a.nome) })
