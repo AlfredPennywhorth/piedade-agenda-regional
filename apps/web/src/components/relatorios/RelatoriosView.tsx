@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as apiClient from '../../api/apiClient'
 import { RelatoriosPresencaView } from './RelatoriosPresencaView'
+import { baixarCsv, montarCsv } from '../../utils/csv'
 
 interface EventoLookup {
   id: string
@@ -63,6 +64,19 @@ interface RelatorioAgregadoData {
   }[]
 }
 
+interface UtilizacaoLocaisData {
+  totalOcorrencias: number
+  totalComLocal: number
+  ranking: Array<{
+    localId: string
+    localNome: string
+    espacoId: string | null
+    espacoNome: string | null
+    totalEventos: number
+    minutosAgendados: number
+  }>
+}
+
 export function RelatoriosView() {
   const [modo, setModo] = useState<'evento' | 'agregado' | 'presencas'>('presencas')
 
@@ -88,6 +102,9 @@ export function RelatoriosView() {
   const [relatorioAgregado, setRelatorioAgregado] = useState<RelatorioAgregadoData | null>(null)
   const [loadingAgregado, setLoadingAgregado] = useState(false)
   const [erroAgregado, setErroAgregado] = useState<string | null>(null)
+  const [utilizacao, setUtilizacao] = useState<UtilizacaoLocaisData | null>(null)
+  const [loadingUtilizacao, setLoadingUtilizacao] = useState(false)
+  const [erroUtilizacao, setErroUtilizacao] = useState<string | null>(null)
 
   useEffect(() => {
     let ativo = true
@@ -151,6 +168,40 @@ export function RelatoriosView() {
     } catch (err: any) {
       console.error(err)
     }
+  }
+
+  const carregarUtilizacao = async () => {
+    if (!escopoId) {
+      setErroUtilizacao('Informe o ID do escopo para consultar locais.')
+      return
+    }
+    setLoadingUtilizacao(true)
+    setErroUtilizacao(null)
+    setUtilizacao(null)
+    try {
+      const params = new URLSearchParams({ escopoTipo, escopoId })
+      if (dataInicio) params.set('dataInicio', dataInicio)
+      if (dataFim) params.set('dataFim', dataFim)
+      const dados = await apiClient.fetchWithAuth<UtilizacaoLocaisData>(
+        `/relatorios/utilizacao-locais?${params.toString()}`
+      )
+      setUtilizacao(dados)
+    } catch (erro) {
+      setErroUtilizacao(erro instanceof Error ? erro.message : 'Não foi possível consultar a utilização dos locais.')
+    } finally {
+      setLoadingUtilizacao(false)
+    }
+  }
+
+  const exportarUtilizacao = () => {
+    if (!utilizacao) return
+    baixarCsv('utilizacao-locais.csv', montarCsv(
+      ['Local', 'Espaço', 'Eventos', 'Horas agendadas'],
+      utilizacao.ranking.map(item => [
+        item.localNome, item.espacoNome ?? 'Sem espaço', item.totalEventos,
+        (item.minutosAgendados / 60).toFixed(2).replace('.', ','),
+      ])
+    ))
   }
 
   const carregarAgregado = async (e: React.FormEvent) => {
@@ -432,6 +483,55 @@ export function RelatoriosView() {
               {loadingAgregado ? 'Gerando Relatório...' : 'Gerar Relatório Agregado'}
             </button>
           </form>
+
+          <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-slate-800">Utilização de locais e espaços</h3>
+                <p className="text-xs text-slate-500">Utiliza o escopo e período selecionados acima; considera eventos ativos com local cadastrado.</p>
+              </div>
+              <button type="button" onClick={() => void carregarUtilizacao()} disabled={loadingUtilizacao}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+                {loadingUtilizacao ? 'Consultando...' : 'Consultar utilização'}
+              </button>
+            </div>
+            {erroUtilizacao && <p role="alert" className="text-sm text-red-700">{erroUtilizacao}</p>}
+            {utilizacao && (
+              <>
+                <div className="flex flex-wrap justify-between gap-2 text-sm text-slate-700">
+                  <p>{utilizacao.totalComLocal} eventos com local, de {utilizacao.totalOcorrencias} eventos no escopo</p>
+                  <button type="button" onClick={exportarUtilizacao}
+                    className="rounded border border-slate-300 px-3 py-1.5 font-medium hover:bg-slate-50">
+                    Exportar CSV
+                  </button>
+                </div>
+                {utilizacao.ranking.length === 0 ? (
+                  <p className="text-sm text-slate-500">Nenhum evento com local cadastrado no período.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-left text-sm">
+                      <thead><tr className="border-b text-slate-600">
+                        <th scope="col" className="p-2">Local</th>
+                        <th scope="col" className="p-2">Espaço</th>
+                        <th scope="col" className="p-2">Eventos</th>
+                        <th scope="col" className="p-2">Horas</th>
+                      </tr></thead>
+                      <tbody>
+                        {utilizacao.ranking.map(item => (
+                          <tr key={`${item.localId}:${item.espacoId ?? ''}`} className="border-b border-slate-100">
+                            <td className="p-2">{item.localNome}</td>
+                            <td className="p-2">{item.espacoNome ?? 'Sem espaço'}</td>
+                            <td className="p-2">{item.totalEventos}</td>
+                            <td className="p-2">{(item.minutosAgendados / 60).toFixed(1).replace('.', ',')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
           {erroAgregado && (
             <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm">
