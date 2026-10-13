@@ -328,6 +328,8 @@ describe('EventosView', () => {
     fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
 
     const eventoDialog = await screen.findByRole('dialog', { name: /novo evento/i })
+    fireEvent.change(within(eventoDialog).getByLabelText(/tipo de escopo/i), { target: { value: 'regional' } })
+    fireEvent.change(within(eventoDialog).getByLabelText(/regional \*/i), { target: { value: REGIONAL_ID } })
     fireEvent.click(within(eventoDialog).getByRole('button', { name: /criar local sem sair/i }))
 
     const localDialog = await screen.findByRole('dialog', { name: /criar local/i })
