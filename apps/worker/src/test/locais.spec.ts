@@ -48,6 +48,7 @@ describe('Locais API (S04)', () => {
     }))
     expect((await criarEspaco(authToken, localCriado.id)).status).toBe(201)
     const outraConta = await criarSessaoAutenticadaTeste(sqlite, 'locais-outro-autor')
+    sqlite.prepare('DELETE FROM acessos_conta WHERE conta_acesso_id = ?').run(outraConta.contaId)
     expect((await criarEspaco(outraConta.token, localCriado.id)).status).toBe(403)
     const tentarEdicao = await app.request('/api/v1/espacos-locais/' + (await db.select().from((await import('../db/schema')).espacosLocal).get()).id, mesclarAutorizacao(authToken, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome: 'Novo Templo' }),
