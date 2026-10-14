@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { and, eq, isNull, or } from 'drizzle-orm'
-import { espacosLocal, locais } from '../db/schema'
+import { espacosLocal, locais, membros, casas, setores } from '../db/schema'
 import { EspacoLocalCreate, EspacoLocalUpdate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, podeGerenciarCadastroTerritorial, obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
@@ -19,6 +19,18 @@ async function espacoVisivel(db: any, contexto: any, local: any, visiveisPrecarr
     GRUPO_TRABALHO: visiveis.gruposTrabalhoIds,
   }
   return grupos[local.escopoTipo]?.has(local.escopoId) ?? false
+}
+
+async function podeCriarEspacoNoLocalDeAutoria(db: any, local: any, membroId: string | null): Promise<boolean> {
+  if (!membroId || local.proprietarioMembroId || local.escopoTipo !== 'SETOR' ||
+      local.criadorInstitucionalMembroId !== membroId || !local.ativo) return false
+  const vinculo = await db.select({ setorId: setores.id })
+    .from(membros)
+    .innerJoin(casas, eq(membros.casaId, casas.id))
+    .innerJoin(setores, eq(casas.setorId, setores.id))
+    .where(and(eq(membros.id, membroId), eq(membros.ativo, true), eq(casas.ativo, true), eq(setores.ativo, true)))
+    .get()
+  return vinculo?.setorId === local.escopoId
 }
 
 export const espacosLocaisRouter = new Hono<any>()
@@ -92,8 +104,9 @@ espacosLocaisRouter.post('/', async c => {
     if (!local || local.proprietarioMembroId) return c.json({ error: 'Local institucional não encontrado' }, 404)
     if (!local.escopoTipo || !local.escopoId) {
       if (!eMasterSistema(c.get('contextoPermissoes'))) return c.json({ error: 'Somente o Master administra espaços de locais legados', code: 'FORBIDDEN' }, 403)
-    } else if (!await podeGerenciarCadastroTerritorial(db, c.get('contextoPermissoes'), local.escopoTipo, local.escopoId)) {
-      return c.json({ error: 'Sem permissão para administrar espaços deste local', code: 'FORBIDDEN' }, 403)
+    } else if (!await podeGerenciarCadastroTerritorial(db, c.get('contextoPermissoes'), local.escopoTipo, local.escopoId) &&
+      !await podeCriarEspacoNoLocalDeAutoria(db, local, c.get('membroId'))) {
+      return c.json({ error: 'Sem permissão para criar espaços neste local', code: 'FORBIDDEN' }, 403)
     }
     const id = crypto.randomUUID()
     await executarOperacaoComAudit(
