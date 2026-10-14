@@ -30,6 +30,7 @@ export function VinculosFuncionaisView() {
   const [vinculos, setVinculos] = useState<VinculoFuncional[]>([])
   const [participantesGt, setParticipantesGt] = useState<Array<{ grupoTrabalhoId: string; membroId: string }>>([])
   const [participantesGtIndisponiveis, setParticipantesGtIndisponiveis] = useState(false)
+  const [participantesGtCarregando, setParticipantesGtCarregando] = useState(true)
   const [buscaVinculo, setBuscaVinculo] = useState('')
   const [filtroStatusLista, setFiltroStatusLista] = useState<'todos' | 'ativos' | 'inativos'>('ativos')
   const [filtroTipoLista, setFiltroTipoLista] = useState<TipoEscopo>('')
@@ -111,6 +112,8 @@ export function VinculosFuncionaisView() {
   const carregarDados = async () => {
     setLoading(true)
     setErro(null)
+    setParticipantesGtCarregando(true)
+    setFiltroGtLista('')
     try {
       await carregarLookups()
       const data = await fetchWithAuth<VinculoFuncional[]>('/vinculos-funcionais')
@@ -121,13 +124,16 @@ export function VinculosFuncionaisView() {
           if (!Array.isArray(participacoes)) throw new Error('Resposta de participantes GT inválida')
           setParticipantesGt(participacoes)
           setParticipantesGtIndisponiveis(false)
+          setParticipantesGtCarregando(false)
         })
         .catch(() => {
           setParticipantesGt([])
           setParticipantesGtIndisponiveis(true)
+          setParticipantesGtCarregando(false)
           setFiltroGtLista('')
         })
     } catch (err: any) {
+      setParticipantesGtCarregando(false)
       setErro(err.message || 'Erro ao carregar os vínculos funcionais.')
     } finally {
       setLoading(false)
@@ -806,7 +812,7 @@ export function VinculosFuncionaisView() {
           </label>
           <label className="text-sm text-slate-700">
             Grupo de Trabalho
-            <select disabled={participantesGtIndisponiveis} value={filtroGtLista} onChange={e => setFiltroGtLista(e.target.value)}
+            <select disabled={participantesGtCarregando || participantesGtIndisponiveis} value={filtroGtLista} onChange={e => setFiltroGtLista(e.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-300 p-2">
               <option value="">Todos os Grupos de Trabalho</option>
               {[...gts].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(gt => (
