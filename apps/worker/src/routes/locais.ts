@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { eq, isNull, or } from 'drizzle-orm'
-import { locais, regionais, administracoes, setores, casas, gruposTrabalho } from '../db/schema'
+import { and, eq, isNull, or } from 'drizzle-orm'
+import { locais, regionais, administracoes, setores, casas, gruposTrabalho, membros } from '../db/schema'
 import { LocalCreate, LocalUpdate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, podeGerenciarCadastroTerritorial, obterRegionalDoEscopo, obterEscoposTerritoriaisVisiveis } from '../security/permissoes'
@@ -21,6 +21,18 @@ async function localVisivel(db: any, contexto: any, local: any, visiveisPrecarre
     GRUPO_TRABALHO: visiveis.gruposTrabalhoIds,
   }
   return chaves[local.escopoTipo]?.has(local.escopoId) ?? false
+}
+
+// A vinculação ordinária à Casa de Oração permite cadastrar Local no próprio Setor,
+// sem conceder permissão administrativa para editar cadastros institucionais.
+async function setorDeOrigemAtivo(db: any, membroId: string | null | undefined) {
+  if (!membroId) return null
+  return db.select({ id: setores.id, nome: setores.nome })
+    .from(membros)
+    .innerJoin(casas, eq(membros.casaId, casas.id))
+    .innerJoin(setores, eq(casas.setorId, setores.id))
+    .where(and(eq(membros.id, membroId), eq(membros.ativo, true), eq(casas.ativo, true), eq(setores.ativo, true)))
+    .get()
 }
 
 export const locaisRouter = new Hono<any>()
@@ -84,6 +96,8 @@ locaisRouter.get('/escopos-autorizados', async c => {
         (regionalId && regionaisGeridas.has(regionalId))) adicionar('GRUPO_TRABALHO', gt.id, gt.nome)
     })
   }
+  const setorOrigem = await setorDeOrigemAtivo(c.get('db'), c.get('membroId'))
+  if (setorOrigem) adicionar('SETOR', setorOrigem.id, setorOrigem.nome)
   return c.json({ master: eMasterSistema(contexto), escopos })
 })
 
@@ -136,7 +150,9 @@ locaisRouter.post('/', async (c) => {
     if (tipo && escopoId) {
       const existe = await obterRegionalDoEscopo(db, tipo, escopoId)
       if (!existe) return c.json({ error: 'Escopo territorial não encontrado' }, 400)
-      if (!await podeGerenciarCadastroTerritorial(db, contexto, tipo, escopoId)) return c.json({ error: 'Sem permissão para cadastrar neste escopo', code: 'FORBIDDEN' }, 403)
+      const setorOrigem = tipo === 'SETOR' ? await setorDeOrigemAtivo(db, c.get('membroId')) : null
+      const podeCriarNoProprioSetor = tipo === 'SETOR' && setorOrigem?.id === escopoId
+      if (!podeCriarNoProprioSetor && !await podeGerenciarCadastroTerritorial(db, contexto, tipo, escopoId)) return c.json({ error: 'Sem permissão para cadastrar neste escopo', code: 'FORBIDDEN' }, 403)
     }
 
     const id = crypto.randomUUID()
