@@ -115,16 +115,18 @@ export function VinculosFuncionaisView() {
       await carregarLookups()
       const data = await fetchWithAuth<VinculoFuncional[]>('/vinculos-funcionais')
       setVinculos(data)
-      try {
-        const participacoes = await fetchWithAuth<Array<{ grupoTrabalhoId: string; membroId: string }>>('/vinculos-funcionais/participantes-gt')
-        if (!Array.isArray(participacoes)) throw new Error('Resposta de participantes GT inválida')
-        setParticipantesGt(participacoes)
-        setParticipantesGtIndisponiveis(false)
-      } catch {
-        setParticipantesGt([])
-        setParticipantesGtIndisponiveis(true)
-        setFiltroGtLista('')
-      }
+      // A consulta auxiliar não pode bloquear a listagem principal.
+      void fetchWithAuth<Array<{ grupoTrabalhoId: string; membroId: string }>>('/vinculos-funcionais/participantes-gt')
+        .then(participacoes => {
+          if (!Array.isArray(participacoes)) throw new Error('Resposta de participantes GT inválida')
+          setParticipantesGt(participacoes)
+          setParticipantesGtIndisponiveis(false)
+        })
+        .catch(() => {
+          setParticipantesGt([])
+          setParticipantesGtIndisponiveis(true)
+          setFiltroGtLista('')
+        })
     } catch (err: any) {
       setErro(err.message || 'Erro ao carregar os vínculos funcionais.')
     } finally {
