@@ -67,7 +67,8 @@ function condicaoGestaoRegionalExternaDaConta(
 
 function condicaoEscoposTecnicosDaConta(
   contexto: ContextoPermissoes,
-  perfisSql: string
+  perfisSql: string,
+  restringirAdministradorARegional = false
 ): SQL {
   if (!contexto.contaAcessoId) return sql`0 = 1`
   const e = schema.eventos
@@ -78,6 +79,7 @@ function condicaoEscoposTecnicosDaConta(
     WHERE ac.conta_acesso_id = ${contexto.contaAcessoId}
       AND ac.ativo = 1
       AND ac.perfil_codigo IN (${perfis})
+      ${restringirAdministradorARegional ? sql`AND (ac.perfil_codigo <> 'ADMINISTRADOR_SISTEMA' OR ac.escopo_tipo = 'REGIONAL')` : sql``}
       AND (
         (ac.escopo_tipo = 'REGIONAL' AND (
           ${e.regionalId} = ac.escopo_id
@@ -206,7 +208,8 @@ export function condicaoEventosGerenciaveis(contexto: ContextoPermissoes): SQL {
   const e = schema.eventos
   const escoposTecnicos = condicaoEscoposTecnicosDaConta(
     contexto,
-    "'ADMINISTRADOR_SISTEMA','GESTOR_AGENDA'"
+    "'ADMINISTRADOR_SISTEMA','GESTOR_AGENDA'",
+    true
   )
   const escopoExternoGerenciavel = condicaoGestaoRegionalExternaDaConta(
     contexto,
