@@ -1035,7 +1035,22 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     setSalvandoLocalRapido(true)
     setLocalRapidoErro(null)
     try {
-      const criado = await postWithAuth<Local>(formData.pessoal ? '/locais/particulares' : '/locais', formData.pessoal ? parsed.data : { ...parsed.data, escopoTipo: tipoEscopo === 'grupoTrabalho' ? 'GRUPO_TRABALHO' : tipoEscopo?.toUpperCase(), escopoId: tipoEscopo === 'regional' ? formData.regionalId : tipoEscopo === 'administracao' ? formData.administracaoId : tipoEscopo === 'setor' ? formData.setorId : tipoEscopo === 'casa' ? formData.casaId : tipoEscopo === 'grupoTrabalho' ? formData.grupoTrabalhoId : null })
+      const escopoTipoOriginal = tipoEscopo === 'grupoTrabalho' ? 'GRUPO_TRABALHO' : tipoEscopo.toUpperCase()
+      const escopoIdOriginal = tipoEscopo === 'regional' ? formData.regionalId : tipoEscopo === 'administracao' ? formData.administracaoId : tipoEscopo === 'setor' ? formData.setorId : tipoEscopo === 'casa' ? formData.casaId : tipoEscopo === 'grupoTrabalho' ? formData.grupoTrabalhoId : null
+      let escopoTipoCadastro = escopoTipoOriginal
+      let escopoIdCadastro = escopoIdOriginal
+      if (!formData.pessoal && tipoEscopo === 'casa') {
+        const setorCasa = casas.find(item => item.id === formData.casaId)?.setorId
+        if (setorCasa) {
+          const autorizados = await fetchWithAuth<{ escopos: Array<{ escopoTipo: string; escopoId: string }> }>('/locais/escopos-autorizados')
+          if (!autorizados.escopos.some(item => item.escopoTipo === 'CASA' && item.escopoId === formData.casaId) &&
+              autorizados.escopos.some(item => item.escopoTipo === 'SETOR' && item.escopoId === setorCasa)) {
+            escopoTipoCadastro = 'SETOR'
+            escopoIdCadastro = setorCasa
+          }
+        }
+      }
+      const criado = await postWithAuth<Local>(formData.pessoal ? '/locais/particulares' : '/locais', formData.pessoal ? parsed.data : { ...parsed.data, escopoTipo: escopoTipoCadastro, escopoId: escopoIdCadastro })
       setLocais(atuais => [...atuais.filter(item => item.id !== criado.id), criado]
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
       setFormData(atual => ({ ...atual, localId: criado.id, espacoId: '' }))

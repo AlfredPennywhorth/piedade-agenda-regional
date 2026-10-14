@@ -51,10 +51,16 @@ espacosLocaisRouter.get('/', async c => {
     a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id)
   )
   const contexto = c.get('contextoPermissoes')
+  // Uma única consulta aos locais associados aos espaços evita N+1 e estouro de queries D1.
+  const localRows = await db.select({ local: locais })
+    .from(espacosLocal)
+    .innerJoin(locais, eq(espacosLocal.localId, locais.id))
+    .where(conditions.length ? and(...conditions) : undefined)
+    .all()
+  const locaisPorId = new Map<string, any>(localRows.map((row: any) => [row.local.id, row.local]))
   const localIds: string[] = [...new Set<string>(data.map((item: any) => String(item.localId)))]
-  const localRows = await Promise.all(localIds.map((id: string) => db.select().from(locais).where(eq(locais.id, id)).get()))
   const visiveis = eMasterSistema(contexto) ? undefined : await obterEscoposTerritoriaisVisiveis(db, contexto)
-  const autorizados = await Promise.all(localRows.map((local: any) => espacoVisivel(db, contexto, local, visiveis)))
+  const autorizados = await Promise.all(localIds.map(id => espacoVisivel(db, contexto, locaisPorId.get(id), visiveis)))
   const idsPermitidos = new Set(localIds.filter((_: string, i: number) => autorizados[i]))
   const referenciados = autorizados.every(Boolean) ? new Set<string>() : await espacosDeEventosVisiveis(db, contexto, data.filter((item: any) => !idsPermitidos.has(item.localId) && !item.proprietarioMembroId).map((item: any) => item.id))
   return c.json(data.filter((item: any) => idsPermitidos.has(item.localId) || (!item.proprietarioMembroId && referenciados.has(item.id))))
