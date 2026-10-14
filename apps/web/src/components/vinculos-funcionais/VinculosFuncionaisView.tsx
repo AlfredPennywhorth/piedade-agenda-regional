@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { CreateVinculoFuncionalSchema, UpdateVinculoFuncionalSchema } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 
@@ -28,6 +28,10 @@ type TipoEscopo = 'regional' | 'administracao' | 'setor' | 'casa' | 'gt' | ''
 
 export function VinculosFuncionaisView() {
   const [vinculos, setVinculos] = useState<VinculoFuncional[]>([])
+  const [participantesGt, setParticipantesGt] = useState<Array<{ grupoTrabalhoId: string; membroId: string }>>([])
+  const [participantesGtIndisponiveis, setParticipantesGtIndisponiveis] = useState(false)
+  const [participantesGtCarregando, setParticipantesGtCarregando] = useState(true)
+  const geracaoCarregamento = useRef(0)
   const [buscaVinculo, setBuscaVinculo] = useState('')
   const [filtroStatusLista, setFiltroStatusLista] = useState<'todos' | 'ativos' | 'inativos'>('ativos')
   const [filtroTipoLista, setFiltroTipoLista] = useState<TipoEscopo>('')
@@ -107,21 +111,44 @@ export function VinculosFuncionaisView() {
   }
 
   const carregarDados = async () => {
+    const geracao = ++geracaoCarregamento.current
     setLoading(true)
     setErro(null)
+    setParticipantesGtCarregando(true)
+    setFiltroGtLista('')
     try {
       await carregarLookups()
       const data = await fetchWithAuth<VinculoFuncional[]>('/vinculos-funcionais')
+      if (geracao !== geracaoCarregamento.current) return
       setVinculos(data)
+      // A consulta auxiliar não pode bloquear a listagem principal.
+      void fetchWithAuth<Array<{ grupoTrabalhoId: string; membroId: string }>>('/vinculos-funcionais/participantes-gt')
+        .then(participacoes => {
+          if (geracao !== geracaoCarregamento.current) return
+          if (!Array.isArray(participacoes)) throw new Error('Resposta de participantes GT inválida')
+          setParticipantesGt(participacoes)
+          setParticipantesGtIndisponiveis(false)
+          setParticipantesGtCarregando(false)
+        })
+        .catch(() => {
+          if (geracao !== geracaoCarregamento.current) return
+          setParticipantesGt([])
+          setParticipantesGtIndisponiveis(true)
+          setParticipantesGtCarregando(false)
+          setFiltroGtLista('')
+        })
     } catch (err: any) {
+      if (geracao !== geracaoCarregamento.current) return
+      setParticipantesGtCarregando(false)
       setErro(err.message || 'Erro ao carregar os vínculos funcionais.')
     } finally {
-      setLoading(false)
+      if (geracao === geracaoCarregamento.current) setLoading(false)
     }
   }
 
   useEffect(() => {
-    carregarDados()
+    void carregarDados()
+    return () => { geracaoCarregamento.current += 1 }
   }, [])
 
   const handleChangeTipoEscopo = (novoTipo: TipoEscopo) => {
@@ -362,8 +389,8 @@ export function VinculosFuncionaisView() {
       .map(m => m.id)
   )
   const membrosDoGt = new Set(
-    vinculos.filter(v => v.grupoTrabalhoId === filtroGtLista && v.ativo)
-      .map(v => v.membroId)
+    participantesGt.filter(p => p.grupoTrabalhoId === filtroGtLista)
+      .map(p => p.membroId)
   )
 
   const vinculosFiltrados = vinculos.filter(v => {
@@ -373,7 +400,7 @@ export function VinculosFuncionaisView() {
     if (filtroTipoLista && tipo !== filtroTipoLista) return false
     if (filtroSetorLista && !membrosDoSetor.has(v.membroId)) return false
     if (filtroCasaLista && membros.find(m => m.id === v.membroId)?.casaId !== filtroCasaLista) return false
-    if (filtroGtLista && !membrosDoGt.has(v.membroId)) return false
+    if (filtroGtLista && !participantesGtIndisponiveis && !membrosDoGt.has(v.membroId)) return false
     const termo = buscaVinculo.trim().toLocaleLowerCase('pt-BR')
     return !termo || [getFuncaoNome(v), getMembroNome(v), renderNomeEscopo(v)].some(nome => nome.toLocaleLowerCase('pt-BR').includes(termo))
   })
@@ -408,6 +435,12 @@ export function VinculosFuncionaisView() {
         <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm flex justify-between items-center">
           <span>{erro}</span>
           <button onClick={() => setErro(null)} className="text-red-500 hover:text-red-700 font-bold ml-2">✕</button>
+        </div>
+      )}
+
+      {participantesGtIndisponiveis && (
+        <div role="alert" className="p-3 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-sm">
+          Participações dos Grupos de Trabalho indisponíveis temporariamente. A listagem de vínculos continua disponível; o filtro por GT está desabilitado.
         </div>
       )}
 
@@ -786,7 +819,7 @@ export function VinculosFuncionaisView() {
           </label>
           <label className="text-sm text-slate-700">
             Grupo de Trabalho
-            <select value={filtroGtLista} onChange={e => setFiltroGtLista(e.target.value)}
+            <select disabled={participantesGtCarregando || participantesGtIndisponiveis} value={filtroGtLista} onChange={e => setFiltroGtLista(e.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-300 p-2">
               <option value="">Todos os Grupos de Trabalho</option>
               {[...gts].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(gt => (
