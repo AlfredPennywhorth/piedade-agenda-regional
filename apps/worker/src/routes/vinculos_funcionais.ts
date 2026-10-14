@@ -417,13 +417,14 @@ vinculosFuncionaisRouter.get('/participantes-gt', async (c) => {
   const tudo = eMasterSistema(contexto)
   const acessos = contexto.acessosAtivos.filter((acesso: any) => acesso.escopoId)
   const gtsDiretos = new Set<string>(acessos.filter((a: any) => a.escopoTipo === 'GRUPO_TRABALHO').map((a: any) => a.escopoId))
+  const regionaisComAcesso = new Set<string>(acessos.filter((a: any) => a.escopoTipo === 'REGIONAL').map((a: any) => a.escopoId))
   const gestores = acessos.filter((a: any) =>
     ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(a.perfilCodigo))
   const regionaisGeridas = new Set<string>(gestores.filter((a: any) => a.escopoTipo === 'REGIONAL').map((a: any) => a.escopoId))
   const admsGeridas = new Set<string>(gestores.filter((a: any) => a.escopoTipo === 'ADMINISTRACAO').map((a: any) => a.escopoId))
   const setoresGeridos = new Set<string>(gestores.filter((a: any) => a.escopoTipo === 'SETOR').map((a: any) => a.escopoId))
   const idsGt = new Set<string>(gtsDiretos)
-  if (!tudo && (regionaisGeridas.size || admsGeridas.size || setoresGeridos.size)) {
+  if (!tudo && (regionaisComAcesso.size || admsGeridas.size || setoresGeridos.size)) {
     const [gts, adms, setoresRows] = await Promise.all([
       db.select({ id: gruposTrabalho.id, regionalId: gruposTrabalho.regionalId,
         administracaoId: gruposTrabalho.administracaoId, setorId: gruposTrabalho.setorId }).from(gruposTrabalho).all(),
@@ -435,7 +436,8 @@ vinculosFuncionaisRouter.get('/participantes-gt', async (c) => {
     for (const gt of gts) {
       const admId = gt.administracaoId || (gt.setorId ? admPorSetor.get(gt.setorId) : null)
       const regionalId = gt.regionalId || (admId ? regionalPorAdm.get(admId) : null)
-      if ((regionalId && regionaisGeridas.has(regionalId)) ||
+      if ((gt.regionalId && regionaisComAcesso.has(gt.regionalId)) ||
+          (regionalId && regionaisGeridas.has(regionalId)) ||
           (admId && admsGeridas.has(admId)) ||
           (gt.setorId && setoresGeridos.has(gt.setorId))) idsGt.add(gt.id)
     }
