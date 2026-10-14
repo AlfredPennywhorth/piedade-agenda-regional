@@ -635,10 +635,13 @@ export async function podeGerenciarAgendaNoEscopo(
   // Administrador Regional pode gerir a Agenda apenas dentro da Regional administrada.
   if (podeAdministrarRegional(contexto, regionalAlvo)) return true
 
-  // A autorização de cadastro de locais não concede gestão de GT legado.
-  // Para os demais escopos, permanece a gestão territorial administrativa.
+  // Permissão de cadastro territorial não implica gestão da agenda.
+  // Reutilizar apenas a resolução hierárquica para credenciais GESTOR_AGENDA.
   if (escopoTipo !== 'GRUPO_TRABALHO' &&
-      await podeGerenciarCadastroTerritorial(db, contexto, escopoTipo, escopoId)) return true
+      await podeGerenciarCadastroTerritorial(db, {
+        ...contexto,
+        acessosAtivos: contexto.acessosAtivos.filter(acesso => acesso.perfilCodigo === 'GESTOR_AGENDA'),
+      }, escopoTipo, escopoId)) return true
 
   // Regra institucional: todo membro pode gerir automaticamente a Agenda da própria Casa.
   if (permitirCasaAutomatica && escopoTipo === 'CASA') {
