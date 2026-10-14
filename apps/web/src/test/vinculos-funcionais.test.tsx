@@ -64,6 +64,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
       if (endpoint === '/grupos-trabalho') return []
       if (endpoint === '/vinculos-funcionais') return [mockVinculo]
       if (endpoint === `/vinculos-funcionais/${VINCULO_ID}`) return mockVinculo
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return []
       throw new Error('Not found')
     })
   })
@@ -91,6 +92,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
         { ...mockVinculo, regionalId: null, casaId: CASA_ID },
         { ...mockVinculo, id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', membroId: outroMembro, regionalId: null, casaId: CASA_ID_2 },
       ]
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return []
       throw new Error('Not found')
     })
     const { container } = render(<VinculosFuncionaisView />)
@@ -120,6 +122,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
         { ...mockVinculo, regionalId: null, casaId: CASA_ID },
         { ...mockVinculo, id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', regionalId: null, casaId: CASA_ID_2 },
       ]
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return []
       throw new Error('Not found')
     })
     const { container } = render(<VinculosFuncionaisView />)
@@ -143,6 +146,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
       if (endpoint === '/casas') return mockCasas
       if (endpoint === '/grupos-trabalho') return []
       if (endpoint === '/vinculos-funcionais') return [] // Lista inicial vazia
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return []
       throw new Error('Not found')
     })
 
@@ -205,6 +209,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
       if (endpoint === '/casas') return mockCasas
       if (endpoint === '/grupos-trabalho') return []
       if (endpoint === '/vinculos-funcionais') return []
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return []
       throw new Error('Not found')
     })
 
@@ -227,6 +232,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
       if (endpoint === '/casas') return mockCasas
       if (endpoint === '/grupos-trabalho') return []
       if (endpoint === '/vinculos-funcionais') return []
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return []
       throw new Error('Not found')
     })
 
@@ -296,6 +302,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
       if (endpoint === '/casas') return mockCasas
       if (endpoint === '/grupos-trabalho') return []
       if (endpoint === '/vinculos-funcionais') return []
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return []
       throw new Error('Not found')
     })
 
@@ -331,6 +338,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
       if (endpoint === '/casas') return mockCasas
       if (endpoint === '/grupos-trabalho') return []
       if (endpoint === '/vinculos-funcionais') return []
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return []
       throw new Error('Not found')
     })
 
