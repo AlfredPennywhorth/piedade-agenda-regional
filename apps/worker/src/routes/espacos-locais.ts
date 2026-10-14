@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, eq, inArray, isNull, or } from 'drizzle-orm'
+import { and, eq, isNull, or } from 'drizzle-orm'
 import { espacosLocal, locais, membros, casas, setores } from '../db/schema'
 import { EspacoLocalCreate, EspacoLocalUpdate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
@@ -51,12 +51,14 @@ espacosLocaisRouter.get('/', async c => {
     a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id)
   )
   const contexto = c.get('contextoPermissoes')
+  // Uma única consulta aos locais associados aos espaços evita N+1 e estouro de queries D1.
+  const localRows = await db.select({ local: locais })
+    .from(espacosLocal)
+    .innerJoin(locais, eq(espacosLocal.localId, locais.id))
+    .where(conditions.length ? and(...conditions) : undefined)
+    .all()
+  const locaisPorId = new Map<string, any>(localRows.map((row: any) => [row.local.id, row.local]))
   const localIds: string[] = [...new Set<string>(data.map((item: any) => String(item.localId)))]
-  const localRows: any[] = []
-  for (let inicio = 0; inicio < localIds.length; inicio += 80) {
-    localRows.push(...await db.select().from(locais).where(inArray(locais.id, localIds.slice(inicio, inicio + 80))).all())
-  }
-  const locaisPorId = new Map<string, any>(localRows.map(local => [local.id, local]))
   const visiveis = eMasterSistema(contexto) ? undefined : await obterEscoposTerritoriaisVisiveis(db, contexto)
   const autorizados = await Promise.all(localIds.map(id => espacoVisivel(db, contexto, locaisPorId.get(id), visiveis)))
   const idsPermitidos = new Set(localIds.filter((_: string, i: number) => autorizados[i]))
