@@ -339,7 +339,8 @@ export function SerieFormModal({
         const setorCasa = casas.find(item => item.id === formData.casaId)?.setorId
         if (setorCasa) {
           const autorizados = await fetchWithAuth<{ escopos: Array<{ escopoTipo: string; escopoId: string }> }>('/locais/escopos-autorizados')
-          if (autorizados.escopos.some(item => item.escopoTipo === 'SETOR' && item.escopoId === setorCasa)) {
+          if (!autorizados.escopos.some(item => item.escopoTipo === 'CASA' && item.escopoId === formData.casaId) &&
+              autorizados.escopos.some(item => item.escopoTipo === 'SETOR' && item.escopoId === setorCasa)) {
             escopoTipoCadastro = 'SETOR'
             escopoIdCadastro = setorCasa
           }
