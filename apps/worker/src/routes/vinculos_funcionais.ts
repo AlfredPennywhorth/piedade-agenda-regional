@@ -331,7 +331,12 @@ async function idsEscoposDasRegionaisAdministradas(db: any, contexto: any) {
   return { regionaisIds, administracoesIds, setoresIds, casasIds, gruposTrabalhoIds }
 }
 
-export async function listarVinculosVisiveis(db: any, contexto: any, membroId?: string) {
+export async function listarVinculosVisiveis(
+  db: any,
+  contexto: any,
+  membroId?: string,
+  escoposPrecalculados?: Awaited<ReturnType<typeof obterEscoposTerritoriaisVisiveis>>
+) {
   if (eMasterSistema(contexto)) {
     const query = selecionarVinculosDetalhados(db)
     return membroId
@@ -358,7 +363,15 @@ export async function listarVinculosVisiveis(db: any, contexto: any, membroId?: 
     return Array.from(porId.values())
   }
 
-  const escopos = await idsEscoposDasRegionaisAdministradas(db, contexto)
+  const escopos = escoposPrecalculados
+    ? {
+        regionaisIds: [...escoposPrecalculados.regionaisIds],
+        administracoesIds: [...escoposPrecalculados.administracoesIds],
+        setoresIds: [...escoposPrecalculados.setoresIds],
+        casasIds: [...escoposPrecalculados.casasIds],
+        gruposTrabalhoIds: [...escoposPrecalculados.gruposTrabalhoIds],
+      }
+    : await idsEscoposDasRegionaisAdministradas(db, contexto)
   const LIMITE_IDS_D1 = 90
 
   const consultarEmLotes = async (coluna: any, ids: string[]) => {
@@ -403,10 +416,11 @@ vinculosFuncionaisRouter.get('/', async (c) => {
 vinculosFuncionaisRouter.get('/participantes-gt', async (c) => {
   const db = c.get('db')
   const contexto = c.get('contextoPermissoes')
-  const vinculosVisiveis = await listarVinculosVisiveis(db, contexto)
+  // Reutilizar a expansão territorial na listagem e na autorização dos GTs.
+  const escoposVisiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+  const vinculosVisiveis = await listarVinculosVisiveis(db, contexto, undefined, escoposVisiveis)
   const membrosVisiveis = new Set<string>(vinculosVisiveis.map((v: any) => v.membroId))
   if (membrosVisiveis.size === 0) return c.json([])
-  const escoposVisiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
   if (!escoposVisiveis.tudo && escoposVisiveis.gruposTrabalhoIds.size === 0) return c.json([])
   const participacoes = await db.select({
     grupoTrabalhoId: participacoesGruposTrabalho.grupoTrabalhoId,
