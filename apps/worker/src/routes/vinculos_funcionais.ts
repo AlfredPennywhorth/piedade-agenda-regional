@@ -429,7 +429,13 @@ vinculosFuncionaisRouter.get('/participantes-gt', async (c) => {
     // Para contas exclusivamente regionais, os escopos gerais são os mesmos
     // autorizados à listagem. Calcular uma vez evita repetir a expansão D1.
     escoposVisiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
-    vinculosVisiveis = await listarVinculosVisiveis(db, contexto, undefined, escoposVisiveis)
+    if ([...escoposVisiveis.regionaisIds].every(id => administradas.has(id))) {
+      vinculosVisiveis = await listarVinculosVisiveis(db, contexto, undefined, escoposVisiveis)
+    } else {
+      // O membro pode ter Casa de origem fora da Regional que administra.
+      // Nesse caso, preservar estritamente a autorização regional da listagem.
+      vinculosVisiveis = await listarVinculosVisiveis(db, contexto)
+    }
   } else {
     // Preserva a regra original para contas comuns e de credenciais mistas;
     // se não houver vínculos, não executar a expansão territorial.
