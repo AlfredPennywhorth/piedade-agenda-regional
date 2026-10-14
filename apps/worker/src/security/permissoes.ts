@@ -278,19 +278,22 @@ export async function obterEscoposTerritoriaisVisiveis(
 
       const admIds = adms.map((item: any) => item.id)
       if (admIds.length > 0) {
-        const setores = await db
-          .select({ id: schema.setores.id })
-          .from(schema.setores)
-          .where(inArray(schema.setores.administracaoId, admIds))
-          .all()
+        const setores: Array<{ id: string }> = []
+        for (let i = 0; i < admIds.length; i += 90) {
+          setores.push(...await db
+            .select({ id: schema.setores.id })
+            .from(schema.setores)
+            .where(inArray(schema.setores.administracaoId, admIds.slice(i, i + 90)))
+            .all())
+        }
         setores.forEach((item: any) => resultado.setoresIds.add(item.id))
 
         const setorIds = setores.map((item: any) => item.id)
-        if (setorIds.length > 0) {
+        for (let i = 0; i < setorIds.length; i += 90) {
           const casas = await db
             .select({ id: schema.casas.id })
             .from(schema.casas)
-            .where(inArray(schema.casas.setorId, setorIds))
+            .where(inArray(schema.casas.setorId, setorIds.slice(i, i + 90)))
             .all()
           casas.forEach((item: any) => resultado.casasIds.add(item.id))
         }
@@ -324,11 +327,11 @@ export async function obterEscoposTerritoriaisVisiveis(
       setores.forEach((item: any) => resultado.setoresIds.add(item.id))
 
       const setorIds = setores.map((item: any) => item.id)
-      if (setorIds.length > 0) {
+      for (let i = 0; i < setorIds.length; i += 90) {
         const casas = await db
           .select({ id: schema.casas.id })
           .from(schema.casas)
-          .where(inArray(schema.casas.setorId, setorIds))
+          .where(inArray(schema.casas.setorId, setorIds.slice(i, i + 90)))
           .all()
         casas.forEach((item: any) => resultado.casasIds.add(item.id))
       }
