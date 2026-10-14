@@ -488,6 +488,7 @@ export const locais = sqliteTable('locais', {
   id: text('id').primaryKey(), // UUID
   nome: text('nome').notNull(),
   proprietarioMembroId: text('proprietario_membro_id').references(() => membros.id),
+  criadorInstitucionalMembroId: text('criador_institucional_membro_id').references(() => membros.id),
   escopoTipo: text('escopo_tipo', { enum: ['REGIONAL', 'ADMINISTRACAO', 'SETOR', 'CASA', 'GRUPO_TRABALHO'] }),
   escopoId: text('escopo_id'),
   endereco: text('endereco').notNull(),
