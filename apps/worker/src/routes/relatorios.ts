@@ -766,17 +766,6 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
     ))
     .get())
   const visibilidade = await condicaoEventosVisiveis(db, c.get('contextoPermissoes'))
-  const visibilidadeRelatorio = gestorRegionalLegado
-    ? or(visibilidade, and(
-        inArray(eventos.abrangencia, ['NACIONAL', 'INTERNACIONAL']),
-        eq(eventos.regionalGestaoId, escopoId),
-      ))!
-    : visibilidade
-  const condicoes = [
-    eq(eventos.ativo, true),
-    eq(eventos.pessoal, false),
-    visibilidadeRelatorio,
-  ]
   const territorial = condicaoEscopo({
     id: 'relatorio-utilizacao',
     perfilCodigo: 'GESTOR_RELATORIOS',
@@ -797,6 +786,17 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
           SELECT id FROM grupos_trabalho WHERE setor_id = ${escopoId}
         )`
       : null
+  // O gestor autorizado ao escopo também deve enxergar os eventos dos seus GTs
+  // descendentes, sem conceder visibilidade para GTs de escopos irmãos.
+  const visibilidadeRelatorio = or(
+    visibilidade,
+    gestorRegionalLegado
+      ? and(inArray(eventos.abrangencia, ['NACIONAL', 'INTERNACIONAL']),
+          eq(eventos.regionalGestaoId, escopoId))
+      : undefined,
+    gtDescendente ?? undefined,
+  )!
+  const condicoes = [eq(eventos.ativo, true), eq(eventos.pessoal, false), visibilidadeRelatorio]
   condicoes.push(
     escopoTipo === 'REGIONAL'
       ? or(territorial, eq(eventos.regionalGestaoId, escopoId))!
