@@ -257,6 +257,7 @@ export function setupDb(sqlite: any) {
       id text PRIMARY KEY NOT NULL,
       nome text NOT NULL,
       proprietario_membro_id text REFERENCES membros(id),
+      criador_institucional_membro_id text REFERENCES membros(id),
       escopo_tipo text,
       escopo_id text,
       endereco text NOT NULL,
