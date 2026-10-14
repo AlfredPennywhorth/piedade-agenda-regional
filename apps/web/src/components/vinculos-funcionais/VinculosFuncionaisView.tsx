@@ -28,6 +28,7 @@ type TipoEscopo = 'regional' | 'administracao' | 'setor' | 'casa' | 'gt' | ''
 
 export function VinculosFuncionaisView() {
   const [vinculos, setVinculos] = useState<VinculoFuncional[]>([])
+  const [participantesGt, setParticipantesGt] = useState<Array<{ grupoTrabalhoId: string; membroId: string }>>([])
   const [buscaVinculo, setBuscaVinculo] = useState('')
   const [filtroStatusLista, setFiltroStatusLista] = useState<'todos' | 'ativos' | 'inativos'>('ativos')
   const [filtroTipoLista, setFiltroTipoLista] = useState<TipoEscopo>('')
@@ -111,8 +112,12 @@ export function VinculosFuncionaisView() {
     setErro(null)
     try {
       await carregarLookups()
-      const data = await fetchWithAuth<VinculoFuncional[]>('/vinculos-funcionais')
+      const [data, participacoes] = await Promise.all([
+        fetchWithAuth<VinculoFuncional[]>('/vinculos-funcionais'),
+        fetchWithAuth<Array<{ grupoTrabalhoId: string; membroId: string }>>('/vinculos-funcionais/participantes-gt'),
+      ])
       setVinculos(data)
+      setParticipantesGt(participacoes)
     } catch (err: any) {
       setErro(err.message || 'Erro ao carregar os vínculos funcionais.')
     } finally {
@@ -362,8 +367,8 @@ export function VinculosFuncionaisView() {
       .map(m => m.id)
   )
   const membrosDoGt = new Set(
-    vinculos.filter(v => v.grupoTrabalhoId === filtroGtLista && v.ativo)
-      .map(v => v.membroId)
+    participantesGt.filter(p => p.grupoTrabalhoId === filtroGtLista)
+      .map(p => p.membroId)
   )
 
   const vinculosFiltrados = vinculos.filter(v => {
