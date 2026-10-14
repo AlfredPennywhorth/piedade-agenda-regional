@@ -1039,7 +1039,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       const escopoIdOriginal = tipoEscopo === 'regional' ? formData.regionalId : tipoEscopo === 'administracao' ? formData.administracaoId : tipoEscopo === 'setor' ? formData.setorId : tipoEscopo === 'casa' ? formData.casaId : tipoEscopo === 'grupoTrabalho' ? formData.grupoTrabalhoId : null
       let escopoTipoCadastro = escopoTipoOriginal
       let escopoIdCadastro = escopoIdOriginal
-      if (tipoEscopo === 'casa') {
+      if (!formData.pessoal && tipoEscopo === 'casa') {
         const setorCasa = casas.find(item => item.id === formData.casaId)?.setorId
         if (setorCasa) {
           const autorizados = await fetchWithAuth<{ escopos: Array<{ escopoTipo: string; escopoId: string }> }>('/locais/escopos-autorizados')
