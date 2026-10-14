@@ -19,7 +19,7 @@ import {
 } from '../db/schema'
 import { CreateVinculoFuncionalSchema, UpdateVinculoFuncionalSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { eMasterSistema, obterEscoposTerritoriaisVisiveis, obterRegionalDoEscopo, regionaisAdministradas } from '../security/permissoes'
+import { eMasterSistema, obterRegionalDoEscopo, regionaisAdministradas } from '../security/permissoes'
 import { executarOperacaoComAudit, executarOperacaoComAudits } from '../services/auditoria'
 
 export const vinculosFuncionaisRouter = new Hono<any>()
@@ -331,7 +331,12 @@ async function idsEscoposDasRegionaisAdministradas(db: any, contexto: any) {
   return { regionaisIds, administracoesIds, setoresIds, casasIds, gruposTrabalhoIds }
 }
 
-export async function listarVinculosVisiveis(db: any, contexto: any, membroId?: string) {
+export async function listarVinculosVisiveis(
+  db: any,
+  contexto: any,
+  membroId?: string,
+  escoposPrecalculados?: Awaited<ReturnType<typeof idsEscoposDasRegionaisAdministradas>>
+) {
   if (eMasterSistema(contexto)) {
     const query = selecionarVinculosDetalhados(db)
     return membroId
@@ -358,7 +363,7 @@ export async function listarVinculosVisiveis(db: any, contexto: any, membroId?: 
     return Array.from(porId.values())
   }
 
-  const escopos = await idsEscoposDasRegionaisAdministradas(db, contexto)
+  const escopos = escoposPrecalculados ?? await idsEscoposDasRegionaisAdministradas(db, contexto)
   const LIMITE_IDS_D1 = 90
 
   const consultarEmLotes = async (coluna: any, ids: string[]) => {
@@ -403,11 +408,43 @@ vinculosFuncionaisRouter.get('/', async (c) => {
 vinculosFuncionaisRouter.get('/participantes-gt', async (c) => {
   const db = c.get('db')
   const contexto = c.get('contextoPermissoes')
+  // Primeiro consultar exatamente os vínculos autorizados pela mesma regra da listagem.
+  // Assim, acessos adicionais e GTs indiretos não ampliam a visibilidade.
   const vinculosVisiveis = await listarVinculosVisiveis(db, contexto)
+  if (vinculosVisiveis.length === 0) return c.json([])
+  // Apenas IDs dos GTs autorizados: evita expandir Casas e Setores por acesso.
+  // Mantém a semântica de obterEscoposTerritoriaisVisiveis para GTs.
+  const tudo = eMasterSistema(contexto)
+  const acessos = contexto.acessosAtivos.filter((acesso: any) => acesso.escopoId)
+  const gtsDiretos = new Set<string>(acessos.filter((a: any) => a.escopoTipo === 'GRUPO_TRABALHO').map((a: any) => a.escopoId))
+  const regionaisComAcesso = new Set<string>(acessos.filter((a: any) => a.escopoTipo === 'REGIONAL').map((a: any) => a.escopoId))
+  const gestores = acessos.filter((a: any) =>
+    ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(a.perfilCodigo))
+  const regionaisGeridas = new Set<string>(gestores.filter((a: any) => a.escopoTipo === 'REGIONAL').map((a: any) => a.escopoId))
+  const admsGeridas = new Set<string>(gestores.filter((a: any) => a.escopoTipo === 'ADMINISTRACAO').map((a: any) => a.escopoId))
+  const setoresGeridos = new Set<string>(gestores.filter((a: any) => a.escopoTipo === 'SETOR').map((a: any) => a.escopoId))
+  const idsGt = new Set<string>(gtsDiretos)
+  if (!tudo && (regionaisComAcesso.size || admsGeridas.size || setoresGeridos.size)) {
+    const [gts, adms, setoresRows] = await Promise.all([
+      db.select({ id: gruposTrabalho.id, regionalId: gruposTrabalho.regionalId,
+        administracaoId: gruposTrabalho.administracaoId, setorId: gruposTrabalho.setorId }).from(gruposTrabalho).all(),
+      db.select({ id: administracoes.id, regionalId: administracoes.regionalId }).from(administracoes).all(),
+      db.select({ id: setores.id, administracaoId: setores.administracaoId }).from(setores).all(),
+    ])
+    const regionalPorAdm = new Map<string, string>(adms.map((a: any) => [a.id, a.regionalId]))
+    const admPorSetor = new Map<string, string>(setoresRows.map((a: any) => [a.id, a.administracaoId]))
+    for (const gt of gts) {
+      const admId = gt.administracaoId || (gt.setorId ? admPorSetor.get(gt.setorId) : null)
+      const regionalId = gt.regionalId || (admId ? regionalPorAdm.get(admId) : null)
+      if ((gt.regionalId && regionaisComAcesso.has(gt.regionalId)) ||
+          (regionalId && regionaisGeridas.has(regionalId)) ||
+          (admId && admsGeridas.has(admId)) ||
+          (gt.setorId && setoresGeridos.has(gt.setorId))) idsGt.add(gt.id)
+    }
+  }
   const membrosVisiveis = new Set<string>(vinculosVisiveis.map((v: any) => v.membroId))
   if (membrosVisiveis.size === 0) return c.json([])
-  const escoposVisiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
-  if (!escoposVisiveis.tudo && escoposVisiveis.gruposTrabalhoIds.size === 0) return c.json([])
+  if (!tudo && idsGt.size === 0) return c.json([])
   const participacoes = await db.select({
     grupoTrabalhoId: participacoesGruposTrabalho.grupoTrabalhoId,
     membroId: preCadastrosMinisteriais.membroId,
@@ -416,7 +453,7 @@ vinculosFuncionaisRouter.get('/participantes-gt', async (c) => {
     .where(and(eq(participacoesGruposTrabalho.ativo, true), eq(preCadastrosMinisteriais.ativo, true)))
     .all()
   return c.json(participacoes.filter((p: any) => p.membroId && membrosVisiveis.has(p.membroId) &&
-    (escoposVisiveis.tudo || escoposVisiveis.gruposTrabalhoIds.has(p.grupoTrabalhoId))))
+    (tudo || idsGt.has(p.grupoTrabalhoId))))
 })
 
 vinculosFuncionaisRouter.get('/:id', async (c) => {
