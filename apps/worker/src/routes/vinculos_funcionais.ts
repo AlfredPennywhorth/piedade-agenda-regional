@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, eq, gt, inArray } from 'drizzle-orm'
+import { and, eq, gt, inArray, sql } from 'drizzle-orm'
 import {
   administracoes,
   casas,
@@ -445,32 +445,19 @@ vinculosFuncionaisRouter.get('/participantes-gt', async (c) => {
   const membrosVisiveis = new Set<string>(vinculosVisiveis.map((v: any) => v.membroId))
   if (membrosVisiveis.size === 0) return c.json([])
   if (!tudo && idsGt.size === 0) return c.json([])
-  // Restringir os GTs no SQL; não materializar participações de GTs não autorizados.
-  // Para Master, a listagem global mantém o mesmo comportamento.
-  const participacoes: Array<{ grupoTrabalhoId: string; membroId: string | null }> = []
-  const gruposAutorizados = [...idsGt]
-  if (tudo) {
-    participacoes.push(...await db.select({
-      grupoTrabalhoId: participacoesGruposTrabalho.grupoTrabalhoId,
-      membroId: preCadastrosMinisteriais.membroId,
-    }).from(participacoesGruposTrabalho)
-      .innerJoin(preCadastrosMinisteriais, eq(participacoesGruposTrabalho.preCadastroMinisterialId, preCadastrosMinisteriais.id))
-      .where(and(eq(participacoesGruposTrabalho.ativo, true), eq(preCadastrosMinisteriais.ativo, true)))
-      .all())
-  } else {
-    for (let i = 0; i < gruposAutorizados.length; i += 80) {
-      participacoes.push(...await db.select({
-        grupoTrabalhoId: participacoesGruposTrabalho.grupoTrabalhoId,
-        membroId: preCadastrosMinisteriais.membroId,
-      }).from(participacoesGruposTrabalho)
-        .innerJoin(preCadastrosMinisteriais, eq(participacoesGruposTrabalho.preCadastroMinisterialId, preCadastrosMinisteriais.id))
-        .where(and(
-          eq(participacoesGruposTrabalho.ativo, true),
-          eq(preCadastrosMinisteriais.ativo, true),
-          inArray(participacoesGruposTrabalho.grupoTrabalhoId, gruposAutorizados.slice(i, i + 80)),
-        )).all())
-    }
-  }
+  // JSON1 oferece um único parâmetro, sem N consultas ou IN com milhares de binds.
+  // A autorização de membros permanece a da listagem funcional.
+  const participacoes = await db.select({
+    grupoTrabalhoId: participacoesGruposTrabalho.grupoTrabalhoId,
+    membroId: preCadastrosMinisteriais.membroId,
+  }).from(participacoesGruposTrabalho)
+    .innerJoin(preCadastrosMinisteriais, eq(participacoesGruposTrabalho.preCadastroMinisterialId, preCadastrosMinisteriais.id))
+    .where(and(
+      eq(participacoesGruposTrabalho.ativo, true),
+      eq(preCadastrosMinisteriais.ativo, true),
+      tudo ? undefined : sql`${participacoesGruposTrabalho.grupoTrabalhoId} IN
+        (SELECT value FROM json_each(${JSON.stringify([...idsGt])}))`,
+    )).all()
   return c.json(participacoes.filter((p: any) => p.membroId && membrosVisiveis.has(p.membroId) &&
     (tudo || idsGt.has(p.grupoTrabalhoId))))
 })
