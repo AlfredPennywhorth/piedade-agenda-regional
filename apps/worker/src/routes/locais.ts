@@ -159,7 +159,7 @@ locaisRouter.post('/', async (c) => {
     const atorMembroId = c.get('membroId') || null
     await executarOperacaoComAudit(
       db,
-      (qdb) => [qdb.insert(locais).values({ id, ...parsed, escopoTipo: tipo ?? null, escopoId: escopoId ?? null })],
+      (qdb) => [qdb.insert(locais).values({ id, ...parsed, escopoTipo: tipo ?? null, escopoId: escopoId ?? null, criadorInstitucionalMembroId: atorMembroId })],
       {
         acao: 'LOCAL_CRIADO',
         atorMembroId,
