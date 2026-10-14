@@ -335,7 +335,7 @@ export async function listarVinculosVisiveis(
   db: any,
   contexto: any,
   membroId?: string,
-  escoposPrecalculados?: Awaited<ReturnType<typeof obterEscoposTerritoriaisVisiveis>>
+  escoposPrecalculados?: Awaited<ReturnType<typeof idsEscoposDasRegionaisAdministradas>>
 ) {
   if (eMasterSistema(contexto)) {
     const query = selecionarVinculosDetalhados(db)
@@ -363,15 +363,7 @@ export async function listarVinculosVisiveis(
     return Array.from(porId.values())
   }
 
-  const escopos = escoposPrecalculados
-    ? {
-        regionaisIds: [...escoposPrecalculados.regionaisIds],
-        administracoesIds: [...escoposPrecalculados.administracoesIds],
-        setoresIds: [...escoposPrecalculados.setoresIds],
-        casasIds: [...escoposPrecalculados.casasIds],
-        gruposTrabalhoIds: [...escoposPrecalculados.gruposTrabalhoIds],
-      }
-    : await idsEscoposDasRegionaisAdministradas(db, contexto)
+  const escopos = escoposPrecalculados ?? await idsEscoposDasRegionaisAdministradas(db, contexto)
   const LIMITE_IDS_D1 = 90
 
   const consultarEmLotes = async (coluna: any, ids: string[]) => {
@@ -416,33 +408,11 @@ vinculosFuncionaisRouter.get('/', async (c) => {
 vinculosFuncionaisRouter.get('/participantes-gt', async (c) => {
   const db = c.get('db')
   const contexto = c.get('contextoPermissoes')
-  // A expansão geral inclui também acessos não regionais. Nunca reutilizá-la
-  // como autorização de vínculos quando há credenciais territoriais mistas.
-  const administradas = regionaisAdministradas(contexto)
-  const somenteGestaoRegional = administradas.size > 0 && contexto.acessosAtivos.every((acesso: any) =>
-    !acesso.escopoId || acesso.escopoTipo === 'GLOBAL' ||
-    (acesso.escopoTipo === 'REGIONAL' && administradas.has(acesso.escopoId))
-  )
-  let vinculosVisiveis: Awaited<ReturnType<typeof listarVinculosVisiveis>>
-  let escoposVisiveis: Awaited<ReturnType<typeof obterEscoposTerritoriaisVisiveis>>
-  if (somenteGestaoRegional) {
-    // Para contas exclusivamente regionais, os escopos gerais são os mesmos
-    // autorizados à listagem. Calcular uma vez evita repetir a expansão D1.
-    escoposVisiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
-    if ([...escoposVisiveis.regionaisIds].every(id => administradas.has(id))) {
-      vinculosVisiveis = await listarVinculosVisiveis(db, contexto, undefined, escoposVisiveis)
-    } else {
-      // O membro pode ter Casa de origem fora da Regional que administra.
-      // Nesse caso, preservar estritamente a autorização regional da listagem.
-      vinculosVisiveis = await listarVinculosVisiveis(db, contexto)
-    }
-  } else {
-    // Preserva a regra original para contas comuns e de credenciais mistas;
-    // se não houver vínculos, não executar a expansão territorial.
-    vinculosVisiveis = await listarVinculosVisiveis(db, contexto)
-    if (vinculosVisiveis.length === 0) return c.json([])
-    escoposVisiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
-  }
+  // Primeiro consultar exatamente os vínculos autorizados pela mesma regra da listagem.
+  // Assim, acessos adicionais e GTs indiretos não ampliam a visibilidade.
+  const vinculosVisiveis = await listarVinculosVisiveis(db, contexto)
+  if (vinculosVisiveis.length === 0) return c.json([])
+  const escoposVisiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
   const membrosVisiveis = new Set<string>(vinculosVisiveis.map((v: any) => v.membroId))
   if (membrosVisiveis.size === 0) return c.json([])
   if (!escoposVisiveis.tudo && escoposVisiveis.gruposTrabalhoIds.size === 0) return c.json([])
