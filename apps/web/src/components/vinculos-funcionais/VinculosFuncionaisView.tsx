@@ -29,6 +29,7 @@ type TipoEscopo = 'regional' | 'administracao' | 'setor' | 'casa' | 'gt' | ''
 export function VinculosFuncionaisView() {
   const [vinculos, setVinculos] = useState<VinculoFuncional[]>([])
   const [participantesGt, setParticipantesGt] = useState<Array<{ grupoTrabalhoId: string; membroId: string }>>([])
+  const [participantesGtIndisponiveis, setParticipantesGtIndisponiveis] = useState(false)
   const [buscaVinculo, setBuscaVinculo] = useState('')
   const [filtroStatusLista, setFiltroStatusLista] = useState<'todos' | 'ativos' | 'inativos'>('ativos')
   const [filtroTipoLista, setFiltroTipoLista] = useState<TipoEscopo>('')
@@ -112,12 +113,18 @@ export function VinculosFuncionaisView() {
     setErro(null)
     try {
       await carregarLookups()
-      const [data, participacoes] = await Promise.all([
-        fetchWithAuth<VinculoFuncional[]>('/vinculos-funcionais'),
-        fetchWithAuth<Array<{ grupoTrabalhoId: string; membroId: string }>>('/vinculos-funcionais/participantes-gt'),
-      ])
+      const data = await fetchWithAuth<VinculoFuncional[]>('/vinculos-funcionais')
       setVinculos(data)
-      setParticipantesGt(participacoes)
+      try {
+        const participacoes = await fetchWithAuth<Array<{ grupoTrabalhoId: string; membroId: string }>>('/vinculos-funcionais/participantes-gt')
+        if (!Array.isArray(participacoes)) throw new Error('Resposta de participantes GT inválida')
+        setParticipantesGt(participacoes)
+        setParticipantesGtIndisponiveis(false)
+      } catch {
+        setParticipantesGt([])
+        setParticipantesGtIndisponiveis(true)
+        setFiltroGtLista('')
+      }
     } catch (err: any) {
       setErro(err.message || 'Erro ao carregar os vínculos funcionais.')
     } finally {
@@ -378,7 +385,7 @@ export function VinculosFuncionaisView() {
     if (filtroTipoLista && tipo !== filtroTipoLista) return false
     if (filtroSetorLista && !membrosDoSetor.has(v.membroId)) return false
     if (filtroCasaLista && membros.find(m => m.id === v.membroId)?.casaId !== filtroCasaLista) return false
-    if (filtroGtLista && !membrosDoGt.has(v.membroId)) return false
+    if (filtroGtLista && !participantesGtIndisponiveis && !membrosDoGt.has(v.membroId)) return false
     const termo = buscaVinculo.trim().toLocaleLowerCase('pt-BR')
     return !termo || [getFuncaoNome(v), getMembroNome(v), renderNomeEscopo(v)].some(nome => nome.toLocaleLowerCase('pt-BR').includes(termo))
   })
