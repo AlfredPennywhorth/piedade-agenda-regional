@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { CreateVinculoFuncionalSchema, UpdateVinculoFuncionalSchema } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 
@@ -31,6 +31,7 @@ export function VinculosFuncionaisView() {
   const [participantesGt, setParticipantesGt] = useState<Array<{ grupoTrabalhoId: string; membroId: string }>>([])
   const [participantesGtIndisponiveis, setParticipantesGtIndisponiveis] = useState(false)
   const [participantesGtCarregando, setParticipantesGtCarregando] = useState(true)
+  const geracaoCarregamento = useRef(0)
   const [buscaVinculo, setBuscaVinculo] = useState('')
   const [filtroStatusLista, setFiltroStatusLista] = useState<'todos' | 'ativos' | 'inativos'>('ativos')
   const [filtroTipoLista, setFiltroTipoLista] = useState<TipoEscopo>('')
@@ -110,6 +111,7 @@ export function VinculosFuncionaisView() {
   }
 
   const carregarDados = async () => {
+    const geracao = ++geracaoCarregamento.current
     setLoading(true)
     setErro(null)
     setParticipantesGtCarregando(true)
@@ -117,31 +119,36 @@ export function VinculosFuncionaisView() {
     try {
       await carregarLookups()
       const data = await fetchWithAuth<VinculoFuncional[]>('/vinculos-funcionais')
+      if (geracao !== geracaoCarregamento.current) return
       setVinculos(data)
       // A consulta auxiliar não pode bloquear a listagem principal.
       void fetchWithAuth<Array<{ grupoTrabalhoId: string; membroId: string }>>('/vinculos-funcionais/participantes-gt')
         .then(participacoes => {
+          if (geracao !== geracaoCarregamento.current) return
           if (!Array.isArray(participacoes)) throw new Error('Resposta de participantes GT inválida')
           setParticipantesGt(participacoes)
           setParticipantesGtIndisponiveis(false)
           setParticipantesGtCarregando(false)
         })
         .catch(() => {
+          if (geracao !== geracaoCarregamento.current) return
           setParticipantesGt([])
           setParticipantesGtIndisponiveis(true)
           setParticipantesGtCarregando(false)
           setFiltroGtLista('')
         })
     } catch (err: any) {
+      if (geracao !== geracaoCarregamento.current) return
       setParticipantesGtCarregando(false)
       setErro(err.message || 'Erro ao carregar os vínculos funcionais.')
     } finally {
-      setLoading(false)
+      if (geracao === geracaoCarregamento.current) setLoading(false)
     }
   }
 
   useEffect(() => {
-    carregarDados()
+    void carregarDados()
+    return () => { geracaoCarregamento.current += 1 }
   }, [])
 
   const handleChangeTipoEscopo = (novoTipo: TipoEscopo) => {
