@@ -1,6 +1,8 @@
 export function csvCell(value: unknown): string {
   const text = value === null || value === undefined ? '' : String(value)
-  return `"${text.replace(/"/g, '""')}"`
+  // Prefixar valores semelhantes a fórmulas, inclusive após espaços iniciais.
+  const seguro = /^[\s\uFEFF]*[=+@-]/u.test(text) ? `'${text}` : text
+  return `"${seguro.replace(/"/g, '""')}"`
 }
 
 export function montarCsv(headers: string[], rows: unknown[][]): string {

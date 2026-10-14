@@ -6,7 +6,7 @@ import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaE
 import { condicaoEscopo, condicaoEventosVisiveis } from '../security/eventos'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
 import { dataValidaRelatorio, inicioDiaSaoPauloUtc, limiteFinalExclusivoSaoPauloUtc } from './relatorios-periodo'
-import { lotesIds, consolidarUtilizacao, type OcorrenciaUtilizacao, type CadastroUtilizacao } from './relatorios-utilizacao'
+import { consolidarUtilizacao, type OcorrenciaUtilizacao, type CadastroUtilizacao } from './relatorios-utilizacao'
 
 export const relatoriosRouter = new Hono<{ Variables: Variables }>()
 
@@ -797,29 +797,38 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
     condicoes.push(lt(eventos.inicioEm, limiteFinalExclusivoSaoPauloUtc(dataFim)))
   }
 
-  const ocorrencias: OcorrenciaUtilizacao[] = await db.select({
+  // Uma única consulta com LEFT JOIN evita N queries por lote de nomes.
+  const linhas: Array<OcorrenciaUtilizacao & {
+    localNome: string | null; localProprietarioMembroId: string | null;
+    espacoNome: string | null; espacoProprietarioMembroId: string | null;
+  }> = await db.select({
     id: eventos.id, inicioEm: eventos.inicioEm, fimEm: eventos.fimEm,
     localId: eventos.localId, espacoId: eventos.espacoId,
-  }).from(eventos).where(and(...condicoes)).all()
+    localNome: locais.nome, localProprietarioMembroId: locais.proprietarioMembroId,
+    espacoNome: espacosLocal.nome, espacoProprietarioMembroId: espacosLocal.proprietarioMembroId,
+  }).from(eventos)
+    .leftJoin(locais, eq(eventos.localId, locais.id))
+    .leftJoin(espacosLocal, eq(eventos.espacoId, espacosLocal.id))
+    .where(and(...condicoes)).all()
 
-  const idsLocal: string[] = [...new Set(ocorrencias.flatMap(e => e.localId ? [e.localId] : []))]
-  const idsEspaco: string[] = [...new Set(ocorrencias.flatMap(e => e.espacoId ? [e.espacoId] : []))]
-  const locaisEncontrados: CadastroUtilizacao[] = []
-  const espacosEncontrados: CadastroUtilizacao[] = []
-  // O D1 tem limite de parâmetros vinculados; manter lotes pequenos.
-  for (const lote of lotesIds(idsLocal)) {
-    const encontrados: CadastroUtilizacao[] = await db.select({
-      id: locais.id, nome: locais.nome, proprietarioMembroId: locais.proprietarioMembroId,
-    }).from(locais).where(inArray(locais.id, lote)).all()
-    locaisEncontrados.push(...encontrados)
+  const ocorrencias: OcorrenciaUtilizacao[] = linhas.map(({ id, inicioEm, fimEm, localId, espacoId }) =>
+    ({ id, inicioEm, fimEm, localId, espacoId }))
+  const locaisPorId = new Map<string, CadastroUtilizacao>()
+  const espacosPorId = new Map<string, CadastroUtilizacao>()
+  for (const linha of linhas) {
+    if (linha.localId && linha.localNome !== null) {
+      locaisPorId.set(linha.localId, {
+        id: linha.localId, nome: linha.localNome, proprietarioMembroId: linha.localProprietarioMembroId,
+      })
+    }
+    if (linha.espacoId && linha.espacoNome !== null) {
+      espacosPorId.set(linha.espacoId, {
+        id: linha.espacoId, nome: linha.espacoNome, proprietarioMembroId: linha.espacoProprietarioMembroId,
+      })
+    }
   }
-  for (const lote of lotesIds(idsEspaco)) {
-    const encontrados: CadastroUtilizacao[] = await db.select({
-      id: espacosLocal.id, nome: espacosLocal.nome,
-      proprietarioMembroId: espacosLocal.proprietarioMembroId,
-    }).from(espacosLocal).where(inArray(espacosLocal.id, lote)).all()
-    espacosEncontrados.push(...encontrados)
-  }
+  const locaisEncontrados = [...locaisPorId.values()]
+  const espacosEncontrados = [...espacosPorId.values()]
   const resumo = consolidarUtilizacao(ocorrencias, locaisEncontrados, espacosEncontrados, membroId)
   return c.json({
     escopo: { escopoTipo, escopoId }, periodo: { dataInicio: dataInicio ?? null, dataFim: dataFim ?? null },
