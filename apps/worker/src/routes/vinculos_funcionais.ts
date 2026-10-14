@@ -416,9 +416,27 @@ vinculosFuncionaisRouter.get('/', async (c) => {
 vinculosFuncionaisRouter.get('/participantes-gt', async (c) => {
   const db = c.get('db')
   const contexto = c.get('contextoPermissoes')
-  // Reutilizar a expansão territorial na listagem e na autorização dos GTs.
-  const escoposVisiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
-  const vinculosVisiveis = await listarVinculosVisiveis(db, contexto, undefined, escoposVisiveis)
+  // A expansão geral inclui também acessos não regionais. Nunca reutilizá-la
+  // como autorização de vínculos quando há credenciais territoriais mistas.
+  const administradas = regionaisAdministradas(contexto)
+  const somenteGestaoRegional = administradas.size > 0 && contexto.acessosAtivos.every((acesso: any) =>
+    !acesso.escopoId || acesso.escopoTipo === 'GLOBAL' ||
+    (acesso.escopoTipo === 'REGIONAL' && administradas.has(acesso.escopoId))
+  )
+  let vinculosVisiveis: Awaited<ReturnType<typeof listarVinculosVisiveis>>
+  let escoposVisiveis: Awaited<ReturnType<typeof obterEscoposTerritoriaisVisiveis>>
+  if (somenteGestaoRegional) {
+    // Para contas exclusivamente regionais, os escopos gerais são os mesmos
+    // autorizados à listagem. Calcular uma vez evita repetir a expansão D1.
+    escoposVisiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+    vinculosVisiveis = await listarVinculosVisiveis(db, contexto, undefined, escoposVisiveis)
+  } else {
+    // Preserva a regra original para contas comuns e de credenciais mistas;
+    // se não houver vínculos, não executar a expansão territorial.
+    vinculosVisiveis = await listarVinculosVisiveis(db, contexto)
+    if (vinculosVisiveis.length === 0) return c.json([])
+    escoposVisiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+  }
   const membrosVisiveis = new Set<string>(vinculosVisiveis.map((v: any) => v.membroId))
   if (membrosVisiveis.size === 0) return c.json([])
   if (!escoposVisiveis.tudo && escoposVisiveis.gruposTrabalhoIds.size === 0) return c.json([])
