@@ -10,6 +10,8 @@ import {
   eventos,
   funcoes,
   gruposTrabalho,
+  participacoesGruposTrabalho,
+  preCadastrosMinisteriais,
   membros,
   regionais,
   setores,
@@ -395,6 +397,23 @@ vinculosFuncionaisRouter.get('/', async (c) => {
   const db = c.get('db')
   const contexto = c.get('contextoPermissoes')
   return c.json(await listarVinculosVisiveis(db, contexto))
+})
+
+// Participação canônica em GT; limitar resultado aos membros cujos vínculos já são visíveis.
+vinculosFuncionaisRouter.get('/participantes-gt', async (c) => {
+  const db = c.get('db')
+  const contexto = c.get('contextoPermissoes')
+  const vinculosVisiveis = await listarVinculosVisiveis(db, contexto)
+  const membrosVisiveis = new Set<string>(vinculosVisiveis.map((v: any) => v.membroId))
+  if (membrosVisiveis.size === 0) return c.json([])
+  const participacoes = await db.select({
+    grupoTrabalhoId: participacoesGruposTrabalho.grupoTrabalhoId,
+    membroId: preCadastrosMinisteriais.membroId,
+  }).from(participacoesGruposTrabalho)
+    .innerJoin(preCadastrosMinisteriais, eq(participacoesGruposTrabalho.preCadastroMinisterialId, preCadastrosMinisteriais.id))
+    .where(and(eq(participacoesGruposTrabalho.ativo, true), eq(preCadastrosMinisteriais.ativo, true)))
+    .all()
+  return c.json(participacoes.filter((p: any) => p.membroId && membrosVisiveis.has(p.membroId)))
 })
 
 vinculosFuncionaisRouter.get('/:id', async (c) => {
