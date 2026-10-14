@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, eq, isNull, or } from 'drizzle-orm'
+import { and, eq, inArray, isNull, or } from 'drizzle-orm'
 import { espacosLocal, locais, membros, casas, setores } from '../db/schema'
 import { EspacoLocalCreate, EspacoLocalUpdate } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
@@ -52,9 +52,13 @@ espacosLocaisRouter.get('/', async c => {
   )
   const contexto = c.get('contextoPermissoes')
   const localIds: string[] = [...new Set<string>(data.map((item: any) => String(item.localId)))]
-  const localRows = await Promise.all(localIds.map((id: string) => db.select().from(locais).where(eq(locais.id, id)).get()))
+  const localRows: any[] = []
+  for (let inicio = 0; inicio < localIds.length; inicio += 80) {
+    localRows.push(...await db.select().from(locais).where(inArray(locais.id, localIds.slice(inicio, inicio + 80))).all())
+  }
+  const locaisPorId = new Map<string, any>(localRows.map(local => [local.id, local]))
   const visiveis = eMasterSistema(contexto) ? undefined : await obterEscoposTerritoriaisVisiveis(db, contexto)
-  const autorizados = await Promise.all(localRows.map((local: any) => espacoVisivel(db, contexto, local, visiveis)))
+  const autorizados = await Promise.all(localIds.map(id => espacoVisivel(db, contexto, locaisPorId.get(id), visiveis)))
   const idsPermitidos = new Set(localIds.filter((_: string, i: number) => autorizados[i]))
   const referenciados = autorizados.every(Boolean) ? new Set<string>() : await espacosDeEventosVisiveis(db, contexto, data.filter((item: any) => !idsPermitidos.has(item.localId) && !item.proprietarioMembroId).map((item: any) => item.id))
   return c.json(data.filter((item: any) => idsPermitidos.has(item.localId) || (!item.proprietarioMembroId && referenciados.has(item.id))))
