@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, or, gte, lt, lte, inArray } from 'drizzle-orm'
+import { eq, and, or, gte, lt, lte, inArray, sql } from 'drizzle-orm'
 import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, locais, espacosLocal, vinculosFuncionais, funcoes, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo } from '../security/permissoes'
@@ -766,17 +766,6 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
     ))
     .get())
   const visibilidade = await condicaoEventosVisiveis(db, c.get('contextoPermissoes'))
-  const visibilidadeRelatorio = gestorRegionalLegado
-    ? or(visibilidade, and(
-        inArray(eventos.abrangencia, ['NACIONAL', 'INTERNACIONAL']),
-        eq(eventos.regionalGestaoId, escopoId),
-      ))!
-    : visibilidade
-  const condicoes = [
-    eq(eventos.ativo, true),
-    eq(eventos.pessoal, false),
-    visibilidadeRelatorio,
-  ]
   const territorial = condicaoEscopo({
     id: 'relatorio-utilizacao',
     perfilCodigo: 'GESTOR_RELATORIOS',
@@ -784,10 +773,34 @@ relatoriosRouter.get('/utilizacao-locais', async c => {
     escopoId,
   })
   if (!territorial) return c.json({ error: 'Escopo inválido' }, 400)
+  // A hierarquia de GTs legados também integra o relatório de Administração/Setor.
+  // A condição adicional é restrita ao mesmo escopo informado e à visibilidade já aplicada.
+  const gtDescendente = escopoTipo === 'ADMINISTRACAO'
+    ? sql`${eventos.grupoTrabalhoId} IN (
+        SELECT g.id FROM grupos_trabalho g
+        LEFT JOIN setores s ON s.id = g.setor_id
+        WHERE COALESCE(g.administracao_id, s.administracao_id) = ${escopoId}
+      )`
+    : escopoTipo === 'SETOR'
+      ? sql`${eventos.grupoTrabalhoId} IN (
+          SELECT id FROM grupos_trabalho WHERE setor_id = ${escopoId}
+        )`
+      : null
+  // O gestor autorizado ao escopo também deve enxergar os eventos dos seus GTs
+  // descendentes, sem conceder visibilidade para GTs de escopos irmãos.
+  const visibilidadeRelatorio = or(
+    visibilidade,
+    gestorRegionalLegado
+      ? and(inArray(eventos.abrangencia, ['NACIONAL', 'INTERNACIONAL']),
+          eq(eventos.regionalGestaoId, escopoId))
+      : undefined,
+    gtDescendente ?? undefined,
+  )!
+  const condicoes = [eq(eventos.ativo, true), eq(eventos.pessoal, false), visibilidadeRelatorio]
   condicoes.push(
     escopoTipo === 'REGIONAL'
       ? or(territorial, eq(eventos.regionalGestaoId, escopoId))!
-      : territorial
+      : gtDescendente ? or(territorial, gtDescendente)! : territorial
   )
   if (dataInicio) condicoes.push(gte(eventos.inicioEm, inicioDiaSaoPauloUtc(dataInicio)))
   if (dataFim) {
