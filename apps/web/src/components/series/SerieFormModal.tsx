@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { SerieCreate, SerieCreateInput, LocalCreate, EspacoLocalCreate } from '@piedade/shared'
-import { ApiError, postWithAuth } from '../../api/apiClient'
+import { ApiError, fetchWithAuth, postWithAuth } from '../../api/apiClient'
 
 export interface Lookups {
   locais: { id: string; nome: string }[]
@@ -303,6 +303,10 @@ export function SerieFormModal({
       setCepRapidoMensagem('Aguarde a consulta do CEP terminar antes de criar o local.')
       return
     }
+    if ((!tipoEscopo || !(tipoEscopo === 'regional' ? formData.regionalId : tipoEscopo === 'administracao' ? formData.administracaoId : tipoEscopo === 'setor' ? formData.setorId : tipoEscopo === 'casa' ? formData.casaId : tipoEscopo === 'grupoTrabalho' ? formData.grupoTrabalhoId : null))) {
+      setLocalRapidoErro('Selecione o escopo territorial da reunião antes de cadastrar o local.')
+      return
+    }
     const parsed = LocalCreate.safeParse({
       nome: localRapido.nome,
       endereco: localRapido.endereco,
@@ -327,7 +331,22 @@ export function SerieFormModal({
     setSalvandoLocalRapido(true)
     setLocalRapidoErro(null)
     try {
-      const criado = await postWithAuth<{ id: string; nome: string }>('/locais', parsed.data)
+      const escopoTipoOriginal = tipoEscopo === 'grupoTrabalho' ? 'GRUPO_TRABALHO' : tipoEscopo.toUpperCase()
+      const escopoIdOriginal = tipoEscopo === 'regional' ? formData.regionalId : tipoEscopo === 'administracao' ? formData.administracaoId : tipoEscopo === 'setor' ? formData.setorId : tipoEscopo === 'casa' ? formData.casaId : tipoEscopo === 'grupoTrabalho' ? formData.grupoTrabalhoId : null
+      let escopoTipoCadastro = escopoTipoOriginal
+      let escopoIdCadastro = escopoIdOriginal
+      if (tipoEscopo === 'casa') {
+        const setorCasa = casas.find(item => item.id === formData.casaId)?.setorId
+        if (setorCasa) {
+          const autorizados = await fetchWithAuth<{ escopos: Array<{ escopoTipo: string; escopoId: string }> }>('/locais/escopos-autorizados')
+          if (!autorizados.escopos.some(item => item.escopoTipo === 'CASA' && item.escopoId === formData.casaId) &&
+              autorizados.escopos.some(item => item.escopoTipo === 'SETOR' && item.escopoId === setorCasa)) {
+            escopoTipoCadastro = 'SETOR'
+            escopoIdCadastro = setorCasa
+          }
+        }
+      }
+      const criado = await postWithAuth<{ id: string; nome: string }>('/locais', { ...parsed.data, escopoTipo: escopoTipoCadastro, escopoId: escopoIdCadastro })
       setLocaisRapidos(atuais => [...atuais.filter(item => item.id !== criado.id), criado])
       setFormData(atual => ({ ...atual, localId: criado.id, espacoId: '' }))
       fecharLocalRapido()

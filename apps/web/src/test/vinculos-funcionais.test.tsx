@@ -64,6 +64,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
       if (endpoint === '/grupos-trabalho') return []
       if (endpoint === '/vinculos-funcionais') return [mockVinculo]
       if (endpoint === `/vinculos-funcionais/${VINCULO_ID}`) return mockVinculo
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return []
       throw new Error('Not found')
     })
   })
@@ -91,6 +92,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
         { ...mockVinculo, regionalId: null, casaId: CASA_ID },
         { ...mockVinculo, id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', membroId: outroMembro, regionalId: null, casaId: CASA_ID_2 },
       ]
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return []
       throw new Error('Not found')
     })
     const { container } = render(<VinculosFuncionaisView />)
@@ -103,8 +105,8 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
     expect(painel.open).toBe(true)
     expect(screen.getByText('João da Silva')).toBeInTheDocument()
     expect(screen.getByText('Maria Oliveira')).toBeInTheDocument()
-    expect(screen.getByText('Casa: Casa A')).toBeInTheDocument()
-    expect(screen.getByText('Casa: Casa B')).toBeVisible()
+    expect(screen.getByText('Casa de Oração: Casa A')).toBeInTheDocument()
+    expect(screen.getByText('Casa de Oração: Casa B')).toBeVisible()
   })
 
   it('1c. Mesmo membro em duas Casas conta como uma pessoa e card permanece aberto com filtro', async () => {
@@ -120,6 +122,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
         { ...mockVinculo, regionalId: null, casaId: CASA_ID },
         { ...mockVinculo, id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', regionalId: null, casaId: CASA_ID_2 },
       ]
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return []
       throw new Error('Not found')
     })
     const { container } = render(<VinculosFuncionaisView />)
@@ -128,7 +131,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
     fireEvent.click(painel.querySelector('summary') as HTMLElement)
     expect(painel.open).toBe(true)
     fireEvent.change(screen.getByPlaceholderText('Nome, função ou local...'), { target: { value: 'Casa B' } })
-    expect(screen.getByText('Casa: Casa B')).toBeVisible()
+    expect(screen.getByText('Casa de Oração: Casa B')).toBeVisible()
     expect(painel.open).toBe(true)
     expect(screen.getByText('1 membro ▾')).toBeVisible()
   })
@@ -143,6 +146,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
       if (endpoint === '/casas') return mockCasas
       if (endpoint === '/grupos-trabalho') return []
       if (endpoint === '/vinculos-funcionais') return [] // Lista inicial vazia
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return []
       throw new Error('Not found')
     })
 
@@ -166,7 +170,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
     fireEvent.change(selectRegional, { target: { value: REGIONAL_ID } })
 
     // Trocar para Setor (deve limpar o escopoId e ocultar o select da Regional)
-    fireEvent.click(screen.getByLabelText(/Setor/i))
+    fireEvent.click(screen.getByLabelText(/Setor/i, { selector: 'input[type="radio"]' }))
     const selectSetor = await screen.findByLabelText(/Setor Selecionado/i)
     
     // Agora selecionamos o setor
@@ -205,6 +209,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
       if (endpoint === '/casas') return mockCasas
       if (endpoint === '/grupos-trabalho') return []
       if (endpoint === '/vinculos-funcionais') return []
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return []
       throw new Error('Not found')
     })
 
@@ -227,6 +232,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
       if (endpoint === '/casas') return mockCasas
       if (endpoint === '/grupos-trabalho') return []
       if (endpoint === '/vinculos-funcionais') return []
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return []
       throw new Error('Not found')
     })
 
@@ -296,6 +302,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
       if (endpoint === '/casas') return mockCasas
       if (endpoint === '/grupos-trabalho') return []
       if (endpoint === '/vinculos-funcionais') return []
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return []
       throw new Error('Not found')
     })
 
@@ -331,6 +338,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
       if (endpoint === '/casas') return mockCasas
       if (endpoint === '/grupos-trabalho') return []
       if (endpoint === '/vinculos-funcionais') return []
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return []
       throw new Error('Not found')
     })
 
@@ -350,7 +358,7 @@ describe('S02-B2 — VinculosFuncionaisView (Frontend)', () => {
     const administracao = screen.getByRole('combobox', { name: 'Administração' })
     fireEvent.change(administracao, { target: { value: ADMINISTRACAO_ID } })
 
-    const setor = screen.getByRole('combobox', { name: 'Setor' })
+    const setor = screen.getByLabelText('Setor', { selector: '#filtro-setor-casa' })
     fireEvent.change(setor, { target: { value: SETOR_ID } })
 
     const casa = screen.getByRole('combobox', {

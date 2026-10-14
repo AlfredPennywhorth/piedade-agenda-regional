@@ -278,19 +278,22 @@ export async function obterEscoposTerritoriaisVisiveis(
 
       const admIds = adms.map((item: any) => item.id)
       if (admIds.length > 0) {
-        const setores = await db
-          .select({ id: schema.setores.id })
-          .from(schema.setores)
-          .where(inArray(schema.setores.administracaoId, admIds))
-          .all()
+        const setores: Array<{ id: string }> = []
+        for (let i = 0; i < admIds.length; i += 90) {
+          setores.push(...await db
+            .select({ id: schema.setores.id })
+            .from(schema.setores)
+            .where(inArray(schema.setores.administracaoId, admIds.slice(i, i + 90)))
+            .all())
+        }
         setores.forEach((item: any) => resultado.setoresIds.add(item.id))
 
         const setorIds = setores.map((item: any) => item.id)
-        if (setorIds.length > 0) {
+        for (let i = 0; i < setorIds.length; i += 90) {
           const casas = await db
             .select({ id: schema.casas.id })
             .from(schema.casas)
-            .where(inArray(schema.casas.setorId, setorIds))
+            .where(inArray(schema.casas.setorId, setorIds.slice(i, i + 90)))
             .all()
           casas.forEach((item: any) => resultado.casasIds.add(item.id))
         }
@@ -324,11 +327,11 @@ export async function obterEscoposTerritoriaisVisiveis(
       setores.forEach((item: any) => resultado.setoresIds.add(item.id))
 
       const setorIds = setores.map((item: any) => item.id)
-      if (setorIds.length > 0) {
+      for (let i = 0; i < setorIds.length; i += 90) {
         const casas = await db
           .select({ id: schema.casas.id })
           .from(schema.casas)
-          .where(inArray(schema.casas.setorId, setorIds))
+          .where(inArray(schema.casas.setorId, setorIds.slice(i, i + 90)))
           .all()
         casas.forEach((item: any) => resultado.casasIds.add(item.id))
       }
@@ -377,6 +380,39 @@ export async function obterEscoposTerritoriaisVisiveis(
     }
   }
 
+  // GTs ligados a uma Administração ou a um Setor também são descendentes
+  // para as credenciais de gestão nesses níveis; não conceder GTs de escopos irmãos.
+  const acessosGestao = contexto.acessosAtivos.filter(acesso =>
+    ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) && acesso.escopoId)
+  const regionaisGeridas = new Set(acessosGestao.filter(a => a.escopoTipo === 'REGIONAL').map(a => a.escopoId))
+  const admsGeridas = new Set(acessosGestao.filter(a => a.escopoTipo === 'ADMINISTRACAO').map(a => a.escopoId))
+  const setoresGeridos = new Set(acessosGestao.filter(a => a.escopoTipo === 'SETOR').map(a => a.escopoId))
+  if (regionaisGeridas.size || admsGeridas.size || setoresGeridos.size) {
+    const gts = await db.select({
+      id: schema.gruposTrabalho.id,
+      regionalId: schema.gruposTrabalho.regionalId,
+      administracaoId: schema.gruposTrabalho.administracaoId,
+      setorId: schema.gruposTrabalho.setorId,
+    }).from(schema.gruposTrabalho).all()
+    // Resolver ascendência indireta do GT, tal como em /locais/escopos-autorizados.
+    const [adms, setores] = await Promise.all([
+      db.select({ id: schema.administracoes.id, regionalId: schema.administracoes.regionalId })
+        .from(schema.administracoes).all(),
+      db.select({ id: schema.setores.id, administracaoId: schema.setores.administracaoId })
+        .from(schema.setores).all(),
+    ])
+    const regionalPorAdm = new Map<string, string>(adms.map((adm: any) => [adm.id, adm.regionalId]))
+    const admPorSetor = new Map<string, string>(setores.map((setor: any) => [setor.id, setor.administracaoId]))
+    for (const gt of gts) {
+      const admId = gt.administracaoId || (gt.setorId ? admPorSetor.get(gt.setorId) : null)
+      const regionalId = gt.regionalId || (admId ? regionalPorAdm.get(admId) : null)
+      if ((regionalId && regionaisGeridas.has(regionalId)) ||
+          (admId && admsGeridas.has(admId)) ||
+          (gt.setorId && setoresGeridos.has(gt.setorId))) {
+        resultado.gruposTrabalhoIds.add(gt.id)
+      }
+    }
+  }
   return resultado
 }
 
@@ -419,6 +455,58 @@ export async function podeAdministrarEscopo(
   if (eMasterSistema(contexto)) return true
   const regionalId = await obterRegionalDoEscopo(db, escopoTipo, escopoId)
   return !!regionalId && regionaisAdministradas(contexto).has(regionalId)
+}
+
+/**
+ * Verifica a concessão administrativa territorial sem ampliar o acesso a cadastros
+ * globais/legados. Usado exclusivamente para criação/edição de locais institucionais.
+ */
+export async function podeGerenciarCadastroTerritorial(
+  db: any,
+  contexto: ContextoPermissoes,
+  escopoTipo: 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO',
+  escopoId: string
+): Promise<boolean> {
+  if (eMasterSistema(contexto)) return true
+  if (!db || !escopoId) return false
+  const admins = contexto.acessosAtivos.filter(acesso =>
+    ['ADMINISTRADOR_SISTEMA', 'GESTOR_AGENDA'].includes(acesso.perfilCodigo) &&
+    acesso.escopoId !== null
+  )
+  if (!admins.length) return false
+  const regionalId = await obterRegionalDoEscopo(db, escopoTipo, escopoId)
+  if (!regionalId) return false
+  if (admins.some(acesso => acesso.escopoTipo === escopoTipo && acesso.escopoId === escopoId)) return true
+  if (admins.some(acesso => acesso.escopoTipo === 'REGIONAL' && acesso.escopoId === regionalId)) return true
+
+  let administracaoId: string | null = null
+  let setorId: string | null = null
+  if (escopoTipo === 'ADMINISTRACAO') {
+    administracaoId = escopoId
+  } else if (escopoTipo === 'SETOR') {
+    setorId = escopoId
+  } else if (escopoTipo === 'CASA') {
+    const casa = await db.select({ setorId: schema.casas.setorId })
+      .from(schema.casas).where(eq(schema.casas.id, escopoId)).get()
+    setorId = casa?.setorId ?? null
+  } else if (escopoTipo === 'GRUPO_TRABALHO') {
+    const gt = await db.select({
+      administracaoId: schema.gruposTrabalho.administracaoId,
+      setorId: schema.gruposTrabalho.setorId,
+    }).from(schema.gruposTrabalho).where(eq(schema.gruposTrabalho.id, escopoId)).get()
+    administracaoId = gt?.administracaoId ?? null
+    setorId = gt?.setorId ?? null
+  }
+
+  if (setorId) {
+    if (admins.some(acesso => acesso.escopoTipo === 'SETOR' && acesso.escopoId === setorId)) return true
+    const setor = await db.select({ administracaoId: schema.setores.administracaoId })
+      .from(schema.setores).where(eq(schema.setores.id, setorId)).get()
+    administracaoId = setor?.administracaoId ?? null
+  }
+  return !!administracaoId && admins.some(acesso =>
+    acesso.escopoTipo === 'ADMINISTRACAO' && acesso.escopoId === administracaoId
+  )
 }
 
 export function temPerfil(contexto: ContextoPermissoes, perfilCodigo: string): boolean {
@@ -546,6 +634,14 @@ export async function podeGerenciarAgendaNoEscopo(
 
   // Administrador Regional pode gerir a Agenda apenas dentro da Regional administrada.
   if (podeAdministrarRegional(contexto, regionalAlvo)) return true
+
+  // Permissão de cadastro territorial não implica gestão da agenda.
+  // Reutilizar apenas a resolução hierárquica para credenciais GESTOR_AGENDA.
+  if (escopoTipo !== 'GRUPO_TRABALHO' &&
+      await podeGerenciarCadastroTerritorial(db, {
+        ...contexto,
+        acessosAtivos: contexto.acessosAtivos.filter(acesso => acesso.perfilCodigo === 'GESTOR_AGENDA'),
+      }, escopoTipo, escopoId)) return true
 
   // Regra institucional: todo membro pode gerir automaticamente a Agenda da própria Casa.
   if (permitirCasaAutomatica && escopoTipo === 'CASA') {

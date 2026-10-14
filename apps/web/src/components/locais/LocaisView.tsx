@@ -18,6 +18,8 @@ interface Local {
   urlMaps?: string | null
   urlWaze?: string | null
   ativo: boolean
+  escopoTipo?: string | null
+  escopoId?: string | null
 }
 
 interface EspacoLocal {
@@ -61,6 +63,12 @@ export function LocaisView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filtroBusca, setFiltroBusca] = useState('')
+  const [escoposCadastro, setEscoposCadastro] = useState<Array<{escopoTipo: string; escopoId: string; nome: string}>>([])
+  const [masterCadastro, setMasterCadastro] = useState(false)
+  const [erroEscoposCadastro, setErroEscoposCadastro] = useState<string | null>(null)
+  const [carregandoEscopos, setCarregandoEscopos] = useState(true)
+  const [escopoSelecionado, setEscopoSelecionado] = useState('')
+  const [editandoLegado, setEditandoLegado] = useState(false)
   
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -118,7 +126,27 @@ export function LocaisView() {
 
   useEffect(() => {
     fetchLocais()
+    apiClient.fetchWithAuth<{master: boolean; escopos: Array<{escopoTipo: string; escopoId: string; nome: string}>}>('/locais/escopos-autorizados')
+      .then(dados => {
+        setMasterCadastro(dados.master)
+        setEscoposCadastro(dados.escopos)
+        setErroEscoposCadastro(null)
+      })
+      .catch(() => {
+        setMasterCadastro(false)
+        setEscoposCadastro([])
+        setErroEscoposCadastro('Não foi possível consultar os escopos autorizados. Atualize a página e tente novamente.')
+      })
+      .finally(() => setCarregandoEscopos(false))
   }, [])
+
+  useEffect(() => {
+    if (!formOpen || editingId || carregandoEscopos) return
+    const setores = escoposCadastro.filter(item => item.escopoTipo === 'SETOR')
+    if (setores.length === 1) {
+      setEscopoSelecionado(atual => atual || `SETOR:${setores[0].escopoId}`)
+    }
+  }, [formOpen, editingId, carregandoEscopos, escoposCadastro])
 
   const locaisFiltrados = useMemo(() => {
     const termo = filtroBusca.trim().toLocaleLowerCase('pt-BR')
@@ -152,6 +180,9 @@ export function LocaisView() {
     cepConsultaSeq.current += 1
     setConsultandoCep(false)
     setEditingId(null)
+    setEditandoLegado(false)
+    const setoresAutorizados = escoposCadastro.filter(item => item.escopoTipo === 'SETOR')
+    setEscopoSelecionado(setoresAutorizados.length === 1 ? `SETOR:${setoresAutorizados[0].escopoId}` : '')
     setFormData({
       nome: '',
       endereco: '',
@@ -183,6 +214,8 @@ export function LocaisView() {
       setLoading(true)
       const data = await apiClient.fetchWithAuth<Local>(`/locais/${id}`)
       setEditingId(data.id)
+      setEditandoLegado(!data.escopoTipo && !data.escopoId)
+      setEscopoSelecionado(data.escopoTipo && data.escopoId ? `${data.escopoTipo}:${data.escopoId}` : '')
       setFormData({
         nome: data.nome,
         endereco: data.endereco,
@@ -464,10 +497,23 @@ export function LocaisView() {
       setFormErrors({})
       setSaving(true)
 
+      const escopoEncontrado = escoposCadastro.find(item => item.escopoTipo + ':' + item.escopoId === escopoSelecionado)
+      const escopo = escopoEncontrado ? { escopoTipo: escopoEncontrado.escopoTipo, escopoId: escopoEncontrado.escopoId } : null
+      if (!editingId || (masterCadastro && editandoLegado)) {
+        if (!escopo) {
+          setError('Selecione um escopo institucional válido para salvar o local.')
+          return
+        }
+      }
+      setSaving(true)
       if (editingId) {
-        await apiClient.patchWithAuth(`/locais/${editingId}`, parsed.data)
+        await apiClient.patchWithAuth(`/locais/${editingId}`, masterCadastro && editandoLegado ? { ...parsed.data, ...escopo } : parsed.data)
       } else {
-        await apiClient.postWithAuth('/locais', parsed.data)
+        if (!escopo) {
+          setError('Selecione um escopo institucional autorizado para cadastrar o local.')
+          return
+        }
+        await apiClient.postWithAuth('/locais', { ...parsed.data, ...(escopo || {}) })
       }
 
       fecharFormulario()
@@ -616,6 +662,23 @@ export function LocaisView() {
               {error && (
                 <div role="alert" className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
                   {error}
+                </div>
+              )}
+              {(!editingId || (masterCadastro && editandoLegado)) && (
+                <div>
+                  <label htmlFor="escopo-local" className="block text-sm font-medium text-slate-700 mb-1">{editingId ? 'Classificar local legado — escopo institucional *' : 'Escopo institucional *'}</label>
+                  <select id="escopo-local" value={escopoSelecionado} onChange={e => setEscopoSelecionado(e.target.value)}
+                    required className="w-full rounded-lg border border-slate-300 p-2.5 text-sm">
+                    <option value="">{carregandoEscopos ? "Carregando escopos..." : "Selecione um escopo"}</option>
+                    {[...escoposCadastro].sort((a, b) => (a.escopoTipo === "SETOR" ? -1 : 0) - (b.escopoTipo === "SETOR" ? -1 : 0) || a.nome.localeCompare(b.nome, "pt-BR")).map(item => (
+                      <option key={item.escopoTipo + item.escopoId} value={item.escopoTipo + ':' + item.escopoId}>
+                        {item.escopoTipo} — {item.nome}
+                      </option>
+                    ))}
+                  </select>
+                  {erroEscoposCadastro && <p role="alert" className="mt-2 text-sm text-red-700">{erroEscoposCadastro}</p>}
+                  {!carregandoEscopos && !erroEscoposCadastro && escoposCadastro.length === 0 &&
+                    <p role="status" className="mt-2 text-sm text-amber-800">Nenhum escopo institucional disponível. Verifique se sua Casa de Oração e Setor de origem estão cadastrados.</p>}
                 </div>
               )}
               <div className="space-y-4">

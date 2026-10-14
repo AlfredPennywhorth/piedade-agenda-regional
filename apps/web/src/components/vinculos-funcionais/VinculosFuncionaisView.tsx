@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { CreateVinculoFuncionalSchema, UpdateVinculoFuncionalSchema } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 
@@ -28,9 +28,16 @@ type TipoEscopo = 'regional' | 'administracao' | 'setor' | 'casa' | 'gt' | ''
 
 export function VinculosFuncionaisView() {
   const [vinculos, setVinculos] = useState<VinculoFuncional[]>([])
+  const [participantesGt, setParticipantesGt] = useState<Array<{ grupoTrabalhoId: string; membroId: string }>>([])
+  const [participantesGtIndisponiveis, setParticipantesGtIndisponiveis] = useState(false)
+  const [participantesGtCarregando, setParticipantesGtCarregando] = useState(true)
+  const geracaoCarregamento = useRef(0)
   const [buscaVinculo, setBuscaVinculo] = useState('')
   const [filtroStatusLista, setFiltroStatusLista] = useState<'todos' | 'ativos' | 'inativos'>('ativos')
   const [filtroTipoLista, setFiltroTipoLista] = useState<TipoEscopo>('')
+  const [filtroSetorLista, setFiltroSetorLista] = useState('')
+  const [filtroCasaLista, setFiltroCasaLista] = useState('')
+  const [filtroGtLista, setFiltroGtLista] = useState('')
   
   // Lookups
   const [membros, setMembros] = useState<any[]>([])
@@ -104,21 +111,44 @@ export function VinculosFuncionaisView() {
   }
 
   const carregarDados = async () => {
+    const geracao = ++geracaoCarregamento.current
     setLoading(true)
     setErro(null)
+    setParticipantesGtCarregando(true)
+    setFiltroGtLista('')
     try {
       await carregarLookups()
       const data = await fetchWithAuth<VinculoFuncional[]>('/vinculos-funcionais')
+      if (geracao !== geracaoCarregamento.current) return
       setVinculos(data)
+      // A consulta auxiliar não pode bloquear a listagem principal.
+      void fetchWithAuth<Array<{ grupoTrabalhoId: string; membroId: string }>>('/vinculos-funcionais/participantes-gt')
+        .then(participacoes => {
+          if (geracao !== geracaoCarregamento.current) return
+          if (!Array.isArray(participacoes)) throw new Error('Resposta de participantes GT inválida')
+          setParticipantesGt(participacoes)
+          setParticipantesGtIndisponiveis(false)
+          setParticipantesGtCarregando(false)
+        })
+        .catch(() => {
+          if (geracao !== geracaoCarregamento.current) return
+          setParticipantesGt([])
+          setParticipantesGtIndisponiveis(true)
+          setParticipantesGtCarregando(false)
+          setFiltroGtLista('')
+        })
     } catch (err: any) {
+      if (geracao !== geracaoCarregamento.current) return
+      setParticipantesGtCarregando(false)
       setErro(err.message || 'Erro ao carregar os vínculos funcionais.')
     } finally {
-      setLoading(false)
+      if (geracao === geracaoCarregamento.current) setLoading(false)
     }
   }
 
   useEffect(() => {
-    carregarDados()
+    void carregarDados()
+    return () => { geracaoCarregamento.current += 1 }
   }, [])
 
   const handleChangeTipoEscopo = (novoTipo: TipoEscopo) => {
@@ -325,7 +355,7 @@ export function VinculosFuncionaisView() {
     if (v.regional) return `Regional: ${v.regional.nome}`
     if (v.administracao) return `Administração: ${v.administracao.nome}`
     if (v.setor) return `Setor: ${v.setor.nome}`
-    if (v.casa) return `Casa: ${v.casa.nome}`
+    if (v.casa) return `Casa de Oração: ${v.casa.nome}`
     if (v.grupoTrabalho) return `GT: ${v.grupoTrabalho.nome}`
 
     if (v.regionalId) {
@@ -342,7 +372,7 @@ export function VinculosFuncionaisView() {
     }
     if (v.casaId) {
       const item = casas.find(item => item.id === v.casaId)
-      return item ? `Casa: ${item.nome}` : 'Casa não encontrada'
+      return item ? `Casa de Oração: ${item.nome}` : 'Casa de Oração não encontrada'
     }
     if (v.grupoTrabalhoId) {
       const item = gts.find(item => item.id === v.grupoTrabalhoId)
@@ -352,11 +382,25 @@ export function VinculosFuncionaisView() {
     return 'Escopo não definido'
   }
 
+  // Setor usa a Casa de Oração de origem do membro, independentemente do escopo
+  // do vínculo (inclusive quando a função está vinculada a um GT).
+  const membrosDoSetor = new Set(
+    membros.filter(m => casas.some(c => c.id === m.casaId && c.setorId === filtroSetorLista))
+      .map(m => m.id)
+  )
+  const membrosDoGt = new Set(
+    participantesGt.filter(p => p.grupoTrabalhoId === filtroGtLista)
+      .map(p => p.membroId)
+  )
+
   const vinculosFiltrados = vinculos.filter(v => {
     if (filtroStatusLista === 'ativos' && !v.ativo) return false
     if (filtroStatusLista === 'inativos' && v.ativo) return false
     const tipo = v.grupoTrabalhoId ? 'gt' : v.casaId ? 'casa' : v.setorId ? 'setor' : v.administracaoId ? 'administracao' : v.regionalId ? 'regional' : ''
     if (filtroTipoLista && tipo !== filtroTipoLista) return false
+    if (filtroSetorLista && !membrosDoSetor.has(v.membroId)) return false
+    if (filtroCasaLista && membros.find(m => m.id === v.membroId)?.casaId !== filtroCasaLista) return false
+    if (filtroGtLista && !participantesGtIndisponiveis && !membrosDoGt.has(v.membroId)) return false
     const termo = buscaVinculo.trim().toLocaleLowerCase('pt-BR')
     return !termo || [getFuncaoNome(v), getMembroNome(v), renderNomeEscopo(v)].some(nome => nome.toLocaleLowerCase('pt-BR').includes(termo))
   })
@@ -391,6 +435,12 @@ export function VinculosFuncionaisView() {
         <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm flex justify-between items-center">
           <span>{erro}</span>
           <button onClick={() => setErro(null)} className="text-red-500 hover:text-red-700 font-bold ml-2">✕</button>
+        </div>
+      )}
+
+      {participantesGtIndisponiveis && (
+        <div role="alert" className="p-3 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-sm">
+          Participações dos Grupos de Trabalho indisponíveis temporariamente. A listagem de vínculos continua disponível; o filtro por GT está desabilitado.
         </div>
       )}
 
@@ -728,7 +778,7 @@ export function VinculosFuncionaisView() {
       )}
 
       <section aria-label="Vínculos por função" className="space-y-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <label className="text-sm text-slate-700 sm:col-span-1">
             Buscar função ou membro
             <input value={buscaVinculo} onChange={e => setBuscaVinculo(e.target.value)}
@@ -744,6 +794,37 @@ export function VinculosFuncionaisView() {
             Abrangência do vínculo
             <select value={filtroTipoLista} onChange={e => setFiltroTipoLista(e.target.value as TipoEscopo)} className="mt-1 w-full rounded-lg border border-slate-300 p-2">
               <option value="">Todas</option><option value="regional">Regional</option><option value="administracao">Administração</option><option value="setor">Setor</option><option value="casa">Casa de Oração</option><option value="gt">Grupo de Trabalho</option>
+            </select>
+          </label>
+          <label className="text-sm text-slate-700">
+            Setor
+            <select value={filtroSetorLista} onChange={e => { setFiltroSetorLista(e.target.value); setFiltroCasaLista('') }}
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2">
+              <option value="">Todos os setores</option>
+              {[...setores].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(s => (
+                <option key={s.id} value={s.id}>{s.nome}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm text-slate-700">
+            Casa de Oração
+            <select value={filtroCasaLista} disabled={!filtroSetorLista} onChange={e => setFiltroCasaLista(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2">
+              <option value="">Todas as Casas de Oração</option>
+              {[...casas].filter(c => Boolean(filtroSetorLista) && c.setorId === filtroSetorLista)
+                .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(c => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm text-slate-700">
+            Grupo de Trabalho
+            <select disabled={participantesGtCarregando || participantesGtIndisponiveis} value={filtroGtLista} onChange={e => setFiltroGtLista(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 p-2">
+              <option value="">Todos os Grupos de Trabalho</option>
+              {[...gts].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(gt => (
+                <option key={gt.id} value={gt.id}>{gt.nome}</option>
+              ))}
             </select>
           </label>
         </div>
@@ -808,8 +889,8 @@ export function VinculosFuncionaisView() {
                 <span className="text-slate-700">{getFuncaoNome(vinculoDetalhe)}</span>
               </div>
               <div>
-                <span className="text-xs font-semibold text-slate-500 block">Escopo:</span>
-                <span className="text-slate-700">{renderNomeEscopo(vinculoDetalhe)}</span>
+                <span className="text-xs font-semibold text-slate-500 block">{vinculoDetalhe.casaId ? "Casa de Oração:" : "Escopo:"}</span>
+                <span className="text-slate-700">{vinculoDetalhe.casaId ? (vinculoDetalhe.casa?.nome || casas.find(c => c.id === vinculoDetalhe.casaId)?.nome || "Casa de Oração não encontrada") : renderNomeEscopo(vinculoDetalhe)}</span>
               </div>
               <div>
                 <span className="text-xs font-semibold text-slate-500 block">Status:</span>
