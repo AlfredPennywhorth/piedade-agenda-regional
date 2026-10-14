@@ -423,6 +423,12 @@ export function VinculosFuncionaisView() {
         </div>
       )}
 
+      {participantesGtIndisponiveis && (
+        <div role="alert" className="p-3 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-sm">
+          Participações dos Grupos de Trabalho indisponíveis temporariamente. A listagem de vínculos continua disponível; o filtro por GT está desabilitado.
+        </div>
+      )}
+
       {lookupAviso && (
         <div className="p-3 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-sm">
           {lookupAviso}
@@ -798,7 +804,7 @@ export function VinculosFuncionaisView() {
           </label>
           <label className="text-sm text-slate-700">
             Grupo de Trabalho
-            <select value={filtroGtLista} onChange={e => setFiltroGtLista(e.target.value)}
+            <select disabled={participantesGtIndisponiveis} value={filtroGtLista} onChange={e => setFiltroGtLista(e.target.value)}
               className="mt-1 w-full rounded-lg border border-slate-300 p-2">
               <option value="">Todos os Grupos de Trabalho</option>
               {[...gts].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(gt => (
