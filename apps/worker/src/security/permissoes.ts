@@ -391,9 +391,20 @@ export async function obterEscoposTerritoriaisVisiveis(
       administracaoId: schema.gruposTrabalho.administracaoId,
       setorId: schema.gruposTrabalho.setorId,
     }).from(schema.gruposTrabalho).all()
+    // Resolver ascendência indireta do GT, tal como em /locais/escopos-autorizados.
+    const [adms, setores] = await Promise.all([
+      db.select({ id: schema.administracoes.id, regionalId: schema.administracoes.regionalId })
+        .from(schema.administracoes).all(),
+      db.select({ id: schema.setores.id, administracaoId: schema.setores.administracaoId })
+        .from(schema.setores).all(),
+    ])
+    const regionalPorAdm = new Map<string, string>(adms.map((adm: any) => [adm.id, adm.regionalId]))
+    const admPorSetor = new Map<string, string>(setores.map((setor: any) => [setor.id, setor.administracaoId]))
     for (const gt of gts) {
-      if ((gt.regionalId && regionaisGeridas.has(gt.regionalId)) ||
-          (gt.administracaoId && admsGeridas.has(gt.administracaoId)) ||
+      const admId = gt.administracaoId || (gt.setorId ? admPorSetor.get(gt.setorId) : null)
+      const regionalId = gt.regionalId || (admId ? regionalPorAdm.get(admId) : null)
+      if ((regionalId && regionaisGeridas.has(regionalId)) ||
+          (admId && admsGeridas.has(admId)) ||
           (gt.setorId && setoresGeridos.has(gt.setorId))) {
         resultado.gruposTrabalhoIds.add(gt.id)
       }
