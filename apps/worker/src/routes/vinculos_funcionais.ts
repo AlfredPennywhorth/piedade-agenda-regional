@@ -19,7 +19,7 @@ import {
 } from '../db/schema'
 import { CreateVinculoFuncionalSchema, UpdateVinculoFuncionalSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { eMasterSistema, obterRegionalDoEscopo, regionaisAdministradas } from '../security/permissoes'
+import { eMasterSistema, obterEscoposTerritoriaisVisiveis, obterRegionalDoEscopo, regionaisAdministradas } from '../security/permissoes'
 import { executarOperacaoComAudit, executarOperacaoComAudits } from '../services/auditoria'
 
 export const vinculosFuncionaisRouter = new Hono<any>()
@@ -406,6 +406,8 @@ vinculosFuncionaisRouter.get('/participantes-gt', async (c) => {
   const vinculosVisiveis = await listarVinculosVisiveis(db, contexto)
   const membrosVisiveis = new Set<string>(vinculosVisiveis.map((v: any) => v.membroId))
   if (membrosVisiveis.size === 0) return c.json([])
+  const escoposVisiveis = await obterEscoposTerritoriaisVisiveis(db, contexto)
+  if (!escoposVisiveis.tudo && escoposVisiveis.gruposTrabalhoIds.size === 0) return c.json([])
   const participacoes = await db.select({
     grupoTrabalhoId: participacoesGruposTrabalho.grupoTrabalhoId,
     membroId: preCadastrosMinisteriais.membroId,
@@ -413,7 +415,8 @@ vinculosFuncionaisRouter.get('/participantes-gt', async (c) => {
     .innerJoin(preCadastrosMinisteriais, eq(participacoesGruposTrabalho.preCadastroMinisterialId, preCadastrosMinisteriais.id))
     .where(and(eq(participacoesGruposTrabalho.ativo, true), eq(preCadastrosMinisteriais.ativo, true)))
     .all()
-  return c.json(participacoes.filter((p: any) => p.membroId && membrosVisiveis.has(p.membroId)))
+  return c.json(participacoes.filter((p: any) => p.membroId && membrosVisiveis.has(p.membroId) &&
+    (escoposVisiveis.tudo || escoposVisiveis.gruposTrabalhoIds.has(p.grupoTrabalhoId))))
 })
 
 vinculosFuncionaisRouter.get('/:id', async (c) => {
