@@ -19,13 +19,17 @@ O redesign **do zero** no Google Stitch é a etapa principal desta rodada, confo
 
 ## Direção visual aprovada e design system (15/10/2026)
 
-O PO aprovou **a direção estética** obtida para Setores (desktop/mobile e temas claro/escuro), com ressalvas obrigatórias: **uniformizar o tom de azul do cabeçalho** e **mostrar ambiente, versão e build reais no rodapé**, nunca no cabeçalho. O aceite estético não homologa código HTML, regras inventadas, responsividade em dispositivo real nem o Gate A completo do lote 1; as demais superfícies ainda carecem de proposta e aceite individual.
+O PO aprovou **a direção estética** obtida para Setores (desktop/mobile e temas claro/escuro), com ressalvas obrigatórias: **uniformizar o tom de azul do cabeçalho** e **mostrar ambiente, versão e build reais no rodapé**, nunca no cabeçalho. O PO também aprovou **a direção visual de Casas de Oração e menu Mais, condicionada às correções documentadas abaixo**. Esses aceites estéticos não homologam código HTML, regras inventadas, responsividade em dispositivo real nem o Gate A completo do lote 1; as superfícies restantes ainda exigem propostas e aceites aplicáveis.
 
 - [Design system Stitch v1](../11-ux-stitch/DESIGN.md): fonte compartilhada de tokens provisórios e regras visuais; confirmar contrastes e temas em implementação.
 - [Handoff Setores](../11-ux-stitch/handoff-setores.md): rastreia `AGD-ADM-007`, `AGD-ADM-041` e `AGD-ADM-042`; decisões, referências e testes pendentes.
 - SIGA da CCB **desktop** é referência estética apenas. Não enviar ou copiar imagens mobile do SIGA; nem utilizar seus fluxos ou código como fonte funcional.
 - Protótipos Stitch antigos são material de ideias, não modelo obrigatório. O sistema atual, o inventário de telas e as permissões do backend prevalecem.
-- Próxima onda de design, de dentro para fora: Casas de Oração, Locais/Espaços e demais cadastros territoriais; preservar a cobertura integral da matriz S13. Todo lote requer aceite explícito do PO antes da implementação.
+- Sequência de design, de dentro para fora: **Casas de Oração/menu Mais — direção visual já aprovada com condições**; **Locais/Espaços — próximo sublote do roteiro após Casas**, seguido dos demais cadastros territoriais. Preservar a cobertura integral da matriz S13. O Gate A integral do lote 1 continua pendente e cada superfície exige rastreabilidade e aceite aplicáveis antes da implementação.
+
+## Casas de Oração e navegação Mais — aceite condicionado do PO (15/10/2026)
+
+O PO **aprovou a direção visual**, condicionada à lista de correções obrigatórias do [handoff Casas de Oração e Mais](../11-ux-stitch/handoff-casas-de-oracao.md), das telas `AGD-ADM-008` (desktop/mobile), `AGD-ADM-043` e `AGD-ADM-044`, além da navegação Mais mobile (sem inventar código). A proibição de cruzes e de iconografia religiosa inadequada passou a ser regra permanente do [DESIGN.md](../11-ux-stitch/DESIGN.md). **Aprovação visual condicionada não constitui autorização para implementação nem encerra Gate A do lote 1.** Próximo sublote Stitch: Locais/Espaços.
 
 ## Ordem e gates
 
@@ -58,4 +62,4 @@ O PO aprovou **a direção estética** obtida para Setores (desktop/mobile e tem
 
 ## Próxima ação concreta
 
-Consolidar as referências do primeiro sublote **Setores** no design system e preparar o briefing de **Casas de Oração**, com a auditoria preliminar #247 em andamento sem bloquear o Stitch. Solicitar e registrar aprovação **explícita do PO, único aprovador obrigatório da proposta UX**, por lote/códigos antes de implementar qualquer componente, inclusive em Beta. Completar a auditoria exaustiva e os testes de visibilidade da #247 após a implementação aprovada.
+Consolidar os aceites visuais condicionados de **Setores** e **Casas de Oração/menu Mais**; preparar e avaliar as propostas de **Locais/Espaços**, com a auditoria preliminar #247 em andamento sem bloquear o Stitch. O **Gate A integral do lote 1 permanece pendente**. Solicitar e registrar aprovação **explícita do PO, único aprovador obrigatório da proposta UX**, por lote/códigos antes de implementar qualquer componente, inclusive em Beta. Completar a auditoria exaustiva e os testes de visibilidade da #247 após a implementação aprovada.
