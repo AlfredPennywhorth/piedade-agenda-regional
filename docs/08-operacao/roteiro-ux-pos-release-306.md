@@ -11,7 +11,7 @@
 
 ## Google Stitch — etapa central, obrigatória e anterior à implementação
 
-O redesign **do zero** no Google Stitch é a etapa principal desta rodada, conforme `docs/10-planejamento-s13/s13-stitch-handoff.md`. Não reaproveitar mockups antigos como padrão obrigatório. Após identificar telas e códigos, enviar ao Stitch briefings por jornada com fluxos reais, permissões, problemas observados e requisitos mobile/desktop. Avaliar e aprovar propostas visuais **antes** de programar a nova interface.
+O redesign **do zero** no Google Stitch é a etapa principal desta rodada, conforme `docs/10-planejamento-s13/s13-stitch-handoff.md`. Não reaproveitar mockups antigos como padrão obrigatório. Após identificar telas e códigos, enviar ao Stitch briefings por jornada com fluxos reais, permissões, problemas observados e requisitos mobile/desktop. O **PO (Product Owner, responsável pelo produto)** deve aprovar explicitamente cada lote de propostas visuais, com registro da decisão e dos códigos de tela, **antes** de programar a nova interface. Revisão por gestor técnico ou responsável pelo lote não substitui o aceite do PO.
 
 **Metas transversais de UX:** eliminar rolagem horizontal desnecessária, especialmente nas tabelas Master; tornar cabeçalhos e identificadores visíveis durante a navegação; substituir listas extensas por filtros, pesquisa e seletores em cascata; destacar ações primárias, feedback e erros; melhorar legibilidade, contraste, acessibilidade e adaptação responsiva. Em telas genuinamente tabulares, preferir tabelas responsivas com colunas prioritárias e alternativas em cards, sem omitir dados ou ações.
 
@@ -19,14 +19,22 @@ O redesign **do zero** no Google Stitch é a etapa principal desta rodada, confo
 
 ## Ordem e gates
 
-| Fase | Escopo | Issues | Gate de conclusão |
+**Regra de aceite por lote:** o Gate A é a proposta Stitch (mobile/desktop segundo classificação canônica), inventário rastreável e **aprovação explícita do PO**, registrada por lote e código. Sem Gate A, não começa S13.03, nem qualquer mudança de UX em `develop`/Beta. O Gate B ocorre **depois** da implementação aprovada: CI, revisão, smoke Beta e verificação dos estados e permissões. A aprovação de um lote não autoriza os demais.
+
+| Fase / lote Stitch | Superfícies canônicas incluídas (cobertura obrigatória) | Issues / foco | Gates |
 |---|---|---|---|
-| 0 — Pré-Stitch (parcial) | Mapear superfícies conhecidas, códigos existentes, perfis, estados e lacunas evidentes, sem impedir o desenho de superfícies ainda não concluídas | #247 | Inventário preliminar rastreável; pendências exaustivas documentadas, sem exigir encerramento da #247 |
-| 1 — Stitch / Cadastros | Redesenhar Locais/Espaços, Casas, formulários e organização de informações; seleção Casa por Setor, Locais ordenados e organizador padrão | #242, #258, #241 | **Gate A:** proposta Stitch mobile/desktop e aprovação explícita do PO registrada antes de qualquer código; **Gate B:** somente após Gate A, implementação, CI/revisão e smoke Beta com Master, gestor e usuário comum |
-| 2 — Stitch / Agenda e Eventos | Redesenhar Minha Agenda, Calendário, Eventos, Séries e Convocações; jornada Evento → Convocação → Funções; filtro geográfico em cascata e criação inline | #231, #278 | **Gate A:** aprovação explícita do PO para propostas Stitch mobile/desktop; **Gate B:** só após aprovação, implementação e testes de fluxos, RSVP, conflitos e séries em Beta |
-| 3 — Stitch / Administração | Redesenhar contas, membros, vínculos Função → Membros, relatórios e telas amplas Master; tratar rolagem horizontal e mensagens de erro | #257, #241, #252 | **Gate A:** aprovação explícita do PO para Stitch desktop/mobile; **Gate B:** somente depois, implementação, smoke administrativo e acessibilidade |
-| 4 — Arquitetura | Rotas navegáveis e lazy loading, após estabilização da navegação e análise de regressão | #276 | PR pequena, teste de permissão e navegação; rollback claro |
-| 5 — Pós-UX | Botão seguro para backup do D1; avaliar relatórios de utilização de Locais/Espaços e arquitetura externa em ciclos independentes | #315, #300, #261 | Segurança, LGPD, restauração isolada e smoke específico |
+| 0 — Inventário preliminar | Todas as superfícies da matriz S13 e seus códigos já existentes; modais/estados conhecidos e lacunas | #247 | Mapa preliminar rastreável; não exigir conclusão exaustiva da #247 para iniciar Stitch |
+| 1 — Cadastros e estrutura | **Regionais, Administrações, Setores, Casas, Grupos de Trabalho, Locais** (incluindo Espaços e formulários/subfluxos correspondentes) | #242, #258, #241; cascatas, ordenação e tabelas | Gate A: aceite PO de todas as superfícies deste lote; Gate B: CI/revisão e smoke Beta por perfis |
+| 2 — Agenda e convocações | **Minha Agenda, Calendário, Eventos, Séries, Convocações** (incluindo detalhe, RSVP, conflitos, QR e subfluxos existentes) | #231, #278; jornada Evento → Convocação → Funções | Gate A: aceite PO deste lote; Gate B: CI/revisão, testes de fluxos e smoke Beta |
+| 3 — Pessoas, acessos e gestão | **Membros, Funções, Vínculos, Acessos, Relatórios, Auditoria, Alerta global de recuperação de PIN** | #257, #241, #252; Master, tabelas e autorização interna | Gate A: aceite PO deste lote; Gate B: CI/revisão, smoke administrativo, acessibilidade e capabilities |
+| 4 — Operação e públicos | **Avisos, Portaria autenticada, Portaria temporária, Cadastro de convidado** | Preferências, QR, check-in, fluxos por token e estados excepcionais | Gate A: aceite PO deste lote; Gate B: CI/revisão e smoke mobile, tokens e permissões |
+| 5 — Conta e gates de sessão | **Meu Cadastro, Login, Ativação de conta, Recuperação de PIN, Ciência de responsabilidade regional** | Segurança e clareza de autenticação, PIN e ciência obrigatória | Gate A: aceite PO deste lote; Gate B: CI/revisão, smoke responsivo, bloqueios e recuperação |
+| 6 — Arquitetura | Rotas navegáveis e lazy loading, **após** estabilização dos lotes e análise de regressão | #276 | PR independente, testes de navegação/permissão e rollback claro; não contornar Gate A de alterações visuais |
+| 7 — Pós-UX | Backup seguro do D1; relatórios de utilização de Locais/Espaços e arquitetura externa em ciclos independentes | #315, #300, #261 | Segurança, LGPD, restauração isolada e smoke específico; mudança visual adicional exige Gate A próprio |
+
+**Conferência de cobertura:** os lotes 1–5 atribuem, sem duplicidade, todas as **27 superfícies** listadas na matriz canônica de `s13-stitch-handoff.md`: 6 de estrutura, 5 de agenda, 7 de administração/pessoas, 4 de operação e 5 de conta/sessão. Subtelas, modais, confirmações, estados de carregamento/erro/vazio/acesso negado, navegação e interações condicionais acompanham a superfície-mãe; superfícies independentes descobertas na #247 recebem código estável, lote e Gate A do PO antes de implementação. A evolução de Avisos (`PARCIAL`) não autoriza criar funcionalidades fora do escopo funcional aprovado.
+
+**Controle de aprovação e encerramento:** registrar para cada superfície `código existente | nome | lote | protótipo mobile/desktop | estados/subfluxos | decisão do PO e referência | CI/revisão | smoke Beta | auditoria final #247`. Nenhum lote pode ser marcado como aprovado apenas por aceite técnico. A passagem à fase 6 ou a um release global de UX requer os Gates A e B de **todos os lotes 1–5**; releases parciais, se autorizados explicitamente pelo PO, devem declarar quais lotes aprovados estão incluídos e não presumir cobertura dos restantes.
 
 ## Regras de preservação
 
@@ -40,4 +48,4 @@ O redesign **do zero** no Google Stitch é a etapa principal desta rodada, confo
 
 ## Próxima ação concreta
 
-Executar a **auditoria preliminar da fase 0 (#247), sem exigir o fechamento da issue**, e produzir o primeiro briefing para o **Google Stitch** sobre a jornada de cadastros, com alternativas visuais mobile/desktop que priorizem legibilidade e eliminação da rolagem horizontal. Solicitar e registrar aprovação **explícita do PO** por lote/códigos antes de implementar qualquer componente, inclusive em Beta. Completar a auditoria exaustiva e os testes de visibilidade da #247 após a implementação aprovada.
+Executar a **auditoria preliminar da fase 0 (#247), sem exigir o fechamento da issue**, e produzir o primeiro briefing para o **Google Stitch** sobre a jornada de cadastros, com alternativas visuais mobile/desktop que priorizem legibilidade e eliminação da rolagem horizontal. Solicitar e registrar aprovação **explícita do PO, único aprovador obrigatório da proposta UX**, por lote/códigos antes de implementar qualquer componente, inclusive em Beta. Completar a auditoria exaustiva e os testes de visibilidade da #247 após a implementação aprovada.
