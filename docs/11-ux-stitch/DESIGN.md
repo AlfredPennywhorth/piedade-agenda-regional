@@ -1,6 +1,6 @@
 # Agenda Regional São Paulo — DESIGN.md (Stitch UX 2026)
 
-**Estado:** referência visual v1, aprovada conceitualmente pelo PO em 15/10/2026 para o sublote Setores; **não é implementação nem aceite funcional**.
+**Estado:** referência visual v1; direção visual de Setores e direção visual condicionada de Casas de Oração/menu Mais aprovadas pelo PO em 15/10/2026. **Não é implementação, aceite funcional nem liberação automática do Gate A do lote 1.**
 
 ## Origem e precedência
 1. Código em `develop` e inventário `docs/inventario-codigos-telas.md`: campos, ações, permissões, menus, estados e códigos oficiais.
@@ -14,6 +14,10 @@
 - Cabeçalho: marca e nome da aplicação, identidade do usuário e ação de sair quando cabíveis. **Sem versão/build/ambiente no cabeçalho.**
 - Rodapé técnico: ambiente, versão e build **dinâmicos**, não valores de exemplo. Código AGD da tela deve ser discreto e respeitar a regra de exibição aprovada no inventário. No mobile, o rodapé fica acessível sem cobrir a barra de navegação inferior, não fixo sobre o conteúdo.
 - Navegação inferior canônica: Minha Agenda, Eventos (condicional), Calendário, Convocações (condicional), Mais. Preservar capabilities.
+
+## Regra absoluta de iconografia religiosa (CCB)
+
+**Proibido** utilizar cruzes, crucifixos ou imagens/ícones de igreja ou templo com cruz, bem como símbolos associados à Igreja Católica como representação da Congregação Cristã no Brasil. Válido para menus, formulários, mapas, ilustrações, imagens, estados vazios, logos e ambos os temas em todos os módulos. Não utilizar Material Symbols `church` nem equivalente iconográfico com cruz. Preferir símbolos neutros como `domain`, `apartment`, `location_city`, `place` ou `location_on`, após verificar visualmente que o desenho não inclui cruz. Dúvidas exigem avaliação do PO; não assumir que um nome genérico de ícone garante conformidade.
 
 ## Tokens de partida — propostas, não valores definitivos
 | Uso | Claro | Escuro |
