@@ -5,7 +5,7 @@
 | Superfície | Código canônico | Resultado visual | Condição |
 |---|---|---|---|
 | Casas de Oração — lista desktop | `AGD-ADM-008` | Aprovada a direção | Filtros reais, tabela sem rolagem horizontal da página, manter ações e dados reais |
-| Casas de Oração — lista mobile | `AGD-ADM-008` | Aprovada a direção | Cards com dados/ações e nomes longos em até duas linhas, sem `truncate` que oculte informação |
+| Casas de Oração — lista mobile | `AGD-ADM-008` | Aprovada a direção | Cards com dados/ações; permitir quebra de nomes completos em quantas linhas forem necessárias, sem `truncate` ou overflow (nomes podem ter até 255 caracteres) |
 | Cadastrar Casa | `AGD-ADM-043` | Aprovada a direção | Apenas Setor*, Nome*, Código opcional, Ativa, Cancelar/Salvar |
 | Editar Casa | `AGD-ADM-044` | Aprovada a direção | Formulário dedicado sem voltar ao topo; mesmas informações, Cancelar/Atualizar; retornar ao contexto anterior |
 | Mais — mobile | Código conforme inventário; **não inventar** | Aprovada a direção | Grupos Agenda, Administração, Pessoas e Acessos, Conta retráteis; itens conforme capability; "Casas de Oração" por extenso |
