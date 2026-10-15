@@ -25,7 +25,7 @@ O PO aprovou **a direção estética** obtida para Setores (desktop/mobile e tem
 - [Handoff Setores](../11-ux-stitch/handoff-setores.md): rastreia `AGD-ADM-007`, `AGD-ADM-041` e `AGD-ADM-042`; decisões, referências e testes pendentes.
 - SIGA da CCB **desktop** é referência estética apenas. Não enviar ou copiar imagens mobile do SIGA; nem utilizar seus fluxos ou código como fonte funcional.
 - Protótipos Stitch antigos são material de ideias, não modelo obrigatório. O sistema atual, o inventário de telas e as permissões do backend prevalecem.
-- Próxima onda de design, de dentro para fora: Casas de Oração, Locais/Espaços e demais cadastros territoriais; preservar a cobertura integral da matriz S13. Todo lote requer aceite explícito do PO antes da implementação.
+- Sequência de design, de dentro para fora: **Casas de Oração/menu Mais — direção visual já aprovada com condições**; **Locais/Espaços — próximo sublote do roteiro após Casas**, seguido dos demais cadastros territoriais. Preservar a cobertura integral da matriz S13. O Gate A integral do lote 1 continua pendente e cada superfície exige rastreabilidade e aceite aplicáveis antes da implementação.
 
 ## Casas de Oração e navegação Mais — aceite condicionado do PO (15/10/2026)
 
