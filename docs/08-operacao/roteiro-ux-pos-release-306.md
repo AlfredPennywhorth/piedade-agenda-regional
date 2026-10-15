@@ -27,6 +27,10 @@ O PO aprovou **a direção estética** obtida para Setores (desktop/mobile e tem
 - Protótipos Stitch antigos são material de ideias, não modelo obrigatório. O sistema atual, o inventário de telas e as permissões do backend prevalecem.
 - Próxima onda de design, de dentro para fora: Casas de Oração, Locais/Espaços e demais cadastros territoriais; preservar a cobertura integral da matriz S13. Todo lote requer aceite explícito do PO antes da implementação.
 
+## Casas de Oração e navegação Mais — aceite condicionado do PO (15/10/2026)
+
+O PO **aprovou a direção visual**, condicionada à lista de correções obrigatórias do [handoff Casas de Oração e Mais](../11-ux-stitch/handoff-casas-de-oracao.md), das telas `AGD-ADM-008` (desktop/mobile), `AGD-ADM-043` e `AGD-ADM-044`, além da navegação Mais mobile (sem inventar código). A proibição de cruzes e de iconografia religiosa inadequada passou a ser regra permanente do [DESIGN.md](../11-ux-stitch/DESIGN.md). **Aprovação visual condicionada não constitui autorização para implementação nem encerra Gate A do lote 1.** Próximo sublote Stitch: Locais/Espaços.
+
 ## Ordem e gates
 
 **Regra de aceite por lote:** o Gate A é a proposta Stitch (mobile/desktop segundo classificação canônica), inventário rastreável e **aprovação explícita do PO**, registrada por lote e código. Sem Gate A, não começa S13.03, nem qualquer mudança de UX em `develop`/Beta. O Gate B ocorre **depois** da implementação aprovada: CI, revisão, smoke Beta e verificação dos estados e permissões. A aprovação de um lote não autoriza os demais.
