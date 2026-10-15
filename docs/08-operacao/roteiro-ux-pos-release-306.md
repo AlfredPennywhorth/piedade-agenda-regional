@@ -17,6 +17,16 @@ O redesign **do zero** no Google Stitch é a etapa principal desta rodada, confo
 
 **Fluxo por lote e gates obrigatórios:** inventário preliminar/códigos existentes (#247, sem exigir fechamento exaustivo) → briefing Stitch → alternativas desktop e mobile → **aprovação explícita do PO registrada por lote e códigos de tela** → somente então implementação React/Tailwind em `develop` (S13.03) → revisão Codex/Copilot e CI → smoke Beta → auditoria final de códigos/visibilidade da #247 para as telas implementadas → autorização expressa de release. Reprovação ou ausência de aprovação do PO bloqueia implementação e Beta, mas não bloqueia a elaboração de propostas no Stitch. Nenhuma alteração de regras de negócio ou de permissões decorrente apenas do layout.
 
+## Direção visual aprovada e design system (15/10/2026)
+
+O PO aprovou **a direção estética** obtida para Setores (desktop/mobile e temas claro/escuro), com ressalvas obrigatórias: **uniformizar o tom de azul do cabeçalho** e **mostrar ambiente, versão e build reais no rodapé**, nunca no cabeçalho. O aceite estético não homologa código HTML, regras inventadas, responsividade em dispositivo real nem o Gate A completo do lote 1; as demais superfícies ainda carecem de proposta e aceite individual.
+
+- [Design system Stitch v1](../11-ux-stitch/DESIGN.md): fonte compartilhada de tokens provisórios e regras visuais; confirmar contrastes e temas em implementação.
+- [Handoff Setores](../11-ux-stitch/handoff-setores.md): rastreia `AGD-ADM-007`, `AGD-ADM-041` e `AGD-ADM-042`; decisões, referências e testes pendentes.
+- SIGA da CCB **desktop** é referência estética apenas. Não enviar ou copiar imagens mobile do SIGA; nem utilizar seus fluxos ou código como fonte funcional.
+- Protótipos Stitch antigos são material de ideias, não modelo obrigatório. O sistema atual, o inventário de telas e as permissões do backend prevalecem.
+- Próxima onda de design, de dentro para fora: Casas de Oração, Locais/Espaços e demais cadastros territoriais; preservar a cobertura integral da matriz S13. Todo lote requer aceite explícito do PO antes da implementação.
+
 ## Ordem e gates
 
 **Regra de aceite por lote:** o Gate A é a proposta Stitch (mobile/desktop segundo classificação canônica), inventário rastreável e **aprovação explícita do PO**, registrada por lote e código. Sem Gate A, não começa S13.03, nem qualquer mudança de UX em `develop`/Beta. O Gate B ocorre **depois** da implementação aprovada: CI, revisão, smoke Beta e verificação dos estados e permissões. A aprovação de um lote não autoriza os demais.
@@ -48,4 +58,4 @@ O redesign **do zero** no Google Stitch é a etapa principal desta rodada, confo
 
 ## Próxima ação concreta
 
-Executar a **auditoria preliminar da fase 0 (#247), sem exigir o fechamento da issue**, e produzir o primeiro briefing para o **Google Stitch** sobre a jornada de cadastros, com alternativas visuais mobile/desktop que priorizem legibilidade e eliminação da rolagem horizontal. Solicitar e registrar aprovação **explícita do PO, único aprovador obrigatório da proposta UX**, por lote/códigos antes de implementar qualquer componente, inclusive em Beta. Completar a auditoria exaustiva e os testes de visibilidade da #247 após a implementação aprovada.
+Consolidar as referências do primeiro sublote **Setores** no design system e preparar o briefing de **Casas de Oração**, com a auditoria preliminar #247 em andamento sem bloquear o Stitch. Solicitar e registrar aprovação **explícita do PO, único aprovador obrigatório da proposta UX**, por lote/códigos antes de implementar qualquer componente, inclusive em Beta. Completar a auditoria exaustiva e os testes de visibilidade da #247 após a implementação aprovada.
