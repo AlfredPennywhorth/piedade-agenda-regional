@@ -27,7 +27,7 @@
 |---|---|
 | Usuário comum | Ativação → Meu Cadastro → Minha Agenda/Calendário → responder convocações |
 | Secretaria / gestor de agenda | Conferir estrutura → Locais/Espaços → Eventos/Séries → Convocações → conferência |
-| Administração Regional | Gestão dos registros dentro de seu escopo autorizado → relatórios e correções |
+| Administração Regional | Gestão dos registros dentro de seu escopo autorizado → correções. **Relatórios somente com permissão adicional específica** (por exemplo, GESTOR_RELATORIOS, vínculo equivalente ou condição de organizador que autorize a consulta). |
 | Operador de Portaria | Acessar Portaria com autorização → conferir evento → executar recepção conforme fluxo da tela |
 | Gestor de Relatórios | Selecionar período e escopo → consultar indicadores → exportar apenas dados autorizados |
 | Auditor | Consultar trilhas de auditoria autorizadas sem alterar registros |
