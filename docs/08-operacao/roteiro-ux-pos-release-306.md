@@ -62,4 +62,4 @@ O PO **aprovou a direção visual**, condicionada à lista de correções obriga
 
 ## Próxima ação concreta
 
-Consolidar as referências do primeiro sublote **Setores** no design system e preparar o briefing de **Casas de Oração**, com a auditoria preliminar #247 em andamento sem bloquear o Stitch. Solicitar e registrar aprovação **explícita do PO, único aprovador obrigatório da proposta UX**, por lote/códigos antes de implementar qualquer componente, inclusive em Beta. Completar a auditoria exaustiva e os testes de visibilidade da #247 após a implementação aprovada.
+Consolidar os aceites visuais condicionados de **Setores** e **Casas de Oração/menu Mais**; preparar e avaliar as propostas de **Locais/Espaços**, com a auditoria preliminar #247 em andamento sem bloquear o Stitch. O **Gate A integral do lote 1 permanece pendente**. Solicitar e registrar aprovação **explícita do PO, único aprovador obrigatório da proposta UX**, por lote/códigos antes de implementar qualquer componente, inclusive em Beta. Completar a auditoria exaustiva e os testes de visibilidade da #247 após a implementação aprovada.
