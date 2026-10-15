@@ -25,11 +25,15 @@ O PO aprovou **a direção estética** obtida para Setores (desktop/mobile e tem
 - [Handoff Setores](../11-ux-stitch/handoff-setores.md): rastreia `AGD-ADM-007`, `AGD-ADM-041` e `AGD-ADM-042`; decisões, referências e testes pendentes.
 - SIGA da CCB **desktop** é referência estética apenas. Não enviar ou copiar imagens mobile do SIGA; nem utilizar seus fluxos ou código como fonte funcional.
 - Protótipos Stitch antigos são material de ideias, não modelo obrigatório. O sistema atual, o inventário de telas e as permissões do backend prevalecem.
-- Sequência de design, de dentro para fora: **Casas de Oração/menu Mais — direção visual já aprovada com condições**; **Locais/Espaços — próximo sublote do roteiro após Casas**, seguido dos demais cadastros territoriais. Preservar a cobertura integral da matriz S13. O Gate A integral do lote 1 continua pendente e cada superfície exige rastreabilidade e aceite aplicáveis antes da implementação.
+- Sequência de design, de dentro para fora: **Casas de Oração/menu Mais — direção visual já aprovada com condições**; **Locais/Espaços — direção visual já aprovada com condições (rastreabilidade ainda pendente)**, seguido dos demais cadastros territoriais. Preservar a cobertura integral da matriz S13. O Gate A integral do lote 1 continua pendente e cada superfície exige rastreabilidade e aceite aplicáveis antes da implementação.
 
 ## Casas de Oração e navegação Mais — aceite condicionado do PO (15/10/2026)
 
 O PO **aprovou a direção visual**, condicionada à lista de correções obrigatórias do [handoff Casas de Oração e Mais](../11-ux-stitch/handoff-casas-de-oracao.md), das telas `AGD-ADM-008` (desktop/mobile), `AGD-ADM-043` e `AGD-ADM-044`, além da navegação Mais mobile (sem inventar código). A proibição de cruzes e de iconografia religiosa inadequada passou a ser regra permanente do [DESIGN.md](../11-ux-stitch/DESIGN.md). **Aprovação visual condicionada não constitui autorização para implementação nem encerra Gate A do lote 1.** Próximo sublote Stitch: Locais/Espaços.
+
+## Locais e Espaços — aceite visual condicionado do PO (15/10/2026)
+
+O PO aprovou a **direção visual de seis propostas**: `AGD-ADM-013` listagem desktop/mobile, `AGD-ADM-055` novo Local, `AGD-ADM-056` edição, `AGD-ADM-057` detalhes e `AGD-ADM-058` Espaços do Local (cadastro e edição no mesmo código). O [handoff de Locais e Espaços](../11-ux-stitch/handoff-locais-espacos.md) registra correções obrigatórias, permissões por autoria/operação, ordenação alfabética #242 e rastreabilidade ainda incompleta dos artefatos originais. **Aceite condicionado não autoriza código/deploy nem encerra Gate A integral do lote 1.**
 
 ## Ordem e gates
 
@@ -62,4 +66,4 @@ O PO **aprovou a direção visual**, condicionada à lista de correções obriga
 
 ## Próxima ação concreta
 
-Consolidar os aceites visuais condicionados de **Setores** e **Casas de Oração/menu Mais**; preparar e avaliar as propostas de **Locais/Espaços**, com a auditoria preliminar #247 em andamento sem bloquear o Stitch. O **Gate A integral do lote 1 permanece pendente**. Solicitar e registrar aprovação **explícita do PO, único aprovador obrigatório da proposta UX**, por lote/códigos antes de implementar qualquer componente, inclusive em Beta. Completar a auditoria exaustiva e os testes de visibilidade da #247 após a implementação aprovada.
+Consolidar os aceites visuais condicionados de **Setores** e **Casas de Oração/menu Mais**; consolidar a rastreabilidade e o aceite condicionado de **Locais/Espaços**, com a auditoria preliminar #247 em andamento sem bloquear o Stitch. O **Gate A integral do lote 1 permanece pendente**. Solicitar e registrar aprovação **explícita do PO, único aprovador obrigatório da proposta UX**, por lote/códigos antes de implementar qualquer componente, inclusive em Beta. Completar a auditoria exaustiva e os testes de visibilidade da #247 após a implementação aprovada.
