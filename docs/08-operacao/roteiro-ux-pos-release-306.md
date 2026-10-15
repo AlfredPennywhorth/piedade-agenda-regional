@@ -29,7 +29,7 @@ O PO aprovou **a direção estética** obtida para Setores (desktop/mobile e tem
 
 ## Casas de Oração e navegação Mais — aceite condicionado do PO (15/10/2026)
 
-O PO **aprovou a direção visual**, condicionada à lista de correções obrigatórias do [handoff Casas de Oração e Mais](../11-ux-stitch/handoff-casas-de-oracao.md), das telas `AGD-ADM-008` (desktop/mobile), `AGD-ADM-043` e `AGD-ADM-044`, além da navegação Mais mobile (sem inventar código). A proibição de cruzes e de iconografia religiosa inadequada passou a ser regra permanente do [DESIGN.md](../11-ux-stitch/DESIGN.md). **Aprovação visual condicionada não constitui autorização para implementação nem encerra Gate A do lote 1.** Próximo sublote Stitch: Locais/Espaços.
+O PO **aprovou a direção visual**, condicionada à lista de correções obrigatórias do [handoff Casas de Oração e Mais](../11-ux-stitch/handoff-casas-de-oracao.md), das telas `AGD-ADM-008` (desktop/mobile), `AGD-ADM-043` e `AGD-ADM-044`, além da navegação Mais mobile (sem inventar código). A proibição de cruzes e de iconografia religiosa inadequada passou a ser regra permanente do [DESIGN.md](../11-ux-stitch/DESIGN.md). **Aprovação visual condicionada não constitui autorização para implementação nem encerra Gate A do lote 1.** Locais/Espaços também recebeu aceite visual condicionado, documentado na seção seguinte; a próxima rodada de design territorial deverá abranger Regionais, Administrações e Grupos de Trabalho, conforme inventário e gates aplicáveis.
 
 ## Locais e Espaços — aceite visual condicionado do PO (15/10/2026)
 
