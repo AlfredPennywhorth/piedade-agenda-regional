@@ -19,7 +19,7 @@ O redesign **do zero** no Google Stitch é a etapa principal desta rodada, confo
 
 ## Direção visual aprovada e design system (15/10/2026)
 
-O PO aprovou **a direção estética** obtida para Setores (desktop/mobile e temas claro/escuro), com ressalvas obrigatórias: **uniformizar o tom de azul do cabeçalho** e **mostrar ambiente, versão e build reais no rodapé**, nunca no cabeçalho. O aceite estético não homologa código HTML, regras inventadas, responsividade em dispositivo real nem o Gate A completo do lote 1; as demais superfícies ainda carecem de proposta e aceite individual.
+O PO aprovou **a direção estética** obtida para Setores (desktop/mobile e temas claro/escuro), com ressalvas obrigatórias: **uniformizar o tom de azul do cabeçalho** e **mostrar ambiente, versão e build reais no rodapé**, nunca no cabeçalho. O PO também aprovou **a direção visual de Casas de Oração e menu Mais, condicionada às correções documentadas abaixo**. Esses aceites estéticos não homologam código HTML, regras inventadas, responsividade em dispositivo real nem o Gate A completo do lote 1; as superfícies restantes ainda exigem propostas e aceites aplicáveis.
 
 - [Design system Stitch v1](../11-ux-stitch/DESIGN.md): fonte compartilhada de tokens provisórios e regras visuais; confirmar contrastes e temas em implementação.
 - [Handoff Setores](../11-ux-stitch/handoff-setores.md): rastreia `AGD-ADM-007`, `AGD-ADM-041` e `AGD-ADM-042`; decisões, referências e testes pendentes.
