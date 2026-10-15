@@ -42,6 +42,15 @@ Fonte canônica atual: `apps/web/src/components/layout/MainLayout.tsx` (abas) e 
 | AGD-ADM-022 | Confirmar alteração apenas desta ocorrência | Confirmação | AGD-ADM-021 |
 | AGD-ADM-023 | Confirmar alteração desta e próximas ocorrências | Confirmação | AGD-ADM-021 |
 
+## Códigos compartilhados já publicados (reservados)
+
+| Código | Superfície | Componente |
+|---|---|---|
+| AGD-SHR-002 | Login | `AuthView.tsx` |
+| AGD-SHR-003 | Ativação | `AuthView.tsx` |
+| AGD-SHR-004 | Recuperação de PIN | `AuthView.tsx` |
+| AGD-SHR-005 | Ciência/responsabilidade regional | `ResponsabilidadeRegionalGate.tsx` |
+
 ## A completar
 
 Subtelas de Séries, Convocações, Administração, Portaria, Relatórios, Meu Cadastro e demais módulos; diálogos de confirmação, fluxos públicos adicionais e variantes de componentes compartilhados. Inventariar código, rota/aba, superfície pai, perfil autorizado, ação, componente e estados antes de declarar #247 concluída.
