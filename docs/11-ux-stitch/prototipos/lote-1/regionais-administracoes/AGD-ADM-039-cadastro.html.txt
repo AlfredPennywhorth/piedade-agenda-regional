@@ -1,0 +1,289 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_standard" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "surface-container-highest": "#dae2fd", "primary": "#00288e", "surface-container-high": "#e2e7ff", "inverse-on-surface": "#eef0ff", "surface-container-lowest": "#ffffff", "inverse-surface": "#283044", "outline": "#757684", "on-error": "#ffffff", "on-tertiary-fixed": "#00210b", "on-primary-container": "#a8b8ff", "on-secondary": "#ffffff", "on-primary-fixed-variant": "#173bab", "on-background": "#131b2e", "on-tertiary-container": "#80cc90", "surface": "#faf8ff", "surface-container": "#eaedff", "surface-variant": "#dae2fd", "primary-fixed-dim": "#b8c4ff", "tertiary-fixed-dim": "#8bd79b", "tertiary": "#003d1a", "on-secondary-fixed": "#111c2d", "error-container": "#ffdad6", "surface-bright": "#faf8ff", "on-surface-variant": "#444653", "secondary-container": "#d5e0f8", "error": "#ba1a1a", "inverse-primary": "#b8c4ff", "on-surface": "#131b2e", "primary-container": "#1e40af", "surface-tint": "#3755c3", "secondary-fixed-dim": "#bcc7de", "tertiary-fixed": "#a6f4b5", "on-tertiary": "#ffffff", "on-tertiary-fixed-variant": "#005226", "outline-variant": "#c4c5d5", "surface-dim": "#d2d9f4", "primary-fixed": "#dde1ff", "surface-container-low": "#f2f3ff", "on-error-container": "#93000a", "on-secondary-container": "#586377", "tertiary-container": "#005728", "secondary-fixed": "#d8e3fb", "secondary": "#545f73", "on-secondary-fixed-variant": "#3c475a", "on-primary": "#ffffff", "on-primary-fixed": "#001453", "background": "#faf8ff" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "gutter": "1.25rem", "space-xl": "2.5rem", "margin-mobile": "1rem", "space-lg": "1.5rem", "gutter-mobile": "0.75rem", "space-xs": "0.25rem", "space-sm": "0.5rem", "space-md": "1rem", "margin": "2rem" }, "fontFamily": { "body-lg": ["Inter"], "body-md": ["Inter"], "headline-md": ["Inter"], "headline-lg-mobile": ["Inter"], "headline-lg": ["Inter"], "label-sm": ["Inter"], "label-md": ["Inter"], "code-badge": ["Inter"], "headline-sm": ["Inter"], "headline-xl": ["Inter"], "headline-xl-mobile": ["Inter"], "body-sm": ["Inter"] }, "fontSize": { "body-lg": ["16px", { "lineHeight": "26px", "fontWeight": "400" }], "body-md": ["14px", { "lineHeight": "22px", "fontWeight": "400" }], "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.005em", "fontWeight": "600" }], "headline-lg-mobile": ["22px", { "lineHeight": "30px", "letterSpacing": "0", "fontWeight": "600" }], "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "label-sm": ["11px", { "lineHeight": "16px", "letterSpacing": "0.04em", "fontWeight": "600" }], "label-md": ["13px", { "lineHeight": "18px", "letterSpacing": "0.01em", "fontWeight": "500" }], "code-badge": ["11px", { "lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "700" }], "headline-sm": ["16px", { "lineHeight": "24px", "fontWeight": "600" }], "headline-xl": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "headline-xl-mobile": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700" }], "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }] } } } };</script></head><body class="bg-surface font-body-md text-on-surface min-h-screen flex flex-col"><header class="fixed top-0 left-0 right-0 z-50 bg-primary shadow-[0_1px_8px_rgba(0,0,0,0.06)]"><div class="h-16 max-w-7xl mx-auto px-margin flex items-center justify-between"><div class="flex items-center gap-space-lg"><div class="flex items-center gap-space-sm"><span class="text-on-primary font-headline-sm text-headline-sm tracking-tight">Agenda Regional SP</span></div><nav class="hidden md:flex items-center gap-space-xs" data-active-classes="bg-primary-container text-on-primary font-label-md text-label-md rounded px-space-md py-space-sm"><a class="text-on-primary/80 font-label-md text-label-md px-space-md py-space-sm rounded hover:bg-primary-container hover:text-on-primary transition-colors" data-path="minha-agenda" href="#">Minha Agenda</a><a class="text-on-primary/80 font-label-md text-label-md px-space-md py-space-sm rounded hover:bg-primary-container hover:text-on-primary transition-colors" data-path="eventos" href="#">Eventos</a><a class="text-on-primary/80 font-label-md text-label-md px-space-md py-space-sm rounded hover:bg-primary-container hover:text-on-primary transition-colors" data-path="calendario" href="#">Calendário</a><a class="text-on-primary/80 font-label-md text-label-md px-space-md py-space-sm rounded hover:bg-primary-container hover:text-on-primary transition-colors" data-path="convocacoes" href="#">Convocações</a><a aria-current="page" class="transition-colors bg-primary-container text-on-primary font-label-md text-label-md rounded px-space-md py-space-sm" data-path="mais" href="#">Mais</a></nav></div><div class="flex items-center gap-space-md"><div class="hidden sm:flex flex-col text-right"><span class="text-on-primary font-label-md text-label-md">André William de Souza</span></div><div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><div class="h-6 w-px bg-on-primary/20 hidden sm:block"></div><a class="text-on-primary/90 hover:text-on-primary hover:bg-primary-container font-label-md text-label-md px-space-sm py-space-xs rounded transition-colors flex items-center gap-space-xs" data-path="autenticacao" href="#"><span class="material-symbols-outlined text-[18px]">logout</span><span class="hidden sm:inline">Sair</span></a></div></div></header><main class="w-full flex-1 pt-16 bg-surface max-w-7xl mx-auto px-margin py-space-lg"><div class="flex flex-col w-full">
+<!-- Sub-header / Caminho Estrutural e Contexto Institucional -->
+<div class="w-full flex flex-col md:flex-row md:items-center md:justify-between gap-space-sm mb-space-lg">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-xl bg-primary-container text-on-primary flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-[20px]">account_balance</span>
+</div>
+<div>
+<div class="flex items-center gap-space-xs text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+<span class="">Configurações Territoriais</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="">Administrações</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-primary font-semibold">Novo Registro</span>
+</div>
+<p class="font-body-sm text-body-sm text-secondary">
+          Gestão descentralizada de polos administrativos da Congregação Cristã no Brasil
+        </p>
+</div>
+</div>
+<!-- Indicador de Status do Sistema & Badge de Identificação -->
+<div class="flex items-center gap-space-sm self-start md:self-auto">
+
+<div class="bg-surface-container-highest text-primary font-code-badge text-code-badge px-space-sm py-1 rounded">
+        AGD-ADM-039
+      </div>
+</div>
+</div>
+<!-- Layout Principal de Duas Colunas (Desk: 8 cols Form + 4 cols Guia Operacional) -->
+<div class="gap-space-lg items-start w-full flex justify-center">
+<!-- Formulário Central (8 colunas) -->
+<div class="flex flex-col gap-space-md max-w-3xl w-full mx-auto">
+<!-- Card Operacional do Formulário AGD-ADM-039 -->
+<div class="bg-surface-container-lowest rounded-xl shadow-md overflow-hidden transition-all duration-200">
+<!-- Cabeçalho do Card Institucional -->
+<div class="bg-surface-container-low px-space-lg py-space-md flex items-center justify-between">
+<div class="flex flex-col">
+<span class="text-on-surface font-headline-md text-headline-md font-semibold tracking-tight">
+              Cadastrar Nova Administração
+            </span>
+<span class="text-secondary font-body-sm text-body-sm">
+              Preencha os parâmetros de circunscrição e sigla unificada.
+            </span>
+</div>
+<div class="flex items-center gap-space-md">
+<span class="hidden sm:inline-block bg-primary/10 text-primary font-code-badge text-code-badge px-space-sm py-1 rounded">
+              Tela AGD-ADM-039
+            </span>
+<button class="text-secondary hover:text-error transition-colors font-label-md text-label-md px-space-sm py-1 rounded hover:bg-error-container/40" onclick="handleResetForm()" type="button">
+              Cancelar
+            </button>
+</div>
+</div>
+<!-- Mensagem de Validação Global (Oculta por padrão) -->
+<div class="hidden bg-error-container text-on-error-container px-space-lg py-space-sm font-label-md text-label-md flex items-center gap-space-sm transition-all duration-200" id="validation-banner">
+<span class="material-symbols-outlined text-[18px]">error</span>
+<span class="">Por favor, preencha os campos obrigatórios identificados em vermelho antes de prosseguir.</span>
+</div>
+<!-- Mensagem de Sucesso (Oculta por padrão) -->
+<div class="hidden bg-tertiary-fixed text-on-tertiary-fixed-variant px-space-lg py-space-sm font-label-md text-label-md flex items-center justify-between transition-all duration-200" id="success-banner">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+<span id="success-message" class="">Registro da administração formalizado com sucesso na Regional SP.</span>
+</div>
+<button class="hover:opacity-75" onclick="document.getElementById('success-banner').classList.add('hidden')" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+</div>
+<!-- Corpo do Formulário -->
+<form class="p-space-lg space-y-space-lg" id="form-cad-adm" novalidate="" onsubmit="handleFormSubmit(event)">
+<!-- Campo 1: Regional (Dropdown Obrigatório) -->
+<div class="space-y-space-xs">
+<div class="flex items-center justify-between">
+<label class="block font-label-md text-label-md text-on-surface font-semibold" for="regional-select">
+                Regional <span class="text-error font-bold">*</span>
+</label>
+<span class="font-body-sm text-body-sm text-secondary">Circunscrição canônica ativa</span>
+</div>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-secondary">
+<span class="material-symbols-outlined text-[20px]">domain</span>
+</div>
+<select class="w-full h-11 pl-10 pr-10 bg-surface-container-lowest text-on-surface font-body-md text-body-md rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-container focus:bg-surface-container-lowest transition-all appearance-none cursor-pointer" id="regional-select" required="">
+<option selected="" value="sao-paulo">São Paulo (Pia-Reg-SP)</option>
+<option value="campinas">Campinas e Região Metropolitana (Pia-Reg-CPS)</option>
+<option value="vale-paraiba">São José dos Campos / Vale do Paraíba (Pia-Reg-SJC)</option>
+<option value="santos">Baixada Santista e Litoral (Pia-Reg-SAN)</option>
+<option value="sorocaba">Sorocaba e Região Sul-Oeste (Pia-Reg-SOR)</option>
+<option value="ribeirao-preto">Ribeirão Preto e Alta Mogiana (Pia-Reg-RP)</option>
+</select>
+<div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-secondary">
+<span class="material-symbols-outlined text-[20px]">unfold_more</span>
+</div>
+</div>
+<p class="hidden font-body-sm text-body-sm text-error flex items-center gap-1 mt-1" id="regional-error">
+<span class="material-symbols-outlined text-[14px]">error</span>
+              A Regional de subordinação é mandatória.
+            </p>
+</div>
+<!-- Campo 2: Nome da Administração (Input de Texto Obrigatório) -->
+<div class="space-y-space-xs">
+<div class="flex items-center justify-between">
+<label class="block font-label-md text-label-md text-on-surface font-semibold" for="nome-adm">
+                Nome da Administração <span class="text-error font-bold">*</span>
+</label>
+<span class="font-code-badge text-code-badge text-outline" id="char-counter">0 / 80 carac.</span>
+</div>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-secondary">
+<span class="material-symbols-outlined text-[20px]">location_city</span>
+</div>
+<input class="w-full h-11 pl-10 pr-4 bg-surface-container-lowest text-on-surface font-body-md text-body-md rounded-lg shadow-sm placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary-container focus:bg-surface-container-lowest transition-all" id="nome-adm" maxlength="80" name="nome-adm" oninput="updateCharCounter(this)" placeholder="Ex: Administração Regional Osasco" required="" type="text">
+</div>
+<p class="hidden font-body-sm text-body-sm text-error flex items-center gap-1 mt-1" id="nome-error">
+<span class="material-symbols-outlined text-[14px]">error</span>
+              Informe a denominação formal da administração (mínimo de 4 caracteres).
+            </p>
+</div>
+<!-- Campo 3: Código Institucional (Opcional) -->
+<div class="space-y-space-xs">
+<div class="flex items-center justify-between">
+<label class="block font-label-md text-label-md text-on-surface font-semibold" for="codigo-adm">
+                Código <span class="text-secondary font-normal">(Opcional)</span>
+</label>
+<span class="font-body-sm text-body-sm text-secondary">Padrão Siglário Unificado</span>
+</div>
+<div class="relative">
+<div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-secondary">
+<span class="material-symbols-outlined text-[20px]">tag</span>
+</div>
+<input class="w-full h-11 pl-10 pr-4 bg-surface-container-lowest text-on-surface font-body-md text-body-md rounded-lg shadow-sm placeholder:text-outline uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-primary-container focus:bg-surface-container-lowest transition-all" id="codigo-adm" maxlength="16" name="codigo-adm" placeholder="Ex: ADM-OSC" type="text">
+</div>
+<p class="font-body-sm text-body-sm text-secondary">
+              Utilizado na indexação de convocações, atas e remessas financeiras.
+            </p>
+</div>
+<!-- Campo 4: Checkbox Administração Ativa -->
+<div class="bg-surface-container-low rounded-lg p-space-md transition-colors hover:bg-surface-container">
+<label class="flex items-start gap-space-sm cursor-pointer select-none">
+<div class="flex items-center h-5 mt-0.5">
+<input checked="" class="w-4 h-4 text-primary bg-surface-container-lowest rounded focus:ring-primary-container focus:ring-2 cursor-pointer" id="ativa-checkbox" type="checkbox">
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">
+                  Administração Ativa
+                </span>
+<span class="font-body-sm text-body-sm text-secondary">
+                  Permite a inclusão imediata desta sede na emissão de escalas e no recebimento de convocações do Ministério de São Paulo.
+                </span>
+</div>
+</label>
+</div>
+<!-- Bloco Informativo de Validação em Linha -->
+<div class="bg-surface-container rounded-lg p-space-md flex items-center gap-space-md">
+<span class="material-symbols-outlined text-primary text-[24px]">verified_user</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">
+                Homologação de Novos Registros
+              </span>
+<span class="font-body-sm text-body-sm text-secondary">
+                O registro será autenticado sob a credencial do operador <strong>André William de Souza</strong> e registrado no log oficial do sistema regional.
+              </span>
+</div>
+</div>
+<!-- Ações do Rodapé (Alinhamento em Desktop) -->
+<div class="pt-space-md flex flex-col-reverse sm:flex-row items-center justify-end gap-space-md">
+<button class="w-full sm:w-auto h-10 px-space-lg rounded-lg bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-colors font-label-md text-label-md font-medium" onclick="handleResetForm()" type="button">
+              Cancelar
+            </button>
+<button class="w-full sm:w-auto h-10 px-space-xl rounded-lg bg-primary-container text-on-primary hover:bg-primary transition-all shadow-sm font-label-md text-label-md font-semibold flex items-center justify-center gap-space-xs" id="submit-btn" type="submit">
+<span class="material-symbols-outlined text-[18px]" id="btn-icon">save</span>
+<span id="btn-text" class="">Salvar Administração</span>
+</button>
+</div>
+</form>
+</div>
+<!-- Resumo Rápido de Administrações Recentes Cadastradas na Regional -->
+
+</div>
+<!-- Coluna Lateral de Apoio Normativo e Estatísticas (4 colunas) -->
+
+</div>
+</div>
+<script>
+  function updateCharCounter(input) {
+    const counter = document.getElementById('char-counter');
+    const length = input.value.length;
+    counter.textContent = length + ' / 80 carac.';
+    
+    const nomeError = document.getElementById('nome-error');
+    if (length >= 4) {
+      nomeError.classList.add('hidden');
+      input.classList.remove('ring-2', 'ring-error');
+    }
+  }
+
+  function handleResetForm() {
+    const form = document.getElementById('form-cad-adm');
+    form.reset();
+    document.getElementById('regional-select').value = 'sao-paulo';
+    document.getElementById('ativa-checkbox').checked = true;
+    document.getElementById('char-counter').textContent = '0 / 80 carac.';
+    document.getElementById('validation-banner').classList.add('hidden');
+    document.getElementById('nome-error').classList.add('hidden');
+    document.getElementById('regional-error').classList.add('hidden');
+    document.getElementById('nome-adm').classList.remove('ring-2', 'ring-error');
+  }
+
+  function handleFormSubmit(event) {
+    event.preventDefault();
+    
+    const regional = document.getElementById('regional-select').value;
+    const nomeInput = document.getElementById('nome-adm');
+    const codigoInput = document.getElementById('codigo-adm');
+    const isAtiva = document.getElementById('ativa-checkbox').checked;
+    const nomeVal = nomeInput.value.trim();
+    
+    let hasError = false;
+
+    // Validação do campo Nome da Administração
+    if (!nomeVal || nomeVal.length < 4) {
+      document.getElementById('nome-error').classList.remove('hidden');
+      nomeInput.classList.add('ring-2', 'ring-error');
+      nomeInput.focus();
+      hasError = true;
+    } else {
+      document.getElementById('nome-error').classList.add('hidden');
+      nomeInput.classList.remove('ring-2', 'ring-error');
+    }
+
+    if (hasError) {
+      document.getElementById('validation-banner').classList.remove('hidden');
+      return;
+    } else {
+      document.getElementById('validation-banner').classList.add('hidden');
+    }
+
+    // Feedback visual de salvamento
+    const submitBtn = document.getElementById('submit-btn');
+    const btnIcon = document.getElementById('btn-icon');
+    const btnText = document.getElementById('btn-text');
+
+    submitBtn.disabled = true;
+    btnIcon.textContent = 'hourglass_empty';
+    btnIcon.classList.add('animate-spin');
+    btnText.textContent = 'Salvando no banco regional...';
+
+    setTimeout(() => {
+      submitBtn.disabled = false;
+      btnIcon.textContent = 'save';
+      btnIcon.classList.remove('animate-spin');
+      btnText.textContent = 'Salvar Administração';
+
+      // Sucesso
+      const successBanner = document.getElementById('success-banner');
+      const successMsg = document.getElementById('success-message');
+      successMsg.textContent = `Administração "${nomeVal}" cadastrada com êxito na Regional Selecionada!`;
+      successBanner.classList.remove('hidden');
+
+      // Adiciona na tabela de recentes
+      const tableBody = document.getElementById('administracoes-table-body');
+      const newRow = document.createElement('tr');
+      newRow.className = 'hover:bg-surface-container-low transition-colors animate-pulse';
+      
+      const sigla = codigoInput.value.trim() ? codigoInput.value.trim().toUpperCase() : 'ADM-NOVA';
+      const statusHtml = isAtiva 
+        ? '<span class="bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm px-2 py-0.5 rounded-full inline-block">Ativa</span>'
+        : '<span class="bg-surface-container-high text-secondary font-label-sm text-label-sm px-2 py-0.5 rounded-full inline-block">Inativa</span>';
+
+      const regionalText = document.getElementById('regional-select').options[document.getElementById('regional-select').selectedIndex].text;
+
+      newRow.innerHTML = `
+        <td class="py-3 px-3 font-code-badge text-code-badge text-primary">${sigla}</td>
+        <td class="py-3 px-3 font-medium">${nomeVal}</td>
+        <td class="py-3 px-3 text-secondary">${regionalText}</td>
+        <td class="py-3 px-3 text-right">${statusHtml}</td>
+      `;
+
+      tableBody.insertBefore(newRow, tableBody.firstChild);
+
+      // Limpar formulário após inclusão
+      handleResetForm();
+    }, 850);
+  }
+</script></main><footer class="w-full bg-surface-container-low py-space-md shadow-[0_1px_8px_rgba(0,0,0,0.04)] mt-auto"><div class="max-w-7xl mx-auto px-margin flex flex-col md:flex-row items-center justify-between gap-space-xs text-on-surface-variant font-body-sm text-body-sm"><div class="">PRODUÇÃO · v1.1.0 · build 6741936 · Congregação Cristã no Brasil</div><div class="text-outline font-label-sm text-label-sm">Sistema Administrativo Regional · SP</div></div></footer><nav class="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.06)] flex items-center justify-around z-50 px-margin-mobile" data-active-classes="text-primary font-label-sm"><a class="flex flex-col items-center text-on-surface-variant font-label-sm text-label-sm" data-path="minha-agenda" href="#"><span class="material-symbols-outlined text-[20px]">calendar_today</span>Minha Agenda</a><a class="flex flex-col items-center text-on-surface-variant font-label-sm text-label-sm" data-path="eventos" href="#"><span class="material-symbols-outlined text-[20px]">event</span>Eventos</a><a class="flex flex-col items-center text-on-surface-variant font-label-sm text-label-sm" data-path="calendario" href="#"><span class="material-symbols-outlined text-[20px]">date_range</span>Calendário</a><a class="flex flex-col items-center text-on-surface-variant font-label-sm text-label-sm" data-path="convocacoes" href="#"><span class="material-symbols-outlined text-[20px]">assignment_ind</span>Convocações</a><a aria-current="page" class="flex flex-col items-center text-primary font-label-sm" data-path="mais" href="#"><span class="material-symbols-outlined text-[20px]">more_horiz</span>Mais</a></nav>
+
+</body></html>

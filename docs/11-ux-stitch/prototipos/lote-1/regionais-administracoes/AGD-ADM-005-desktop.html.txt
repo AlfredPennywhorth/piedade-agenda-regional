@@ -1,0 +1,408 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_standard" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "surface-container-highest": "#dae2fd", "primary": "#00288e", "surface-container-high": "#e2e7ff", "inverse-on-surface": "#eef0ff", "surface-container-lowest": "#ffffff", "inverse-surface": "#283044", "outline": "#757684", "on-error": "#ffffff", "on-tertiary-fixed": "#00210b", "on-primary-container": "#a8b8ff", "on-secondary": "#ffffff", "on-primary-fixed-variant": "#173bab", "on-background": "#131b2e", "on-tertiary-container": "#80cc90", "surface": "#faf8ff", "surface-container": "#eaedff", "surface-variant": "#dae2fd", "primary-fixed-dim": "#b8c4ff", "tertiary-fixed-dim": "#8bd79b", "tertiary": "#003d1a", "on-secondary-fixed": "#111c2d", "error-container": "#ffdad6", "surface-bright": "#faf8ff", "on-surface-variant": "#444653", "secondary-container": "#d5e0f8", "error": "#ba1a1a", "inverse-primary": "#b8c4ff", "on-surface": "#131b2e", "primary-container": "#1e40af", "surface-tint": "#3755c3", "secondary-fixed-dim": "#bcc7de", "tertiary-fixed": "#a6f4b5", "on-tertiary": "#ffffff", "on-tertiary-fixed-variant": "#005226", "outline-variant": "#c4c5d5", "surface-dim": "#d2d9f4", "primary-fixed": "#dde1ff", "surface-container-low": "#f2f3ff", "on-error-container": "#93000a", "on-secondary-container": "#586377", "tertiary-container": "#005728", "secondary-fixed": "#d8e3fb", "secondary": "#545f73", "on-secondary-fixed-variant": "#3c475a", "on-primary": "#ffffff", "on-primary-fixed": "#001453", "background": "#faf8ff" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "gutter": "1.25rem", "space-xl": "2.5rem", "margin-mobile": "1rem", "space-lg": "1.5rem", "gutter-mobile": "0.75rem", "space-xs": "0.25rem", "space-sm": "0.5rem", "space-md": "1rem", "margin": "2rem" }, "fontFamily": { "body-lg": ["Inter"], "body-md": ["Inter"], "headline-md": ["Inter"], "headline-lg-mobile": ["Inter"], "headline-lg": ["Inter"], "label-sm": ["Inter"], "label-md": ["Inter"], "code-badge": ["Inter"], "headline-sm": ["Inter"], "headline-xl": ["Inter"], "headline-xl-mobile": ["Inter"], "body-sm": ["Inter"] }, "fontSize": { "body-lg": ["16px", { "lineHeight": "26px", "fontWeight": "400" }], "body-md": ["14px", { "lineHeight": "22px", "fontWeight": "400" }], "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.005em", "fontWeight": "600" }], "headline-lg-mobile": ["22px", { "lineHeight": "30px", "letterSpacing": "0", "fontWeight": "600" }], "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "label-sm": ["11px", { "lineHeight": "16px", "letterSpacing": "0.04em", "fontWeight": "600" }], "label-md": ["13px", { "lineHeight": "18px", "letterSpacing": "0.01em", "fontWeight": "500" }], "code-badge": ["11px", { "lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "700" }], "headline-sm": ["16px", { "lineHeight": "24px", "fontWeight": "600" }], "headline-xl": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "headline-xl-mobile": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700" }], "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }] } } } };</script></head><body class="bg-surface font-body-md text-on-surface min-h-screen flex flex-col"><header class="fixed top-0 left-0 right-0 z-50 bg-primary shadow-[0_1px_8px_rgba(0,0,0,0.06)]"><div class="h-16 max-w-7xl mx-auto px-margin flex items-center justify-between"><div class="flex items-center gap-space-lg"><div class="flex items-center gap-space-sm"><span class="text-on-primary font-headline-sm text-headline-sm tracking-tight">Agenda Regional SP</span></div><nav class="hidden md:flex items-center gap-space-xs" data-active-classes="bg-primary-container text-on-primary font-label-md text-label-md rounded px-space-md py-space-sm"><a class="text-on-primary/80 font-label-md text-label-md px-space-md py-space-sm rounded hover:bg-primary-container hover:text-on-primary transition-colors" data-path="minha-agenda" href="#">Minha Agenda</a><a class="text-on-primary/80 font-label-md text-label-md px-space-md py-space-sm rounded hover:bg-primary-container hover:text-on-primary transition-colors" data-path="eventos" href="#">Eventos</a><a class="text-on-primary/80 font-label-md text-label-md px-space-md py-space-sm rounded hover:bg-primary-container hover:text-on-primary transition-colors" data-path="calendario" href="#">Calendário</a><a class="text-on-primary/80 font-label-md text-label-md px-space-md py-space-sm rounded hover:bg-primary-container hover:text-on-primary transition-colors" data-path="convocacoes" href="#">Convocações</a><a aria-current="page" class="transition-colors bg-primary-container text-on-primary font-label-md text-label-md rounded px-space-md py-space-sm" data-path="mais" href="#">Mais</a></nav></div><div class="flex items-center gap-space-md"><div class="hidden sm:flex flex-col text-right"><span class="text-on-primary font-label-md text-label-md">André William de Souza</span></div><div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><div class="h-6 w-px bg-on-primary/20 hidden sm:block"></div><a class="text-on-primary/90 hover:text-on-primary hover:bg-primary-container font-label-md text-label-md px-space-sm py-space-xs rounded transition-colors flex items-center gap-space-xs" data-path="autenticacao" href="#"><span class="material-symbols-outlined text-[18px]">logout</span><span class="hidden sm:inline">Sair</span></a></div></div></header><main class="w-full flex-1 pt-16 bg-surface max-w-7xl mx-auto px-margin py-space-lg"><div class="flex flex-col w-full">
+<!-- Top Meta / Breadcrumb & Screen Code Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-space-xs pb-space-md">
+<div class="flex items-center gap-space-xs text-on-surface-variant font-label-sm text-label-sm tracking-wide">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-secondary">layers</span>
+        ADMINISTRAÇÃO
+      </span>
+<span class="text-outline-variant">/</span>
+<span class="text-secondary font-medium">GESTÃO TERRITORIAL</span>
+<span class="text-outline-variant">/</span>
+<span class="text-primary font-semibold">REGIONAIS</span>
+</div>
+<!-- Tela Code Indicator (AGD-ADM-005) -->
+<div class="flex items-center gap-space-xs self-start sm:self-auto bg-surface-container-high px-space-sm py-1 rounded">
+<span class="material-symbols-outlined text-primary text-[14px]">terminal</span>
+<span class="font-code-badge text-code-badge text-primary uppercase">Tela AGD-ADM-005</span>
+</div>
+</div>
+<!-- Primary Page Header & Actions Bar -->
+<div class="flex flex-col lg:flex-row lg:items-end justify-between gap-space-md pb-space-lg">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">
+        Gestão Territorial — Regionais
+      </h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-0.5">
+        Listagem, cadastro e atualização de Regionais Administrativas do Estado de São Paulo.
+      </p>
+</div>
+<div class="flex flex-wrap items-center gap-space-sm">
+<!-- State Demonstrator Tabs (Interactive PO Tool) -->
+
+<!-- Primary Action (+ Nova Regional) -->
+<button class="inline-flex items-center justify-center gap-space-xs bg-primary-container text-on-primary hover:bg-primary font-label-md text-label-md px-space-md h-10 rounded-lg shadow-sm transition-all focus:outline-none" onclick="openModal()">
+<span class="material-symbols-outlined text-[18px]">add</span>
+<span class="">Nova Regional</span>
+</button>
+</div>
+</div>
+<!-- Operational Context Metric Chips -->
+
+<!-- Main View Container -->
+<div class="w-full bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden mb-space-lg">
+<!-- Table Utilities Bar -->
+<div class="p-space-md bg-surface-container-low flex flex-col md:flex-row md:items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-xs flex-1 max-w-md bg-surface-container-lowest px-space-sm h-10 rounded-lg shadow-sm">
+<span class="material-symbols-outlined text-outline text-[20px]">search</span>
+<input class="w-full bg-transparent border-0 outline-none font-body-md text-body-md text-on-surface placeholder:text-outline" id="search-input" oninput="handleSearch(this.value)" placeholder="Buscar regional por nome ou código..." type="text">
+</div>
+<div class="flex items-center gap-space-sm">
+<div class="relative">
+<select class="h-10 px-space-md bg-surface-container-lowest rounded-lg font-label-md text-label-md text-on-surface shadow-sm outline-none cursor-pointer">
+<option value="all">Status: Todos</option>
+<option selected="" value="active">Status: Ativo</option>
+<option value="inactive">Status: Inativo</option>
+</select>
+</div>
+<button class="h-10 px-space-sm bg-surface-container-lowest hover:bg-surface-container text-on-surface-variant rounded-lg shadow-sm transition-colors flex items-center justify-center" onclick="refreshData()" title="Recarregar Dados">
+<span class="material-symbols-outlined text-[20px]">sync</span>
+</button>
+</div>
+</div>
+<!-- STATE 1: Default Data Table -->
+<div class="w-full overflow-x-auto" id="view-default">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+<th class="py-space-sm px-space-md font-semibold">Nome</th>
+<th class="py-space-sm px-space-md font-semibold">Código</th>
+<th class="py-space-sm px-space-md font-semibold">Status</th>
+<th class="py-space-sm px-space-md font-semibold text-right">Ações</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-high font-body-md text-body-md text-on-surface">
+<!-- Primary Registry (Faithful to mobile screenshot) -->
+<tr class="hover:bg-surface-container transition-colors group">
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-surface-container-highest flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">domain</span>
+</div>
+<div>
+<span class="font-headline-sm text-headline-sm text-on-surface block font-semibold">São Paulo</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Capital e Região Metropolitana Ampliada</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<span class="font-code-badge text-code-badge bg-surface-container px-space-sm py-1 rounded text-primary font-bold tracking-wider uppercase">
+                Pia-Reg-SP
+              </span>
+</td>
+<td class="py-space-md px-space-md">
+<!-- Institutional Safe Badge: Green Active -->
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm px-space-sm py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary-container"></span>
+                Ativo
+              </span>
+</td>
+<td class="py-space-md px-space-md text-right">
+<div class="inline-flex items-center justify-end gap-space-xs">
+<!-- Action: Detalhes -->
+<button class="h-8 px-space-sm bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-on-surface font-label-md text-label-md rounded shadow-sm transition-all flex items-center gap-1" onclick="showDetailsModal('São Paulo', 'Pia-Reg-SP')">
+<span class="material-symbols-outlined text-[16px]">visibility</span>
+<span class="">Detalhes</span>
+</button>
+<!-- Action: Editar -->
+<button class="h-8 px-space-sm bg-primary-fixed hover:bg-primary-fixed-dim text-on-primary-fixed font-label-md text-label-md rounded shadow-sm transition-all flex items-center gap-1 font-semibold" onclick="showEditModal('São Paulo', 'Pia-Reg-SP')">
+<span class="material-symbols-outlined text-[16px]">edit</span>
+<span class="">Editar</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Complementary Authorized Sample Registry for Desktop Width Context -->
+<tr class="hover:bg-surface-container transition-colors group">
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-surface-container-highest flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">domain</span>
+</div>
+<div>
+<span class="font-headline-sm text-headline-sm text-on-surface block font-semibold">Campinas &amp; Circunvizinhas</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Regional Administrativa Interior Centro-Leste</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<span class="font-code-badge text-code-badge bg-surface-container px-space-sm py-1 rounded text-primary font-bold tracking-wider uppercase">
+                Pia-Reg-CPS
+              </span>
+</td>
+<td class="py-space-md px-space-md">
+<span class="inline-flex items-center gap-1 font-label-sm text-label-sm px-space-sm py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary-container"></span>
+                Ativo
+              </span>
+</td>
+<td class="py-space-md px-space-md text-right">
+<div class="inline-flex items-center justify-end gap-space-xs">
+<button class="h-8 px-space-sm bg-surface-container-low hover:bg-surface-container text-on-surface-variant hover:text-on-surface font-label-md text-label-md rounded shadow-sm transition-all flex items-center gap-1" onclick="showDetailsModal('Campinas &amp; Circunvizinhas', 'Pia-Reg-CPS')">
+<span class="material-symbols-outlined text-[16px]">visibility</span>
+<span class="">Detalhes</span>
+</button>
+<button class="h-8 px-space-sm bg-primary-fixed hover:bg-primary-fixed-dim text-on-primary-fixed font-label-md text-label-md rounded shadow-sm transition-all flex items-center gap-1 font-semibold" onclick="showEditModal('Campinas &amp; Circunvizinhas', 'Pia-Reg-CPS')">
+<span class="material-symbols-outlined text-[16px]">edit</span>
+<span class="">Editar</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+<!-- Bottom Pagination / Summary -->
+<div class="p-space-md bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-space-xs text-on-surface-variant font-body-sm text-body-sm">
+<span class="">Exibindo 2 de 2 regionais homologadas</span>
+<div class="flex items-center gap-space-xs">
+<button class="px-space-sm py-1 rounded bg-surface-container-lowest text-outline font-label-sm cursor-not-allowed" disabled="">Anterior</button>
+<span class="px-space-sm py-1 font-label-sm font-semibold text-primary bg-surface-container-high rounded">1</span>
+<button class="px-space-sm py-1 rounded bg-surface-container-lowest text-outline font-label-sm cursor-not-allowed" disabled="">Próxima</button>
+</div>
+</div>
+</div>
+<!-- STATE 2: Empty State (Sem Registros) -->
+<div class="hidden flex-col items-center justify-center p-space-xl text-center" id="view-empty">
+<div class="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center text-secondary mb-space-md">
+<span class="material-symbols-outlined text-[32px]">folder_off</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-1">Nenhuma regional encontrada</h3>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-md mb-space-lg">
+        Não há registros cadastrados para os critérios selecionados ou para este território estadual.
+      </p>
+<button class="inline-flex items-center gap-space-xs bg-primary-container text-on-primary font-label-md text-label-md px-space-md h-10 rounded-lg shadow-sm" onclick="openModal()">
+<span class="material-symbols-outlined text-[18px]">add</span>
+<span class="">Cadastrar Nova Regional</span>
+</button>
+</div>
+<!-- STATE 3: Loading Skeleton State -->
+<div class="hidden w-full p-space-md space-y-4" id="view-loading">
+<div class="animate-pulse space-y-4">
+<div class="h-6 bg-surface-container-high rounded w-1/4"></div>
+<div class="h-12 bg-surface-container rounded-lg w-full"></div>
+<div class="h-12 bg-surface-container rounded-lg w-full"></div>
+<div class="h-12 bg-surface-container rounded-lg w-full"></div>
+</div>
+<div class="flex justify-center py-4 text-secondary font-label-md text-label-md items-center gap-2">
+<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
+        Carregando registros do servidor regional...
+      </div>
+</div>
+</div>
+<!-- Regional Contextual Information Card -->
+
+<!-- Operational Modal: Nova Regional / Edição (Vanilla JS controlled) -->
+<div class="fixed inset-0 z-50 bg-inverse-surface/40 backdrop-blur-sm hidden items-center justify-center p-margin-mobile" id="modal-regional">
+<div class="bg-surface-container-lowest w-full max-w-lg rounded-xl shadow-xl overflow-hidden animate-in fade-in">
+<!-- Modal Header -->
+<div class="bg-surface-container-low px-space-lg py-space-md flex items-center justify-between">
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface" id="modal-title">Cadastrar Nova Regional</h2>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Formulário Oficial de Expansão Territorial</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="font-code-badge text-code-badge bg-surface-container-high px-space-xs py-0.5 rounded text-primary">AGD-ADM-005-F</span>
+<button class="w-8 h-8 rounded hover:bg-surface-container-high text-on-surface-variant flex items-center justify-center transition-colors" onclick="closeModal()">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+</div>
+<!-- Modal Body Form -->
+<form class="p-space-lg space-y-space-md" id="form-regional" onsubmit="handleFormSubmit(event)">
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-1">
+            Nome da Regional <span class="text-error">*</span>
+</label>
+<input class="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant focus:border-primary text-on-surface font-body-md text-body-md outline-none transition-all" id="input-name" placeholder="Ex.: São Paulo, Campinas, Baixada Santista" required="" type="text">
+<span class="font-body-sm text-body-sm text-outline mt-1 block">Insira a designação geográfica formal homologada.</span>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-1">
+            Código Institucional <span class="text-error">*</span>
+</label>
+<input class="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant focus:border-primary text-on-surface font-body-md text-body-md outline-none transition-all uppercase" id="input-code" placeholder="Ex.: Pia-Reg-SP" required="" type="text">
+<span class="font-body-sm text-body-sm text-outline mt-1 block">Padrão obrigatório: Pia-Reg-[SIGLA].</span>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-1">
+            Status da Operação <span class="text-error">*</span>
+</label>
+<select class="w-full h-10 px-3 rounded-lg bg-surface-container-lowest border border-outline-variant focus:border-primary text-on-surface font-body-md text-body-md outline-none transition-all cursor-pointer" id="input-status">
+<option value="Ativo">Ativo (Habilitado para agendas e convocações)</option>
+<option value="Em Homologação">Em Homologação (Restrito à Diretoria)</option>
+<option value="Inativo">Inativo (Histórico e arquivamento)</option>
+</select>
+</div>
+<!-- Feedback message area -->
+<div class="hidden p-space-sm rounded-lg text-body-sm font-body-sm" id="modal-feedback"></div>
+<!-- Modal Actions -->
+<div class="pt-space-md flex items-center justify-end gap-space-sm bg-surface-container-lowest">
+<button class="h-10 px-space-md rounded-lg font-label-md text-label-md text-secondary hover:bg-surface-container transition-colors" onclick="closeModal()" type="button">
+            Cancelar
+          </button>
+<button class="h-10 px-space-lg rounded-lg bg-primary-container text-on-primary hover:bg-primary font-label-md text-label-md font-semibold transition-colors shadow-sm flex items-center gap-1" type="submit">
+<span class="material-symbols-outlined text-[18px]">save</span>
+<span class="">Gravar Registro</span>
+</button>
+</div>
+</form>
+</div>
+</div>
+<!-- Detail Popover Modal -->
+<div class="fixed inset-0 z-50 bg-inverse-surface/40 backdrop-blur-sm hidden items-center justify-center p-margin-mobile" id="modal-details">
+<div class="bg-surface-container-lowest w-full max-w-md rounded-xl shadow-xl overflow-hidden">
+<div class="bg-surface-container-low px-space-lg py-space-md flex items-center justify-between">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Ficha Territorial</h3>
+<button class="text-on-surface-variant hover:text-on-surface" onclick="closeDetailsModal()">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<div class="p-space-lg space-y-space-md">
+<div>
+<span class="font-label-sm text-label-sm text-outline uppercase block">Regional</span>
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold block" id="detail-name"></span>
+</div>
+<div class="grid grid-cols-2 gap-space-md">
+<div>
+<span class="font-label-sm text-label-sm text-outline uppercase block">Código</span>
+<span class="font-code-badge text-code-badge bg-surface-container px-2 py-0.5 rounded text-primary font-bold" id="detail-code"></span>
+</div>
+<div>
+<span class="font-label-sm text-label-sm text-outline uppercase block">Jurisdição</span>
+<span class="font-body-md text-body-md text-on-surface">São Paulo (SP)</span>
+</div>
+</div>
+<div class="p-space-sm bg-surface-container-low rounded-lg text-body-sm text-on-surface-variant">
+          Registro sincronizado na base unificada. Todas as convocações emitidas com este identificador possuem validade jurídica institucional.
+        </div>
+</div>
+<div class="px-space-lg py-space-md bg-surface-container-low flex justify-end">
+<button class="h-9 px-space-md rounded-lg bg-surface-container-lowest text-on-surface font-label-md text-label-md shadow-sm" onclick="closeDetailsModal()">
+          Fechar
+        </button>
+</div>
+</div>
+</div>
+</div>
+<script>
+  // State Switching for PO demonstration
+  function setViewMode(mode) {
+    const vDefault = document.getElementById('view-default');
+    const vEmpty = document.getElementById('view-empty');
+    const vLoading = document.getElementById('view-loading');
+
+    const bDefault = document.getElementById('btn-state-default');
+    const bEmpty = document.getElementById('btn-state-empty');
+    const bLoading = document.getElementById('btn-state-loading');
+
+    // Reset buttons
+    [bDefault, bEmpty, bLoading].forEach(b => {
+      b.className = "px-space-sm py-1 rounded text-label-sm font-label-sm text-on-surface-variant hover:text-on-surface transition-all flex items-center gap-1";
+    });
+
+    // Hide all
+    vDefault.classList.add('hidden');
+    vEmpty.classList.add('hidden');
+    vLoading.classList.add('hidden');
+
+    if (mode === 'default') {
+      vDefault.classList.remove('hidden');
+      bDefault.className = "px-space-sm py-1 rounded text-label-sm font-label-sm bg-surface-container-lowest text-primary shadow-sm font-semibold transition-all flex items-center gap-1";
+    } else if (mode === 'empty') {
+      vEmpty.classList.remove('hidden');
+      vEmpty.classList.add('flex');
+      bEmpty.className = "px-space-sm py-1 rounded text-label-sm font-label-sm bg-surface-container-lowest text-primary shadow-sm font-semibold transition-all flex items-center gap-1";
+    } else if (mode === 'loading') {
+      vLoading.classList.remove('hidden');
+      bLoading.className = "px-space-sm py-1 rounded text-label-sm font-label-sm bg-surface-container-lowest text-primary shadow-sm font-semibold transition-all flex items-center gap-1";
+    }
+  }
+
+  // Modal Controls
+  function openModal() {
+    document.getElementById('modal-title').innerText = 'Cadastrar Nova Regional';
+    document.getElementById('input-name').value = '';
+    document.getElementById('input-code').value = '';
+    document.getElementById('modal-feedback').classList.add('hidden');
+    const modal = document.getElementById('modal-regional');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  function closeModal() {
+    const modal = document.getElementById('modal-regional');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+
+  function showEditModal(name, code) {
+    document.getElementById('modal-title').innerText = 'Editar Regional Administrativa';
+    document.getElementById('input-name').value = name.replace(/&/g, '&');
+    document.getElementById('input-code').value = code;
+    document.getElementById('modal-feedback').classList.add('hidden');
+    const modal = document.getElementById('modal-regional');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  function showDetailsModal(name, code) {
+    document.getElementById('detail-name').innerText = name.replace(/&/g, '&');
+    document.getElementById('detail-code').innerText = code;
+    const modal = document.getElementById('modal-details');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  function closeDetailsModal() {
+    const modal = document.getElementById('modal-details');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+
+  function handleFormSubmit(e) {
+    e.preventDefault();
+    const fb = document.getElementById('modal-feedback');
+    fb.className = "p-space-sm rounded-lg text-body-sm font-body-sm bg-tertiary-fixed text-on-tertiary-fixed-variant";
+    fb.innerText = "Registro homologado com sucesso na base de dados!";
+    fb.classList.remove('hidden');
+    setTimeout(() => {
+      closeModal();
+    }, 1100);
+  }
+
+  function refreshData() {
+    setViewMode('loading');
+    setTimeout(() => {
+      setViewMode('default');
+    }, 600);
+  }
+
+  function handleSearch(term) {
+    const t = term.toLowerCase();
+    const rows = document.querySelectorAll('#view-default tbody tr');
+    let matches = 0;
+    rows.forEach(r => {
+      const text = r.innerText.toLowerCase();
+      if (text.includes(t)) {
+        r.style.display = '';
+        matches++;
+      } else {
+        r.style.display = 'none';
+      }
+    });
+
+    if (matches === 0 && term.trim() !== '') {
+      document.getElementById('view-default').classList.add('hidden');
+      document.getElementById('view-empty').classList.remove('hidden');
+      document.getElementById('view-empty').classList.add('flex');
+    } else {
+      document.getElementById('view-default').classList.remove('hidden');
+      document.getElementById('view-empty').classList.add('hidden');
+      document.getElementById('view-empty').classList.remove('flex');
+    }
+  }
+</script></main><footer class="w-full bg-surface-container-low py-space-md shadow-[0_1px_8px_rgba(0,0,0,0.04)] mt-auto"><div class="max-w-7xl mx-auto px-margin flex flex-col md:flex-row items-center justify-between gap-space-xs text-on-surface-variant font-body-sm text-body-sm"><div class="">PRODUÇÃO · v1.1.0 · build 6741936 · Congregação Cristã no Brasil</div><div class="text-outline font-label-sm text-label-sm">Sistema Administrativo Regional · SP</div></div></footer><nav class="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.06)] flex items-center justify-around z-50 px-margin-mobile" data-active-classes="text-primary font-label-sm"><a class="flex flex-col items-center text-on-surface-variant font-label-sm text-label-sm" data-path="minha-agenda" href="#"><span class="material-symbols-outlined text-[20px]">calendar_today</span>Minha Agenda</a><a class="flex flex-col items-center text-on-surface-variant font-label-sm text-label-sm" data-path="eventos" href="#"><span class="material-symbols-outlined text-[20px]">event</span>Eventos</a><a class="flex flex-col items-center text-on-surface-variant font-label-sm text-label-sm" data-path="calendario" href="#"><span class="material-symbols-outlined text-[20px]">date_range</span>Calendário</a><a class="flex flex-col items-center text-on-surface-variant font-label-sm text-label-sm" data-path="convocacoes" href="#"><span class="material-symbols-outlined text-[20px]">assignment_ind</span>Convocações</a><a aria-current="page" class="flex flex-col items-center text-primary font-label-sm" data-path="mais" href="#"><span class="material-symbols-outlined text-[20px]">more_horiz</span>Mais</a></nav>
+
+</body></html>

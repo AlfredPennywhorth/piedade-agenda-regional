@@ -1,0 +1,225 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_standard" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "surface-container-highest": "#dae2fd", "primary": "#00288e", "surface-container-high": "#e2e7ff", "inverse-on-surface": "#eef0ff", "surface-container-lowest": "#ffffff", "inverse-surface": "#283044", "outline": "#757684", "on-error": "#ffffff", "on-tertiary-fixed": "#00210b", "on-primary-container": "#a8b8ff", "on-secondary": "#ffffff", "on-primary-fixed-variant": "#173bab", "on-background": "#131b2e", "on-tertiary-container": "#80cc90", "surface": "#faf8ff", "surface-container": "#eaedff", "surface-variant": "#dae2fd", "primary-fixed-dim": "#b8c4ff", "tertiary-fixed-dim": "#8bd79b", "tertiary": "#003d1a", "on-secondary-fixed": "#111c2d", "error-container": "#ffdad6", "surface-bright": "#faf8ff", "on-surface-variant": "#444653", "secondary-container": "#d5e0f8", "error": "#ba1a1a", "inverse-primary": "#b8c4ff", "on-surface": "#131b2e", "primary-container": "#1e40af", "surface-tint": "#3755c3", "secondary-fixed-dim": "#bcc7de", "tertiary-fixed": "#a6f4b5", "on-tertiary": "#ffffff", "on-tertiary-fixed-variant": "#005226", "outline-variant": "#c4c5d5", "surface-dim": "#d2d9f4", "primary-fixed": "#dde1ff", "surface-container-low": "#f2f3ff", "on-error-container": "#93000a", "on-secondary-container": "#586377", "tertiary-container": "#005728", "secondary-fixed": "#d8e3fb", "secondary": "#545f73", "on-secondary-fixed-variant": "#3c475a", "on-primary": "#ffffff", "on-primary-fixed": "#001453", "background": "#faf8ff" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "gutter": "1.25rem", "space-xl": "2.5rem", "margin-mobile": "1rem", "space-lg": "1.5rem", "gutter-mobile": "0.75rem", "space-xs": "0.25rem", "space-sm": "0.5rem", "space-md": "1rem", "margin": "2rem" }, "fontFamily": { "body-lg": ["Inter"], "body-md": ["Inter"], "headline-md": ["Inter"], "headline-lg-mobile": ["Inter"], "headline-lg": ["Inter"], "label-sm": ["Inter"], "label-md": ["Inter"], "code-badge": ["Inter"], "headline-sm": ["Inter"], "headline-xl": ["Inter"], "headline-xl-mobile": ["Inter"], "body-sm": ["Inter"] }, "fontSize": { "body-lg": ["16px", { "lineHeight": "26px", "fontWeight": "400" }], "body-md": ["14px", { "lineHeight": "22px", "fontWeight": "400" }], "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.005em", "fontWeight": "600" }], "headline-lg-mobile": ["22px", { "lineHeight": "30px", "letterSpacing": "0", "fontWeight": "600" }], "headline-lg": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "label-sm": ["11px", { "lineHeight": "16px", "letterSpacing": "0.04em", "fontWeight": "600" }], "label-md": ["13px", { "lineHeight": "18px", "letterSpacing": "0.01em", "fontWeight": "500" }], "code-badge": ["11px", { "lineHeight": "14px", "letterSpacing": "0.06em", "fontWeight": "700" }], "headline-sm": ["16px", { "lineHeight": "24px", "fontWeight": "600" }], "headline-xl": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "headline-xl-mobile": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700" }], "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }] } } } };</script></head><body class="bg-surface font-body-md text-on-surface min-h-screen flex flex-col"><header class="fixed top-0 left-0 right-0 z-50 bg-primary shadow-[0_1px_8px_rgba(0,0,0,0.06)]"><div class="h-16 max-w-7xl mx-auto px-margin flex items-center justify-between"><div class="flex items-center gap-space-lg"><div class="flex items-center gap-space-sm"><span class="text-on-primary font-headline-sm text-headline-sm tracking-tight">Agenda Regional SP</span></div><nav class="hidden md:flex items-center gap-space-xs" data-active-classes="bg-primary-container text-on-primary font-label-md text-label-md rounded px-space-md py-space-sm"><a class="text-on-primary/80 font-label-md text-label-md px-space-md py-space-sm rounded hover:bg-primary-container hover:text-on-primary transition-colors" data-path="minha-agenda" href="#">Minha Agenda</a><a class="text-on-primary/80 font-label-md text-label-md px-space-md py-space-sm rounded hover:bg-primary-container hover:text-on-primary transition-colors" data-path="eventos" href="#">Eventos</a><a class="text-on-primary/80 font-label-md text-label-md px-space-md py-space-sm rounded hover:bg-primary-container hover:text-on-primary transition-colors" data-path="calendario" href="#">Calendário</a><a class="text-on-primary/80 font-label-md text-label-md px-space-md py-space-sm rounded hover:bg-primary-container hover:text-on-primary transition-colors" data-path="convocacoes" href="#">Convocações</a><a aria-current="page" class="transition-colors bg-primary-container text-on-primary font-label-md text-label-md rounded px-space-md py-space-sm" data-path="mais" href="#">Mais</a></nav></div><div class="flex items-center gap-space-md"><div class="hidden sm:flex flex-col text-right"><span class="text-on-primary font-label-md text-label-md">André William de Souza</span></div><div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><div class="h-6 w-px bg-on-primary/20 hidden sm:block"></div><a class="text-on-primary/90 hover:text-on-primary hover:bg-primary-container font-label-md text-label-md px-space-sm py-space-xs rounded transition-colors flex items-center gap-space-xs" data-path="autenticacao" href="#"><span class="material-symbols-outlined text-[18px]">logout</span><span class="hidden sm:inline">Sair</span></a></div></div></header><main class="w-full flex-1 pt-16 bg-surface max-w-7xl mx-auto px-margin py-space-lg"><div class="flex flex-col w-full pb-space-xl">
+<!-- Cabeçalho de Contexto de Gestão Territorial -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-space-sm mb-space-lg">
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider mb-1">
+<span class="">Módulo Administrativo</span>
+<span class="">/</span>
+<span class="">Estrutura Eclesiástica</span>
+</div>
+<h1 class="text-on-surface font-headline-lg text-headline-lg tracking-tight">Gestão Territorial — Regionais</h1>
+<p class="text-on-surface-variant font-body-md text-body-md mt-0.5">Listagem, cadastro e homologação de circunscrições regionais do Estado de São Paulo.</p>
+</div>
+<!-- Indicador de Permissão Restrita / Perfil Cívico -->
+
+</div>
+<!-- Layout Dividido em Grid: Formulário Institucional (AGD-ADM-037) em Destaque + Painel de Contexto de Regionais -->
+<div class="w-full flex justify-center">
+<!-- Formulário Principal: AGD-ADM-037 (Destaque Principal) -->
+<div class="flex flex-col max-w-3xl w-full mx-auto">
+<!-- Card Operacional do Formulário -->
+<div class="bg-surface-container-lowest rounded-xl shadow-md overflow-hidden relative">
+<!-- Faixa de Cabeçalho do Card -->
+<div class="bg-surface-container-low px-space-lg py-space-md flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-primary text-[22px]">domain_add</span>
+<span class="text-on-surface font-headline-sm text-headline-sm">Cadastrar Nova Regional</span>
+</div>
+<div class="flex items-center gap-space-md">
+<span class="bg-surface-container-highest text-primary font-code-badge text-code-badge px-space-sm py-0.5 rounded shadow-sm">Tela AGD-ADM-037</span>
+<button class="text-secondary hover:text-on-surface font-label-md text-label-md transition-colors" id="btnTopCancel" type="button">
+              Cancelar
+            </button>
+</div>
+</div>
+<!-- Banner de Sucesso / Alerta (Interativo) -->
+<div class="hidden mx-space-lg mt-space-md bg-tertiary-fixed text-on-tertiary-fixed-variant px-space-md py-space-sm rounded-lg flex items-center justify-between shadow-sm" id="toastSuccess">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[20px] text-tertiary">check_circle</span>
+<span class="font-body-md text-body-md font-medium" id="toastMessage">Regional cadastrada com sucesso no sistema regional!</span>
+</div>
+<button class="text-on-tertiary-fixed-variant hover:opacity-75" onclick="document.getElementById('toastSuccess').classList.add('hidden')" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<!-- Corpo do Formulário -->
+<form class="p-space-lg flex flex-col gap-space-md" id="formRegional" novalidate="" onsubmit="return false;">
+
+<!-- Campo: Nome da Regional (Obrigatório) -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<label class="text-on-surface font-label-md text-label-md" for="regNome">
+                Nome da Regional <span class="text-error">*</span>
+</label>
+<span class="text-on-surface-variant font-label-sm text-label-sm">Denominação oficial</span>
+</div>
+<div class="relative">
+<input autocomplete="off" class="w-full h-10 px-3 bg-surface-container-lowest text-on-surface font-body-md text-body-md rounded-lg transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-outline" id="regNome" name="regNome" placeholder="Ex: São Paulo Leste" type="text">
+<span class="hidden material-symbols-outlined text-tertiary-container absolute right-3 top-2.5 text-[20px]" id="inputValidIcon">check_circle</span>
+</div>
+<p class="hidden text-error font-body-sm text-body-sm flex items-center gap-1" id="errNome">
+<span class="material-symbols-outlined text-[16px]">error</span>
+              O nome da regional é de preenchimento obrigatório (mínimo 3 caracteres).
+            </p>
+<p class="text-outline font-body-sm text-body-sm" id="helpNome">Informe o nome geográfico reconhecido para a região administrativa.</p>
+</div>
+<!-- Campo: Código (Opcional) -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<label class="text-on-surface font-label-md text-label-md" for="regCodigo">
+                Código <span class="text-on-surface-variant font-normal">(Opcional)</span>
+</label>
+
+</div>
+<div class="relative">
+<input class="w-full h-10 px-3 bg-surface-container-lowest text-on-surface font-body-md text-body-md uppercase rounded-lg transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:text-outline font-mono text-sm" id="regCodigo" maxlength="14" name="regCodigo" placeholder="Ex: SP-LST" type="text">
+</div>
+<p class="text-outline font-body-sm text-body-sm">Identificador mnemônico para exportações e relatórios consolidados.</p>
+</div>
+<!-- Checkbox: Regional Ativa -->
+<div class="flex items-center gap-space-sm pt-space-xs">
+<label class="relative flex items-center gap-space-sm cursor-pointer select-none">
+<input checked="" class="sr-only peer" id="regAtiva" name="regAtiva" type="checkbox">
+<div class="w-5 h-5 rounded bg-surface-container-highest peer-checked:bg-primary transition-colors flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-on-primary text-[16px] opacity-0 peer-checked:opacity-100 transition-opacity">check</span>
+</div>
+<span class="text-on-surface font-label-md text-label-md">Regional Ativa</span>
+</label>
+
+</div>
+<!-- Divisória suave e Ações de Rodapé -->
+<div class="mt-space-md pt-space-md bg-surface-container-low/40 -mx-space-lg -mb-space-lg px-space-lg py-space-md flex flex-col sm:flex-row items-center justify-between gap-space-sm">
+
+<div class="flex items-center gap-space-sm w-full sm:w-auto order-1 sm:order-2 justify-end">
+<button class="px-space-md h-10 rounded-lg text-secondary hover:text-on-surface hover:bg-surface-container-high transition-colors font-label-md text-label-md shadow-sm" id="btnCancel" type="button">
+                Cancelar
+              </button>
+<button class="px-space-lg h-10 rounded-lg bg-primary-container text-on-primary font-label-md text-label-md hover:bg-primary transition-all shadow-md flex items-center justify-center gap-space-xs disabled:opacity-50 disabled:cursor-not-allowed min-w-[140px]" id="btnSubmit" type="button">
+<span class="material-symbols-outlined text-[18px]" id="btnIcon">save</span>
+<span class="hidden animate-spin h-4 w-4 rounded-full border-2 border-on-primary border-t-transparent" id="btnSpinner"></span>
+<span id="btnLabel" class="">Salvar Regional</span>
+</button>
+</div>
+</div>
+</form>
+</div>
+<!-- Resumo Rápido de Normas Administrativas -->
+
+</div>
+<!-- Painel de Contexto / Listagem de Fundo (Visão Geral das Regionais Existentes) -->
+
+</div>
+</div>
+<script>
+  (function() {
+    const inputNome = document.getElementById('regNome');
+    const inputCodigo = document.getElementById('regCodigo');
+    const checkAtiva = document.getElementById('regAtiva');
+    const errNome = document.getElementById('errNome');
+    const helpNome = document.getElementById('helpNome');
+    const inputValidIcon = document.getElementById('inputValidIcon');
+    const btnSubmit = document.getElementById('btnSubmit');
+    const btnLabel = document.getElementById('btnLabel');
+    const btnIcon = document.getElementById('btnIcon');
+    const btnSpinner = document.getElementById('btnSpinner');
+    const toastSuccess = document.getElementById('toastSuccess');
+    const toastMessage = document.getElementById('toastMessage');
+    const btnCancel = document.getElementById('btnCancel');
+    const btnTopCancel = document.getElementById('btnTopCancel');
+    const tabelaBody = document.querySelector('#tabelaRegionais tbody');
+
+    function validateNome() {
+      const val = inputNome.value.trim();
+      if (val.length < 3) {
+        errNome.classList.remove('hidden');
+        helpNome.classList.add('hidden');
+        inputValidIcon.classList.add('hidden');
+        inputNome.classList.add('bg-error-container/20');
+        return false;
+      } else {
+        errNome.classList.add('hidden');
+        helpNome.classList.remove('hidden');
+        inputValidIcon.classList.remove('hidden');
+        inputNome.classList.remove('bg-error-container/20');
+        return true;
+      }
+    }
+
+    inputNome.addEventListener('input', function() {
+      if (!errNome.classList.contains('hidden')) {
+        validateNome();
+      } else if (inputNome.value.trim().length >= 3) {
+        inputValidIcon.classList.remove('hidden');
+      } else {
+        inputValidIcon.classList.add('hidden');
+      }
+    });
+
+    function resetForm() {
+      inputNome.value = '';
+      inputCodigo.value = '';
+      checkAtiva.checked = true;
+      errNome.classList.add('hidden');
+      helpNome.classList.remove('hidden');
+      inputValidIcon.classList.add('hidden');
+      inputNome.classList.remove('bg-error-container/20');
+    }
+
+    btnCancel.addEventListener('click', resetForm);
+    btnTopCancel.addEventListener('click', resetForm);
+
+    btnSubmit.addEventListener('click', function() {
+      const isValid = validateNome();
+      if (!isValid) {
+        inputNome.focus();
+        return;
+      }
+
+      // Ativa estado de carregamento institucional
+      btnSubmit.disabled = true;
+      btnIcon.classList.add('hidden');
+      btnSpinner.classList.remove('hidden');
+      btnLabel.textContent = 'Salvando...';
+
+      setTimeout(function() {
+        const nomeValor = inputNome.value.trim();
+        const codigoValor = inputCodigo.value.trim() || 'Pia-Reg-' + nomeValor.substring(0, 3).toUpperCase();
+        const isAtiva = checkAtiva.checked;
+
+        // Inserir dinamicamente na tabela de contexto
+        const novaLinha = document.createElement('tr');
+        novaLinha.className = 'hover:bg-surface-container-low transition-colors bg-tertiary-fixed/20';
+        novaLinha.innerHTML = `
+          <td class="py-2.5 px-3 font-medium text-on-surface">${nomeValor}</td>
+          <td class="py-2.5 px-2 font-mono text-outline">${codigoValor}</td>
+          <td class="py-2.5 px-3 text-right">
+            <span class="${isAtiva ? 'bg-tertiary-fixed text-on-tertiary-fixed-variant' : 'bg-surface-container-high text-on-surface-variant'} px-2 py-0.5 rounded font-label-sm text-label-sm font-semibold">
+              ${isAtiva ? 'Ativo' : 'Inativo'}
+            </span>
+          </td>
+        `;
+        tabelaBody.insertBefore(novaLinha, tabelaBody.firstChild);
+
+        // Feedback positivo
+        toastMessage.textContent = `Regional "${nomeValor}" cadastrada e sincronizada com sucesso!`;
+        toastSuccess.classList.remove('hidden');
+
+        // Restaurar estado do botão
+        btnSubmit.disabled = false;
+        btnIcon.classList.remove('hidden');
+        btnSpinner.classList.add('hidden');
+        btnLabel.textContent = 'Salvar Regional';
+
+        // Limpar inputs
+        resetForm();
+
+        // Scroll suave para visualização
+        toastSuccess.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 750);
+    });
+  })();
+</script></main><footer class="w-full bg-surface-container-low py-space-md shadow-[0_1px_8px_rgba(0,0,0,0.04)] mt-auto"><div class="max-w-7xl mx-auto px-margin flex flex-col md:flex-row items-center justify-between gap-space-xs text-on-surface-variant font-body-sm text-body-sm"><div class="">PRODUÇÃO · v1.1.0 · build 6741936 · Congregação Cristã no Brasil</div><div class="text-outline font-label-sm text-label-sm">Sistema Administrativo Regional · SP</div></div></footer><nav class="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.06)] flex items-center justify-around z-50 px-margin-mobile" data-active-classes="text-primary font-label-sm"><a class="flex flex-col items-center text-on-surface-variant font-label-sm text-label-sm" data-path="minha-agenda" href="#"><span class="material-symbols-outlined text-[20px]">calendar_today</span>Minha Agenda</a><a class="flex flex-col items-center text-on-surface-variant font-label-sm text-label-sm" data-path="eventos" href="#"><span class="material-symbols-outlined text-[20px]">event</span>Eventos</a><a class="flex flex-col items-center text-on-surface-variant font-label-sm text-label-sm" data-path="calendario" href="#"><span class="material-symbols-outlined text-[20px]">date_range</span>Calendário</a><a class="flex flex-col items-center text-on-surface-variant font-label-sm text-label-sm" data-path="convocacoes" href="#"><span class="material-symbols-outlined text-[20px]">assignment_ind</span>Convocações</a><a aria-current="page" class="flex flex-col items-center text-primary font-label-sm" data-path="mais" href="#"><span class="material-symbols-outlined text-[20px]">more_horiz</span>Mais</a></nav>
+
+</body></html>
