@@ -32,6 +32,8 @@ Prints de origem (4 imagens) e **5 HTML posteriores** enviados na conversa do pr
 - `Texto colado (2)(20261016-123748).txt` — `AGD-ADM-046` edição
 - `Texto colado (3)(20261016-123808).txt` — `AGD-ADM-047` detalhes
 
-**Pendente:** arquivar os HTML e capturas originais em local versionado/imutável, conferir hashes SHA-256, registrar ligações de rastreabilidade; os nomes acima **não significam** que os arquivos estejam presentes no repositório. Não afirmar Gate A concluído por este aceite.
+**Hashes SHA-256 conferidos:** as cinco propostas finais de GTs estão identificadas com SHA-256 dos bytes dos anexos no manifesto [`gate-a-lote-1-rastreabilidade.md`](./gate-a-lote-1-rastreabilidade.md), seção **Grupos de Trabalho: inventário da remessa final do Stitch**. Essa conferência identifica as cópias recebidas, mas **não** equivale ao arquivamento dos HTMLs originais no repositório.
+
+**Pendente:** arquivar os cinco HTMLs originais e as capturas de referência em local versionado/imutável, e registrar as ligações de cada anexo com o respectivo commit/blob recuperável e seu hash. Os nomes acima **não significam** que os arquivos estejam presentes no repositório. Não afirmar Gate A concluído por este aceite.
 
 **Limites:** nenhuma implementação, alteração funcional, mudança de banco, CI de aplicação, deploy ou merge autorizados por este documento. O lote 1 continua com Gate A integral aberto.
