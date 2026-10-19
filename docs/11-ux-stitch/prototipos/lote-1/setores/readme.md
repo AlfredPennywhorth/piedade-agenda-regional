@@ -20,3 +20,9 @@ Arquivos **-unificado.html** são DERIVAÇÕES para revisão visual e técnica. 
 ## Publicação proposta
 Arquivar `originais/` como material-fonte, e os quatro derivados em subpasta `unificados-em-avaliacao/` de `docs/11-ux-stitch/prototipos/lote-1/setores/`. Submeter PR documental à `develop` e aguardar CI/Codex e aprovação explícita de merge. O Gate A integral continua aberto.
 
+## Diretriz do Product Owner — textos orientativos (19/10/2026)
+- **Por enquanto, não apresentar textos orientativos ou explicativos nas telas da aplicação.** Orientações de uso devem ser concentradas exclusivamente no **Manual de Uso**.
+- Eliminar na futura implementação descrições auxiliares, blocos de dicas, avisos tutoriais e parágrafos de explicação que não sejam indispensáveis à operação.
+- Permanecem admitidos rótulos de campos, títulos, botões, indicações de obrigatoriedade, mensagens objetivas de validação/erro, confirmação de ação e informações operacionais estritamente necessárias; essas não constituem texto orientativo.
+- Esta diretriz também se aplica às telas de Setores. Alguns HTMLs Stitch originais e derivados ainda contêm textos orientativos; **isso é dívida visual documentada, não autorização para reproduzi-los na aplicação**.
+- **Preservação de evidências:** não alterar os oito originais nem os quatro derivados neste arquivamento documental. Remover esses textos somente de versões de implementação/revisão visual derivadas, após autorização específica do PO e nova validação.
