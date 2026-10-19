@@ -1,21 +1,21 @@
 [
   {
-    "arquivo": "AGD-ADM-007-desktop-unificado.html",
-    "bytes": 47937,
-    "sha256": "0f255e29b88879cd02f9992642de0d0e069da982575e195ef25d6d404ea5a28b"
+    "arquivo": "unificados-em-avaliacao/AGD-ADM-007-desktop-unificado.html",
+    "bytes": 47347,
+    "sha256": "61ecb7dc240cb16188d50541998171cf3535ba3d96772870318fc58b97f3d987"
   },
   {
     "arquivo": "originais/claro/AGD-ADM-007-desktop.html",
-    "bytes": 39510,
-    "sha256": "a6038962a21ad98793201bb6081e6a1448f8d8fbba581bb969cd403401f77ef5"
+    "bytes": 38920,
+    "sha256": "41b160d9068b2921f1378af2beeda1c6ff97529befcf2629f0ada6c0da99232b"
   },
   {
     "arquivo": "originais/escuro/AGD-ADM-007-desktop.html",
-    "bytes": 37596,
-    "sha256": "b310a4a73d9730b3c89609a48869d27e07c8134779ca1ba0f8680544bdfa6446"
+    "bytes": 37510,
+    "sha256": "0ff39d376cc8a3df37b7a86a93e714b105d6e499c497926da65a2ef6ad224e84"
   },
   {
-    "arquivo": "AGD-ADM-007-mobile-unificado.html",
+    "arquivo": "unificados-em-avaliacao/AGD-ADM-007-mobile-unificado.html",
     "bytes": 36864,
     "sha256": "68e576a27eb72c81f3d22f338d1a4af0593331a65c04551e43b804a34dc4390c"
   },
@@ -30,7 +30,7 @@
     "sha256": "38ef26c13f166d02f388cbeb8fcc62befd1f3b1a9860f7771b26137dcb7c2cf9"
   },
   {
-    "arquivo": "AGD-ADM-041-cadastro-unificado.html",
+    "arquivo": "unificados-em-avaliacao/AGD-ADM-041-cadastro-unificado.html",
     "bytes": 26667,
     "sha256": "16a32e203f6e2814c49267bd900d6db88f2d2cbf043c8d01e36ab541bd3b396d"
   },
@@ -45,7 +45,7 @@
     "sha256": "f09e8e1df62b19853fce95e53e1997033c17aae7c3a75ac238d59bed572fcd4b"
   },
   {
-    "arquivo": "AGD-ADM-042-edicao-unificado.html",
+    "arquivo": "unificados-em-avaliacao/AGD-ADM-042-edicao-unificado.html",
     "bytes": 28053,
     "sha256": "cbafa8aff28a4097d6b32711ea58648c403c3d0be6ed5f150215c4156e7dc617"
   },

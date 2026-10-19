@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="pt-BR"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"primary":"#2563eb","primary-hover":"#1d4ed8","primary-container":"#1d4ed8","slate-bg":"#0a0f1d","slate-surface":"#1e293b","slate-border":"#334155","slate-input":"#0f172a"},borderRadius:{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},fontFamily:{"sans":["Inter","sans-serif"]}}}};</script></head><body class="bg-[#0a0f1d] text-slate-100 font-sans antialiased min-h-screen flex flex-col justify-between"><header class="fixed top-0 left-0 w-full z-50 bg-[#060b17] border-b border-slate-800/80 shadow-lg"><div class="h-16 w-full max-w-[1280px] mx-auto px-6 flex items-center justify-between"><div class="flex items-center gap-4"><div class="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm"><span class="material-symbols-outlined text-[20px]">book</span></div><div class="flex flex-col"><div class="flex items-center gap-2"><span class="text-[16px] font-semibold text-white tracking-tight">Agenda Regional SP</span><span class="px-2 py-0.5 rounded bg-blue-950/80 border border-blue-800/50 text-blue-300 font-mono text-[11px] font-bold uppercase tracking-wider">BETA · V1.1.0 · BUILD 82D569B</span></div><div class="flex items-center gap-1.5"><span class="material-symbols-outlined text-slate-400 text-[14px]">person</span><span class="text-[12px] text-slate-400">Rodrigo Cesar Salustiano</span></div></div></div><div class="flex items-center gap-4"><a class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-[13px] font-medium" data-path="login" href="#"><span class="material-symbols-outlined text-[18px]">logout</span><span>Sair</span></a><div class="w-8 h-8 rounded-full bg-blue-600/30 border border-blue-500/40 flex items-center justify-center shrink-0 text-blue-300"><span class="material-symbols-outlined text-[18px]">person</span></div></div></div><div class="w-full bg-[#0a1020] border-t border-slate-800/60 shadow-inner"><div class="w-full max-w-[1280px] mx-auto px-6 flex items-center justify-between h-11"><nav class="flex items-center gap-1.5 h-full"><a class="px-3 py-1.5 text-[13px] font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors rounded-lg" data-path="minha-agenda" href="#">Minha Agenda</a><a class="px-3 py-1.5 text-[13px] font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors rounded-lg" data-path="eventos" href="#">Eventos</a><a class="px-3 py-1.5 text-[13px] font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors rounded-lg" data-path="calendario" href="#">Calendário</a><a class="px-3 py-1.5 text-[13px] font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors rounded-lg" data-path="convocacoes" href="#">Convocações</a><a aria-current="page" class="px-3.5 py-1.5 transition-colors bg-blue-600 text-white font-medium text-[13px] rounded-lg shadow-sm" data-path="mais" href="#">Mais</a></nav><div class="hidden sm:flex items-center gap-2 text-[12px] text-slate-400"><span class="hover:text-slate-200">Administração</span><span class="material-symbols-outlined text-[13px] text-slate-500">chevron_right</span><span class="hover:text-slate-200">Operações</span><span class="material-symbols-outlined text-[13px] text-slate-500">chevron_right</span><span class="text-blue-400 font-medium">Gestão Territorial</span><span class="text-slate-600 mx-1">•</span><span class="text-slate-400">Secretaria Regional • Módulo Territorial</span></div></div></div></header><main class="w-full max-w-[1280px] mx-auto px-6 pt-[124px] flex-1 pb-12"><div class="flex flex-col w-full">
+<!-- Feedback Toast Notifier -->
+<div class="fixed bottom-6 right-8 z-50 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-3 px-4 py-3 bg-slate-900 border border-slate-700 text-slate-100 rounded-xl shadow-2xl" id="statusToast">
+<span class="material-symbols-outlined text-[20px] text-emerald-400">check_circle</span>
+<span class="text-[13px] font-medium">Alterações do setor salvas com êxito no Sistema AGD-SP.</span>
+</div>
+<!-- Page Header Container -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+<div class="flex flex-col">
+<div class="flex items-center gap-1.5 text-slate-400 text-[12px] mb-1">
+<span>Secretaria e Estatística</span>
+<span class="material-symbols-outlined text-[14px] text-slate-600">chevron_right</span>
+<span>Operações Administrativas</span>
+<span class="material-symbols-outlined text-[14px] text-slate-600">chevron_right</span>
+<span class="text-blue-400 font-medium">Divisão Territorial</span>
+</div>
+<h1 class="text-[28px] font-bold text-white tracking-tight">Gestão Territorial — Setores</h1>
+<p class="text-[14px] text-slate-400 mt-0.5">Listagem, cadastro e atualização de Setores territoriais</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-[13px] shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-400" type="button">
+<span class="material-symbols-outlined text-[18px]">add</span>
+<span>Novo Setor</span>
+</button>
+</div>
+</div>
+<!-- Main Form Card (Tela AGD-ADM-042 - Dark Theme) -->
+<div class="w-full bg-[#1e293b] border border-slate-700/80 rounded-xl shadow-xl overflow-hidden">
+<!-- Card Top Bar: Title, Technical Identifier Badge & Top Cancel Action -->
+<div class="bg-[#182234] border-b border-slate-700/70 px-6 py-4 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-lg bg-blue-950 border border-blue-800/60 flex items-center justify-center text-blue-400">
+<span class="material-symbols-outlined text-[20px]">edit_location_alt</span>
+</div>
+<div>
+<div class="flex items-center gap-3">
+<h2 class="text-[18px] font-semibold text-white tracking-tight">Editar Setor</h2>
+<span class="inline-flex items-center px-2 py-0.5 rounded font-mono text-[11px] bg-slate-800 border border-slate-700 text-blue-400 font-semibold tracking-wider">
+Tela AGD-ADM-042
+</span>
+</div>
+<p class="text-[13px] text-slate-400 hidden sm:block">Parâmetros de jurisdição e distribuição eclesiástica</p>
+</div>
+</div>
+<a class="text-[13px] font-medium text-slate-400 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800" href="#">
+Cancelar
+</a>
+</div>
+<!-- Mandatory Warning Banner -->
+<div class="px-6 pt-5">
+<div class="flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-blue-950/40 border border-blue-800/40 text-blue-300 text-[13px]">
+<span class="material-symbols-outlined text-[18px] text-blue-400 shrink-0">info</span>
+<span>Campos sinalizados com <strong class="text-red-400 font-semibold">*</strong> possuem preenchimento obrigatório para homologação.</span>
+</div>
+</div>
+<!-- Form Body -->
+<form class="p-6 flex flex-col gap-6" id="formEditarSetor" onsubmit="event.preventDefault(); salvarSetor();">
+<!-- Linha 1: Regional * e Administração * -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Campo Regional -->
+<div class="flex flex-col gap-1.5">
+<label class="text-[13px] text-slate-200 font-medium flex items-center gap-1" for="regionalSelect">
+<span>Regional</span>
+<span class="text-red-400 font-bold">*</span>
+</label>
+<div class="relative">
+<select class="w-full h-11 px-3.5 pr-9 bg-[#0f172a] border border-slate-700 text-slate-100 font-normal text-[14px] rounded-lg shadow-inner focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none appearance-none cursor-pointer transition-all" id="regionalSelect" required="">
+<option selected="" value="SP">São Paulo</option>
+<option value="CAMP">Campinas</option>
+<option value="SJC">São José dos Campos</option>
+<option value="SAN">Santos</option>
+</select>
+<span class="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">expand_more</span>
+</div>
+<p class="text-[12px] text-slate-400">Sede administrativa regional de vínculo.</p>
+</div>
+<!-- Campo Administração -->
+<div class="flex flex-col gap-1.5">
+<label class="text-[13px] text-slate-200 font-medium flex items-center gap-1" for="admSelect">
+<span>Administração</span>
+<span class="text-red-400 font-bold">*</span>
+</label>
+<div class="relative">
+<select class="w-full h-11 px-3.5 pr-9 bg-[#0f172a] border border-slate-700 text-slate-100 font-normal text-[14px] rounded-lg shadow-inner focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none appearance-none cursor-pointer transition-all" id="admSelect" required="">
+<option selected="" value="SP-CEN">São Paulo</option>
+<option value="SP-LES">São Paulo — Leste</option>
+<option value="SP-NOR">São Paulo — Norte</option>
+<option value="SP-SUL">São Paulo — Sul</option>
+<option value="SP-OES">São Paulo — Oeste</option>
+</select>
+<span class="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">expand_more</span>
+</div>
+<p class="text-[12px] text-slate-400">Administração territorial local responsável.</p>
+</div>
+</div>
+<!-- Linha 2: Nome do Setor * -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<label class="text-[13px] text-slate-200 font-medium flex items-center gap-1" for="nomeSetorInput">
+<span>Nome do Setor</span>
+<span class="text-red-400 font-bold">*</span>
+</label>
+<span class="text-[12px] text-slate-400">Identificação pública do setor</span>
+</div>
+<div class="relative">
+<input class="w-full h-11 px-4 bg-[#0f172a] border border-slate-700 text-slate-100 font-semibold text-[15px] tracking-wide rounded-lg shadow-inner uppercase focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-all placeholder:text-slate-600" id="nomeSetorInput" placeholder="EX: BRÁS, VILA PRUDENTE, PENHA" required="" type="text" value="BRÁS"/>
+</div>
+<p class="text-[12px] text-slate-400">Nome convencional utilizado para escalas, relatórios e circulares de reunião.</p>
+</div>
+<!-- Linha 3: Código (Opcional) -->
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center justify-between">
+<label class="text-[13px] text-slate-200 font-medium" for="codigoSetorInput">
+<span>Código (Opcional)</span>
+</label>
+<span class="text-[12px] text-slate-400">Identificador mnemônico</span>
+</div>
+<div class="relative">
+<input class="w-full h-11 px-4 bg-[#0f172a] border border-slate-700 text-slate-100 font-mono text-[14px] rounded-lg shadow-inner uppercase focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none transition-all placeholder:text-slate-600" id="codigoSetorInput" placeholder="EX: SET-01" type="text" value=""/>
+</div>
+<p class="text-[12px] text-slate-400">Sigla alfanumérica de até 8 caracteres para relatórios sintéticos.</p>
+</div>
+<!-- Linha 4: Checkbox Setor Ativo com Badge e Legenda -->
+<div class="p-4 rounded-xl bg-[#0f172a]/70 border border-slate-700/60 flex flex-col gap-2">
+<div class="flex items-center gap-3">
+<label class="relative flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" id="setorAtivoCheckbox" type="checkbox"/>
+<div class="w-5 h-5 bg-[#0f172a] border border-slate-600 rounded peer-checked:bg-blue-600 peer-checked:border-blue-600 transition-all flex items-center justify-center shadow-inner">
+<span class="material-symbols-outlined text-[16px] text-white scale-0 peer-checked:scale-100 transition-transform">check</span>
+</div>
+</label>
+<label class="text-[14px] text-slate-100 cursor-pointer select-none font-medium flex items-center gap-2" for="setorAtivoCheckbox">
+<span>Setor Ativo</span>
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-950/80 border border-emerald-600/40 text-emerald-300">
+Operacional
+</span>
+</label>
+</div>
+<p class="text-[12px] text-slate-400 pl-8">Setores ativos recebem convocações, constam na emissão de escalas ministeriais e ficam visíveis na agenda integrada.</p>
+</div>
+<!-- Rodapé de Ações do Card -->
+<div class="pt-5 border-t border-slate-700/80 flex items-center justify-end gap-3">
+<button class="h-11 px-5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[13px] font-medium transition-colors" onclick="window.history.back()" type="button">
+Cancelar
+</button>
+<button class="h-11 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[14px] shadow-lg shadow-blue-900/30 transition-all flex items-center justify-center gap-2 active:scale-[0.98]" type="submit">
+<span class="material-symbols-outlined text-[18px]">check</span>
+<span>Atualizar Setor</span>
+</button>
+</div>
+</form>
+</div>
+</div>
+<!-- Inline Interaction Behavior -->
+<script>
+    function salvarSetor() {
+      const nomeInput = document.getElementById('nomeSetorInput');
+      const toast = document.getElementById('statusToast');
+
+      if (!nomeInput.value.trim()) {
+        nomeInput.focus();
+        return;
+      }
+
+      // Show toast
+      toast.classList.remove('translate-y-24', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-24', 'opacity-0');
+      }, 3500);
+    }
+</script>
+</main><footer class="w-full bg-[#060b17] border-t border-slate-800 shadow-xl mt-auto"><div class="w-full max-w-[1280px] mx-auto px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-3 text-[12px] text-slate-400"><div class="flex items-center gap-2 flex-wrap justify-center md:justify-start"><span>Congregação Cristã no Brasil</span><span class="text-slate-600">•</span><span>Secretaria Regional de São Paulo</span><span class="text-slate-600">•</span><span class="font-mono text-blue-400 font-semibold tracking-wider">SISTEMA AGD-SP</span></div><div class="flex items-center gap-3 text-[12px]"><span class="text-slate-400">Uso Interno e Ministerial Exclusivo</span><span class="text-slate-600">•</span><a class="hover:text-slate-200 transition-colors" data-path="privacidade-termos" href="#">Normas &amp; Privacidade</a></div></div></footer>
+</body></html>

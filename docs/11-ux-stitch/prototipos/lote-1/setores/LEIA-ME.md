@@ -1,9 +1,9 @@
 # Setores — protótipos com alternância integrada (prévia derivada)
 
-Arquivos **-unificado.html** são DERIVAÇÕES para revisão visual e técnica. Os oito arquivos em `originais/` são cópias byte a byte dos downloads Stitch recebidos, preservados para rastreabilidade.
+Arquivos **-unificado.html** são DERIVAÇÕES para revisão visual e técnica. Os oito arquivos em `originais/` preservam as versões do Stitch efetivamente recebidas no repositório. Alguns uploads sofreram normalização de bytes (por exemplo, finais de linha); portanto, os hashes abaixo atestam os bytes versionados no GitHub, sem afirmar identidade byte a byte com os downloads anteriores ao upload.
 
 ## Operação
-- Abrir cada `-unificado.html` num navegador; o botão flutuante “Tema claro/escuro” alterna os dois temas NO MESMO HTML.
+- Abrir cada `unificados-em-avaliacao/*-unificado.html` num navegador; o botão flutuante “Tema claro/escuro” alterna os dois temas NO MESMO HTML.
 - O tema persiste no navegador via localStorage; sem permissão de armazenamento, o controle continua funcional na página aberta.
 - Os quatro arquivos partilham o mesmo mecanismo, incluído em cada HTML para prévia independente. Nenhuma instalação é necessária; o Tailwind CDN e fontes externas dos originais exigem internet.
 - Alterações de cor e ajustes de contraste usam CSS de sobreposição. O layout, os campos e scripts originais de referência foram mantidos da versão clara.
@@ -15,10 +15,10 @@ Arquivos **-unificado.html** são DERIVAÇÕES para revisão visual e técnica. 
 - Conteúdo ilustrativo como setor, nome de usuário, versão, ambiente e opções não deve gerar novas regras de produto.
 - No app definitivo: tokens de temas globais, identidade institucional e logotipo aprovado; cabeçalho azul #102D55; versão/build/ambiente dinâmicos SOMENTE no rodapé; evitar rolagem horizontal; não duplicar tema por tela.
 - Não incluir variante defeituosa de edição com filtros duplicados.
-- Não altera develop, main, banco ou deploy.
+- Esta PR propõe atualização documental em `develop` após aprovação; não altera `main`, banco ou deploy.
 
 ## Publicação proposta
-Arquivar `originais/` como material-fonte, e os quatro derivados em subpasta `unificados-em-avaliacao/` de `docs/11-ux-stitch/prototipos/lote-1/setores/`. Submeter PR documental à `develop` e aguardar CI/Codex e aprovação explícita de merge. O Gate A integral continua aberto.
+Manter oito fontes em `originais/` e os quatro derivados exclusivamente em `unificados-em-avaliacao/`, sem cópias na raiz. `MANIFESTO-SHA256.json` relaciona caminhos, tamanhos e hashes SHA-256 dos bytes versionados no GitHub. Submeter PR documental à `develop` e aguardar CI/Codex e aprovação explícita de merge; Gate A integral continua aberto. O Gate A integral continua aberto.
 
 ## Diretriz do Product Owner — textos orientativos (19/10/2026)
 - **Por enquanto, não apresentar textos orientativos ou explicativos nas telas da aplicação.** Orientações de uso devem ser concentradas exclusivamente no **Manual de Uso**.
