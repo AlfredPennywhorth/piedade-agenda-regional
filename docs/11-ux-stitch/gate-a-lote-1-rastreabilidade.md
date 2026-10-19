@@ -2,14 +2,14 @@
 
 **Estado:** aceites visuais condicionados registrados; **Gate A integral ainda não concluído**. Não autoriza implementação, deploy ou mudança funcional.
 
-## Verificação do repositório em 16/10/2026
+## Verificação do repositório em 16/10/2026 (atualizada para a PR #328 em 19/10/2026)
 
 - PR #320 (Locais/Espaços): **mesclada** na develop em 15/10/2026 (merge `2898566`); já não é pendência de merge.
 - PR #321 (Regionais/Administrações/GTs): **mesclada** na develop (merge `68be8ad`).
 - Handoffs presentes: Setores, Casas, Locais/Espaços, Regionais/Administrações e Grupos de Trabalho.
-- Arquivamento de HTMLs originais **ainda não concluído no GitHub**, mesmo quando SHA-256 ou nome de arquivo constam nos handoffs; não equiparar anexo de conversa a artefato versionado.
+- O arquivamento de HTMLs originais está **em andamento por sublote**, não universalmente concluído. **Locais/Espaços:** seis arquivos versionados na branch da PR #328, aguardando merge em `develop`; outras superfícies exigem validação específica. Não equiparar anexos de conversa a artefatos versionados.
 - Regionais/Administrações: oito propostas aprovadas com ressalvas; identificar hashes e consolidar correspondência de cada arquivo de origem antes de declarar Gate A.
-- Locais/Espaços: seis propostas já possuem hashes no handoff, mas faltam arquivos brutos recuperáveis em commit/blob imutável; `AGD-ADM-057` é transcrição e exige ressalva quanto à equivalência byte a byte.
+- Locais/Espaços: as seis propostas estão recuperáveis como HTML no commit `567dc4f1ad6871238e71fa7c552d63918055b9f8` da PR #328, sob `docs/11-ux-stitch/prototipos/lote-1/locais-espacos/originais/`, com manifesto SHA-256. Ainda aguardam integração à `develop` e validação final do Gate A. Para `AGD-ADM-057`, o hash do arquivo agora versionado atesta os bytes recebidos pelo GitHub, **não** sua equivalência byte a byte à transcrição anterior ou a uma exportação original do Stitch.
 - Setores e Casas: detalhar e recuperar fontes finais aprovadas, variantes mobile onde aplicáveis e estado dos subfluxos.
 
 ## Grupos de Trabalho: inventário da remessa final do Stitch
