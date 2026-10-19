@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, user-scalable=yes" name="viewport"/>
+<title>AGD-ADM-013 — Gestão de Locais | Agenda Regional SP</title>
+<!-- Inter Google Font -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined (Neutros) -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<!-- Tailwind CSS v3 CDN with forms and container queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              navy: '#002B5C',
+              primary: '#1e40af',
+              primaryLight: '#3b82f6',
+              surface: '#faf8ff',
+              surfaceContainerLowest: '#ffffff',
+              surfaceContainerLow: '#f2f3ff',
+              surfaceContainer: '#eaeefc',
+              borderSubtle: '#e2e8f0',
+              statusActiveBg: '#dcfce7',
+              statusActiveText: '#15803d'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          boxShadow: {
+            card: '0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03)',
+            elevated: '0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04)'
+          }
+        }
+      }
+    }
+  </script>
+<!-- BEGIN: Custom Styles -->
+<style data-purpose="base-styling">
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #faf8ff;
+      color: #1e293b;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    /* Safe padding for iOS Home Indicator */
+    .safe-pb-nav {
+      padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 16px));
+    }
+  </style>
+<!-- END: Custom Styles -->
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-blue-100 selection:text-blue-900">
+<!-- BEGIN: InstitutionalHeader -->
+<header class="bg-[#002B5C] text-white pt-3 pb-4 px-4 sticky top-0 z-30 shadow-md" data-purpose="app-header">
+<div class="max-w-md mx-auto flex items-center justify-between gap-3">
+<!-- Identificação e Logotipo da Instituição -->
+<div class="flex items-center gap-3 min-w-0">
+<!-- Ícone institucional neutro e moderno com moldura suave -->
+<div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0 border border-white/20">
+<span aria-hidden="true" class="material-symbols-outlined text-white text-2xl">apartment</span>
+</div>
+<div class="min-w-0">
+<h1 class="text-base font-bold tracking-tight leading-tight truncate">Agenda Regional SP</h1>
+<p class="text-xs text-blue-200/90 truncate">Rodrigo Cesar Salustiano</p>
+</div>
+</div>
+<!-- Ação de Sair com área de toque mínima garantida de 44x44px -->
+<button aria-label="Sair da conta" class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-white/10 hover:bg-white/20 active:bg-white/30 text-white border border-white/20 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50" type="button">
+<span>Sair</span>
+</button>
+</div>
+</header>
+<!-- END: InstitutionalHeader -->
+<!-- BEGIN: MainContent -->
+<main class="flex-1 max-w-md w-full mx-auto px-4 py-4 space-y-4 safe-pb-nav">
+<!-- Identificador e Cabeçalho da Tela -->
+<section aria-labelledby="screen-heading" class="bg-gradient-to-br from-[#002B5C] to-[#0A417D] text-white rounded-2xl p-4 shadow-elevated">
+<div class="flex items-center justify-between gap-2 mb-1">
+<span class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-blue-200 bg-white/10 px-2.5 py-0.5 rounded-full border border-white/10">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          AGD-ADM-013
+        </span>
+<span class="text-[11px] text-blue-200">Administrativo</span>
+</div>
+<h2 class="text-xl font-bold tracking-tight text-white mt-1" id="screen-heading">Gestão de Locais</h2>
+<p class="text-xs text-blue-100/80 mt-1 leading-relaxed">Cadastro de casas de oração, templos e outros locais para eventos</p>
+<!-- Botão de Ação Primária (+ Novo Local) com 44px de altura mínima e largura total -->
+<button class="mt-4 w-full min-h-[44px] py-2.5 px-4 bg-white hover:bg-blue-50 active:bg-blue-100 text-[#002B5C] font-semibold text-sm rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-300 active:scale-[0.99]" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-lg">add</span>
+<span>Novo Local</span>
+</button>
+</section>
+<!-- Barra de Pesquisa com Ícone e Altura Adequada -->
+<section aria-label="Pesquisa de locais" class="relative">
+<label class="sr-only" for="search-input">Pesquisar locais</label>
+<div class="relative flex items-center">
+<span aria-hidden="true" class="absolute left-3.5 text-slate-400 pointer-events-none flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</span>
+<input class="w-full min-h-[44px] pl-10 pr-10 py-2.5 text-sm bg-white border border-slate-200 rounded-xl placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-sm transition-all" id="search-input" placeholder="Pesquisar por nome, endereço, bairro..." type="search"/>
+<button aria-label="Filtrar pesquisa" class="absolute right-2.5 min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-lg" type="button">
+<span class="material-symbols-outlined text-[20px]">tune</span>
+</button>
+</div>
+</section>
+<!-- Resumo de Quantidade de Registros -->
+<div class="flex items-center justify-between px-1 text-xs text-slate-600 font-medium">
+<span class="flex items-center gap-1.5">
+<span aria-hidden="true" class="material-symbols-outlined text-[16px] text-blue-700">location_city</span>
+        Total de 7 locais ativos
+      </span>
+<span class="text-slate-400 text-[11px]">Ordenado por nome</span>
+</div>
+<!-- Lista de Locais em Cards Verticais (Substituição Ergonômica Mobile da Tabela) -->
+<section aria-label="Lista de locais cadastrados" class="space-y-3">
+<!-- Card 1: Vila Prudente -->
+<article class="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-card hover:shadow-elevated transition-shadow flex flex-col gap-3">
+<div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+<div class="flex items-start gap-2.5 min-w-0">
+<span aria-hidden="true" class="mt-0.5 p-1.5 rounded-lg bg-blue-50 text-blue-700 shrink-0">
+<span class="material-symbols-outlined text-[18px]">location_on</span>
+</span>
+<div class="min-w-0">
+<h3 class="text-base font-bold text-slate-900 leading-snug truncate">Vila Prudente</h3>
+<p class="text-xs text-slate-500 font-medium">São Paulo - SP</p>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Ativo
+          </span>
+</div>
+<div class="text-xs text-slate-600 space-y-1">
+<div class="flex items-start gap-1.5">
+<span aria-hidden="true" class="material-symbols-outlined text-slate-400 text-[16px] mt-0.5 shrink-0">navigation</span>
+<span class="break-words font-medium">Rua Chamantá, 970</span>
+</div>
+</div>
+<!-- Botões de Ação Ergonômicos (Mínimo 44px de altura de toque) -->
+<div class="pt-1 grid grid-cols-3 gap-2 border-t border-slate-100">
+<button class="min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-blue-700 transition-colors" title="Ver espaços disponíveis do local" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px]">meeting_room</span>
+<span>Espaços</span>
+</button>
+<button class="min-h-[44px] flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-xl bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 border border-slate-200 transition-colors" title="Ver detalhes do local" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px] text-slate-500">visibility</span>
+<span>Detalhes</span>
+</button>
+<button class="min-h-[44px] flex items-center justify-center gap-1 px-2 py-2 text-xs font-semibold rounded-xl bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-800 border border-amber-200/70 transition-colors" title="Editar informações do local" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px] text-amber-700">edit</span>
+<span>Editar</span>
+</button>
+</div>
+</article>
+<!-- Card 2: Brás -->
+<article class="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-card hover:shadow-elevated transition-shadow flex flex-col gap-3">
+<div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+<div class="flex items-start gap-2.5 min-w-0">
+<span aria-hidden="true" class="mt-0.5 p-1.5 rounded-lg bg-blue-50 text-blue-700 shrink-0">
+<span class="material-symbols-outlined text-[18px]">location_on</span>
+</span>
+<div class="min-w-0">
+<h3 class="text-base font-bold text-slate-900 leading-snug truncate">Brás</h3>
+<p class="text-xs text-slate-500 font-medium">São Paulo - SP</p>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Ativo
+          </span>
+</div>
+<div class="text-xs text-slate-600 space-y-1">
+<div class="flex items-start gap-1.5">
+<span aria-hidden="true" class="material-symbols-outlined text-slate-400 text-[16px] mt-0.5 shrink-0">navigation</span>
+<span class="break-words font-medium">Rua Visconde de Parnaíba, 1616</span>
+</div>
+</div>
+<div class="pt-1 grid grid-cols-3 gap-2 border-t border-slate-100">
+<button class="min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-blue-700 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px]">meeting_room</span>
+<span>Espaços</span>
+</button>
+<button class="min-h-[44px] flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-xl bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 border border-slate-200 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px] text-slate-500">visibility</span>
+<span>Detalhes</span>
+</button>
+<button class="min-h-[44px] flex items-center justify-center gap-1 px-2 py-2 text-xs font-semibold rounded-xl bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-800 border border-amber-200/70 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px] text-amber-700">edit</span>
+<span>Editar</span>
+</button>
+</div>
+</article>
+<!-- Card 3: Jardim Planalto -->
+<article class="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-card hover:shadow-elevated transition-shadow flex flex-col gap-3">
+<div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+<div class="flex items-start gap-2.5 min-w-0">
+<span aria-hidden="true" class="mt-0.5 p-1.5 rounded-lg bg-blue-50 text-blue-700 shrink-0">
+<span class="material-symbols-outlined text-[18px]">location_on</span>
+</span>
+<div class="min-w-0">
+<h3 class="text-base font-bold text-slate-900 leading-snug truncate">Jardim Planalto</h3>
+<p class="text-xs text-slate-500 font-medium">São Paulo - SP</p>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Ativo
+          </span>
+</div>
+<div class="text-xs text-slate-600 space-y-1">
+<div class="flex items-start gap-1.5">
+<span aria-hidden="true" class="material-symbols-outlined text-slate-400 text-[16px] mt-0.5 shrink-0">navigation</span>
+<span class="break-words font-medium">Avenida Doutor Frederico Martins da Costa Carvalho, 178</span>
+</div>
+</div>
+<div class="pt-1 grid grid-cols-3 gap-2 border-t border-slate-100">
+<button class="min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-blue-700 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px]">meeting_room</span>
+<span>Espaços</span>
+</button>
+<button class="min-h-[44px] flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-xl bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 border border-slate-200 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px] text-slate-500">visibility</span>
+<span>Detalhes</span>
+</button>
+<button class="min-h-[44px] flex items-center justify-center gap-1 px-2 py-2 text-xs font-semibold rounded-xl bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-800 border border-amber-200/70 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px] text-amber-700">edit</span>
+<span>Editar</span>
+</button>
+</div>
+</article>
+<!-- Card 4: Vila Moraes -->
+<article class="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-card hover:shadow-elevated transition-shadow flex flex-col gap-3">
+<div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+<div class="flex items-start gap-2.5 min-w-0">
+<span aria-hidden="true" class="mt-0.5 p-1.5 rounded-lg bg-blue-50 text-blue-700 shrink-0">
+<span class="material-symbols-outlined text-[18px]">location_on</span>
+</span>
+<div class="min-w-0">
+<h3 class="text-base font-bold text-slate-900 leading-snug truncate">Vila Moraes</h3>
+<p class="text-xs text-slate-500 font-medium">São Paulo - SP</p>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Ativo
+          </span>
+</div>
+<div class="text-xs text-slate-600 space-y-1">
+<div class="flex items-start gap-1.5">
+<span aria-hidden="true" class="material-symbols-outlined text-slate-400 text-[16px] mt-0.5 shrink-0">navigation</span>
+<span class="break-words font-medium">Rua Kalil Nader Habr, 117</span>
+</div>
+</div>
+<div class="pt-1 grid grid-cols-3 gap-2 border-t border-slate-100">
+<button class="min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-blue-700 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px]">meeting_room</span>
+<span>Espaços</span>
+</button>
+<button class="min-h-[44px] flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-xl bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 border border-slate-200 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px] text-slate-500">visibility</span>
+<span>Detalhes</span>
+</button>
+<button class="min-h-[44px] flex items-center justify-center gap-1 px-2 py-2 text-xs font-semibold rounded-xl bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-800 border border-amber-200/70 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px] text-amber-700">edit</span>
+<span>Editar</span>
+</button>
+</div>
+</article>
+<!-- Card 5: Jardim Santo Eduardo -->
+<article class="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-card hover:shadow-elevated transition-shadow flex flex-col gap-3">
+<div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+<div class="flex items-start gap-2.5 min-w-0">
+<span aria-hidden="true" class="mt-0.5 p-1.5 rounded-lg bg-blue-50 text-blue-700 shrink-0">
+<span class="material-symbols-outlined text-[18px]">location_on</span>
+</span>
+<div class="min-w-0">
+<h3 class="text-base font-bold text-slate-900 leading-snug truncate">Jardim Santo Eduardo</h3>
+<p class="text-xs text-slate-500 font-medium">São Paulo - SP</p>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Ativo
+          </span>
+</div>
+<div class="text-xs text-slate-600 space-y-1">
+<div class="flex items-start gap-1.5">
+<span aria-hidden="true" class="material-symbols-outlined text-slate-400 text-[16px] mt-0.5 shrink-0">navigation</span>
+<span class="break-words font-medium">Rua Manoel Ferreira Pires, 726</span>
+</div>
+</div>
+<div class="pt-1 grid grid-cols-3 gap-2 border-t border-slate-100">
+<button class="min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-blue-700 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px]">meeting_room</span>
+<span>Espaços</span>
+</button>
+<button class="min-h-[44px] flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-xl bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 border border-slate-200 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px] text-slate-500">visibility</span>
+<span>Detalhes</span>
+</button>
+<button class="min-h-[44px] flex items-center justify-center gap-1 px-2 py-2 text-xs font-semibold rounded-xl bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-800 border border-amber-200/70 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px] text-amber-700">edit</span>
+<span>Editar</span>
+</button>
+</div>
+</article>
+<!-- Card 6: Água Rasa -->
+<article class="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-card hover:shadow-elevated transition-shadow flex flex-col gap-3">
+<div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+<div class="flex items-start gap-2.5 min-w-0">
+<span aria-hidden="true" class="mt-0.5 p-1.5 rounded-lg bg-blue-50 text-blue-700 shrink-0">
+<span class="material-symbols-outlined text-[18px]">location_on</span>
+</span>
+<div class="min-w-0">
+<h3 class="text-base font-bold text-slate-900 leading-snug truncate">Água Rasa</h3>
+<p class="text-xs text-slate-500 font-medium">São Paulo - SP</p>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Ativo
+          </span>
+</div>
+<div class="text-xs text-slate-600 space-y-1">
+<div class="flex items-start gap-1.5">
+<span aria-hidden="true" class="material-symbols-outlined text-slate-400 text-[16px] mt-0.5 shrink-0">navigation</span>
+<span class="break-words font-medium">Avenida Sapopemba, 415</span>
+</div>
+</div>
+<div class="pt-1 grid grid-cols-3 gap-2 border-t border-slate-100">
+<button class="min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-blue-700 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px]">meeting_room</span>
+<span>Espaços</span>
+</button>
+<button class="min-h-[44px] flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-xl bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 border border-slate-200 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px] text-slate-500">visibility</span>
+<span>Detalhes</span>
+</button>
+<button class="min-h-[44px] flex items-center justify-center gap-1 px-2 py-2 text-xs font-semibold rounded-xl bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-800 border border-amber-200/70 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px] text-amber-700">edit</span>
+<span>Editar</span>
+</button>
+</div>
+</article>
+<!-- Card 7: Jardim Yara -->
+<article class="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-card hover:shadow-elevated transition-shadow flex flex-col gap-3">
+<div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+<div class="flex items-start gap-2.5 min-w-0">
+<span aria-hidden="true" class="mt-0.5 p-1.5 rounded-lg bg-blue-50 text-blue-700 shrink-0">
+<span class="material-symbols-outlined text-[18px]">location_on</span>
+</span>
+<div class="min-w-0">
+<h3 class="text-base font-bold text-slate-900 leading-snug truncate">Jardim Yara</h3>
+<p class="text-xs text-slate-500 font-medium">São Paulo - SP</p>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Ativo
+          </span>
+</div>
+<div class="text-xs text-slate-600 space-y-1">
+<div class="flex items-start gap-1.5">
+<span aria-hidden="true" class="material-symbols-outlined text-slate-400 text-[16px] mt-0.5 shrink-0">navigation</span>
+<span class="break-words font-medium">Avenida Antônio Manograsso, 107</span>
+</div>
+</div>
+<div class="pt-1 grid grid-cols-3 gap-2 border-t border-slate-100">
+<button class="min-h-[44px] flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold rounded-xl bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-blue-700 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px]">meeting_room</span>
+<span>Espaços</span>
+</button>
+<button class="min-h-[44px] flex items-center justify-center gap-1 px-2 py-2 text-xs font-medium rounded-xl bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 border border-slate-200 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px] text-slate-500">visibility</span>
+<span>Detalhes</span>
+</button>
+<button class="min-h-[44px] flex items-center justify-center gap-1 px-2 py-2 text-xs font-semibold rounded-xl bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-800 border border-amber-200/70 transition-colors" type="button">
+<span aria-hidden="true" class="material-symbols-outlined text-[17px] text-amber-700">edit</span>
+<span>Editar</span>
+</button>
+</div>
+</article>
+</section>
+<!-- Rodapé Institucional Sutil Antes da Barra Fixa -->
+<footer class="pt-3 pb-2 text-center" data-purpose="institutional-version-footer">
+<p class="text-[11px] font-medium tracking-wide text-slate-400">
+        PRODUÇÃO · v1.1.0 · build 82d569b
+      </p>
+<p class="text-[10px] text-slate-400 mt-0.5">
+        Agenda Regional SP · Congregação Cristã no Brasil
+      </p>
+</footer>
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: BottomNavigation -->
+<!-- Barra de navegação inferior fixa com 5 abas canônicas e aba 'Mais' ativa -->
+<nav aria-label="Navegação Principal" class="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/80 shadow-[0_-4px_12px_rgba(0,0,0,0.03)]">
+<div class="max-w-md mx-auto grid grid-cols-5 px-1 pb-[env(safe-area-inset-bottom,8px)] pt-1">
+<!-- 1. Minha Agenda -->
+<a class="min-h-[48px] flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 transition-colors group" href="#minha-agenda">
+<span aria-hidden="true" class="material-symbols-outlined text-[22px] group-hover:scale-105 transition-transform">event_note</span>
+<span class="text-[10px] font-medium tracking-tight mt-0.5">Agenda</span>
+</a>
+<!-- 2. Eventos -->
+<a class="min-h-[48px] flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 transition-colors group" href="#eventos">
+<span aria-hidden="true" class="material-symbols-outlined text-[22px] group-hover:scale-105 transition-transform">confirmation_number</span>
+<span class="text-[10px] font-medium tracking-tight mt-0.5">Eventos</span>
+</a>
+<!-- 3. Calendário -->
+<a class="min-h-[48px] flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 transition-colors group" href="#calendario">
+<span aria-hidden="true" class="material-symbols-outlined text-[22px] group-hover:scale-105 transition-transform">calendar_month</span>
+<span class="text-[10px] font-medium tracking-tight mt-0.5">Calendário</span>
+</a>
+<!-- 4. Convocações -->
+<a class="min-h-[48px] flex flex-col items-center justify-center text-slate-400 hover:text-slate-600 transition-colors group" href="#convocacoes">
+<span aria-hidden="true" class="material-symbols-outlined text-[22px] group-hover:scale-105 transition-transform">notifications</span>
+<span class="text-[10px] font-medium tracking-tight mt-0.5">Convocações</span>
+</a>
+<!-- 5. Mais (Ativo) -->
+<a aria-current="page" class="min-h-[48px] flex flex-col items-center justify-center text-[#002B5C] relative font-semibold group" href="#mais">
+<!-- Indicador de aba selecionada -->
+<span class="absolute top-0 w-8 h-0.5 bg-[#002B5C] rounded-full"></span>
+<span aria-hidden="true" class="material-symbols-outlined text-[22px] text-[#002B5C]">more_horiz</span>
+<span class="text-[10px] tracking-tight mt-0.5 text-[#002B5C]">Mais</span>
+</a>
+</div>
+</nav>
+<!-- END: BottomNavigation -->
+<!-- BEGIN: InteractiveHandlers -->
+<script data-purpose="search-filter-script">
+    // Filtro interativo simples e rápido em memória para os cards de locais
+    document.addEventListener('DOMContentLoaded', () => {
+      const searchInput = document.getElementById('search-input');
+      const cards = document.querySelectorAll('section[aria-label="Lista de locais cadastrados"] > article');
+
+      if (searchInput && cards.length) {
+        searchInput.addEventListener('input', (event) => {
+          const query = event.target.value.toLowerCase().trim();
+
+          cards.forEach((card) => {
+            const cardText = card.innerText.toLowerCase();
+            if (cardText.includes(query)) {
+              card.style.display = 'flex';
+            } else {
+              card.style.display = 'none';
+            }
+          });
+        });
+      }
+    });
+  </script>
+<!-- END: InteractiveHandlers -->
+</body></html>
