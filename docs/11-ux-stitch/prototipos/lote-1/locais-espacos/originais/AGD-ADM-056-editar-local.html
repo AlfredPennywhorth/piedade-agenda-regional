@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AGD-ADM-056 — Editar Local | Agenda Regional SP</title>
+<!-- Tailwind CSS v3 with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Google Material Symbols Outlined (Ícones estritamente neutros) -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<!-- Tailwind Configuration for Serenidade Cívica -->
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              navy: '#002B5C',       // Azul institucional CCB
+              primary: '#1e40af',    // Azul primário do tema
+              surface: '#faf8ff',    // Superfície clara do Serenidade Cívica
+              container: '#ffffff',
+              low: '#f2f3ff',
+              dim: '#d2d9f4',
+              accent: '#2563eb'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          borderRadius: {
+            civic: '0.5rem',
+          }
+        }
+      }
+    };
+  </script>
+<!-- BEGIN: Custom Styles -->
+<style data-purpose="typography">
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+      color: #1e293b;
+    }
+  </style>
+<style data-purpose="icons">
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      vertical-align: middle;
+    }
+  </style>
+<!-- END: Custom Styles -->
+</head>
+<body class="min-h-screen flex flex-col bg-slate-50 text-slate-800 antialiased">
+<!-- BEGIN: InstitutionalHeader -->
+<header class="bg-[#002B5C] text-white shadow-md select-none">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+<!-- Logo e Identificação Regional -->
+<div class="flex items-center space-x-3">
+<div class="w-9 h-9 rounded bg-white/10 flex items-center justify-center border border-white/20">
+<span class="material-symbols-outlined text-white text-2xl">apartment</span>
+</div>
+<div>
+<span class="font-bold text-lg tracking-tight block leading-tight">Agenda Regional SP</span>
+<span class="text-xs text-blue-200 uppercase tracking-wider font-medium">Congregação Cristã no Brasil</span>
+</div>
+</div>
+<!-- Informações do Usuário e Status -->
+<div class="flex items-center space-x-4">
+<div class="hidden md:flex flex-col text-right">
+<span class="text-xs font-semibold text-white">Administração Geral</span>
+<span class="text-[11px] text-blue-200">Regional Grande São Paulo</span>
+</div>
+<div class="w-9 h-9 rounded-full bg-blue-800 border border-blue-400/40 flex items-center justify-center font-semibold text-sm">
+          AD
+        </div>
+</div>
+</div>
+</header>
+<!-- END: InstitutionalHeader -->
+<!-- BEGIN: Breadcrumbs & System Status Bar -->
+<nav aria-label="Breadcrumb" class="bg-white border-b border-slate-200">
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-2">
+<!-- Trilha de Navegação -->
+<ol class="flex items-center space-x-2 text-xs sm:text-sm text-slate-500 font-medium">
+<li>
+<a class="hover:text-blue-700 transition-colors" href="#">Administração</a>
+</li>
+<li class="flex items-center text-slate-400">
+<span class="material-symbols-outlined text-base">chevron_right</span>
+</li>
+<li>
+<a class="hover:text-blue-700 transition-colors" href="#">Gestão Territorial</a>
+</li>
+<li class="flex items-center text-slate-400">
+<span class="material-symbols-outlined text-base">chevron_right</span>
+</li>
+<li>
+<a class="hover:text-blue-700 transition-colors" href="#">Locais</a>
+</li>
+<li class="flex items-center text-slate-400">
+<span class="material-symbols-outlined text-base">chevron_right</span>
+</li>
+<li aria-current="page" class="text-blue-900 font-semibold">
+          Editar Local
+        </li>
+</ol>
+<!-- Identificador Técnico de Tela -->
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200 text-xs font-mono font-medium">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        Tela AGD-ADM-056
+      </div>
+</div>
+</nav>
+<!-- END: Breadcrumbs & System Status Bar -->
+<!-- BEGIN: MainContent -->
+<main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<!-- Header do Formulário de Edição -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+<div class="flex items-center gap-3">
+<a class="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 rounded-full transition-colors" href="#" title="Retornar para a listagem">
+<span class="material-symbols-outlined">arrow_back</span>
+</a>
+<div>
+<h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            Editar Local
+          </h1>
+<p class="text-sm text-slate-500 mt-0.5">Atualize as informações cadastrais e de navegação deste local.</p>
+</div>
+</div>
+<!-- Ações rápidas superiores (opcional) -->
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span> Ativo no Cadastro
+        </span>
+</div>
+</div>
+<!-- Container Card Dedicado (Sem duplo scroll, layout fluido) -->
+<div class="bg-white rounded-xl shadow-sm border border-slate-200/90 overflow-hidden" data-purpose="edit-form-card">
+<form action="#" class="p-6 sm:p-8 space-y-8" id="form-editar-local" method="POST">
+<!-- BLOCO 1: Informações Básicas -->
+<section aria-labelledby="heading-bloco-1" class="space-y-4">
+<div class="border-b border-slate-200 pb-3 flex items-center justify-between">
+<h2 class="text-base font-semibold text-slate-900 flex items-center gap-2" id="heading-bloco-1">
+<span class="material-symbols-outlined text-blue-700">info</span>
+              Informações Básicas
+            </h2>
+<span class="text-xs text-slate-400">* Campos obrigatórios</span>
+</div>
+<div class="grid grid-cols-1 gap-4">
+<!-- Nome -->
+<div>
+<label class="block text-sm font-medium text-slate-700 mb-1.5" for="nome-local">
+                Nome <span class="text-red-500 font-bold">*</span>
+</label>
+<input class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm py-2.5 px-3" id="nome-local" name="nome-local" placeholder="Ex: Vila Prudente" required="" type="text" value="Vila Prudente"/>
+</div>
+</div>
+</section>
+<!-- BLOCO 2: Endereço -->
+<section aria-labelledby="heading-bloco-2" class="space-y-4">
+<div class="border-b border-slate-200 pb-3">
+<h2 class="text-base font-semibold text-slate-900 flex items-center gap-2" id="heading-bloco-2">
+<span class="material-symbols-outlined text-blue-700">place</span>
+              Endereço
+            </h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+<!-- CEP -->
+<div class="md:col-span-5">
+<label class="block text-sm font-medium text-slate-700 mb-1.5" for="cep-local">CEP</label>
+<div class="relative">
+<input class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm py-2.5 px-3" id="cep-local" name="cep-local" placeholder="00000-000" type="text" value="03127-001"/>
+</div>
+</div>
+<!-- Bairro -->
+<div class="md:col-span-7">
+<label class="block text-sm font-medium text-slate-700 mb-1.5" for="bairro-local">Bairro</label>
+<input class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm py-2.5 px-3" id="bairro-local" name="bairro-local" type="text" value="Vila Prudente"/>
+</div>
+<!-- Endereço (Logradouro) -->
+<div class="md:col-span-8">
+<label class="block text-sm font-medium text-slate-700 mb-1.5" for="endereco-local">
+                Endereço <span class="text-red-500 font-bold">*</span>
+</label>
+<input class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm py-2.5 px-3" id="endereco-local" name="endereco-local" required="" type="text" value="Rua Chamantá"/>
+</div>
+<!-- Número -->
+<div class="md:col-span-4">
+<label class="block text-sm font-medium text-slate-700 mb-1.5" for="numero-local">
+                Número <span class="text-red-500 font-bold">*</span>
+</label>
+<input class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm py-2.5 px-3" id="numero-local" name="numero-local" required="" type="text" value="970"/>
+</div>
+<!-- Complemento -->
+<div class="md:col-span-6">
+<label class="block text-sm font-medium text-slate-700 mb-1.5" for="complemento-local">Complemento</label>
+<input class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm py-2.5 px-3" id="complemento-local" name="complemento-local" placeholder="Ex: Sala 2, Bloco B" type="text" value=""/>
+</div>
+<!-- Referência -->
+<div class="md:col-span-6">
+<label class="block text-sm font-medium text-slate-700 mb-1.5" for="referencia-local">Referência</label>
+<input class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm py-2.5 px-3" id="referencia-local" name="referencia-local" placeholder="Ex: Próximo à estação do metrô" type="text" value=""/>
+</div>
+<!-- Cidade -->
+<div class="md:col-span-8">
+<label class="block text-sm font-medium text-slate-700 mb-1.5" for="cidade-local">
+                Cidade <span class="text-red-500 font-bold">*</span>
+</label>
+<input class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm py-2.5 px-3" id="cidade-local" name="cidade-local" required="" type="text" value="São Paulo"/>
+</div>
+<!-- UF -->
+<div class="md:col-span-4">
+<label class="block text-sm font-medium text-slate-700 mb-1.5" for="uf-local">
+                UF <span class="text-red-500 font-bold">*</span>
+</label>
+<input class="w-full uppercase rounded-md border-slate-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm py-2.5 px-3" id="uf-local" maxlength="2" name="uf-local" required="" type="text" value="SP"/>
+</div>
+</div>
+</section>
+<!-- BLOCO 3: Geolocalização & Navegação (Opcional) -->
+<section aria-labelledby="heading-bloco-3" class="space-y-4">
+<div class="border-b border-slate-200 pb-3 flex items-center justify-between">
+<h2 class="text-base font-semibold text-slate-900 flex items-center gap-2" id="heading-bloco-3">
+<span class="material-symbols-outlined text-blue-700">edit_location</span>
+              Geolocalização &amp; Navegação <span class="text-xs font-normal text-slate-500">(Opcional)</span>
+</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Latitude -->
+<div>
+<label class="block text-sm font-medium text-slate-700 mb-1.5" for="latitude-local">Latitude</label>
+<input class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm py-2.5 px-3 font-mono" id="latitude-local" name="latitude-local" type="text" value="-23,5793579"/>
+</div>
+<!-- Longitude -->
+<div>
+<label class="block text-sm font-medium text-slate-700 mb-1.5" for="longitude-local">Longitude</label>
+<input class="w-full rounded-md border-slate-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm py-2.5 px-3 font-mono" id="longitude-local" name="longitude-local" type="text" value="-46,590048"/>
+</div>
+<!-- URL Google Maps -->
+<div class="md:col-span-2">
+<label class="block text-sm font-medium text-slate-700 mb-1.5" for="url-gmaps">
+                URL Google Maps
+              </label>
+<div class="flex rounded-md shadow-sm">
+<span class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-slate-300 bg-slate-50 text-slate-500 text-sm">
+<span class="material-symbols-outlined text-base">navigation</span>
+</span>
+<input class="flex-1 min-w-0 block w-full rounded-none rounded-r-md border-slate-300 focus:border-blue-600 focus:ring-blue-600 text-sm py-2.5 px-3 text-slate-700" id="url-gmaps" name="url-gmaps" type="url" value="https://www.google.com/maps/place/Rua+Chamant%C3%A1,+970+-+Vila+Prudente,+SP"/>
+</div>
+</div>
+<!-- URL Waze -->
+<div class="md:col-span-2">
+<label class="block text-sm font-medium text-slate-700 mb-1.5" for="url-waze">
+                URL Waze
+              </label>
+<div class="flex rounded-md shadow-sm">
+<span class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-slate-300 bg-slate-50 text-slate-500 text-sm">
+<span class="material-symbols-outlined text-base">directions_car</span>
+</span>
+<input class="flex-1 min-w-0 block w-full rounded-none rounded-r-md border-slate-300 focus:border-blue-600 focus:ring-blue-600 text-sm py-2.5 px-3 text-slate-700" id="url-waze" name="url-waze" type="url" value="https://ul.waze.com/ul?from=place.ChIJBQFZ9AVczpQRHVd5_pmEwsk&amp;utm_campaign=waze_app"/>
+</div>
+</div>
+</div>
+<!-- Status do Local (Checkbox) -->
+<div class="pt-4 border-t border-slate-100">
+<label class="relative inline-flex items-center cursor-pointer select-none">
+<input checked="" class="w-4 h-4 text-blue-600 bg-slate-100 border-slate-300 rounded focus:ring-blue-500 focus:ring-2" id="local-ativo" name="local-ativo" type="checkbox"/>
+<span class="ml-2.5 text-sm font-medium text-slate-800">Local Ativo</span>
+</label>
+<p class="text-xs text-slate-500 ml-6 mt-0.5">Locais ativos ficam visíveis para seleção nas assembleias e reuniões regionais.</p>
+</div>
+</section>
+<!-- Ações do Rodapé do Formulário -->
+<div class="pt-6 border-t border-slate-200 flex flex-col-reverse sm:flex-row items-center justify-end gap-3" data-purpose="form-actions">
+<button class="w-full sm:w-auto px-5 py-2.5 rounded-md border border-slate-300 bg-white text-slate-700 font-medium text-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400 transition" type="button">
+            Cancelar
+          </button>
+<button class="w-full sm:w-auto px-6 py-2.5 rounded-md bg-[#1e40af] hover:bg-[#1e3a8a] text-white font-medium text-sm shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-700 transition flex items-center justify-center gap-1.5" type="submit">
+<span class="material-symbols-outlined text-base">check</span>
+            Salvar Local
+          </button>
+</div>
+</form>
+</div>
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: InstitutionalFooter -->
+<footer class="bg-white border-t border-slate-200 py-4 mt-auto">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+<div class="flex items-center space-x-2">
+<span class="font-medium text-slate-700">Agenda Regional SP</span>
+<span>•</span>
+<span>Congregação Cristã no Brasil</span>
+</div>
+<div class="flex items-center space-x-3 text-slate-400">
+<span>Build 2026.10.15.01</span>
+<span>•</span>
+<span>Versão 2.4.0</span>
+</div>
+</div>
+</footer>
+<!-- END: InstitutionalFooter -->
+</body></html>

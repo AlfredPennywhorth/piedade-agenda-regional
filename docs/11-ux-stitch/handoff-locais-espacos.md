@@ -13,7 +13,7 @@
 
 ## Proveniência das propostas avaliadas — rastreio de arquivos
 
-O PO enviou **cinco arquivos HTML como anexos de conversa** e **um HTML colado diretamente na conversa**, na rodada de 15/10/2026. As impressões SHA-256 abaixo identificam **bytes exatos** dos anexos recebidos (não são hashes de commits GitHub, nem significam que os arquivos foram versionados neste repositório). Conservar os anexos originais; qualquer regeneração pelo Stitch precisa de nova avaliação. A vinculação a URLs/IDs permanentes do projeto Stitch ainda deverá ser completada antes de encerrar o gate de rastreabilidade.
+Na rodada inicial de 15/10/2026, o PO enviou cinco anexos HTML e forneceu o AGD-ADM-057 como HTML colado na conversa. **Posteriormente, os seis arquivos HTML foram arquivados na branch da PR #328**, em `docs/11-ux-stitch/prototipos/lote-1/locais-espacos/originais/`, com nomes canônicos e manifesto SHA-256. A tabela a seguir registra a **proveniência histórica** (os nomes e hashes dos primeiros cinco anexos e da transcrição anterior do AGD-ADM-057); os tamanhos e hashes dos **seis arquivos GitHub** estão no `MANIFESTO-SHA256.json` da PR. Os hashes históricos não devem ser confundidos com os hashes do repositório. Conservar os originais; qualquer regeneração pelo Stitch exige nova avaliação. A vinculação a IDs/versões permanentes do projeto Stitch ainda deve ser completada.
 
 | Superfície | Arquivo de origem recebido | SHA-256 do arquivo original |
 |---|---|---|
@@ -24,7 +24,7 @@ O PO enviou **cinco arquivos HTML como anexos de conversa** e **um HTML colado d
 | AGD-ADM-058 Espaços | `Texto colado (5)(4).txt` | `13d689dbb0ac2b59efd89ffaf0838d85fb8913e2a0519456219692d8d8de98c6` |
 | AGD-ADM-057 detalhes | HTML integral fornecido novamente pelo PO na conversa em 15/10/2026, título `AGD-ADM-057 - Detalhes do Local`; cópia local de referência `agd-adm-057.html` | `4ffb09061992900bcff57190548c900b1e48329487acfb364dacfdb5d326d992` (hash da transcrição em arquivo UTF-8 com LF; não equivale a exportação imutável do Stitch) |
 
-**Situação de rastreabilidade:** as **seis propostas agora estão identificadas por SHA-256**, mas o P2 só estará **inteiramente resolvido** após arquivar os artefatos exatos em um endereço GitHub imutável (commit/blobs) ou registrar IDs de versão do Stitch. Hashes e nomes em conversa não constituem, por si, hospedagem recuperável. A referência AGD-ADM-057 é uma transcrição textual do conteúdo fornecido pelo PO, sem garantia de equivalência byte a byte ao eventual arquivo exportado. Não declarar o gate de rastreabilidade encerrado antes de validar os artefatos.
+**Situação de rastreabilidade (PR #328):** os **seis HTMLs já são recuperáveis** no commit `567dc4f1ad6871238e71fa7c552d63918055b9f8`, com tamanhos e SHA-256 no manifesto do sublote; a PR ainda aguarda revisão/merge para `develop`. O `AGD-ADM-057-detalhes-local.html` foi enviado posteriormente como arquivo e está arquivado: seu SHA-256 documenta os bytes **versionados**, mas não comprova equivalência byte a byte com a transcrição histórica da tabela nem com uma exportação anterior do Stitch. A etapa de custódia GitHub para este sublote está atendida na branch da PR, **sem encerrar automaticamente o Gate A integral** nem aprovar a implementação.
 
 ## Correções obrigatórias antes de qualquer implementação
 
