@@ -47,7 +47,7 @@ Se não houver pré-cadastro aproveitável e o procedimento institucional permit
 6. Use **Copiar link** ou **Enviar pelo WhatsApp**, quando houver celular válido, para encaminhá-lo **somente ao titular**.
 7. Oriente a pessoa a realizar a ativação antes do vencimento.
 
-O botão **Gerar ativação** é exibido quando o membro não possui conta de acesso. Para contas existentes, o sistema oferece outras ações conforme status e permissões; não utilize **Redefinir PIN** como substituto de uma ativação inicial.
+O botão **Gerar ativação** é exibido quando o membro não possui conta de acesso. Para contas existentes, o sistema oferece outras ações conforme status e permissões. **Exceção importante — ativação pendente:** a geração do primeiro link já pode criar uma conta em status `PENDENTE_ATIVACAO`. Se esse link expirar ou for perdido antes da conclusão, **Gerar ativação** não aparece mais. Nessa condição, o administrador autorizado pode selecionar **Redefinir PIN** para emitir um novo link individual de conclusão da ativação. Confira a identidade e o celular do titular antes de reemitir e encaminhe o link somente a ele. Essa operação não significa que o membro já definiu um PIN.
 
 **Segurança:** o link é individual, temporário e de uso único. Não publique em grupos, não encaminhe a terceiros e não solicite que o administrador escolha ou conheça o PIN do membro.
 
@@ -97,7 +97,7 @@ Em **Meu Cadastro** (`AGD-SHR-001`), o membro pode consultar nome, carteirinha, 
 | Pré-cadastro aparece como **Já vinculado** | Localizar o membro já criado |
 | Carteirinha ou celular não coincide | Corrigir os dados pelo fluxo administrativo autorizado antes de nova tentativa |
 | Membro não vê menu administrativo | Verificar permissões; ausência de menu não implica defeito |
-| Link expirou ou já foi usado | Solicitar análise e novo procedimento ao administrador; não reutilizar o link |
+| Link inicial expirou ou foi perdido com conta `PENDENTE_ATIVACAO` | Administrador autorizado deve confirmar identidade e usar **Redefinir PIN** para gerar novo link; não reutilizar o anterior |
 | PIN esquecido | Usar **Esqueci meu PIN** e seguir a recuperação supervisionada |
 | Conta bloqueada ou desativada | Encaminhar ao administrador com permissão para avaliar o status; não contornar o bloqueio |
 
