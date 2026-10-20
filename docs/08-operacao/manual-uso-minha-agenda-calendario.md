@@ -80,7 +80,8 @@ Para certos eventos de abrangência **NACIONAL** ou **INTERNACIONAL**, os detalh
 
 1. Abra o cartão do evento externo e confira o destino informado (cidade/UF ou país/cidade), a data, o horário e os demais detalhes.
 2. Se o convite estiver **pendente** e os comandos estiverem disponíveis, selecione **Confirmar** ou **Recusar** conforme sua decisão.
-3. Aguarde a resposta do sistema e confira o novo status antes de fechar os detalhes.
+3. Aguarde a confirmação do sistema. Após uma resposta bem-sucedida, a janela de detalhes **fecha automaticamente**.
+4. De volta à **Minha Agenda** ou ao **Calendário**, confira o **status atualizado no cartão do evento**. Se não aparecer, atualize a visualização antes de tentar novamente; não presuma que uma resposta repetida seja permitida.
 
 **Importante:** após confirmar ou recusar o convite nominal, **não é possível mudar a decisão pelos mesmos botões**. O sistema só aceita a resposta enquanto o convite está pendente. Se precisar corrigir uma decisão já registrada, procure o organizador/administrador; o manual não deve prometer uma alteração direta pelo convidado.
 
