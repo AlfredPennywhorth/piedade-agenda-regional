@@ -1,3 +1,5 @@
+import { CentralAjuda } from '../ajuda/CentralAjuda'
+import { obterArtigos } from '../ajuda/artigos'
 import { IdentificacaoVersao } from '../versao/VersaoPwa'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { IosInstallPrompt } from '../pwa/IosInstallPrompt'
@@ -58,10 +60,19 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
   const mostrarPessoas = capacidades?.podeAdministrarPessoas === true
   const mostrarFuncoes = capacidades?.podeAdministrarFuncoes === true
   const mostrarGestaoAgenda = capacidades?.podeGerirAgenda === true
+  const retornoAjudaRef = useRef<HTMLElement | null>(null)
+  const [assuntoAjuda, setAssuntoAjuda] = useState<string | null>(null)
+  const temAjudaContextual = obterArtigos(capacidades).some(a => a.id === currentTab)
   const [mostrarMais, setMostrarMais] = useState(false)
   const botaoMaisRef = useRef<HTMLButtonElement>(null)
   const conteudoPrincipalRef = useRef<HTMLElement>(null)
   const abaAnteriorRef = useRef(currentTab)
+
+  useEffect(() => {
+    const abrir = (event: Event) => { if (temAjudaContextual) { retornoAjudaRef.current = (event as CustomEvent<HTMLElement>).detail; setAssuntoAjuda(currentTab) } }
+    window.addEventListener('abrir-ajuda-contextual', abrir)
+    return () => window.removeEventListener('abrir-ajuda-contextual', abrir)
+  }, [currentTab, temAjudaContextual])
 
   const maisAtivo = mostrarMais || !['agenda', 'eventos', 'calendario', 'convocacoes'].includes(currentTab)
 
@@ -169,6 +180,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
             </button>
           </div>
         )}
+        {temAjudaContextual && <div className="px-4 pt-3 text-right"><button type="button" onClick={e => { retornoAjudaRef.current = e.currentTarget; setAssuntoAjuda(currentTab) }} className="rounded-lg border border-brand-700 px-3 py-2 text-sm font-semibold text-brand-800">Ajuda</button></div>}
         {children}
         <div
           className="px-4 pb-4 pt-2 text-right text-[10px] font-medium tracking-wide text-slate-400"
@@ -244,6 +256,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
                 </div>
               )}
 
+              <div><button type="button" onClick={() => { retornoAjudaRef.current = botaoMaisRef.current; setMostrarMais(false); setAssuntoAjuda('') }} className="w-full rounded-lg bg-slate-50 p-3 text-left">Central de Ajuda</button></div>
               <div>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Conta</h3>
                 <button type="button" onClick={() => navegar('cadastro')} className="w-full rounded-lg bg-slate-50 p-3 text-left">Meu Cadastro</button>
@@ -285,6 +298,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
         </div>
       </nav>
 
+      {assuntoAjuda !== null && <CentralAjuda capacidades={capacidades} assunto={assuntoAjuda} retornoFoco={retornoAjudaRef.current} onClose={() => { setAssuntoAjuda(null) }} />}
       <IosInstallPrompt />
     </div>
   )

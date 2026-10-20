@@ -1,3 +1,4 @@
+import { AjudaContextual } from '../ajuda/AjudaContextual'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, fetchWithAuth, postWithAuth } from '../../api/apiClient'
 
@@ -221,7 +222,7 @@ export function GerenciarAcessosPanel({
     <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50/40 p-4 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h4 className="font-semibold text-slate-900">Gerenciar acessos</h4>
+          <h4 className="font-semibold text-slate-900">Gerenciar acessos</h4><AjudaContextual />
           <p className="text-xs text-slate-600">
             Usuário Comum é o acesso padrão. Use esta área apenas para atribuir perfis especiais a {nomePessoa}.
           </p>

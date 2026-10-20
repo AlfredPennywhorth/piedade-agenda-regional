@@ -120,3 +120,12 @@ O formulário de Membros possui operações distintas: `AGD-ADM-035` no cadastro
 | AGD-ADM-058 | Gerenciar espaços de um local (inclui formulário inline) | AGD-ADM-013 |
 
 O diálogo de espaços (`AGD-ADM-058`) contém formulário e listagem no mesmo contexto. Uma evolução futura deverá distinguir operações de criar e editar Espaço se houver estados CRUD independentes; este código identifica somente a superfície atual. As confirmações nativas do navegador e demais operações permanecem pendentes no inventário global.
+
+
+## Central de Ajuda
+
+| Código | Superfície | Navegação |
+|---|---|---|
+| AGD-SHR-006 | Central de Ajuda pesquisável e artigo contextual | Mais → Central de Ajuda ou Ajuda na tela atual |
+
+Preserva a tela e os formulários de origem; códigos citados nos artigos identificam as telas documentadas, sem renumerá-las.
