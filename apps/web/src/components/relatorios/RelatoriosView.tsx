@@ -183,7 +183,7 @@ export function RelatoriosView() {
     try {
       const list = await apiClient.fetchWithAuth<ItemPresenca[]>(url)
       if (requisicao === requisicaoPresencas.current) setPresencas(list)
-    } catch (err: any) {
+    } catch {
       if (requisicao === requisicaoPresencas.current) {
         setPresencas([])
         setErroPresencas('Não foi possível atualizar a lista nominal. Tente novamente.')
