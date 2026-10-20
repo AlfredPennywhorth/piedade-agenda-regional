@@ -10,5 +10,19 @@
     "origem": "AGD-ADM-044-edicao-B-rebaixada.html",
     "sha256": "c5325cbd97f7437b4f5d596ca0de1a8ec8676b18a8e87e87ac0ebda201e8e68b",
     "bytes": 18234
+  },
+  {
+    "arquivo": "AGD-ADM-043-cadastro-referencia-main.html",
+    "origem": "main",
+    "sha256": "8b8e6694104017d1b49a0b2587b93073ce87ddb341d17e6fa954d3d9505eaed4",
+    "bytes": 21977,
+    "git_blob_sha": "30f20cc2a9cda2f8816d783bda5bf302d6ead251"
+  },
+  {
+    "arquivo": "AGD-ADM-044-edicao-referencia-main.html",
+    "origem": "main",
+    "sha256": "764999dc57c7a035ab21ee4dbb617267a524e87c24f281608ef4a69fb534a316",
+    "bytes": 21156,
+    "git_blob_sha": "6c3b1d4158bc1b66fc6d8afb508d9beaabe19366"
   }
 ]
