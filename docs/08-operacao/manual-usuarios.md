@@ -1,6 +1,6 @@
 # Manual operacional — Agenda Regional São Paulo
 
-> Versão inicial para usuários da produção v1.1.0 (build 6741936). Os nomes de botões e permissões podem variar por perfil. Este documento não substitui orientação institucional.
+> Rascunho operacional para validação antes da publicação; não presume versão/build atualmente implantados em produção. Os nomes de botões e permissões podem variar por perfil. Este documento não substitui orientação institucional.
 
 ## Acesso e primeiros passos
 
@@ -40,7 +40,7 @@ A autorização efetiva é determinada pelo backend e pelos vínculos do usuári
 - Ao relatar erro, informe **ambiente**, **versão/build**, **código da tela**, ação realizada e mensagem mostrada. Evite enviar dados pessoais ou PIN.
 - Antes de repetir uma operação que parece ter falhado, atualize a listagem e confira se o registro já foi criado.
 - A URL oficial é https://piedade-agenda-regional.pages.dev/ (sem prefixo `main`).
-- Antes de cargas grandes, confirme com o administrador que há backup válido do D1 e procedimento de recuperação.
+- Antes de cargas grandes ou operações de risco, solicite avaliação administrativa e técnica. O mecanismo de backup D1 por botão é apenas estudo futuro, não procedimento disponível no sistema.
 
 ## Pontos que exigem validação com usuários antes da publicação como manual definitivo
 
