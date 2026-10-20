@@ -44,9 +44,10 @@ A lista administrativa não deve ser confundida com a lista pessoal de compromis
 
 - Se o registro permitir, selecione **Editar**, revise os campos e confirme a gravação.
 - Quando a ocorrência pertence a uma série, a interface distingue **esta ocorrência** e alterações da série **desta em diante**. Leia a confirmação antes de salvar; não suponha que modificar um dia específico altere todos os outros.
-- **Cancelar Evento** pede confirmação. Se houver convocação em rascunho, o sistema indica que suas funções serão removidas e a convocação será cancelada. A ação não deve ser descrita como simples retorno da convocação a rascunho.
+- **Cancelar Evento** pede confirmação. Se houver convocação em **RASCUNHO**, o sistema indica que suas funções serão removidas e a convocação será cancelada. A ação não é um retorno da convocação a rascunho.
+- **Se houver convocação PUBLICADA, é obrigatório cancelar primeiro a convocação no módulo Convocações; só depois cancelar o evento.** Caso contrário, a API bloqueia o cancelamento do evento (conflito 409). Confira a situação da convocação antes de tentar.
 - Em eventos inativos cujo término ainda é futuro, a interface pode oferecer **Reativar Evento**. **A convocação cancelada não é reaberta automaticamente** na reativação.
-- Se não houver autorização ou o evento já estiver encerrado, alguns comandos não aparecem. Em erro de gravação, leia a mensagem exibida e não repita indiscriminadamente a ação.
+- A presença do comando **Editar** ou **Cancelar Evento** não garante que a operação será aceita: em evento **já encerrado**, os botões podem continuar visíveis para quem o gerencia, mas a API recusa a gravação/cancelamento por imutabilidade do evento passado (`EVENTO_PASSADO_IMUTAVEL`). Confira a data do evento e a mensagem retornada; não repita indiscriminadamente a ação. Falta de autorização também pode impedir operações.
 
 ## 5. Preparar convocação institucional
 
@@ -86,7 +87,8 @@ Cancelar uma convocação ou um evento é uma ação relevante; revise o alvo an
 4. Confira a prévia/validação exibida e salve.
 5. Na lista, utilize os filtros de séries **ativas/inativas/todas** e de **futuras/passadas/todas**.
 6. Ao editar uma série, a interface pede confirmação para aplicar a alteração no modo indicado; verifique o efeito sobre ocorrências antes de confirmar.
-7. Ao **inativar**, confirme qual série será afetada. Não trate inativar como apagar histórico nem como cancelamento automático de todas as convocações já publicadas.
+7. Antes de **inativar**, confira as ocorrências futuras: **qualquer convocação ativa vinculada (inclusive RASCUNHO ou PUBLICADA) impede a inativação da série**. Trate/cancele primeiro essas convocações, com as autorizações institucionais adequadas, e só então solicite a inativação. Se a API retornar `SERIE_COM_CONVOCACAO`, revise as ocorrências e seus vínculos; não tente contornar o bloqueio.
+8. Confirme qual série será afetada. Inativar não significa apagar histórico nem cancelar automaticamente convocações já publicadas.
 
 O filtro temporal considera a última ocorrência real da série. Um período nominal amplo pode não significar que haja reunião futura gerada.
 
