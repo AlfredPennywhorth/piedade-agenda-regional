@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Inclui develop entre os destinos elegíveis a revisões automáticas.
+# O CodeRabbit SEMPRE inclui também a branch padrão (main); base_branches não a exclui.
+# Atenção: a instalação informou que repositórios com menos de 10 estrelas
+# não recebem revisões automáticas atualmente. Usar @coderabbitai review manualmente
+# enquanto essa restrição estiver vigente; conferir cota/plano antes de solicitar.
+# Revisar PRs NÃO promove alterações a main e não dispara deploy por si só.
+# A promoção para main e os deploys continuam sujeitos à autorização humana.
+language: "pt-BR"
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: false
+  high_level_summary: false
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    base_branches:
+      - "^develop$"
+  path_instructions:
+    - path: "docs/08-operacao/**/*.md"
+      instructions: |
+        Confirme cada instrução operacional confrontando a interface React, a API e as permissões reais.
+        Priorize divergências de comportamento, rótulos exatos, escopo territorial, sincronização
+        de convocações, efeitos sobre sessões, concessão/revogação de acesso e LGPD.
+        Não sugira procedimentos que a tela ou a API não suportem.
+    - path: "apps/worker/src/**/*.ts"
+      instructions: |
+        Priorize autenticação, autorização e escopo de dados em cada rota.
+        Verifique alterações no D1/Drizzle, isolamento territorial e funções reservadas,
+        idempotência e efeitos de sincronização em convocações publicadas.
+        Solicite teste de regressão para alterações em permissões ou regras de negócio.
+    - path: "apps/web/src/**/*.{ts,tsx}"
+      instructions: |
+        Priorize comportamento responsivo sem rolagem horizontal, acessibilidade,
+        estados de erro/carregamento, filtros por escopo e coerência com validações da API.
+        Não trate protótipos do Google Stitch como código de produção.
