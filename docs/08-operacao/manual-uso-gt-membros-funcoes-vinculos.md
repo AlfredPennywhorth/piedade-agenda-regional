@@ -45,11 +45,17 @@ Cadastros de membros contêm dados pessoais. Pesquise e atualize apenas dentro d
 5. Quando houver pré-cadastro ministerial, **pesquise e selecione o pré-cadastro**, depois confirme Casa de Oração, carteirinha e celular, e finalize. O nome fornecido pelo pré-cadastro fica somente para leitura nesse fluxo.
 6. Se o procedimento institucional permitir **novo membro manual**, confira nome, data de ordenação, carteirinha, celular e Casa de Oração, usando a cascata Regional → Administração → Setor → Casa.
 7. Salve e confira a mensagem de retorno.
-8. Para cadastro existente, use **Editar**, revise e atualize apenas dados legitimamente corrigíveis.
+8. Para cadastro existente, use **Editar**, revise e atualize apenas dados legitimamente corrigíveis. **Trocar a Casa de Oração e reativar o membro não são edições meramente cadastrais:** siga as verificações da seção 4.2 antes de salvar.
 
 A alteração de Regional ou Administração no formulário limpa as seleções inferiores para evitar associação incoerente. A mudança de Setor também limpa a Casa selecionada. Confira o vínculo completo antes de salvar.
 
-**Exclusão:** a tela dispõe de ação de exclusão definitiva. A API exige ausência de **conta, convocações, vínculos manuais/legados ou outro histórico impeditivo**. **Exceção:** vínculos DCO criados automaticamente com origem `MEMBRO_AUTOMATICO` são removidos pela própria exclusão e **não bloqueiam sozinhos** a operação. Isso não autoriza apagar membro com histórico real. A confirmação é explícita; não trate esse comando como simples inativação nem o use para resolver duplicidade com histórico. Em recusa, solicite análise administrativa.
+**Exclusão:** a tela dispõe de ação de exclusão definitiva. A API exige ausência de **conta, convocações, vínculos manuais/legados ou outro histórico impeditivo**. **Exceção condicionada:** vínculos DCO com origem `MEMBRO_AUTOMATICO` podem ser removidos previamente pela própria exclusão **somente quando a função-base com código `DCO` estiver ativa e for localizada pelo sistema**. Se o Master tiver inativado a função DCO ou alterado seu código, essa limpeza não ocorre e até vínculos de origem automática podem bloquear a exclusão. Confirme o código e a situação da função-base com o Master antes de presumir que a exceção se aplica. Se o DCO automático foi editado, sua origem também pode ter deixado de ser automática (seção 6). Isso não autoriza apagar membro com histórico real. A confirmação é explícita; não trate esse comando como simples inativação nem o use para resolver duplicidade com histórico. Em recusa, solicite análise administrativa.
+
+### 4.2. Troca de Casa ou reativação: conferir impacto antes de salvar
+
+**Troca de Casa de Oração:** ao alterar a Casa de um membro, a API inativa os vínculos DCO ativos da Casa anterior e cria ou reaproveita um vínculo DCO ativo na Casa de destino. Ela também pode atualizar os destinatários de **convocações já publicadas** que ainda estejam vigentes. Para membro com conta, os acessos `USUARIO_COMUM` anteriores são revogados e um acesso no destino é concedido. **Antes de salvar**, confirme com os responsáveis das duas Casas a transferência, os vínculos DCO, a continuidade do acesso e as convocações em andamento. **Depois de salvar**, confira Casa de destino, acesso efetivo, vínculos ativos e listas de destinatários/RSVP de convocações vigentes. Não execute troca de Casa apenas para corrigir a exibição sem avaliar esses efeitos.
+
+**Reativação do membro:** mesmo sem mudar a Casa, passar o cadastro de **Inativo** para **Ativo** pode sincronizar imediatamente o DCO e incluir o membro em convocações `PUBLICADA` ainda vigentes. Confira as convocações da Casa antes e depois da reativação; o capítulo 7 explica por que o efeito não se restringe a futuras publicações.
 
 ### 4.1. Pré-cadastro não é ativação de acesso
 
@@ -80,7 +86,7 @@ A função cadastrada representa um tipo de atribuição, **não** uma pessoa es
 3. Escolha **Tipo de Escopo Institucional**: Regional, Administração, Setor, Casa de Oração ou Grupo de Trabalho.
 4. No seletor correspondente, informe a unidade/GT concreta. **Uma escolha de escopo exige a identificação da unidade**, não apenas o tipo.
 5. **Antes de salvar, confirme o código da Função com um Master**: a tela **Vínculos Funcionais** mostra apenas o **nome** da Função, que pode ser editado e não comprova seu código. Peça ao Master que abra **Funções → Detalhes** (ou **Editar**) e consulte o **Código** e a situação **Ativo/Inativo** do mesmo cadastro selecionado. Solicite confirmação expressa de que é ou não um dos códigos reservados da seção 5, registrando a autorização institucional para o membro, função e escopo quando aplicável. **Não presuma que uma função é comum pelo nome e não salve sem essa conferência**, inclusive ao editar ou reativar vínculos existentes.
-6. Para corrigir vínculo existente, abra **Editar**, confira pessoa, função, escopo e situação antes de clicar **Atualizar Vínculo**. **Atenção aos vínculos DCO automáticos:** editar qualquer vínculo com origem `MEMBRO_AUTOMATICO` faz a API redefinir a origem para `null`, mesmo quando a única alteração é marcar ou desmarcar **Ativo**. Ele deixa de ser tratado como vínculo automático e passa a ser considerado manual para a regra de exclusão de membros: a remoção automática de DCO descrita na seção 4 não será mais aplicável a esse vínculo, podendo bloquear a exclusão futura do cadastro. Antes de editar um DCO automático, valide a necessidade com o responsável institucional; não use **Editar** apenas para ajustar sua situação sem considerar esse efeito.
+6. Para corrigir vínculo existente, abra **Editar**, confira pessoa, função, escopo e situação antes de clicar **Atualizar Vínculo**. **Atenção aos vínculos DCO automáticos:** a tela **Vínculos Funcionais** não exibe o campo interno `origem`, portanto **não permite distinguir visualmente** DCO automático de DCO manual. **Trate todo vínculo DCO como potencialmente automático** e, se precisar saber sua origem real, solicite verificação técnica autorizada antes da edição. Editar qualquer vínculo com origem `MEMBRO_AUTOMATICO` faz a API redefinir a origem para `null`, mesmo quando a única alteração é marcar ou desmarcar **Ativo**. Ele deixa de ser tratado como vínculo automático e passa a ser considerado manual para a regra de exclusão de membros: a remoção automática de DCO descrita na seção 4 não será mais aplicável a esse vínculo, podendo bloquear a exclusão futura do cadastro. Antes de editar um DCO automático, valide a necessidade com o responsável institucional; não use **Editar** apenas para ajustar sua situação sem considerar esse efeito.
 
 ### 6.1. Consultar vínculos pela Função
 
@@ -119,14 +125,16 @@ Não use cadastro fictício de função para forçar inclusão de convidado exte
 | Função não está disponível no novo vínculo | Verificar se ela está ativa e se o perfil pode administrá-la |
 | Vínculo incorreto | Conferir pessoa, função e unidade antes de atualizar/inativar |
 | Filtro por GT desabilitado | Ler alerta de indisponibilidade temporária das participações |
-| Exclusão de membro recusada | Verificar conta, convocação, vínculos **manuais/legados** e histórico; DCO exclusivamente automático não bloqueia por si só |
+| Exclusão de membro recusada | Verificar conta, convocação, vínculos manuais/legados e histórico; mesmo DCO automático pode bloquear quando a função `DCO` está inativa/renomeada ou sua origem foi alterada |
 
 ## 9. Pendências para homologação editorial
 
 - [ ] Confirmar versão/build publicado e capturar telas reais com dados anonimizados.
 - [ ] Validar limites exatos de edição por escopo e perfil na API de Membros, Funções e Vínculos.
 - [ ] Validar o procedimento de confirmação do código da Função pelo Master antes de criar, editar ou reativar vínculos; registrar como dívida de UX a exibição do código e do alerta de privilégio na tela de Vínculos.
-- [ ] Verificar em produção os rótulos de criação/edição de Funções e o tratamento de função-base **Diácono Casa de Oração**.
+- [ ] Verificar em produção os rótulos de criação/edição de Funções e o tratamento de função-base **Diácono Casa de Oração**, inclusive código `DCO`, situação ativa e exclusão condicionada.
+- [ ] Conferir os efeitos da troca de Casa sobre DCO, acesso `USUARIO_COMUM` e convocações; testar reativação com eventos ainda vigentes em homologação, sem usar dados produtivos para testes.
+- [ ] Registrar como dívida de UX a falta do indicador de origem automática/manual em Vínculos Funcionais.
 - [ ] Validar com secretaria as condições de cadastro manual e origem/atualização de pré-cadastro ministerial.
 - [ ] Conferir em perfis autorizados os efeitos de inclusão, reativação, edição e inativação de vínculo/DCO sobre **convocações já publicadas** e futuras, preservando o snapshot histórico.
 - [ ] Documentar em subcapítulo próprio as telas de **participações em GT**, após localização e auditoria dos respectivos controles.
