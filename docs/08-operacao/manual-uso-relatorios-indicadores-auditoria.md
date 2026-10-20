@@ -18,7 +18,7 @@ A interface `RelatoriosView` oferece **Relatório do Evento**, **Presenças** e 
 2. Pesquise pelo nome e selecione a reunião na lista disponível.
 3. Acione **Buscar Relatório**.
 4. Confira indicadores, como convocados, respostas e presenças.
-5. Na relação nominal, utilize os filtros de **resposta RSVP**, **presente/ausente** e **nome**, conforme o objetivo da consulta.
+5. A relação nominal apresenta filtros de **resposta RSVP**, **presente/ausente** e **nome**, mas **há uma limitação conhecida**: ao alterá-los, a consulta pode usar o valor anterior do filtro. Até a correção do frontend, não utilize o primeiro resultado filtrado como evidência definitiva; confirme a relação com uma nova consulta e confira os registros individualmente.
 
 A API consolida destinatários por membro em convocações publicadas ativas. Em eventos nacionais ou internacionais, a forma de obter convidados nominais e confirmações difere do fluxo territorial; não interprete a contagem como check-in de Portaria quando a operação de Portaria não se aplica.
 
@@ -56,7 +56,7 @@ Esse consolidado agrega **eventos territoriais institucionais com fechamento de 
 ## 3. Relatório Agregado e utilização de locais
 
 1. Abra **Relatórios → Relatório Agregado**.
-2. Defina **tipo de escopo**, **unidade**, **data inicial** e **data final**.
+2. Defina **tipo de escopo**, informe o campo técnico **ID do Escopo (UUID)** e escolha **data inicial** e **data final**. **Nesta tela ainda não há seletor de unidade**: o UUID deve ser obtido com a equipe administradora responsável pelo cadastro institucional, mediante conferência da unidade e autorização. Não tente adivinhar o identificador nem utilizar dados de outra unidade.
 3. Gere o relatório e confira totais e taxas por evento.
 4. Para analisar demanda por instalações, consulte a seção de **utilização de locais/espaços**, que usa o mesmo escopo e período.
 5. Caso precise compartilhar o levantamento de utilização, use **Exportar CSV**.
