@@ -1,5 +1,10 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-# Revisões automáticas das PRs destinadas à develop.
+# Inclui develop entre os destinos elegíveis a revisões automáticas.
+# O CodeRabbit SEMPRE inclui também a branch padrão (main); base_branches não a exclui.
+# Atenção: a instalação informou que repositórios com menos de 10 estrelas
+# não recebem revisões automáticas atualmente. Usar @coderabbitai review manualmente
+# enquanto essa restrição estiver vigente; conferir cota/plano antes de solicitar.
+# Revisar PRs NÃO promove alterações a main e não dispara deploy por si só.
 # A promoção para main e os deploys continuam sujeitos à autorização humana.
 language: "pt-BR"
 
