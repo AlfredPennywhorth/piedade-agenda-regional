@@ -42,7 +42,7 @@ vi.mock('../api/apiClient', async (importOriginal) => {
     await waitFor(() => expect(screen.queryByText('Antigo')).not.toBeInTheDocument())
     expect(urls.some(url => url.includes('busca=A'))).toBe(true)
     expect(urls.some(url => url.includes('busca=Atual'))).toBe(true)
-    fireEvent.change(screen.getByRole('combobox', { name: /todos status rsvp/i }), { target: { value: 'PARTICIPAREI' } })
+    fireEvent.change(screen.getByDisplayValue('Todos Status RSVP'), { target: { value: 'PARTICIPAREI' } })
     await waitFor(() => expect(urls.some(url => url.includes('statusRsvp=PARTICIPAREI') && url.includes('busca=Atual'))).toBe(true))
   })
 
