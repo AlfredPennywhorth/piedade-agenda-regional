@@ -71,7 +71,7 @@ A função cadastrada representa um tipo de atribuição, **não** uma pessoa es
 | `GESTOR_RELATORIOS` | Visualização/gestão de relatórios conforme escopo |
 | `AUDITOR_SISTEMA` | Acesso de auditoria conforme escopo |
 
-**Antes de criar, ativar ou alterar vínculo com esses códigos, obtenha autorização expressa do responsável institucional, confira pessoa e escopo e registre a justificativa pelo procedimento administrativo vigente.** Uma edição aparentemente cadastral pode conceder acesso a dados ou ações sensíveis imediatamente. Não crie funções reservadas ou cargos ministeriais artificiais para contornar permissões ou escopo de eventos nacionais/internacionais.
+**Antes de criar, ativar ou alterar vínculo com esses códigos, obtenha autorização expressa do responsável institucional, confira pessoa e escopo e registre a justificativa pelo procedimento administrativo vigente.** A mesma autorização é obrigatória **antes de alterar o código de uma Função para um código reservado ou reativar uma Função reservada já cadastrada**: consulte todos os vínculos existentes (inclusive os que já estavam ativos), verifique seus membros e escopos e avalie os acessos que serão concedidos **em conjunto**. A API calcula as capacidades pelo código e pela situação **atuais** da Função: uma única alteração no catálogo pode conceder imediatamente acesso sensível a várias pessoas vinculadas, mesmo sem editar qualquer vínculo. Se houver dúvida sobre os destinatários ou a autorização, **não salve** e encaminhe para validação administrativa. Não crie funções reservadas ou cargos ministeriais artificiais para contornar permissões ou escopo de eventos nacionais/internacionais.
 
 ## 6. Vincular um Membro a uma Função
 
