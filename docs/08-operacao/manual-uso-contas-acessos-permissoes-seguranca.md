@@ -74,11 +74,11 @@ Depois de alterar o status, atualize a consulta e confirme a situação efetiva.
 
 ## 7. Sessões de acesso
 
-**As operações administrativas de sessão são exclusivas do Master do Sistema:** **Sessões ativas** (listar dispositivos), **Revogar esta sessão** e **Revogar todas as sessões** exigem a capacidade `podeGerenciarSessoes`. Um administrador regional não pode executar nenhuma dessas ações, inclusive revogação total. A interface do Master exibe dispositivos identificados, criação e último uso; a API aplica a mesma restrição.
+**As operações administrativas de sessão são exclusivas do Master do Sistema:** **Sessões ativas** (listar dispositivos), **Revogar esta sessão** e **Revogar todas** (encerrar todas as sessões) exigem a capacidade `podeGerenciarSessoes`. Um administrador regional não pode executar nenhuma dessas ações, inclusive revogação total. A interface do Master exibe rótulos aproximados do dispositivo, inferidos das informações do navegador, além de criação e último uso; a API aplica a mesma restrição.
 
 1. Identifique o titular e confirme a legitimidade da solicitação.
-2. **Somente como Master**, para encerramento completo, use **Revogar todas as sessões**, confirme e informe que novos acessos poderão exigir login.
-3. Para revogação específica, quando autorizada, abra **Sessões ativas**, identifique o dispositivo e confirme **Revogar esta sessão**.
+2. **Somente como Master**, para encerramento completo, use **Revogar todas** para encerrar todas as sessões da conta, confirme a operação e informe que novos acessos poderão exigir login.
+3. Para revogação específica, quando autorizada, abra **Sessões ativas**, avalie o rótulo aproximado e as datas da sessão (sem presumir identidade física do dispositivo) e confirme **Revogar esta sessão**.
 4. Confira o resultado e registre a providência conforme o procedimento de suporte.
 
 A listagem de dispositivos pode exibir **Dispositivo não identificado** ou último uso indisponível; não atribua titularidade a um dispositivo apenas pelo rótulo técnico.
