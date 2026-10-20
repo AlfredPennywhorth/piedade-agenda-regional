@@ -15,7 +15,7 @@ const required = {
 }
 const sha = 'a'.repeat(40)
 
-function scenario({ base = 'develop', head = 'feature/x', actualSha = sha, expectedSha = sha, changes = [], fetchFails = false, omitDeclaration, output = false } = {}) {
+function scenario({ base = 'develop', head = 'feature/x', actualSha = sha, expectedSha = sha, changes = [], fetchFails = false, diffFails = false, omitDeclaration, output = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'agenda-preflight-'))
   const bin = join(dir, 'bin')
   mkdirSync(bin)
@@ -26,7 +26,11 @@ function scenario({ base = 'develop', head = 'feature/x', actualSha = sha, expec
     'const args = process.argv.slice(2)',
     'if (args[0] === "rev-parse") process.stdout.write(process.env.MOCK_ACTUAL_SHA)',
     'else if (args[0] === "fetch") process.exit(process.env.MOCK_FETCH_FAIL === "true" ? 1 : 0)',
-    'else if (args[0] === "diff") process.stdout.write(process.env.MOCK_CHANGED)',
+    'else if (args[0] === "diff") {',
+    '  if (process.env.MOCK_DIFF_FAIL === "true") process.exit(1)',
+    '  if (args.length !== 3 || args[1] !== "--name-only" || args[2] !== "origin/" + process.env.MOCK_BASE + "...HEAD") process.exit(3)',
+    '  process.stdout.write(process.env.MOCK_CHANGED)',
+    '}',
     'else if (args[0] === "branch") process.stdout.write(process.env.MOCK_HEAD)',
     'else process.exit(2)',
   ].join('\n') + '\n')
@@ -46,6 +50,8 @@ function scenario({ base = 'develop', head = 'feature/x', actualSha = sha, expec
       GITHUB_SHA: expectedSha,
       MOCK_ACTUAL_SHA: actualSha,
       MOCK_FETCH_FAIL: String(fetchFails),
+      MOCK_DIFF_FAIL: String(diffFails),
+      MOCK_BASE: base,
       MOCK_CHANGED: changes.join('\n'),
       MOCK_HEAD: head,
     }
@@ -89,6 +95,14 @@ test('checkout SHA differs from expected SHA', () => {
 })
 test('remote diff errors fail closed', () => {
   const r = scenario({ fetchFails: true, output: true })
+  assert.equal(r.status, 1)
+  assert.match(r.log, /Não foi possível calcular o diff remoto/)
+  assert.match(r.outputs, /worker_changed=true/)
+  assert.match(r.outputs, /web_changed=true/)
+  assert.match(r.outputs, /migration_changed=true/)
+})
+test('remote diff errors fail closed after successful fetch', () => {
+  const r = scenario({ diffFails: true, output: true })
   assert.equal(r.status, 1)
   assert.match(r.log, /Não foi possível calcular o diff remoto/)
   assert.match(r.outputs, /worker_changed=true/)
