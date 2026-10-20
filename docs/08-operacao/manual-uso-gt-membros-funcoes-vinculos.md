@@ -32,7 +32,7 @@ Cadastros de membros contêm dados pessoais. Pesquise e atualize apenas dentro d
 3. Use o filtro **Escopo** para a consulta de dados existentes; filtros de escopos históricos não significam que se possa criar novos GTs em qualquer nível.
 4. Para criar, clique **+ Novo Grupo**, informe o **Nome do Grupo**, selecione a **Regional vinculada** e confira **Grupo Ativo**.
 5. Confirme em **Salvar Grupo**.
-6. Para atualizar, use **Editar**, revise nome, Regional e situação e salve com **Atualizar Grupo**; **Detalhes** permite consulta.
+6. Para atualizar um **GT já vinculado a uma Regional**, use **Editar**, revise nome, Regional e situação e salve com **Atualizar Grupo**; **Detalhes** permite consulta. **GTs históricos de Administração ou Setor** podem constar no filtro, mas **não podem ser atualizados pelo formulário atual**, nem pelo Master: a API rejeita a edição de registros sem vínculo Regional. Encaminhe tais casos para tratamento administrativo/migração fora deste fluxo; não tente alterar o escopo pela tela.
 
 **Regra atual:** novos GTs são **exclusivamente Regionais**. Não cadastre GT subordinado a Administração ou Setor para representar participação local. A participação dos Setores ocorre por representantes; o capítulo de vínculos e a gestão específica de participantes devem manter essa distinção.
 
@@ -49,7 +49,7 @@ Cadastros de membros contêm dados pessoais. Pesquise e atualize apenas dentro d
 
 A alteração de Regional ou Administração no formulário limpa as seleções inferiores para evitar associação incoerente. A mudança de Setor também limpa a Casa selecionada. Confira o vínculo completo antes de salvar.
 
-**Exclusão:** a tela dispõe de ação de exclusão definitiva, mas o sistema só a permite para membro **sem conta, vínculos, convocação ou outro histórico relacionado**. A confirmação é explícita. Não trate esse comando como simples inativação nem o use para resolver registros duplicados com histórico. Qualquer tentativa recusada exige análise administrativa.
+**Exclusão:** a tela dispõe de ação de exclusão definitiva. A API exige ausência de **conta, convocações, vínculos manuais/legados ou outro histórico impeditivo**. **Exceção:** vínculos DCO criados automaticamente com origem `MEMBRO_AUTOMATICO` são removidos pela própria exclusão e **não bloqueiam sozinhos** a operação. Isso não autoriza apagar membro com histórico real. A confirmação é explícita; não trate esse comando como simples inativação nem o use para resolver duplicidade com histórico. Em recusa, solicite análise administrativa.
 
 ### 4.1. Pré-cadastro não é ativação de acesso
 
@@ -63,7 +63,15 @@ Concluir um pré-cadastro ministerial cria/regulariza o membro; isso não substi
 4. Confirme **Função Ativa** e utilize **Salvar Função**.
 5. Para manutenção, utilize **Detalhes** ou **Editar**, alterando somente o necessário e salvando em **Atualizar Função**.
 
-A função cadastrada representa um tipo de atribuição, **não** uma pessoa específica nem uma autorização irrestrita. Não crie cargos ministeriais artificiais para contornar escopo de eventos nacionais/internacionais.
+A função cadastrada representa um tipo de atribuição, **não** uma pessoa específica. **Atenção: algumas funções reservadas também concedem permissões operacionais quando há vínculo ativo no escopo aplicável:**
+
+| Código reservado | Acesso que pode conceder |
+|---|---|
+| `OPERADOR_PORTARIA` | Operação de Portaria |
+| `GESTOR_RELATORIOS` | Visualização/gestão de relatórios conforme escopo |
+| `AUDITOR_SISTEMA` | Acesso de auditoria conforme escopo |
+
+**Antes de criar, ativar ou alterar vínculo com esses códigos, obtenha autorização expressa do responsável institucional, confira pessoa e escopo e registre a justificativa pelo procedimento administrativo vigente.** Uma edição aparentemente cadastral pode conceder acesso a dados ou ações sensíveis imediatamente. Não crie funções reservadas ou cargos ministeriais artificiais para contornar permissões ou escopo de eventos nacionais/internacionais.
 
 ## 6. Vincular um Membro a uma Função
 
@@ -71,7 +79,7 @@ A função cadastrada representa um tipo de atribuição, **não** uma pessoa es
 2. Selecione o **Membro** e a **Função**. A criação normalmente apresenta funções ativas; ao editar um vínculo existente, sua função inativa pode continuar sendo mostrada para preservar o registro histórico.
 3. Escolha **Tipo de Escopo Institucional**: Regional, Administração, Setor, Casa de Oração ou Grupo de Trabalho.
 4. No seletor correspondente, informe a unidade/GT concreta. **Uma escolha de escopo exige a identificação da unidade**, não apenas o tipo.
-5. Confira a situação **Ativo** e salve.
+5. Confira a situação **Ativo** e o potencial de concessão de acesso da função (seção 5) **antes de salvar**. Se for função reservada, confirme a autorização institucional e o escopo.
 6. Para corrigir vínculo existente, abra **Editar**, confira pessoa, função, escopo e situação e clique **Atualizar Vínculo**.
 
 ### 6.1. Consultar vínculos pela Função
@@ -97,7 +105,9 @@ Uma convocação territorial pode selecionar destinatários por função e escop
 3. O organizador deve conferir a função selecionada no rascunho antes da publicação.
 4. **Convites nominais externos** seguem fluxo diferente, descrito nos capítulos M2.2 e M2.3.
 
-Não use cadastro fictício de função para forçar a inclusão de um convidado externo. Inativar ou alterar vínculos pode afetar elegibilidade de futuras convocações; valide o impacto com a secretaria.
+**Impacto imediato em convocações já publicadas:** criar, reativar ou editar um vínculo que fique **ativo** pode incluir imediatamente o membro como destinatário de convocações em status **PUBLICADA** cujo evento ainda não terminou. A sincronização também acontece quando o fluxo de cadastro manual ou de finalização de pré-cadastro cria automaticamente o vínculo DCO, **mesmo antes da ativação da conta de acesso**. Por outro lado, **inativar** um vínculo não remove retroativamente destinatários já materializados no retrato (snapshot) da convocação. Por isso, antes e depois de qualquer inclusão, edição ou inativação, a secretaria deve conferir **convocações vigentes e futuras**, destinatários e RSVP, além do escopo autorizado.
+
+Não use cadastro fictício de função para forçar inclusão de convidado externo. O processo de revisão de destinatários de convocação publicada deve seguir a governança institucional.
 
 ## 8. Problemas frequentes
 
@@ -109,7 +119,7 @@ Não use cadastro fictício de função para forçar a inclusão de um convidado
 | Função não está disponível no novo vínculo | Verificar se ela está ativa e se o perfil pode administrá-la |
 | Vínculo incorreto | Conferir pessoa, função e unidade antes de atualizar/inativar |
 | Filtro por GT desabilitado | Ler alerta de indisponibilidade temporária das participações |
-| Exclusão de membro recusada | Verificar existência de conta, vínculo ou histórico; não insistir sem análise |
+| Exclusão de membro recusada | Verificar conta, convocação, vínculos **manuais/legados** e histórico; DCO exclusivamente automático não bloqueia por si só |
 
 ## 9. Pendências para homologação editorial
 
@@ -117,7 +127,7 @@ Não use cadastro fictício de função para forçar a inclusão de um convidado
 - [ ] Validar limites exatos de edição por escopo e perfil na API de Membros, Funções e Vínculos.
 - [ ] Verificar em produção os rótulos de criação/edição de Funções e o tratamento de função-base **Diácono Casa de Oração**.
 - [ ] Validar com secretaria as condições de cadastro manual e origem/atualização de pré-cadastro ministerial.
-- [ ] Conferir os efeitos de inativação de membro, função, GT e vínculo nos destinatários de novas convocações.
+- [ ] Conferir em perfis autorizados os efeitos de inclusão, reativação, edição e inativação de vínculo/DCO sobre **convocações já publicadas** e futuras, preservando o snapshot histórico.
 - [ ] Documentar em subcapítulo próprio as telas de **participações em GT**, após localização e auditoria dos respectivos controles.
 - [ ] Evitar incluir credenciais ou dados pessoais nas capturas do manual.
 
