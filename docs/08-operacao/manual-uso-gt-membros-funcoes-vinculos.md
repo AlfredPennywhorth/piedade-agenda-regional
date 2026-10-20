@@ -79,7 +79,7 @@ A função cadastrada representa um tipo de atribuição, **não** uma pessoa es
 2. Selecione o **Membro** e a **Função**. A criação normalmente apresenta funções ativas; ao editar um vínculo existente, sua função inativa pode continuar sendo mostrada para preservar o registro histórico.
 3. Escolha **Tipo de Escopo Institucional**: Regional, Administração, Setor, Casa de Oração ou Grupo de Trabalho.
 4. No seletor correspondente, informe a unidade/GT concreta. **Uma escolha de escopo exige a identificação da unidade**, não apenas o tipo.
-5. Confira a situação **Ativo** e o potencial de concessão de acesso da função (seção 5) **antes de salvar**. Se for função reservada, confirme a autorização institucional e o escopo.
+5. **Antes de salvar, confirme o código da Função com um Master**: a tela **Vínculos Funcionais** mostra apenas o **nome** da Função, que pode ser editado e não comprova seu código. Peça ao Master que abra **Funções → Detalhes** (ou **Editar**) e consulte o **Código** e a situação **Ativo/Inativo** do mesmo cadastro selecionado. Solicite confirmação expressa de que é ou não um dos códigos reservados da seção 5, registrando a autorização institucional para o membro, função e escopo quando aplicável. **Não presuma que uma função é comum pelo nome e não salve sem essa conferência**, inclusive ao editar ou reativar vínculos existentes.
 6. Para corrigir vínculo existente, abra **Editar**, confira pessoa, função, escopo e situação e clique **Atualizar Vínculo**.
 
 ### 6.1. Consultar vínculos pela Função
@@ -125,6 +125,7 @@ Não use cadastro fictício de função para forçar inclusão de convidado exte
 
 - [ ] Confirmar versão/build publicado e capturar telas reais com dados anonimizados.
 - [ ] Validar limites exatos de edição por escopo e perfil na API de Membros, Funções e Vínculos.
+- [ ] Validar o procedimento de confirmação do código da Função pelo Master antes de criar, editar ou reativar vínculos; registrar como dívida de UX a exibição do código e do alerta de privilégio na tela de Vínculos.
 - [ ] Verificar em produção os rótulos de criação/edição de Funções e o tratamento de função-base **Diácono Casa de Oração**.
 - [ ] Validar com secretaria as condições de cadastro manual e origem/atualização de pré-cadastro ministerial.
 - [ ] Conferir em perfis autorizados os efeitos de inclusão, reativação, edição e inativação de vínculo/DCO sobre **convocações já publicadas** e futuras, preservando o snapshot histórico.
