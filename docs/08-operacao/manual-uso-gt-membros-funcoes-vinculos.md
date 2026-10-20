@@ -1,0 +1,147 @@
+# Manual de Uso — Grupos de Trabalho, Membros, Funções e Vínculos
+
+> **Rascunho M2.5, 20/10/2026, sujeito à validação do PO.** Base funcional: componentes da `main`. Confirmar versão/build e telas publicadas antes de distribuir. Nenhuma mudança funcional é proposta por este capítulo.
+
+## 1. Quatro conceitos que não devem ser confundidos
+
+| Cadastro | Para que serve |
+|---|---|
+| **Grupo de Trabalho (GT)** | Grupo institucional vinculado à **Regional**, com nome e situação ativa/inativa; os Setores participam por representantes |
+| **Membro** | Pessoa cadastrada, com identificação ministerial, Casa de Oração e contato institucional |
+| **Função** | Catálogo de atribuições disponíveis no sistema |
+| **Vínculo funcional** | Associação entre **Membro + Função + Escopo institucional**, ativa ou inativa |
+
+Uma pessoa pode ter mais de um vínculo; registrar um membro não o torna automaticamente integrante de todos os GTs nem cria convocação. Participação em GT e vínculo de função são conceitos relacionados, mas distintos.
+
+## 2. Permissões e proteção dos dados
+
+A navegação distingue capacidades efetivas:
+
+- **Grupos de Trabalho:** a aba depende de `podeAdministrarEstrutura`.
+- **Membros** e **Vínculos Funcionais:** as abas dependem de `podeAdministrarPessoas`.
+- **Funções:** a aba depende de `podeAdministrarFuncoes`.
+
+A API também valida permissão e escopo de cada escrita. Nem todo administrador territorial recebe automaticamente todas as capacidades. Caso não veja uma aba, solicite atendimento ao administrador competente, sem compartilhar sua conta.
+
+Cadastros de membros contêm dados pessoais. Pesquise e atualize apenas dentro da finalidade institucional; não divulgue listas, carteirinhas ou celulares em grupos públicos. Não cadastre data de nascimento — esse campo foi removido do fluxo.
+
+## 3. Grupos de Trabalho
+
+1. Abra **Grupos de Trabalho** na área de gestão, quando autorizado.
+2. Na listagem, consulte nome, escopo e situação **Ativo/Inativo**.
+3. Use o filtro **Escopo** para a consulta de dados existentes; filtros de escopos históricos não significam que se possa criar novos GTs em qualquer nível.
+4. Para criar, clique **+ Novo Grupo**, informe o **Nome do Grupo**, selecione a **Regional vinculada** e confira **Grupo Ativo**.
+5. Confirme em **Salvar Grupo**.
+6. Para atualizar um **GT já vinculado a uma Regional**, use **Editar**, revise nome, Regional e situação e salve com **Atualizar Grupo**; **Detalhes** permite consulta. **GTs históricos de Administração ou Setor** podem constar no filtro, mas **não podem ser atualizados pelo formulário atual**, nem pelo Master: a API rejeita a edição de registros sem vínculo Regional. Encaminhe tais casos para tratamento administrativo/migração fora deste fluxo; não tente alterar o escopo pela tela.
+
+**Regra atual:** novos GTs são **exclusivamente Regionais**. Não cadastre GT subordinado a Administração ou Setor para representar participação local. A participação dos Setores ocorre por representantes; o capítulo de vínculos e a gestão específica de participantes devem manter essa distinção.
+
+## 4. Diretório de Membros
+
+1. Abra **Membros** (Diretório de Membros).
+2. Utilize **Filtrar membros por Setor** e **Buscar membro ou Casa**, que aceita nome, código de carteirinha, nome/código da Casa de Oração.
+3. Antes de cadastrar, confira se a pessoa já existe; **não crie duplicatas** por divergência de nome ou telefone.
+4. Clique **+ Cadastrar Membro**.
+5. Quando houver pré-cadastro ministerial, **pesquise e selecione o pré-cadastro**, depois confirme Casa de Oração, carteirinha e celular, e finalize. O nome fornecido pelo pré-cadastro fica somente para leitura nesse fluxo.
+6. Se o procedimento institucional permitir **novo membro manual**, confira nome, data de ordenação, carteirinha, celular e Casa de Oração, usando a cascata Regional → Administração → Setor → Casa.
+7. Salve e confira a mensagem de retorno.
+8. Para cadastro existente, use **Editar**, revise e atualize apenas dados legitimamente corrigíveis. **Trocar a Casa de Oração e reativar o membro não são edições meramente cadastrais:** siga as verificações da seção 4.2 antes de salvar.
+
+A alteração de Regional ou Administração no formulário limpa as seleções inferiores para evitar associação incoerente. A mudança de Setor também limpa a Casa selecionada. Confira o vínculo completo antes de salvar.
+
+**Exclusão:** a tela dispõe de ação de exclusão definitiva. A API exige ausência de **conta, convocações, vínculos manuais/legados ou outro histórico impeditivo**. **Exceção condicionada:** vínculos DCO com origem `MEMBRO_AUTOMATICO` podem ser removidos previamente pela própria exclusão **somente quando a função-base com código `DCO` estiver ativa e for localizada pelo sistema**. Se o Master tiver inativado a função DCO ou alterado seu código, essa limpeza não ocorre e até vínculos de origem automática podem bloquear a exclusão. Confirme o código e a situação da função-base com o Master antes de presumir que a exceção se aplica. Se o DCO automático foi editado, sua origem também pode ter deixado de ser automática (seção 6). Isso não autoriza apagar membro com histórico real. A confirmação é explícita; não trate esse comando como simples inativação nem o use para resolver duplicidade com histórico. Em recusa, solicite análise administrativa.
+
+### 4.2. Troca de Casa ou reativação: conferir impacto antes de salvar
+
+**Troca de Casa de Oração:** ao alterar a Casa de um membro, a API inativa os vínculos DCO ativos da Casa anterior e cria ou reaproveita um vínculo DCO ativo na Casa de destino. Ela também pode atualizar os destinatários de **convocações já publicadas** que ainda estejam vigentes. Para membro com conta, os acessos `USUARIO_COMUM` anteriores são revogados e um acesso no destino é concedido. **Antes de salvar**, confirme com os responsáveis das duas Casas a transferência, os vínculos DCO, a continuidade do acesso e as convocações em andamento. **Depois de salvar**, confira Casa de destino, acesso efetivo, vínculos ativos e listas de destinatários/RSVP de convocações vigentes. Não execute troca de Casa apenas para corrigir a exibição sem avaliar esses efeitos.
+
+**Reativação do membro:** mesmo sem mudar a Casa, passar o cadastro de **Inativo** para **Ativo** pode sincronizar imediatamente o DCO e incluir o membro em convocações `PUBLICADA` ainda vigentes. Confira as convocações da Casa antes e depois da reativação; o capítulo 7 explica por que o efeito não se restringe a futuras publicações.
+
+### 4.1. Pré-cadastro não é ativação de acesso
+
+Concluir um pré-cadastro ministerial cria/regulariza o membro; isso não substitui as etapas de **geração de link de ativação e criação do PIN**. Consulte `manual-uso-acesso-cadastro.md` para a sequência administrativa de ativação, reemissão do link pendente e entrega ao titular.
+
+## 5. Catálogo de Funções
+
+1. Abra **Funções**, quando autorizado.
+2. Consulte a lista por nome, código e situação.
+3. Use o cadastro de nova função apenas quando houver atribuição institucional aprovada; preencha nome/código/descrição conforme campos e validações exibidos.
+4. Confirme **Função Ativa** e utilize **Salvar Função**.
+5. Para manutenção, utilize **Detalhes** ou **Editar**, alterando somente o necessário e salvando em **Atualizar Função**.
+
+A função cadastrada representa um tipo de atribuição, **não** uma pessoa específica. **Atenção: algumas funções reservadas também concedem permissões operacionais quando há vínculo ativo no escopo aplicável:**
+
+| Código reservado | Acesso que pode conceder |
+|---|---|
+| `OPERADOR_PORTARIA` | Operação de Portaria |
+| `GESTOR_RELATORIOS` | Visualização/gestão de relatórios conforme escopo |
+| `AUDITOR_SISTEMA` | Acesso de auditoria conforme escopo |
+
+**Antes de criar, ativar ou alterar vínculo com esses códigos, obtenha autorização expressa do responsável institucional, confira pessoa e escopo e registre a justificativa pelo procedimento administrativo vigente.** A mesma autorização é obrigatória **antes de alterar o código de uma Função para um código reservado ou reativar uma Função reservada já cadastrada**: consulte todos os vínculos existentes (inclusive os que já estavam ativos), verifique seus membros e escopos e avalie os acessos que serão concedidos **em conjunto**. A API calcula as capacidades pelo código e pela situação **atuais** da Função: uma única alteração no catálogo pode **conceder ou revogar imediatamente** acesso sensível a várias pessoas vinculadas, mesmo sem editar qualquer vínculo. **A mesma autorização, conferência coletiva dos vínculos e análise de impacto são obrigatórias antes de desmarcar Função Ativa ou trocar o código de uma Função reservada por outro código**: essas ações podem interromper de uma vez o acesso à Portaria, aos Relatórios ou à Auditoria de todos os membros vinculados. Combine previamente com os responsáveis a continuidade das atividades e confira os acessos afetados após a mudança. Se houver dúvida sobre os destinatários ou a autorização, **não salve** e encaminhe para validação administrativa. Não crie funções reservadas ou cargos ministeriais artificiais para contornar permissões ou escopo de eventos nacionais/internacionais.
+
+## 6. Vincular um Membro a uma Função
+
+1. Abra **Vínculos Funcionais** e escolha **+ Novo Vínculo**.
+2. Selecione o **Membro** e a **Função**. A criação normalmente apresenta funções ativas; ao editar um vínculo existente, sua função inativa pode continuar sendo mostrada para preservar o registro histórico.
+3. Escolha **Tipo de Escopo Institucional**: Regional, Administração, Setor, Casa de Oração ou Grupo de Trabalho.
+4. No seletor correspondente, informe a unidade/GT concreta. **Uma escolha de escopo exige a identificação da unidade**, não apenas o tipo.
+5. **Antes de salvar, confirme o código da Função com um Master**: a tela **Vínculos Funcionais** mostra apenas o **nome** da Função, que pode ser editado e não comprova seu código. Peça ao Master que abra **Funções → Detalhes** (ou **Editar**) e consulte o **Código** e a situação **Ativo/Inativo** do mesmo cadastro selecionado. Solicite confirmação expressa de que é ou não um dos códigos reservados da seção 5, registrando a autorização institucional para o membro, função e escopo quando aplicável. **Não presuma que uma função é comum pelo nome e não salve sem essa conferência**, inclusive ao editar ou reativar vínculos existentes.
+6. Para corrigir vínculo existente, abra **Editar**, confira pessoa, função, escopo e situação antes de clicar **Atualizar Vínculo**. **Atenção aos vínculos DCO automáticos:** a tela **Vínculos Funcionais** não exibe o campo interno `origem`, portanto **não permite distinguir visualmente** DCO automático de DCO manual. **Trate todo vínculo DCO como potencialmente automático** e, se precisar saber sua origem real, solicite verificação técnica autorizada antes da edição. Editar qualquer vínculo com origem `MEMBRO_AUTOMATICO` faz a API redefinir a origem para `null`, mesmo quando a única alteração é marcar ou desmarcar **Ativo**. Ele deixa de ser tratado como vínculo automático e passa a ser considerado manual para a regra de exclusão de membros: a remoção automática de DCO descrita na seção 4 não será mais aplicável a esse vínculo, podendo bloquear a exclusão futura do cadastro. Antes de editar um DCO automático, valide a necessidade com o responsável institucional; não use **Editar** apenas para ajustar sua situação sem considerar esse efeito.
+
+### 6.1. Consultar vínculos pela Função
+
+A tela atual organiza a lista **por Função**, com cartões expansíveis que mostram quantidade de **membros distintos**, vínculos e escopos. Assim, um membro pode aparecer em mais de uma atribuição ou em mais de um escopo.
+
+Os filtros disponíveis incluem:
+
+- **Buscar função ou membro**, por nome, função ou local.
+- **Situação**: ativos, inativos ou todos.
+- **Abrangência do vínculo**: Regional, Administração, Setor, Casa ou GT.
+- **Setor → Casa de Oração** em filtro dependente.
+- **Grupo de Trabalho**, quando dados de participações estiverem disponíveis.
+
+Se aparecer o alerta de **participações dos GTs indisponíveis**, a listagem de vínculos continua utilizável, mas o filtro por GT é desabilitado. Não interprete a ausência desse filtro como exclusão das participações.
+
+## 7. Relação com convocações
+
+Uma convocação territorial pode selecionar destinatários por função e escopo. Para a lista resultar corretamente:
+
+1. O membro precisa estar cadastrado e corretamente vinculado à sua Casa.
+2. A função e o vínculo institucional devem refletir a atribuição real.
+3. O organizador deve conferir a função selecionada no rascunho antes da publicação.
+4. **Convites nominais externos** seguem fluxo diferente, descrito nos capítulos M2.2 e M2.3.
+
+**Impacto imediato em convocações já publicadas:** criar, reativar ou editar um vínculo que fique **ativo** pode incluir imediatamente o membro como destinatário de convocações em status **PUBLICADA** cujo evento ainda não terminou. A sincronização também acontece quando o fluxo de cadastro manual ou de finalização de pré-cadastro cria automaticamente o vínculo DCO, **mesmo antes da ativação da conta de acesso**. Por outro lado, **inativar** um vínculo não remove retroativamente destinatários já materializados no retrato (snapshot) da convocação. Por isso, antes e depois de qualquer inclusão, edição ou inativação, a secretaria deve conferir **convocações vigentes e futuras**, destinatários e RSVP, além do escopo autorizado.
+
+Não use cadastro fictício de função para forçar inclusão de convidado externo. O processo de revisão de destinatários de convocação publicada deve seguir a governança institucional.
+
+## 8. Problemas frequentes
+
+| Situação | Verificação |
+|---|---|
+| Membro não localizado | Setor filtrado, grafia do nome, carteirinha, Casa e existência de pré-cadastro |
+| Casa não aparece no cadastro | Revisar a cascata Regional → Administração → Setor |
+| Membro criado, mas ainda sem acesso | O fluxo de ativação é separado do cadastro |
+| Função não está disponível no novo vínculo | Verificar se ela está ativa e se o perfil pode administrá-la |
+| Vínculo incorreto | Conferir pessoa, função e unidade antes de atualizar/inativar |
+| Filtro por GT desabilitado | Ler alerta de indisponibilidade temporária das participações |
+| Exclusão de membro recusada | Verificar conta, convocação, vínculos manuais/legados e histórico; mesmo DCO automático pode bloquear quando a função `DCO` está inativa/renomeada ou sua origem foi alterada |
+
+## 9. Pendências para homologação editorial
+
+- [ ] Confirmar versão/build publicado e capturar telas reais com dados anonimizados.
+- [ ] Validar limites exatos de edição por escopo e perfil na API de Membros, Funções e Vínculos.
+- [ ] Validar o procedimento de confirmação do código da Função pelo Master antes de criar, editar ou reativar vínculos; registrar como dívida de UX a exibição do código e do alerta de privilégio na tela de Vínculos.
+- [ ] Verificar em produção os rótulos de criação/edição de Funções e o tratamento de função-base **Diácono Casa de Oração**, inclusive código `DCO`, situação ativa e exclusão condicionada.
+- [ ] Conferir os efeitos da troca de Casa sobre DCO, acesso `USUARIO_COMUM` e convocações; testar reativação com eventos ainda vigentes em homologação, sem usar dados produtivos para testes.
+- [ ] Registrar como dívida de UX a falta do indicador de origem automática/manual em Vínculos Funcionais.
+- [ ] Validar com secretaria as condições de cadastro manual e origem/atualização de pré-cadastro ministerial.
+- [ ] Conferir em perfis autorizados os efeitos de inclusão, reativação, edição e inativação de vínculo/DCO sobre **convocações já publicadas** e futuras, preservando o snapshot histórico.
+- [ ] Documentar em subcapítulo próprio as telas de **participações em GT**, após localização e auditoria dos respectivos controles.
+- [ ] Evitar incluir credenciais ou dados pessoais nas capturas do manual.
+
+## 10. Fontes
+
+Componentes auditados na `main`: `apps/web/src/App.tsx`, `apps/web/src/components/grupos-trabalho/GruposTrabalhoView.tsx`, `apps/web/src/components/membros/MembrosView.tsx`, `apps/web/src/components/funcoes/FuncoesView.tsx` e `apps/web/src/components/vinculos-funcionais/VinculosFuncionaisView.tsx`.
+
+Complementos: `docs/08-operacao/manual-uso-acesso-cadastro.md`, `docs/08-operacao/manual-uso-gestao-eventos-convocacoes-series.md`. Protótipos Stitch são referências visuais, não fontes das regras.
