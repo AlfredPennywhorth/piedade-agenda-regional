@@ -16,8 +16,10 @@ O arquivamento não representa autorização para implementar, alterar funcional
 | AGD-ADM-008 | AGD-ADM-008-mobile.html | Listagem de Casas de Oração — mobile |
 | AGD-ADM-043 | AGD-ADM-043-cadastro.html | Formulário de cadastro de Casa de Oração |
 | AGD-ADM-044 | AGD-ADM-044-edicao.html | Formulário de edição de Casa de Oração |
+| AGD-ADM-043 | AGD-ADM-043-cadastro-referencia-main.html | Variante do cadastro preservada da `main` (não aprovada como implementação) |
+| AGD-ADM-044 | AGD-ADM-044-edicao-referencia-main.html | Variante da edição preservada da `main` (não aprovada como implementação) |
 
-**Total:** quatro protótipos distintos.
+**Total:** quatro protótipos principais e duas variantes preservadas da `main` para avaliação comparativa.
 
 Uma cópia duplicada do formulário AGD-ADM-044 foi identificada e excluída do conjunto destinado ao arquivamento.
 
@@ -68,7 +70,7 @@ Os arquivos originais devem permanecer preservados, sem alterações de conteúd
 
 - Confirmar a completude dos protótipos de Setores.
 - Validar o código AGD-ADM-041, que aparece em um protótipo de navegação denominado "Mais" e também como referência secundária em um arquivo de Casas de Oração.
-- Conferir os quatro protótipos de Casas de Oração com o inventário e o aceite visual condicionado.
+- Conferir os quatro protótipos principais e as duas variantes da `main` com o inventário e o aceite visual condicionado.
 - Atualizar a rastreabilidade do Gate A após a incorporação dos arquivos na branch `develop`.
 
 O protótipo do menu "Mais" deve permanecer separado desta pasta até a confirmação de seu código oficial.
@@ -77,7 +79,7 @@ O protótipo do menu "Mais" deve permanecer separado desta pasta até a confirma
 
 | Etapa | Situação |
 |---|---|
-| Identificação dos quatro protótipos | Concluída |
+| Identificação dos quatro protótipos principais e duas variantes | Concluída |
 | Identificação de duplicatas | Concluída |
 | Padronização dos nomes | Concluída |
 | Conferência com o inventário oficial | Pendente |
@@ -89,3 +91,12 @@ O protótipo do menu "Mais" deve permanecer separado desta pasta até a confirma
 **Classificação:** documentação de referência visual, sujeita às ressalvas do aceite condicionado.
 
 **Importante:** estes arquivos não devem ser tratados como código de produção nem substituir as especificações funcionais da aplicação.
+
+## Variantes preservadas da `main` — integridade
+
+| Arquivo | SHA-256 | Git blob SHA-1 |
+|---|---|---|
+| `AGD-ADM-043-cadastro-referencia-main.html` | `8b8e6694104017d1b49a0b2587b93073ce87ddb341d17e6fa954d3d9505eaed4` | `30f20cc2a9cda2f8816d783bda5bf302d6ead251` |
+| `AGD-ADM-044-edicao-referencia-main.html` | `764999dc57c7a035ab21ee4dbb617267a524e87c24f281608ef4a69fb534a316` | `6c3b1d4158bc1b66fc6d8afb508d9beaabe19366` |
+
+Hashes calculados sobre os bytes UTF-8 dos arquivos versionados. As variantes não alteram o aplicativo em produção.
