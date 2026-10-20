@@ -76,12 +76,15 @@ Se aparecer o aviso **Reconfirmar**, uma alteração relevante no evento exige u
 
 ## 5. Convites nominais para eventos externos
 
-Para certos eventos de abrangência **NACIONAL** ou **INTERNACIONAL**, os detalhes podem exibir um convite nominal com os comandos **Confirmar** e **Recusar**. Esse fluxo é diferente do RSVP por função/convocação descrito acima.
+Para certos eventos de abrangência **NACIONAL** ou **INTERNACIONAL**, os detalhes podem exibir um convite nominal. **Confirmar** e **Recusar** só aparecem enquanto o convite estiver com status **CONVIDADO** (pendente) e **antes do início do evento**. Esse fluxo é diferente do RSVP por função/convocação descrito acima.
 
-1. Abra o cartão do evento externo.
-2. Confira o destino informado, como cidade/UF ou país/cidade, e os demais detalhes.
-3. Selecione **Confirmar** ou **Recusar**, conforme sua decisão.
-4. Aguarde a resposta do sistema e confira o novo status.
+1. Abra o cartão do evento externo e confira o destino informado (cidade/UF ou país/cidade), a data, o horário e os demais detalhes.
+2. Se o convite estiver **pendente** e os comandos estiverem disponíveis, selecione **Confirmar** ou **Recusar** conforme sua decisão.
+3. Aguarde a resposta do sistema e confira o novo status antes de fechar os detalhes.
+
+**Importante:** após confirmar ou recusar o convite nominal, **não é possível mudar a decisão pelos mesmos botões**. O sistema só aceita a resposta enquanto o convite está pendente. Se precisar corrigir uma decisão já registrada, procure o organizador/administrador; o manual não deve prometer uma alteração direta pelo convidado.
+
+Uma participação com status **ATRIBUIDO** é apresentada como **Atribuição individual**, **sem botões de Confirmar ou Recusar**. Após o início do evento, esses comandos também deixam de estar disponíveis. Portanto, a ausência dos botões não indica necessariamente erro.
 
 Não confunda **convite nominal externo** com criação de um evento pessoal. Os dois tipos podem aparecer na agenda, mas possuem regras diferentes.
 
