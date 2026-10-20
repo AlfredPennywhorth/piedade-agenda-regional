@@ -86,6 +86,7 @@ export function RelatoriosView() {
   const [eventosLookup, setEventosLookup] = useState<EventoLookup[]>([])
   const [relatorioEvento, setRelatorioEvento] = useState<RelatorioEventoData | null>(null)
   const [presencas, setPresencas] = useState<ItemPresenca[]>([])
+  const requisicaoPresencas = useRef(0)
   const [loadingEvento, setLoadingEvento] = useState(false)
   const [erroEvento, setErroEvento] = useState<string | null>(null)
 
@@ -151,7 +152,7 @@ export function RelatoriosView() {
     try {
       const data = await apiClient.fetchWithAuth<RelatorioEventoData>(`/relatorios/eventos/${eventoIdSelecionado}`)
       setRelatorioEvento(data)
-      await carregarPresencas(eventoIdSelecionado)
+      await carregarPresencas(eventoIdSelecionado, filtroRsvp, filtroPresente, buscaNome)
     } catch (err: any) {
       setErroEvento(err.message || 'Erro ao carregar relatório do evento.')
       setRelatorioEvento(null)
@@ -161,19 +162,20 @@ export function RelatoriosView() {
     }
   }
 
-  const carregarPresencas = async (evId: string) => {
+  const carregarPresencas = async (evId: string, rsvp: string, presente: string, nome: string) => {
+    const requisicao = ++requisicaoPresencas.current
     let url = `/relatorios/eventos/${evId}/presencas?`
     const params = new URLSearchParams()
-    if (filtroRsvp) params.append('statusRsvp', filtroRsvp)
-    if (filtroPresente) params.append('presente', filtroPresente)
-    if (buscaNome) params.append('busca', buscaNome)
+    if (rsvp) params.append('statusRsvp', rsvp)
+    if (presente) params.append('presente', presente)
+    if (nome) params.append('busca', nome)
     url += params.toString()
 
     try {
       const list = await apiClient.fetchWithAuth<ItemPresenca[]>(url)
-      setPresencas(list)
+      if (requisicao === requisicaoPresencas.current) setPresencas(list)
     } catch (err: any) {
-      console.error(err)
+      if (requisicao === requisicaoPresencas.current) console.error(err)
     }
   }
 
@@ -357,7 +359,7 @@ export function RelatoriosView() {
                     value={buscaNome}
                     onChange={(e) => {
                       setBuscaNome(e.target.value)
-                      carregarPresencas(eventoIdSelecionado)
+                      void carregarPresencas(eventoIdSelecionado, filtroRsvp, filtroPresente, e.target.value)
                     }}
                     className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm"
                   />
@@ -365,7 +367,7 @@ export function RelatoriosView() {
                     value={filtroRsvp}
                     onChange={(e) => {
                       setFiltroRsvp(e.target.value)
-                      carregarPresencas(eventoIdSelecionado)
+                      void carregarPresencas(eventoIdSelecionado, e.target.value, filtroPresente, buscaNome)
                     }}
                     className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm"
                   >
@@ -379,7 +381,7 @@ export function RelatoriosView() {
                     value={filtroPresente}
                     onChange={(e) => {
                       setFiltroPresente(e.target.value)
-                      carregarPresencas(eventoIdSelecionado)
+                      void carregarPresencas(eventoIdSelecionado, filtroRsvp, e.target.value, buscaNome)
                     }}
                     className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm"
                   >
