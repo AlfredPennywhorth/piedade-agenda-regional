@@ -21,7 +21,7 @@ As permissões são diferentes para **Locais/Espaços** e para **Estrutura Terri
 |---|---|---|---|
 | Consultar Locais | Pode acessar a tela | Pode acessar | Pode acessar |
 | Criar Local institucional | Apenas no **Setor da sua Casa de Oração** | Conforme seu escopo autorizado | Conforme autorização global |
-| Criar Espaço institucional | Apenas em **Local ativo criado pelo próprio membro** | Conforme seu escopo autorizado | Conforme autorização global |
+| Criar Espaço institucional | Apenas em **Local ativo de sua autoria**, desde que sua **Casa de Oração e seu Setor atuais estejam ativos** e o **Setor atual seja o mesmo do escopo do Local** | Conforme seu escopo autorizado | Conforme autorização global |
 | Editar ou inativar Local/Espaço | **Não permitido**, mesmo se o botão estiver visível (API retorna 403) | Permitido dentro dos limites de seu escopo | Conforme autorização global |
 | Gravar estrutura territorial | Não permitido | Somente perfil/escopo descrito na seção 5 | Permitido |
 
@@ -59,7 +59,7 @@ Na edição autorizada, **Local Ativo** registra a situação do cadastro, prese
 
 1. Na lista de Locais, clique em **Espaços** no local correto.
 2. A janela **Espaços do Local** lista os ambientes com nome, capacidade e status.
-3. Para adicionar, informe **Nome do Espaço** (obrigatório), capacidade e descrição quando aplicável.
+3. Para adicionar, informe **Nome do Espaço** (obrigatório), capacidade e descrição quando aplicável. Se for membro comum, confirme antes que o Local esteja ativo, seja de sua autoria, que sua Casa e seu Setor atuais estejam ativos e que esse Setor coincida com o escopo do Local; mudança posterior de Casa/Setor pode bloquear a criação (403).
 4. Marque ou desmarque **Espaço ativo** conforme a situação verificada.
 5. Clique em **+ Adicionar Espaço** e aguarde a resposta.
 6. **Somente gestores autorizados** podem modificar um Espaço existente: escolha **Editar**, atualize e clique em **Atualizar Espaço**. Para membro comum, a tentativa é recusada pela API mesmo que o comando permaneça visível.
