@@ -1,6 +1,6 @@
 # Manual de Uso — Acesso, pré-cadastro e ativação
 
-> **Rascunho para revisão do PO — 20/10/2026.** Base funcional: código de `main` examinado no commit `1dc2b49`. A versão/build efetivamente publicada na Cloudflare e capturas de tela ainda precisam ser validados. Este capítulo não altera procedimentos institucionais, permissões ou o sistema.
+> **Rascunho para revisão do PO — 20/10/2026.** Base funcional: código de `main` examinado no commit [`1dc2b49121b9040aded31c6ea7f1691bf5fade5c`](https://github.com/AlfredPennywhorth/piedade-agenda-regional/commit/1dc2b49121b9040aded31c6ea7f1691bf5fade5c). A versão/build efetivamente publicada na Cloudflare e capturas de tela ainda precisam ser validados. Este capítulo não altera procedimentos institucionais, permissões ou o sistema.
 
 ## 1. Antes do primeiro acesso: responsabilidades
 
