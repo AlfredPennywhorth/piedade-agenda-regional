@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { RelatoriosView } from '../components/relatorios/RelatoriosView'
 import * as apiClient from '../api/apiClient'
 
@@ -193,8 +193,11 @@ describe('S12 — RelatoriosView (Frontend)', () => {
     await waitFor(() => expect(resolverPrimeira).toBeDefined())
     fireEvent.change(campoNome, { target: { value: 'Atual' } })
     await screen.findByText('Atual')
-    resolverPrimeira?.([{ destinatarioId: 'dest-antigo', membroNome: 'Antigo', casaNome: 'Casa', respostaRsvp: 'PARTICIPAREI', presente: true }])
-    await waitFor(() => expect(screen.queryByText('Antigo')).not.toBeInTheDocument())
+    await act(async () => {
+      resolverPrimeira?.([{ destinatarioId: 'dest-antigo', membroNome: 'Antigo', casaNome: 'Casa', respostaRsvp: 'PARTICIPAREI', presente: true }])
+    })
+    expect(screen.getByText('Atual')).toBeInTheDocument()
+    expect(screen.queryByText('Antigo')).not.toBeInTheDocument()
     expect(urls.some(url => new URL(url, 'http://localhost').searchParams.get('busca') === 'A')).toBe(true)
     expect(urls.some(url => url.includes('busca=Atual'))).toBe(true)
     fireEvent.change(screen.getByDisplayValue('Todos Status RSVP'), { target: { value: 'PARTICIPAREI' } })
