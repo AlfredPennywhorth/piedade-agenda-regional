@@ -43,6 +43,8 @@ A seção **3. Convidados não cadastrados** oferece um fluxo diferente do check
 
 1. Se o evento e sua autorização permitirem, escolha **Gerar QR para convidados**.
 2. Disponibilize o QR de autocadastro ao convidado ou utilize **Copiar link** quando necessário, somente pelos canais destinados à reunião.
+
+**Atenção ao gerar novamente:** cada novo acionamento de **Gerar QR para convidados** revoga as credenciais anteriores desse evento. Links e QR já encaminhados deixam de funcionar. Evite gerar outro sem necessidade; se for indispensável, distribua o novo QR/link a todos os destinatários afetados.
 3. Aguarde a atualização da relação de convidados.
 4. Confira a identificação apresentada e acione **Validar presença** somente após confirmar o comparecimento.
 
@@ -66,8 +68,10 @@ O encerramento envolve **solicitação** e **confirmação**:
 
 1. O operador autorizado aciona **Solicitar encerramento** e confirma a intenção.
 2. A Portaria **permanece aberta** após a solicitação, até a confirmação do gestor da reunião.
-3. O responsável autorizado utiliza **Confirmar encerramento**, após conferir a relação de presentes, ausentes e convidados.
+3. **Outra pessoa autorizada, diferente de quem solicitou**, utiliza **Confirmar encerramento**, após conferir a relação de presentes, ausentes e convidados. Mesmo que um usuário tenha ambas as permissões, a API impede que confirme seu próprio pedido.
 4. A confirmação definitiva consolida os registros e revoga os acessos temporários vinculados à operação.
+
+**A confirmação exige duas pessoas distintas.** Se o mesmo membro tentar solicitar e confirmar, o sistema recusará a operação (`DUPLA_CONFIRMACAO_NECESSARIA`).
 
 **Não confunda solicitação com fechamento efetivo.** Solicitar não é autorização para abandonar a conferência de participantes; o gestor deve validar o resultado antes de confirmar.
 
@@ -94,7 +98,7 @@ Este capítulo não substitui o módulo específico de relatórios nem promete e
 
 | Ocorrência | Providência |
 |---|---|
-| Evento não aparece | Conferir autorização de Portaria, escopo e estado da reunião |
+| Evento não aparece | A lista padrão da Portaria exibe eventos **da data de hoje no fuso de São Paulo**; reuniões de outros dias não aparecem nessa tela. Se o evento é de hoje, conferir autorização, escopo e estado da reunião |
 | QR não aceito | Conferir se pertence ao destinatário de convocação publicada e ao evento correto |
 | Presença já registrada | Conferir lista, evitar duplicidade e retificar somente quando necessário |
 | Participante não encontrado | Verificar filtros, Casa e convocação; não cadastrar ficticiamente |
