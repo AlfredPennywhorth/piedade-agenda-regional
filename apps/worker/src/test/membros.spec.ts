@@ -933,7 +933,7 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
       VALUES ('paginado-1', 'Ana Paginação', 'PG-001', '${casaId}', 1),
              ('paginado-2', 'Zeca Paginação', 'PG-002', '${casaId2}', 1);
     `)
-    const primeira = await req('/api/v1/membros/paginados?pagina=1&limite=1&busca=Pagina')
+    const primeira = await req('/api/v1/membros/paginados?pagina=1&limite=1&busca=PG-')
     expect(primeira.status).toBe(200)
     const dados = await primeira.json() as { itens: MembroResponse[]; total: number; totalPaginas: number }
     expect(dados.total).toBeGreaterThanOrEqual(2)
