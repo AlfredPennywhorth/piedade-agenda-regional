@@ -438,7 +438,8 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     }
   })
   const alterarOrdenacaoEventos = (coluna: 'inicio' | 'titulo') => {
-    setOrdenacaoEventos(atual => atual === `${coluna}-asc` ? `${coluna}-desc` : `${coluna}-asc`)
+    setOrdenacaoEventos(atual => coluna === 'inicio'
+      ? (atual === 'inicio-asc' ? 'inicio-desc' : 'inicio-asc')\n      : (atual === 'titulo-asc' ? 'titulo-desc' : 'titulo-asc'))
   }
 
   const parseDatetimeLocal = (val: string) => {
