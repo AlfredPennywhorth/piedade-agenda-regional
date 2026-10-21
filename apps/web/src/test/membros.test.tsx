@@ -58,7 +58,22 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
 
   const mockEstrutura = (membros = mockMembros) => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
-      if (endpoint === '/membros') return membros
+      if (endpoint.startsWith('/membros/paginados?')) {
+        const params = new URLSearchParams(endpoint.split('?')[1])
+        const busca = (params.get('busca') || '').toLocaleLowerCase('pt-BR')
+        const setorId = params.get('setorId')
+        const pagina = Number(params.get('pagina') || 1)
+        const limite = Number(params.get('limite') || 50)
+        const filtrados = membros.filter(membro => {
+          const casa = mockCasas.find(c => c.id === membro.casaId)
+          if (setorId && !mockSetores.some(s => s.id === setorId && s.id === casa?.setorId)) return false
+          return !busca || membro.nome.toLocaleLowerCase('pt-BR').includes(busca)
+            || membro.codigoCarteirinha?.toLocaleLowerCase('pt-BR').includes(busca)
+            || (casa?.nome || '').toLocaleLowerCase('pt-BR').includes(busca)
+        })
+        return { itens: filtrados.slice((pagina - 1) * limite, pagina * limite), total: filtrados.length,
+          totalPaginas: Math.max(1, Math.ceil(filtrados.length / limite)) }
+      }
       if (endpoint === '/casas') return mockCasas
       if (endpoint === '/setores') return mockSetores
       if (endpoint === '/administracoes') return mockAdministracoes
