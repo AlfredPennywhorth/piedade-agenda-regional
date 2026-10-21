@@ -1396,12 +1396,12 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
                 <tr>
-                  <th className="px-6 py-4">
+                  <th className="px-6 py-4" aria-sort={ordenacaoEventos === 'titulo-asc' ? 'ascending' : ordenacaoEventos === 'titulo-desc' ? 'descending' : 'none'}>
                     <button type="button" onClick={() => alterarOrdenacaoEventos('titulo')} aria-label="Ordenar eventos por título" className="inline-flex items-center gap-1 hover:underline">
                       Título {ordenacaoEventos === 'titulo-asc' ? '↑' : ordenacaoEventos === 'titulo-desc' ? '↓' : '↕'}
                     </button>
                   </th>
-                  <th className="px-6 py-4">
+                  <th className="px-6 py-4" aria-sort={ordenacaoEventos === 'inicio-asc' ? 'ascending' : ordenacaoEventos === 'inicio-desc' ? 'descending' : 'none'}>
                     <button type="button" onClick={() => alterarOrdenacaoEventos('inicio')} aria-label="Ordenar eventos por início" className="inline-flex items-center gap-1 hover:underline">
                       Início {ordenacaoEventos === 'inicio-asc' ? '↑' : ordenacaoEventos === 'inicio-desc' ? '↓' : '↕'}
                     </button>
