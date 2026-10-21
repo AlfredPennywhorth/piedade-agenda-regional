@@ -927,4 +927,27 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     ).get(criado.id)).toBeUndefined()
   })
 
+  it('38. Paginação: respeita limite, total, filtros e ordem estável', async () => {
+    sqlite.exec(`
+      INSERT INTO membros (id, nome, codigo_carteirinha, casa_id, ativo)
+      VALUES ('paginado-1', 'Ana Paginação', 'PG-001', '${casaId}', 1),
+             ('paginado-2', 'Zeca Paginação', 'PG-002', '${casaId2}', 1);
+    `)
+    const primeira = await req('/api/v1/membros/paginados?pagina=1&limite=1&busca=Pagina')
+    expect(primeira.status).toBe(200)
+    const dados = await primeira.json() as { itens: MembroResponse[]; total: number; totalPaginas: number }
+    expect(dados.total).toBeGreaterThanOrEqual(2)
+    expect(dados.itens).toHaveLength(1)
+    expect(dados.totalPaginas).toBeGreaterThanOrEqual(2)
+    const setor = await req(`/api/v1/membros/paginados?setorId=${setorId}&limite=100`)
+    expect(setor.status).toBe(200)
+  })
+
+  it('39. Paginação: rejeita páginas e limites inválidos', async () => {
+    for (const params of ['pagina=0', 'pagina=-1', 'pagina=abc', 'limite=0', 'limite=101', 'limite=1.5']) {
+      const resposta = await req(`/api/v1/membros/paginados?${params}`)
+      expect(resposta.status).toBe(400)
+    }
+  })
+
 })
