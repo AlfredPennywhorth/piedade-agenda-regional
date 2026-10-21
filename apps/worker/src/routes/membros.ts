@@ -3,7 +3,7 @@ import { and, eq, inArray, or, sql, type AnyColumn } from 'drizzle-orm'
 import { acessosConta, administracoes, casas, contasAcesso, funcoes, membros, setores, tentativasAcesso, vinculosFuncionais } from '../db/schema'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { eMasterSistema, regionaisAdministradas, type ContextoPermissoes } from '../security/permissoes'
+import { eMasterSistema, regionaisAdministradas, obterEscoposTerritoriaisVisiveis, type ContextoPermissoes } from '../security/permissoes'
 import { listarVinculosVisiveis, prepararSincronizacaoConvocacoes, queriesSincronizacaoConvocacoes } from './vinculos_funcionais'
 import { executarOperacaoComAudit, executarOperacaoComAudits } from '../services/auditoria'
 import { queriesSincronizacaoDcoAtual } from '../services/sincronizacao-dco'
@@ -295,8 +295,15 @@ membrosRouter.get('/paginados', async (c) => {
   const busca = (c.req.query('busca') || '').trim().slice(0, 120).toLocaleLowerCase('pt-BR')
   const setorId = (c.req.query('setorId') || '').trim()
   const db = c.get('db')
-  const { visivel, completo } = escopoMembrosPaginados(c.get('contextoPermissoes'))
-  const where = and(visivel, setorId ? eq(casas.setorId, setorId) : undefined)
+  const contexto = c.get('contextoPermissoes')
+  const { visivel, completo } = escopoMembrosPaginados(contexto)
+  // Reutiliza a mesma autorização de /casas. Acesso ao membro via GT não
+  // concede acesso aos metadados da Casa dele, nem à filtragem pelo seu setor.
+  const territorios = await obterEscoposTerritoriaisVisiveis(db, contexto)
+  const casaVisivel = territorios.tudo
+    ? sql`1 = 1`
+    : emConjuntoJson(casas.id, [...territorios.casasIds])
+  const where = and(visivel, setorId ? and(casaVisivel, eq(casas.setorId, setorId)) : undefined)
 
   // D1 não oferece collation ICU pt-BR. Ordenamos só metadados autorizados no
   // runtime antes de recortar a página; os cadastros completos vêm apenas nela.
@@ -310,7 +317,8 @@ membrosRouter.get('/paginados', async (c) => {
   }[] = await db.select({
     id: membros.id, nome: membros.nome,
     codigoCarteirinha: sql<string | null>`case when ${completo} then ${membros.codigoCarteirinha} else null end`,
-    casaNome: casas.nome, casaCodigo: casas.codigo,
+    casaNome: sql<string | null>`case when ${casaVisivel} then ${casas.nome} else null end`,
+    casaCodigo: sql<string | null>`case when ${casaVisivel} then ${casas.codigo} else null end`,
   }).from(membros)
     .leftJoin(casas, eq(membros.casaId, casas.id))
     .leftJoin(setores, eq(casas.setorId, setores.id))

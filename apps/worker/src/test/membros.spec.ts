@@ -997,13 +997,38 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     for (const busca of ['SEGREDO-123', 'SEGREDO', 'FORA-999']) {
       expect(await listar(`busca=${busca}`)).toMatchObject({ itens: [], total: 0, totalPaginas: 1 })
     }
-    for (const busca of ['ÁLVARO', 'álvaro', 'Casa 1']) {
+    for (const busca of ['ÁLVARO', 'álvaro']) {
       const encontrado = await listar(`busca=${encodeURIComponent(busca)}`)
       expect(encontrado.total).toBe(1)
       expect(encontrado.itens).toEqual([dados.itens[0]])
     }
     sqlite.prepare("UPDATE casas SET codigo = 'CASA-CODIGO' WHERE id = ?").run(casaId)
-    expect((await listar('busca=CASA-CODIGO')).itens).toEqual([dados.itens[0]])
+    const casasAutorizadas = await req('/api/v1/casas')
+    const idsCasas = (await casasAutorizadas.json() as { id: string }[]).map(casa => casa.id)
+    expect(idsCasas.includes(casaId)).toBe(tipo !== 'GRUPO_TRABALHO')
+    for (const busca of ['Casa 1', 'CASA-CODIGO']) {
+      const resultado = await listar(`busca=${encodeURIComponent(busca)}`)
+      const esperado = tipo === 'GRUPO_TRABALHO' ? [] : [dados.itens[0]]
+      expect(resultado.itens).toEqual(esperado)
+      expect(resultado.total).toBe(esperado.length)
+    }
+    const porSetor = await listar(`setorId=${setorId}`)
+    expect(porSetor.itens).toEqual(tipo === 'GRUPO_TRABALHO' ? [] : [dados.itens[0]])
+    expect(porSetor.total).toBe(tipo === 'GRUPO_TRABALHO' ? 0 : 1)
+    if (tipo === 'GRUPO_TRABALHO') {
+      // Permissão territorial adicional permite pesquisar a Casa, mas não
+      // amplia os membros visíveis além do GT e do cadastro próprio.
+      sqlite.prepare(`INSERT INTO membros (id, nome, casa_id)
+        VALUES ('fora-do-gt-na-casa', 'Pessoa Sem GT', ?)`).run(casaId)
+      sqlite.prepare(`INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id)
+        VALUES ('territorio-extra', 'membros-auth-conta', 'GESTOR_AGENDA', 'CASA', ?)`).run(casaId)
+      for (const busca of ['Casa 1', 'CASA-CODIGO']) {
+        expect(await listar(`busca=${encodeURIComponent(busca)}`))
+          .toMatchObject({ itens: [dados.itens[0]], total: 1 })
+      }
+      expect(await listar(`setorId=${setorId}`)).toMatchObject({ itens: [dados.itens[0]], total: 1 })
+      expect(await listar('busca=Pessoa Sem GT')).toMatchObject({ itens: [], total: 0 })
+    }
     // O cadastro próprio continua completo e pesquisável, mesmo no perfil relatório.
     sqlite.prepare("UPDATE membros SET codigo_carteirinha = 'PROPRIO-123' WHERE id = 'membros-auth-membro'").run()
     const proprio = await listar('busca=PROPRIO-123')
