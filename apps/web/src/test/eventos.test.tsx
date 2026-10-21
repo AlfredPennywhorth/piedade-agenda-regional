@@ -71,17 +71,17 @@ describe('EventosView', () => {
     const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => url === '/eventos'
       ? [
-          { ...mockEventos[0], id: 'z', titulo: 'Zulu', inicioEm: '2026-10-13T10:00:00.000Z', fimEm: '2026-10-13T12:00:00.000Z' },
-          { ...mockEventos[0], id: 'a', titulo: 'Alfa', inicioEm: '2026-10-11T10:00:00.000Z', fimEm: '2026-10-11T12:00:00.000Z' },
+          { ...mockEventos[0], id: 'z', titulo: 'Zulu', inicioEm: '2026-10-11T10:00:00.000Z', fimEm: '2026-10-11T12:00:00.000Z' },
+          { ...mockEventos[0], id: 'a', titulo: 'Alfa', inicioEm: '2026-10-13T10:00:00.000Z', fimEm: '2026-10-13T12:00:00.000Z' },
           { ...mockEventos[0], id: 'm', titulo: 'Meio', inicioEm: '2026-10-12T10:00:00.000Z', fimEm: '2026-10-12T12:00:00.000Z' },
         ] : original(url))
     render(<EventosView />)
     await screen.findByText('Zulu')
     const titles = () => Array.from(document.querySelectorAll('tbody tr td:first-child'))
       .map(cell => cell.textContent?.trim())
-    expect(titles()).toEqual(['Alfa', 'Meio', 'Zulu'])
-    fireEvent.click(screen.getByRole('button', { name: 'Ordenar eventos por início' }))
     expect(titles()).toEqual(['Zulu', 'Meio', 'Alfa'])
+    fireEvent.click(screen.getByRole('button', { name: 'Ordenar eventos por início' }))
+    expect(titles()).toEqual(['Alfa', 'Meio', 'Zulu'])
     fireEvent.click(screen.getByRole('button', { name: 'Ordenar eventos por título' }))
     expect(titles()).toEqual(['Alfa', 'Meio', 'Zulu'])
     fireEvent.click(screen.getByRole('button', { name: 'Ordenar eventos por título' }))
