@@ -53,7 +53,7 @@ Estados transitórios de carregamento, confirmações nativas do navegador, perm
 - Eventos/Convocações/Séries: manual M2.3 e componentes/rotas correspondentes, incluindo autorização específica do acompanhamento RSVP.
 - GTs: manual M2.5 e `GruposTrabalhoView`.
 - Portaria e fluxos públicos: manual M2.7, `PortariaView`, `PortariaOperadorTemporarioView`, `CadastroConvidadoView` e fluxo de fechamento.
-- Relatórios/Auditoria: manual M2.8 e componentes atuais. O aviso antigo sobre filtros nominais usarem valores anteriores **não foi reproduzido**: o código atual passa os novos valores explicitamente para a consulta. O relatório agregado ainda usa UUID do escopo.
+- Relatórios/Auditoria: manual M2.8 e componentes atuais. O aviso antigo sobre filtros nominais usarem valores anteriores **não foi reproduzido**: o código atual passa os novos valores explicitamente para a consulta. O relatório agregado ainda usa UUID do escopo. Relatório Agregado e utilização de locais/espaços exigem Master ou gestor de relatórios autorizado para o escopo; ser organizador de um evento não basta. Regra cotejada nas duas rotas e em `eGestorRelatoriosAutorizadoParaEscopo`.
 - Avisos: `App.tsx` e `NotificacoesControl`. A tela configura a inscrição push do dispositivo e informa módulo em desenvolvimento; o texto não promete uma caixa de avisos de reuniões criada/alterada/cancelada.
 
 ## Verificação automatizada
