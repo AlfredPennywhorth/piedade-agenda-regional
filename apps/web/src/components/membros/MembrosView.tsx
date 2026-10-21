@@ -1,5 +1,5 @@
 import { AjudaContextual } from '../ajuda/AjudaContextual'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { ApiError, fetchWithAuth, patchWithAuth, postWithAuth } from '../../api/apiClient'
 import type { Regional } from '../regionais/RegionaisView'
@@ -53,6 +53,8 @@ export function MembrosView() {
   const [regionais, setRegionais] = useState<Regional[]>([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [erroTerritorial, setErroTerritorial] = useState<string | null>(null)
+  const [erroMembros, setErroMembros] = useState<string | null>(null)
   const [sucesso, setSucesso] = useState<string | null>(null)
 
   const [filtroSetorId, setFiltroSetorId] = useState('')
@@ -102,8 +104,9 @@ export function MembrosView() {
       setSetores(ordenarPorNome(setoresData))
       setAdministracoes(ordenarPorNome(administracoesData))
       setRegionais(ordenarPorNome(regionaisData))
+      setErroTerritorial(null)
     } catch (err: any) {
-      setErro(err.message || 'Erro ao carregar a estrutura territorial.')
+      setErroTerritorial(err.message || 'Erro ao carregar a estrutura territorial.')
     }
   }
 
@@ -126,15 +129,17 @@ export function MembrosView() {
       setMembros(resposta.itens)
       setTotalMembros(resposta.total)
       setTotalPaginasServidor(resposta.totalPaginas)
-      setErro(null)
+      setErroMembros(null)
     } catch (err: any) {
-      if (seq === consultaMembrosSeq.current) setErro(err.message || 'Erro ao carregar os membros.')
+      if (seq === consultaMembrosSeq.current) setErroMembros(err.message || 'Erro ao carregar os membros.')
     } finally {
       if (seq === consultaMembrosSeq.current) setLoading(false)
     }
   }
 
-  carregarMembrosAtual.current = carregarMembros
+  useLayoutEffect(() => {
+    carregarMembrosAtual.current = carregarMembros
+  })
 
   useEffect(() => { void carregarDados() }, [])
   useEffect(() => {
@@ -575,12 +580,16 @@ export function MembrosView() {
         </button>
       </div>
 
-      {erro && (
-        <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm flex justify-between items-center">
-          <span>{erro}</span>
-          <button onClick={() => setErro(null)} className="font-bold ml-2">✕</button>
+      {[
+        { origem: 'territorio', mensagem: erroTerritorial, limpar: () => setErroTerritorial(null) },
+        { origem: 'membros', mensagem: erroMembros, limpar: () => setErroMembros(null) },
+        { origem: 'operacao', mensagem: erro, limpar: () => setErro(null) },
+      ].map(({ origem, mensagem, limpar }) => mensagem && (
+        <div key={origem} role="alert" className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm flex justify-between items-center">
+          <span>{mensagem}</span>
+          <button onClick={limpar} aria-label={`Fechar erro de ${origem}`} className="font-bold ml-2">✕</button>
         </div>
-      )}
+      ))}
 
       {sucesso && (
         <div className="p-3 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-sm flex justify-between items-center">

@@ -1022,7 +1022,12 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     inserir.run('acento-b', 'álvaro', 'ORDEM-B', casaId)
     inserir.run('fora-grande', 'Álvaro Fora', 'LOTE-FORA', 'membros-auth-casa')
     const bindings: number[] = []
-    db = drizzle(sqlite, { schema, logger: { logQuery(_query, params) {
+    const paginasEnviadas: string[][] = []
+    db = drizzle(sqlite, { schema, logger: { logQuery(query, params) {
+      if (query.includes('as ordem')) {
+        const ordem = params.find(param => typeof param === 'string' && param.startsWith('["grande-'))
+        if (typeof ordem === 'string') paginasEnviadas.push(JSON.parse(ordem))
+      }
       bindings.push(params.length)
       if (params.length > 100) throw new Error('D1: too many SQL variables')
     } } })
@@ -1040,7 +1045,10 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     expect([...primeira.itens, ...segunda.itens, ...terceira.itens].map((i: any) => i.id))
       .toEqual(Array.from({ length: 125 }, (_, i) => `grande-${String(i).padStart(3, '0')}`))
     expect(primeira.itens[0]).toMatchObject({ codigoCarteirinha: 'LOTE-0' })
+    expect(paginasEnviadas.map(ids => ids.length)).toEqual([50, 50, 25])
+    expect(paginasEnviadas).toEqual([primeira, segunda, terceira].map(p => p.itens.map((i: MembroResponse) => i.id)))
     expect(await pagina(4, 'LOTE-')).toMatchObject({ itens: [], total: 125, totalPaginas: 3 })
+    expect(paginasEnviadas).toHaveLength(3)
     expect((await pagina(1, 'ORDEM-', 1)).itens.map((i: any) => i.id)).toEqual(['acento-a'])
     expect((await pagina(2, 'ORDEM-', 1)).itens.map((i: any) => i.id)).toEqual(['acento-b'])
     expect((await pagina(3, 'ORDEM-', 1)).itens.map((i: any) => i.id)).toEqual(['acento-z'])

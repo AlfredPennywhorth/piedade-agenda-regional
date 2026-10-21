@@ -299,7 +299,7 @@ membrosRouter.get('/paginados', async (c) => {
   const where = and(visivel, setorId ? eq(casas.setorId, setorId) : undefined)
 
   // D1 não oferece collation ICU pt-BR. Ordenamos só metadados autorizados no
-  // runtime antes de LIMIT/OFFSET; os cadastros completos vêm apenas na página.
+  // runtime antes de recortar a página; os cadastros completos vêm apenas nela.
   // CASE impede inclusive a pesquisa/inferência da carteirinha de relatório.
   const candidatos: {
     id: string
@@ -322,17 +322,18 @@ membrosRouter.get('/paginados', async (c) => {
   filtrados.sort((a, b) =>
     a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
   const total = filtrados.length
-  // A lista ordenada usa um único binding, inclusive com milhares de membros.
-  const ordem = JSON.stringify(filtrados.map(item => item.id))
+  // Envia ao D1 apenas os IDs da página (no máximo 100), em um binding.
+  const idsPagina = filtrados.slice(offset, offset + limite).map(item => item.id)
+  const ordem = JSON.stringify(idsPagina)
   const selecionados: (Pick<typeof membros.$inferSelect, keyof typeof membroPublico> & { completo: number })[] =
-    await db.select({ ...membroPublico, completo: sql<number>`${completo}` })
+    idsPagina.length === 0 ? [] : await db.select({ ...membroPublico, completo: sql<number>`${completo}` })
     .from(membros)
     .leftJoin(casas, eq(membros.casaId, casas.id))
     .leftJoin(setores, eq(casas.setorId, setores.id))
     .leftJoin(administracoes, eq(setores.administracaoId, administracoes.id))
     .innerJoin(sql`json_each(${ordem}) as ordem`, sql`ordem.value = ${membros.id}`)
     .where(where).orderBy(sql`cast(ordem.key as integer)`)
-    .limit(limite).offset(offset).all()
+    .all()
   const itens = selecionados.map(({ completo: cadastroCompleto, ...item }) => cadastroCompleto
     ? item : { id: item.id, nome: item.nome, casaId: item.casaId, ativo: item.ativo })
   return c.json({ itens, total, pagina, limite, totalPaginas: Math.max(1, Math.ceil(total / limite)) })

@@ -443,4 +443,53 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
     expect(screen.getByText('1 membros encontrados — exibindo 1 nesta página')).toBeInTheDocument()
   })
 
+  it.each(['/casas', '/setores', '/administracoes', '/regionais'])(
+    'preserva erro de %s após a lista paginada carregar e ser pesquisada', async endpointComFalha => {
+      mockEstrutura()
+      const buscar = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+      let carregarLista: ((value: unknown) => void) | undefined
+      let primeiraConsulta = true
+      vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint, options) => {
+        if (endpoint === endpointComFalha) throw new Error('Estrutura territorial indisponível')
+        if (endpoint.startsWith('/membros/paginados?') && primeiraConsulta) {
+          primeiraConsulta = false
+          return new Promise(resolve => { carregarLista = resolve })
+        }
+        return buscar(endpoint, options)
+      })
+      render(<MembrosView />)
+      expect(await screen.findByRole('alert')).toHaveTextContent('Estrutura territorial indisponível')
+      await waitFor(() => expect(carregarLista).toBeDefined())
+      await act(async () => {
+        carregarLista!({ itens: mockMembros, total: 2, totalPaginas: 1 })
+      })
+      expect(await screen.findByText('João da Silva')).toBeInTheDocument()
+      expect(screen.getByRole('alert')).toHaveTextContent('Estrutura territorial indisponível')
+      fireEvent.change(screen.getByLabelText(/Buscar membro ou Casa/i), { target: { value: 'Maria' } })
+      await waitFor(() => expect(screen.queryByText('João da Silva')).not.toBeInTheDocument())
+      expect(screen.getByRole('alert')).toHaveTextContent('Estrutura territorial indisponível')
+      fireEvent.click(screen.getByRole('button', { name: 'Fechar erro de territorio' }))
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    }
+  )
+
+  it('recupera o erro da lista sem apagar o erro territorial', async () => {
+    mockEstrutura()
+    const buscar = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    let falharLista = true
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint, options) => {
+      if (endpoint === '/casas') throw new Error('Falha territorial persistente')
+      if (endpoint.startsWith('/membros/paginados?') && falharLista) throw new Error('Falha na lista')
+      return buscar(endpoint, options)
+    })
+    render(<MembrosView />)
+    await screen.findByText('Falha na lista')
+    expect(screen.getAllByRole('alert')).toHaveLength(2)
+    falharLista = false
+    fireEvent.change(screen.getByLabelText(/Buscar membro ou Casa/i), { target: { value: 'Maria' } })
+    await screen.findByText('Maria Souza')
+    expect(screen.queryByText('Falha na lista')).not.toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Falha territorial persistente')
+  })
+
 })
