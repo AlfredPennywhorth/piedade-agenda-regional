@@ -108,8 +108,8 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
     })
 
     expect(screen.getByText('João da Silva')).toBeInTheDocument()
-    expect(screen.queryByText('Maria Souza')).not.toBeInTheDocument()
-    expect(screen.getByText('1 de 2 membros encontrados — exibindo 1 nesta página')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Maria Souza')).not.toBeInTheDocument())
+    expect(screen.getByText('1 membros encontrados — exibindo 1 nesta página')).toBeInTheDocument()
   })
 
   it('pagina listas extensas e mantém a pesquisa sobre todos os membros', async () => {
@@ -122,11 +122,11 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
     expect(screen.getByText('Membro 049')).toBeInTheDocument()
     expect(screen.queryByText('Membro 050')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Próxima' }))
-    expect(screen.getByText('Membro 050')).toBeInTheDocument()
+    expect(await screen.findByText('Membro 050')).toBeInTheDocument()
     expect(screen.queryByText('Membro 000')).not.toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/Buscar membro ou Casa/i), { target: { value: 'Membro 000' } })
-    expect(screen.getByText('Membro 000')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Próxima' })).not.toBeInTheDocument()
+    expect(await screen.findByText('Membro 000')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Próxima' })).not.toBeInTheDocument())
   })
 
   it('3. Vazio: exibe estado vazio sem registros', async () => {
@@ -329,7 +329,7 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
       if (endpoint === `/membros/${MEMBRO_1_ID}` && options?.method === 'DELETE') {
         return { message: 'Membro excluído', id: MEMBRO_1_ID } as any
       }
-      if (endpoint === '/membros') return [mockMembros[0]] as any
+      if (endpoint.startsWith('/membros/paginados?')) return { itens: [mockMembros[0]], total: 1, totalPaginas: 1 } as any
       if (endpoint === '/casas') return mockCasas as any
       if (endpoint === '/setores') return mockSetores as any
       if (endpoint === '/administracoes') return mockAdministracoes as any
