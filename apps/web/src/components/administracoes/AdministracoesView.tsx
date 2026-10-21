@@ -1,3 +1,4 @@
+import { AjudaContextual } from '../ajuda/AjudaContextual'
 import { useState, useEffect } from 'react'
 import { CreateAdministracaoSchema, UpdateAdministracaoSchema } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
@@ -256,7 +257,7 @@ export function AdministracoesView() {
       {/* Form de Criação / Edição */}
       {modoForm && (
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-md space-y-4">
-          <span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-039' : 'AGD-ADM-040'} className="block text-right text-[10px] font-medium tracking-wide text-slate-500">Tela {modoForm === 'criar' ? 'AGD-ADM-039' : 'AGD-ADM-040'}</span>
+          <AjudaContextual /><span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-039' : 'AGD-ADM-040'} className="block text-right text-[10px] font-medium tracking-wide text-slate-500">Tela {modoForm === 'criar' ? 'AGD-ADM-039' : 'AGD-ADM-040'}</span>
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <h3 className="font-bold text-slate-800 text-base">
               {modoForm === 'criar' ? 'Cadastrar Nova Administração' : 'Editar Administração'}
@@ -448,7 +449,7 @@ export function AdministracoesView() {
         <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200">
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-              <h3 className="font-bold text-slate-800 text-base">Detalhes da Administração</h3>
+              <h3 className="font-bold text-slate-800 text-base">Detalhes da Administração</h3><AjudaContextual />
               <button
                 onClick={() => setAdmDetalhe(null)}
                 className="text-slate-400 hover:text-slate-600 text-sm font-semibold"

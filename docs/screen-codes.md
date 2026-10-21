@@ -37,3 +37,12 @@ Os códigos abaixo são estáveis e devem ser usados por QA, suporte e manutenç
 - Redesign visual não altera o código da tela.
 - Novas telas devem receber código antes do merge.
 - Modais recebem código próprio apenas quando forem tratados como superfície independente de suporte/QA.
+
+
+## Central de Ajuda
+
+| Código | Superfície | Navegação |
+|---|---|---|
+| AGD-SHR-006 | Central de Ajuda pesquisável e artigo contextual | Mais → Central de Ajuda ou Ajuda na tela atual |
+
+Preserva a tela e os formulários de origem; códigos citados nos artigos identificam as telas documentadas, sem renumerá-las.
