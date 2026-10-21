@@ -1,6 +1,6 @@
 # Central de Ajuda e ajuda contextual
 
-Mais → Central de Ajuda abre a busca por assunto, palavras sem acentos ou código oficial. Nas telas prioritárias, Ajuda abre o artigo correspondente. Nos formulários e detalhes com código próprio, Ajuda desta tela mantém a mesma orientação do módulo. Fechar ajuda ou Escape retorna ao trabalho sem navegar, salvar ou limpar campos.
+Mais → Central de Ajuda abre a busca por assunto, palavras sem acentos ou código oficial. Nas telas prioritárias, Ajuda abre o artigo correspondente. Nos formulários e detalhes com código próprio, Ajuda desta tela mantém a mesma orientação do módulo. Dentro de um artigo ou de uma busca, **Voltar à Central de Ajuda** limpa a pesquisa e mostra todos os assuntos permitidos, mantendo o painel aberto. Os botões de Ajuda usam fundo azul escuro e texto branco. Fechar ajuda ou Escape retorna ao trabalho sem navegar, salvar ou limpar campos.
 
 O painel usa diálogo modal nativo: foco contido, fundo indisponível e retorno ao botão de origem. Pode rolar em telas pequenas. O código da Central é AGD-SHR-006; os identificadores anteriores permanecem inalterados.
 
@@ -8,6 +8,7 @@ O painel usa diálogo modal nativo: foco contido, fundo indisponível e retorno 
 
 Conteúdo editorial resumido em `apps/web/src/components/ajuda/artigos.ts`, derivado de:
 
+- `manual-uso-gestao-eventos-convocacoes-series.md`: Eventos e Convocações, incluindo criação, cancelamento, rascunho, publicação e RSVP.
 - `manual-uso-locais-espacos-territorio.md`: Regionais, Administrações, Setores, Casas e Locais/Espaços.
 - `manual-uso-gt-membros-funcoes-vinculos.md`: Membros, Funções e Vínculos.
 - `manual-uso-contas-acessos-permissoes-seguranca.md`: Contas/Acessos e sessões.
@@ -21,6 +22,7 @@ Conferência na implementação: `MainLayout.tsx`, `App.tsx`, componentes dos no
 | Como usar a ajuda | Todas as contas autenticadas |
 | Estrutura Territorial | podeAdministrarEstrutura |
 | Criação/edição de Regional | podeAdministrarRegionais, dentro do artigo territorial |
+| Eventos e Convocações | podeGerirAgenda |
 | Locais/Espaços | podeGerirAgenda |
 | Membros e Vínculos | podeAdministrarPessoas |
 | Funções | podeAdministrarFuncoes |
@@ -31,4 +33,4 @@ O filtro ocorre antes da busca e da seleção de artigos. Texto estático da apl
 
 ## Validação e integração
 
-Testes unitários de ajuda exercitam os nove contextos de aba no `MainLayout` com campos de teste, além de busca, ausência de resultados, capacidades, retorno de foco e fechamento. Eles rodam na etapa `pnpm test` da CI. O Playwright usa o formulário real de `LocaisView` em celular e desktop, com API simulada, verificando Escape, retorno de foco, busca e conservação dos dados. Roda na etapa separada `pnpm --filter @piedade/web test:e2e` da CI. Não há teste de navegador dos formulários reais dos outros oito módulos nesta entrega. Nenhuma alteração de banco, API ou política de promoção. PR para develop independente de #344/#345 (reconciliação de branches) e #346 (testes do preflight); não inclui merge ou deploy.
+Testes unitários de ajuda exercitam os onze contextos de aba no `MainLayout` com campos de teste, além de busca, ausência de resultados, capacidades, retorno de foco e fechamento. Eles rodam na etapa `pnpm test` da CI. O Playwright usa os formulários reais de `LocaisView`, `EventosView` e `ConvocacoesView` em celular e desktop, com API simulada, verificando Escape, retorno de foco, busca e conservação dos dados. Roda na etapa separada `pnpm --filter @piedade/web test:e2e` da CI. Os outros oito módulos permanecem cobertos por testes unitários de contexto, sem E2E de seus formulários reais nesta entrega. Nenhuma alteração de banco, API ou política de promoção. PR para develop independente de #344/#345 (reconciliação de branches) e #346 (testes do preflight); não inclui merge ou deploy.

@@ -33,6 +33,8 @@ describe('Central de Ajuda', () => {
   })
 
   it.each([
+    ['eventos', 'podeGerirAgenda', 'Eventos'],
+    ['convocacoes', 'podeGerirAgenda', 'Convocações'],
     ['regionais', 'podeAdministrarEstrutura', 'Regionais'],
     ['administracoes', 'podeAdministrarEstrutura', 'Administrações'],
     ['setores', 'podeAdministrarEstrutura', 'Setores'],
@@ -86,8 +88,34 @@ describe('Central de Ajuda', () => {
     ).toHaveLength(1)
   })
 
+  it('volta à central limpando a busca sem fechar ajuda nem perder formulário', () => {
+    const navegar = vi.fn()
+    render(
+      <MainLayout
+        currentTab="eventos"
+        capacidades={{ podeGerirAgenda: true }}
+        onTabChange={navegar}
+      >
+        <input aria-label="Rascunho" defaultValue="reunião em elaboração" />
+      </MainLayout>
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Ajuda' }))
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'AGD-ADM-033' } })
+    fireEvent.click(screen.getByRole('button', { name: /Convocações —/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar à Central de Ajuda' }))
+    expect(screen.getByRole('dialog', { name: 'Central de Ajuda' })).toBeInTheDocument()
+    expect(screen.getByRole('searchbox')).toHaveValue('')
+    expect(screen.getByRole('searchbox')).toHaveFocus()
+    expect(screen.getByRole('button', { name: /Eventos —/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Convocações —/ })).toBeInTheDocument()
+    expect(screen.getByLabelText('Rascunho')).toHaveValue('reunião em elaboração')
+    expect(navegar).not.toHaveBeenCalled()
+  })
+
   it('filtra antes de pesquisar e separa instruções exclusivas do Master', () => {
     expect(pesquisarArtigos(obterArtigos(), 'AGD-ADM-015')).toHaveLength(0)
+    expect(pesquisarArtigos(obterArtigos(), 'AGD-ADM-016')).toHaveLength(0)
+    expect(pesquisarArtigos(obterArtigos(), 'AGD-ADM-033')).toHaveLength(0)
     const regional = obterArtigos({ podeAdministrarEstrutura: true, podeAdministrarAcessos: true })
     expect(regional.find(a => a.id === 'regionais')?.passos.join(' ')).toContain(
       'exclusivas do Master'
