@@ -45,13 +45,13 @@ Cadastros de membros contêm dados pessoais. Pesquise e atualize apenas dentro d
 5. Quando houver pré-cadastro ministerial, **pesquise e selecione o pré-cadastro**, depois confirme Casa de Oração, carteirinha e celular, e finalize. O nome fornecido pelo pré-cadastro fica somente para leitura nesse fluxo.
 6. Se o procedimento institucional permitir **novo membro manual**, confira nome, data de ordenação, carteirinha, celular e Casa de Oração, usando a cascata Regional → Administração → Setor → Casa.
 7. Salve e confira a mensagem de retorno.
-8. Para cadastro existente, use **Editar**, revise e atualize apenas dados legitimamente corrigíveis. **Trocar a Casa de Oração e reativar o membro não são edições meramente cadastrais:** siga as verificações da seção 4.2 antes de salvar.
+8. Para cadastro existente, use **Editar**, revise e atualize apenas dados legitimamente corrigíveis. **Trocar a Casa de Oração e reativar o membro não são edições meramente cadastrais:** siga as verificações da seção 4.1 antes de salvar.
 
 A alteração de Regional ou Administração no formulário limpa as seleções inferiores para evitar associação incoerente. A mudança de Setor também limpa a Casa selecionada. Confira o vínculo completo antes de salvar.
 
 **Exclusão:** a tela dispõe de ação de exclusão definitiva. A API exige ausência de **conta, convocações, vínculos manuais/legados ou outro histórico impeditivo**. **Exceção condicionada:** vínculos DCO com origem `MEMBRO_AUTOMATICO` podem ser removidos previamente pela própria exclusão **somente quando a função-base com código `DCO` estiver ativa e for localizada pelo sistema**. Se o Master tiver inativado a função DCO ou alterado seu código, essa limpeza não ocorre e até vínculos de origem automática podem bloquear a exclusão. Confirme o código e a situação da função-base com o Master antes de presumir que a exceção se aplica. Se o DCO automático foi editado, sua origem também pode ter deixado de ser automática (seção 6). Isso não autoriza apagar membro com histórico real. A confirmação é explícita; não trate esse comando como simples inativação nem o use para resolver duplicidade com histórico. Em recusa, solicite análise administrativa.
 
-### 4.2. Troca de Casa ou reativação: conferir impacto antes de salvar
+### 4.1. Troca de Casa ou reativação: conferir impacto antes de salvar
 
 **Troca de Casa de Oração:** ao alterar a Casa de um membro, a API inativa os vínculos DCO ativos da Casa anterior e cria ou reaproveita um vínculo DCO ativo na Casa de destino. Ela também pode atualizar os destinatários de **convocações já publicadas** que ainda estejam vigentes. Para membro com conta, os acessos `USUARIO_COMUM` anteriores são revogados e um acesso no destino é concedido. **Antes de salvar**, confirme com os responsáveis das duas Casas a transferência, os vínculos DCO, a continuidade do acesso e as convocações em andamento. **Depois de salvar**, confira Casa de destino, acesso efetivo, vínculos ativos e listas de destinatários/RSVP de convocações vigentes. Não execute troca de Casa apenas para corrigir a exibição sem avaliar esses efeitos.
 

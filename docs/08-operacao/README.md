@@ -66,4 +66,4 @@ pnpm --filter @piedade/worker deploy
 | M2.7 | Portaria e Presenças | [Abrir](manual-uso-portaria-recepcao-presencas.md) |
 | M2.8 | Relatórios e Auditoria | [Abrir](manual-uso-relatorios-indicadores-auditoria.md) |
 
-**Atenções editoriais:** filtros nominais de relatórios com defeito registrado na [issue #339](https://github.com/AlfredPennywhorth/piedade-agenda-regional/issues/339) (correção proposta na PR #340); relatório agregado requer UUID de escopo fornecido pela administração; capturas e exemplos devem ser anonimizados. Nenhuma publicação em `main` está implícita nesta documentação.
+**Atenções editoriais:** filtros nominais corrigidos na PR #340 e validados em smoke Beta (na aba **Relatório do Evento**); relatório agregado requer UUID de escopo fornecido pela administração; capturas e exemplos devem ser anonimizados. Nenhuma publicação em `main` está implícita nesta documentação.

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { RelatoriosView } from '../components/relatorios/RelatoriosView'
 import * as apiClient from '../api/apiClient'
 
@@ -9,43 +9,6 @@ vi.mock('../api/apiClient', async (importOriginal) => {
     ...actual,
     fetchWithAuth: vi.fn(),
   }
-  it('envia os filtros nominais atuais e ignora respostas anteriores', async () => {
-    let resolverPrimeira: ((value: any) => void) | undefined
-    const urls: string[] = []
-    const dadosEvento = {
-      evento: { id: 'ev-123', titulo: 'Reunião de Teste', inicioEm: '2026-10-01T09:00:00Z', fimEm: '2026-10-01T12:00:00Z', modalidade: 'PRESENCIAL' },
-      totalConvocados: 1, totalConfirmados: 1, totalRecusados: 0, totalNaoSei: 0,
-      totalSemResposta: 0, totalPresencas: 1, presencasConfirmados: 1,
-      taxaEngajamentoRsvp: 100, taxaPresencaConvocados: 100, taxaPresencaConfirmados: 100,
-    }
-    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url: string) => {
-      if (url === '/eventos') return [{ id: 'ev-123', titulo: 'Reunião de Teste', inicioEm: '2026-10-01T09:00:00Z', ativo: true }]
-      if (url.endsWith('/presencas?')) return []
-      if (url.includes('/presencas?')) {
-        urls.push(url)
-        if (url.includes('busca=A')) return new Promise(resolve => { resolverPrimeira = resolve })
-        return [{ destinatarioId: 'dest-2', membroNome: 'Atual', casaNome: 'Casa', respostaRsvp: 'PARTICIPAREI', presente: true }]
-      }
-      return dadosEvento
-    })
-    render(<RelatoriosView />)
-    fireEvent.click(screen.getByText('Relatório do Evento'))
-    fireEvent.change(await screen.findByRole('combobox', { name: /selecionar evento/i }), { target: { value: 'ev-123' } })
-    fireEvent.click(screen.getByText('Buscar Relatório'))
-    await screen.findByPlaceholderText('Filtrar por nome...')
-    const campoNome = screen.getByPlaceholderText('Filtrar por nome...')
-    fireEvent.change(campoNome, { target: { value: 'A' } })
-    await waitFor(() => expect(resolverPrimeira).toBeDefined())
-    fireEvent.change(campoNome, { target: { value: 'Atual' } })
-    await screen.findByText('Atual')
-    resolverPrimeira?.([{ destinatarioId: 'dest-antigo', membroNome: 'Antigo', casaNome: 'Casa', respostaRsvp: 'PARTICIPAREI', presente: true }])
-    await waitFor(() => expect(screen.queryByText('Antigo')).not.toBeInTheDocument())
-    expect(urls.some(url => url.includes('busca=A'))).toBe(true)
-    expect(urls.some(url => url.includes('busca=Atual'))).toBe(true)
-    fireEvent.change(screen.getByDisplayValue('Todos Status RSVP'), { target: { value: 'PARTICIPAREI' } })
-    await waitFor(() => expect(urls.some(url => url.includes('statusRsvp=PARTICIPAREI') && url.includes('busca=Atual'))).toBe(true))
-  })
-
 })
 
 describe('S12 — RelatoriosView (Frontend)', () => {
@@ -201,4 +164,44 @@ describe('S12 — RelatoriosView (Frontend)', () => {
 
     expect(await screen.findByText('Evento 1')).toBeInTheDocument()
   })
+  it('envia os filtros nominais atuais e ignora respostas anteriores', async () => {
+    let resolverPrimeira: ((value: any) => void) | undefined
+    const urls: string[] = []
+    const dadosEvento = {
+      evento: { id: 'ev-123', titulo: 'Reunião de Teste', inicioEm: '2026-10-01T09:00:00Z', fimEm: '2026-10-01T12:00:00Z', modalidade: 'PRESENCIAL' },
+      totalConvocados: 1, totalConfirmados: 1, totalRecusados: 0, totalNaoSei: 0,
+      totalSemResposta: 0, totalPresencas: 1, presencasConfirmados: 1,
+      taxaEngajamentoRsvp: 100, taxaPresencaConvocados: 100, taxaPresencaConfirmados: 100,
+    }
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url: string) => {
+      if (url === '/eventos') return [{ id: 'ev-123', titulo: 'Reunião de Teste', inicioEm: '2026-10-01T09:00:00Z', ativo: true }]
+      if (url.endsWith('/presencas?')) return []
+      if (url.includes('/presencas?')) {
+        urls.push(url)
+        if (new URL(url, 'http://localhost').searchParams.get('busca') === 'A') return new Promise(resolve => { resolverPrimeira = resolve })
+        return [{ destinatarioId: 'dest-2', membroNome: 'Atual', casaNome: 'Casa', respostaRsvp: 'PARTICIPAREI', presente: true }]
+      }
+      return dadosEvento
+    })
+    render(<RelatoriosView />)
+    fireEvent.click(screen.getByText('Relatório do Evento'))
+    fireEvent.change(await screen.findByRole('combobox', { name: /selecionar evento/i }), { target: { value: 'ev-123' } })
+    fireEvent.click(screen.getByText('Buscar Relatório'))
+    await screen.findByPlaceholderText('Filtrar por nome...')
+    const campoNome = screen.getByPlaceholderText('Filtrar por nome...')
+    fireEvent.change(campoNome, { target: { value: 'A' } })
+    await waitFor(() => expect(resolverPrimeira).toBeDefined())
+    fireEvent.change(campoNome, { target: { value: 'Atual' } })
+    await screen.findByText('Atual')
+    await act(async () => {
+      resolverPrimeira?.([{ destinatarioId: 'dest-antigo', membroNome: 'Antigo', casaNome: 'Casa', respostaRsvp: 'PARTICIPAREI', presente: true }])
+    })
+    expect(screen.getByText('Atual')).toBeInTheDocument()
+    expect(screen.queryByText('Antigo')).not.toBeInTheDocument()
+    expect(urls.some(url => new URL(url, 'http://localhost').searchParams.get('busca') === 'A')).toBe(true)
+    expect(urls.some(url => url.includes('busca=Atual'))).toBe(true)
+    fireEvent.change(screen.getByDisplayValue('Todos Status RSVP'), { target: { value: 'PARTICIPAREI' } })
+    await waitFor(() => expect(urls.some(url => url.includes('statusRsvp=PARTICIPAREI') && url.includes('busca=Atual'))).toBe(true))
+  })
+
 })

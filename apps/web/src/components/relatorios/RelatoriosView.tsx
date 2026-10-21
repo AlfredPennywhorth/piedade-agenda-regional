@@ -87,6 +87,9 @@ export function RelatoriosView() {
   const [relatorioEvento, setRelatorioEvento] = useState<RelatorioEventoData | null>(null)
   const [presencas, setPresencas] = useState<ItemPresenca[]>([])
   const requisicaoPresencas = useRef(0)
+  const filtrosAtuais = useRef({ rsvp: '', presente: '', nome: '' })
+  const eventoAtual = useRef('')
+  const [erroPresencas, setErroPresencas] = useState<string | null>(null)
   const [loadingEvento, setLoadingEvento] = useState(false)
   const [erroEvento, setErroEvento] = useState<string | null>(null)
 
@@ -140,6 +143,8 @@ export function RelatoriosView() {
       eventoIdSelecionado &&
       !eventosFiltrados.some(evento => evento.id === eventoIdSelecionado)
     ) {
+      eventoAtual.current = ''
+      requisicaoPresencas.current++
       setEventoIdSelecionado('')
     }
   }, [eventoIdSelecionado, eventosFiltrados])
@@ -152,7 +157,10 @@ export function RelatoriosView() {
     try {
       const data = await apiClient.fetchWithAuth<RelatorioEventoData>(`/relatorios/eventos/${eventoIdSelecionado}`)
       setRelatorioEvento(data)
-      await carregarPresencas(eventoIdSelecionado, filtroRsvp, filtroPresente, buscaNome)
+      if (eventoAtual.current === eventoIdSelecionado) {
+        const atual = filtrosAtuais.current
+        await carregarPresencas(eventoIdSelecionado, atual.rsvp, atual.presente, atual.nome)
+      }
     } catch (err: any) {
       setErroEvento(err.message || 'Erro ao carregar relatório do evento.')
       setRelatorioEvento(null)
@@ -164,6 +172,7 @@ export function RelatoriosView() {
 
   const carregarPresencas = async (evId: string, rsvp: string, presente: string, nome: string) => {
     const requisicao = ++requisicaoPresencas.current
+    setErroPresencas(null)
     let url = `/relatorios/eventos/${evId}/presencas?`
     const params = new URLSearchParams()
     if (rsvp) params.append('statusRsvp', rsvp)
@@ -174,8 +183,11 @@ export function RelatoriosView() {
     try {
       const list = await apiClient.fetchWithAuth<ItemPresenca[]>(url)
       if (requisicao === requisicaoPresencas.current) setPresencas(list)
-    } catch (err: any) {
-      if (requisicao === requisicaoPresencas.current) console.error(err)
+    } catch {
+      if (requisicao === requisicaoPresencas.current) {
+        setPresencas([])
+        setErroPresencas('Não foi possível atualizar a lista nominal. Tente novamente.')
+      }
     }
   }
 
@@ -294,7 +306,13 @@ export function RelatoriosView() {
             <select
               aria-label="Selecionar evento"
               value={eventoIdSelecionado}
-              onChange={(e) => setEventoIdSelecionado(e.target.value)}
+              onChange={(e) => {
+                eventoAtual.current = e.target.value
+                requisicaoPresencas.current++
+                setPresencas([])
+                setErroPresencas(null)
+                setEventoIdSelecionado(e.target.value)
+              }}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
               <option value="">Selecione um evento</option>
@@ -358,6 +376,7 @@ export function RelatoriosView() {
                     placeholder="Filtrar por nome..."
                     value={buscaNome}
                     onChange={(e) => {
+                      filtrosAtuais.current.nome = e.target.value
                       setBuscaNome(e.target.value)
                       void carregarPresencas(eventoIdSelecionado, filtroRsvp, filtroPresente, e.target.value)
                     }}
@@ -366,6 +385,7 @@ export function RelatoriosView() {
                   <select
                     value={filtroRsvp}
                     onChange={(e) => {
+                      filtrosAtuais.current.rsvp = e.target.value
                       setFiltroRsvp(e.target.value)
                       void carregarPresencas(eventoIdSelecionado, e.target.value, filtroPresente, buscaNome)
                     }}
@@ -380,6 +400,7 @@ export function RelatoriosView() {
                   <select
                     value={filtroPresente}
                     onChange={(e) => {
+                      filtrosAtuais.current.presente = e.target.value
                       setFiltroPresente(e.target.value)
                       void carregarPresencas(eventoIdSelecionado, filtroRsvp, e.target.value, buscaNome)
                     }}
@@ -391,6 +412,7 @@ export function RelatoriosView() {
                   </select>
                 </div>
 
+                {erroPresencas && <p role="alert" className="mb-2 text-sm text-red-700">{erroPresencas}</p>}
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
@@ -429,7 +451,7 @@ export function RelatoriosView() {
                         </tr>
                       ))}
 
-                      {presencas.length === 0 && (
+                      {!erroPresencas && presencas.length === 0 && (
                         <tr>
                           <td colSpan={4} className="p-4 text-center text-slate-400">
                             Nenhum participante encontrado.

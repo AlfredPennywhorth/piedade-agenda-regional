@@ -61,7 +61,7 @@ O botão **Gerar ativação** é exibido quando o membro não possui conta de ac
 6. Se houver mensagem de erro, confira os dados e procure o administrador responsável; não compartilhe PIN nem link em mensagens de suporte.
 7. Após entrar, abra **Mais → Meu Cadastro** para conferir os dados institucionais e o celular.
 
-A carteira e o celular informados no primeiro acesso devem corresponder aos dados cadastrados para a conta. A tela permite **Voltar para o login** quando a ativação tiver sido aberta indevidamente.
+O Código da carteirinha e o celular informados no primeiro acesso devem corresponder aos dados cadastrados para a conta. A tela permite **Voltar para o login** quando a ativação tiver sido aberta indevidamente.
 
 ## 5. Membro — acessar nos dias seguintes
 

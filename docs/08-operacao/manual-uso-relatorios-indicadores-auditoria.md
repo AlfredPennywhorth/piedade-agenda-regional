@@ -18,7 +18,7 @@ A interface `RelatoriosView` oferece **Relatório do Evento**, **Presenças** e 
 2. Pesquise pelo nome e selecione a reunião na lista disponível.
 3. Acione **Buscar Relatório**.
 4. Confira indicadores, como convocados, respostas e presenças.
-5. A relação nominal apresenta filtros de **resposta RSVP**, **presente/ausente** e **nome**, mas **há uma limitação conhecida**: ao alterá-los, a consulta pode usar o valor anterior do filtro. Até a correção do frontend, não utilize o primeiro resultado filtrado como evidência definitiva; confirme a relação com uma nova consulta e confira os registros individualmente.
+5. Na relação nominal, utilize os filtros por **resposta RSVP**, **presença** e **nome**. Os valores selecionados são aplicados à consulta, e respostas de consultas anteriores não devem substituir os resultados mais recentes. Confirme que está na aba **Relatório do Evento**, pois **Presenças → Reunião específica** possui apresentação distinta.
 
 A API consolida destinatários por membro em convocações publicadas ativas. Em eventos nacionais ou internacionais, a forma de obter convidados nominais e confirmações difere do fluxo territorial; não interprete a contagem como check-in de Portaria quando a operação de Portaria não se aplica.
 

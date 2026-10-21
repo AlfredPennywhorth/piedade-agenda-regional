@@ -22,7 +22,7 @@
 | `AGD-ADM-046` edição | `Texto colado (2)(20261016-123748).txt` | `4c37e2e35a0b592caf497cb08b1bc7cae4159c7dd6288486bf986ffd54926066` |
 | `AGD-ADM-047` detalhes | `Texto colado (3)(20261016-123808).txt` | `14356a95cb1218f09bcaf56f9638735c3d97dd7a24c2435e6e43937af2290289` |
 
-**Limite de custódia:** originais conferidos em cópias de anexos disponíveis na conversa; este commit arquiva **apenas o manifesto**, não os cinco HTMLs. Há um pacote ZIP preparado para upload separado. O Gate A não deve ser considerado concluído até os HTMLs finais estarem versionados com integridade verificável.
+**Custódia de GTs:** os cinco HTMLs de Grupos de Trabalho citados na tabela acima estão versionados em `docs/11-ux-stitch/prototipos/lote-1/grupos-trabalho/`, com hashes SHA-256 conferidos na revisão da release. Não existe manifesto separado nesse diretório; a própria tabela registra os hashes. **Isso não conclui o Gate A integral**, que ainda depende das verificações visuais e dos demais sublotes. Não é necessário reimportar esses cinco HTMLs por ZIP.
 
 ## Critério do PO para mockups (16/10/2026)
 
