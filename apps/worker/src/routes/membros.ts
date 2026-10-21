@@ -285,6 +285,12 @@ function escopoMembrosPaginados(contexto: ContextoPermissoes) {
   return { visivel, completo }
 }
 
+// Normaliza apenas a pesquisa, sem alterar a comparação institucional de nomes.
+// Evita que "andre" deixe de encontrar "André".
+function normalizarBusca(valor: string): string {
+  return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
+}
+
 membrosRouter.get('/paginados', async (c) => {
   const pagina = Number(c.req.query('pagina') || '1')
   const limite = Number(c.req.query('limite') || '50')
@@ -292,7 +298,7 @@ membrosRouter.get('/paginados', async (c) => {
   if (!Number.isSafeInteger(pagina) || pagina < 1 || !Number.isSafeInteger(limite) || limite < 1 || limite > 100 || !Number.isSafeInteger(offset)) {
     return c.json({ error: 'Paginação inválida' }, 400)
   }
-  const busca = (c.req.query('busca') || '').trim().slice(0, 120).toLocaleLowerCase('pt-BR')
+  const busca = normalizarBusca((c.req.query('busca') || '').trim().slice(0, 120))
   const setorId = (c.req.query('setorId') || '').trim()
   const db = c.get('db')
   const contexto = c.get('contextoPermissoes')
@@ -326,7 +332,7 @@ membrosRouter.get('/paginados', async (c) => {
     .where(where).all()
   const filtrados = candidatos.filter(item => !busca ||
     [item.nome, item.codigoCarteirinha, item.casaNome, item.casaCodigo]
-      .some(valor => (valor || '').toLocaleLowerCase('pt-BR').includes(busca)))
+      .some(valor => normalizarBusca(valor || '').includes(busca)))
   filtrados.sort((a, b) =>
     a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
   const total = filtrados.length
