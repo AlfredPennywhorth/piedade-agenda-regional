@@ -1,3 +1,4 @@
+import { AjudaContextual } from '../ajuda/AjudaContextual'
 import { useState, useEffect } from 'react'
 import * as apiClient from '../../api/apiClient'
 
@@ -209,7 +210,7 @@ export function AuditoriaView() {
         <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-lg w-full p-4 space-y-4 shadow-xl border border-slate-200">
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-              <h3 className="font-bold text-slate-800 text-sm">Contexto do Evento de Auditoria</h3>
+              <h3 className="font-bold text-slate-800 text-sm">Contexto do Evento de Auditoria</h3><AjudaContextual />
               <button onClick={() => setDetalhesJson(null)} className="text-slate-400 hover:text-slate-600">
                 ✕
               </button>

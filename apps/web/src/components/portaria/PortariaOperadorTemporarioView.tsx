@@ -1,3 +1,4 @@
+import { AjudaIsolada } from '../ajuda/AjudaIsolada'
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { API_BASE_URL, ApiError } from '../../api/apiClient'
 import { generateQrMatrix } from '../agenda/qrGenerator'
@@ -323,7 +324,7 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
     return (
       <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="max-w-md rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-          <h1 className="text-xl font-semibold text-slate-900">Acesso de Portaria</h1>
+          <h1 className="text-xl font-semibold text-slate-900">Acesso de Portaria</h1><AjudaIsolada assunto="portaria-temporaria" />
           <p role={erro ? "alert" : "status"} className="mt-3 text-sm text-slate-600">{erro || mensagem || 'Este acesso não está mais disponível.'}</p>
         </div>
       </main>
@@ -337,7 +338,7 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
       <div className="mx-auto max-w-3xl space-y-5">
         <header className="rounded-2xl bg-brand-900 p-5 text-white shadow">
           <p className="text-xs uppercase tracking-wide text-brand-200">Acesso temporário de Portaria</p>
-          <h1 className="mt-1 text-2xl font-bold">{sessao.evento.titulo}</h1>
+          <h1 className="mt-1 text-2xl font-bold">{sessao.evento.titulo}</h1><AjudaIsolada assunto="portaria-temporaria" />
           <p className="mt-2 text-sm text-brand-100">
             Este acesso vale somente para esta reunião e será revogado no fechamento.
           </p>

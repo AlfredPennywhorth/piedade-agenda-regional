@@ -1,3 +1,4 @@
+import { AjudaContextual } from '../ajuda/AjudaContextual'
 import { useState, useEffect, useRef } from 'react'
 import { fetchWithAuth, ApiError } from '../../api/apiClient'
 import type { AcompanhamentoRsvpResponse } from '@piedade/shared'
@@ -108,7 +109,7 @@ export function AcompanhamentoRsvpModal({ convocacaoId, onClose }: Props) {
           <div>
             <h2 id="acompanhamento-dialog-title" className="text-xl font-bold text-slate-900">
               Acompanhamento RSVP
-            </h2>
+            </h2><AjudaContextual />
             <p className="text-sm text-slate-500 mt-1">
               Total de destinatários: {meta.total}
             </p>

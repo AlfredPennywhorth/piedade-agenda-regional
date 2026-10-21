@@ -1,3 +1,4 @@
+import { AjudaContextual } from '../ajuda/AjudaContextual'
 import { useEffect, useRef, useState } from 'react'
 import { AgendaItem } from './types'
 import { PAISES_ISO } from '@piedade/shared'
@@ -268,6 +269,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
       </div>
 
       <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto text-slate-800">
+        <AjudaContextual />
         {reconfirmacaoPendente && item.evento.agendaAviso && (
           <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950" role="alert">
             <p className="font-semibold">Atenção: este evento foi alterado</p>

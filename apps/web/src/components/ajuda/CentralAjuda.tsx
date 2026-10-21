@@ -7,17 +7,26 @@ export function CentralAjuda({
   assunto,
   retornoFoco,
   onClose,
+  assuntosPermitidos,
 }: {
   capacidades?: CapacidadesFrontend
   assunto: string
   retornoFoco: HTMLElement | null
+  assuntosPermitidos?: readonly string[]
   onClose: () => void
 }) {
   const [busca, setBusca] = useState('')
   const [selecionado, setSelecionado] = useState(assunto)
   const dialogo = useRef<HTMLDialogElement>(null)
-  const artigos = obterArtigos(capacidades)
+  const buscaRef = useRef<HTMLInputElement>(null)
+  const artigos = obterArtigos(capacidades, assuntosPermitidos)
   const artigo = artigos.find(a => a.id === selecionado)
+  const voltarCentral = () => {
+    setSelecionado('')
+    setBusca('')
+    if (dialogo.current) dialogo.current.scrollTop = 0
+    buscaRef.current?.focus()
+  }
 
   useEffect(() => {
     const focoAnterior = retornoFoco
@@ -36,10 +45,19 @@ export function CentralAjuda({
       onCancel={onClose}
       className="m-auto max-h-[90dvh] w-[calc(100%_-_1rem)] max-w-2xl overflow-y-auto rounded-2xl bg-white p-4 text-slate-900 shadow-xl backdrop:bg-slate-900/50 sm:p-6"
     >
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center justify-between gap-3 bg-white py-2">
         <h2 id="titulo-ajuda" className="text-lg font-semibold">
           Central de Ajuda
         </h2>
+        {(artigo || busca) && (
+          <button
+            type="button"
+            onClick={voltarCentral}
+            className="rounded-lg bg-brand-900 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-900"
+          >
+            Voltar à Central de Ajuda
+          </button>
+        )}
         <button type="button" onClick={onClose} className="rounded-lg border px-3 py-2">
           Fechar ajuda
         </button>
@@ -48,6 +66,7 @@ export function CentralAjuda({
         Pesquisar ajuda por assunto ou código de tela
       </label>
       <input
+        ref={buscaRef}
         autoFocus
         id="buscar-ajuda"
         type="search"
@@ -60,13 +79,6 @@ export function CentralAjuda({
       />
       {artigo ? (
         <article>
-          <button
-            type="button"
-            onClick={() => setSelecionado('')}
-            className="mb-3 rounded-lg border px-3 py-2 text-sm"
-          >
-            Todos os assuntos
-          </button>
           <h3 className="text-lg font-semibold">{artigo.titulo}</h3>
           <p className="my-2 text-xs text-slate-500">{artigo.codigos.join(' · ')}</p>
           <ol className="list-decimal space-y-2 pl-5 text-sm">

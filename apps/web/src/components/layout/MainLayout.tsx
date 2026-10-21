@@ -17,7 +17,7 @@ export interface CapacidadesFrontend {
   podeGerirAgenda?: boolean
 }
 
-const SCREEN_CODES = {
+export const SCREEN_CODES = {
   agenda: 'AGD-MOB-001',
   eventos: 'AGD-ADM-001',
   series: 'AGD-ADM-002',
@@ -180,7 +180,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
             </button>
           </div>
         )}
-        {temAjudaContextual && <div className="px-4 pt-3 text-right"><button type="button" onClick={e => { retornoAjudaRef.current = e.currentTarget; setAssuntoAjuda(currentTab) }} className="rounded-lg border border-brand-700 px-3 py-2 text-sm font-semibold text-brand-800">Ajuda</button></div>}
+        {temAjudaContextual && <div className="px-4 pt-3 text-right"><button type="button" onClick={e => { retornoAjudaRef.current = e.currentTarget; setAssuntoAjuda(currentTab) }} className="rounded-lg bg-brand-900 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-900">Ajuda</button></div>}
         {children}
         <div
           className="px-4 pb-4 pt-2 text-right text-[10px] font-medium tracking-wide text-slate-400"
@@ -256,7 +256,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
                 </div>
               )}
 
-              <div><button type="button" onClick={() => { retornoAjudaRef.current = botaoMaisRef.current; setMostrarMais(false); setAssuntoAjuda('') }} className="w-full rounded-lg bg-slate-50 p-3 text-left">Central de Ajuda</button></div>
+              <div><button type="button" onClick={() => { retornoAjudaRef.current = botaoMaisRef.current; setMostrarMais(false); setAssuntoAjuda('') }} className="w-full rounded-lg bg-brand-900 p-3 text-left font-semibold text-white hover:bg-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-900">Central de Ajuda</button></div>
               <div>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Conta</h3>
                 <button type="button" onClick={() => navegar('cadastro')} className="w-full rounded-lg bg-slate-50 p-3 text-left">Meu Cadastro</button>

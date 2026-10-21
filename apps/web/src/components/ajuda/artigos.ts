@@ -1,3 +1,4 @@
+import { artigosComplementares } from './artigosComplementares'
 import type { CapacidadesFrontend } from '../layout/MainLayout'
 
 export interface ArtigoAjuda {
@@ -5,22 +6,82 @@ export interface ArtigoAjuda {
   titulo: string
   codigos: string[]
   capacidade?: keyof CapacidadesFrontend
+  capacidadesAlternativas?: (keyof CapacidadesFrontend)[]
+  isolado?: boolean
   passos: string[]
   cuidados: string[]
 }
 
 export const artigosAjuda: ArtigoAjuda[] = [
+  ...artigosComplementares,
   {
     id: 'inicio',
     titulo: 'Como usar a ajuda',
-    codigos: [],
+    codigos: ['AGD-SHR-006'],
     passos: [
-      'Abra Mais → Central de Ajuda e pesquise por assunto ou código de tela.',
+      'Após entrar, abra Mais → Central de Ajuda e pesquise por assunto ou código de tela. Nas telas de acesso, use o botão Ajuda para orientações daquele fluxo.',
       'Nas telas administrativas, Ajuda abre as orientações da tela atual. Feche a ajuda para continuar de onde parou.',
     ],
     cuidados: [
       'As opções disponíveis dependem do seu perfil e escopo. A ajuda não concede permissões.',
       'Não compartilhe PIN, links de ativação ou dados pessoais em pedidos públicos de suporte.',
+    ],
+  },
+  {
+    id: 'eventos',
+    titulo: 'Eventos — cadastrar, editar e cancelar',
+    codigos: [
+      'AGD-ADM-001',
+      'AGD-ADM-016',
+      'AGD-ADM-017',
+      'AGD-ADM-018',
+      'AGD-ADM-019',
+      'AGD-ADM-020',
+      'AGD-ADM-021',
+      'AGD-ADM-022',
+      'AGD-ADM-023',
+    ],
+    capacidade: 'podeGerirAgenda',
+    passos: [
+      'A lista inicia com eventos futuros e ativos. Revise período, situação e filtros territoriais antes de concluir que um evento não existe. Use Ver para consultar os detalhes.',
+      'Em + Novo Evento, escolha o tipo e escopo autorizados. Preencha título, início, fim, modalidade e os demais campos apresentados.',
+      'Para reunião presencial ou híbrida, confira Local e Espaço. Nas modalidades online, confira a URL solicitada. Locais particulares e institucionais têm autorizações diferentes.',
+      'Confira organizador e abrangência: Territorial, Nacional ou Internacional. Para destinos externos, confira cidade/UF ou cidade/país.',
+      'Clique em Salvar Evento e aguarde a confirmação. O próximo passo depende do tipo: agenda pessoal, preparação de convocação territorial ou participantes nominais do evento externo.',
+      'Para alterar um registro autorizado, use Editar. Em ocorrência de série, leia se a alteração afeta apenas esta ocorrência ou a série desta em diante.',
+    ],
+    cuidados: [
+      'Salvar um evento não publica automaticamente uma convocação. Confira a distribuição aos participantes no fluxo apropriado.',
+      'Para cancelar um evento com convocação PUBLICADA, cancele primeiro a convocação em Convocações. A API bloqueia a ordem inversa.',
+      'Cancelar evento com convocação em rascunho cancela essa convocação e remove suas funções. Reativar o evento não reabre a convocação cancelada.',
+      'Eventos já encerrados não podem ser alterados ou cancelados, mesmo se um botão permanecer visível. As ações dependem de autorização e escopo validados pela API.',
+    ],
+  },
+  {
+    id: 'convocacoes',
+    titulo: 'Convocações — rascunho, publicação e acompanhamento',
+    codigos: [
+      'AGD-ADM-014',
+      'AGD-ADM-031',
+      'AGD-ADM-032',
+      'AGD-ADM-033',
+      'AGD-ADM-034',
+      'AGD-ADM-059',
+    ],
+    capacidade: 'podeGerirAgenda',
+    passos: [
+      'Revise os filtros de situação, período e território para localizar a convocação.',
+      'Em Nova Convocação, selecione o evento correto, preencha os campos apresentados e salve para criar um rascunho.',
+      'No RASCUNHO, use Gerenciar Funções para configurar destinatários por função nos eventos institucionais compatíveis. Confira as funções e o evento antes de Publicar.',
+      'Publicar exige confirmação e é diferente de salvar o rascunho. Editar só está disponível enquanto a convocação estiver em RASCUNHO.',
+      'Depois de publicada, Acompanhar RSVP permite consultar respostas somente ao organizador, Master ou gestor de relatórios autorizado para aquele evento. A capacidade de gestão de agenda, sozinha, não autoriza essa consulta; a API pode retornar 403. Os membros respondem pelas telas pessoais.',
+      'Quando disponível, Sincronizar Diáconos atualiza destinatários DCO de convocação territorial publicada antes do encerramento. Confira as contagens antes e depois.',
+    ],
+    cuidados: [
+      'Convites de eventos NACIONAIS e INTERNACIONAIS são tratados nas ações de participantes nominais do evento externo; não presuma convocação por função.',
+      'Se houver conflito por atualização de outra pessoa, recarregue e confira o estado atual antes de repetir a operação.',
+      'Antes de Cancelar, confira o alvo e a autorização. Não há promessa de reabertura automática da convocação.',
+      'Acesso ao módulo não autoriza gerenciar todos os registros. A API valida perfil e escopo em cada operação.',
     ],
   },
   {
@@ -158,9 +219,17 @@ export const artigosAjuda: ArtigoAjuda[] = [
   },
 ]
 
-export function obterArtigos(capacidades: CapacidadesFrontend = {}): ArtigoAjuda[] {
+export function obterArtigos(
+  capacidades: CapacidadesFrontend = {},
+  assuntosPermitidos?: readonly string[]
+): ArtigoAjuda[] {
   return artigosAjuda
-    .filter(a => !a.capacidade || capacidades[a.capacidade] === true)
+    .filter(a => (assuntosPermitidos ? assuntosPermitidos.includes(a.id) : !a.isolado))
+    .filter(
+      a =>
+        (!a.capacidade || capacidades[a.capacidade] === true) &&
+        (!a.capacidadesAlternativas || a.capacidadesAlternativas.some(c => capacidades[c] === true))
+    )
     .map(a => {
       if (a.id === 'regionais')
         return {
