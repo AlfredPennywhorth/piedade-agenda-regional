@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { MembrosView } from '../components/membros/MembrosView'
 import * as apiClient from '../api/apiClient'
 
@@ -138,7 +138,12 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
 
   it('4. Criar manual: usa hierarquia territorial e cadastra membro', async () => {
     mockEstrutura([])
-    vi.mocked(apiClient.postWithAuth).mockResolvedValue({})
+    const lista: typeof mockMembros = []
+    mockEstrutura(lista)
+    vi.mocked(apiClient.postWithAuth).mockImplementation(async () => {
+      lista.push({ ...mockMembros[0], nome: 'Pedro Henrique' })
+      return {}
+    })
 
     render(<MembrosView />)
     await screen.findByText('Nenhum membro encontrado.')
@@ -168,6 +173,7 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
         ativo: true,
       })
     })
+    expect(await screen.findByText('Pedro Henrique')).toBeInTheDocument()
   })
 
   it('5. Validação: mostra feedback de nome e celular inválidos', async () => {
@@ -196,7 +202,13 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
 
   it('6. Editar: carrega hierarquia e atualiza membro', async () => {
     mockEstrutura([mockMembros[0]])
-    vi.mocked(apiClient.patchWithAuth).mockResolvedValue({})
+    const lista = [{ ...mockMembros[0] }]
+    mockEstrutura(lista)
+    vi.mocked(apiClient.patchWithAuth).mockImplementation(async () => {
+      lista[0].nome = 'João da Silva Silva'
+      lista[0].ativo = false
+      return {}
+    })
 
     render(<MembrosView />)
     fireEvent.click((await screen.findAllByText('Editar'))[0])
@@ -220,11 +232,13 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
         ativo: false,
       })
     })
+    expect(await screen.findByText('João da Silva Silva')).toBeInTheDocument()
+    expect(screen.queryByText('João da Silva')).not.toBeInTheDocument()
   })
 
   it('7. Pré-cadastro: diferencia homônimos com RRM, Administração e ordenação', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
-      if (endpoint === '/membros') return []
+      if (endpoint.startsWith('/membros/paginados?')) return { itens: [], total: 0, totalPaginas: 1 }
       if (endpoint === '/casas') return mockCasas
       if (endpoint === '/setores') return mockSetores
       if (endpoint === '/administracoes') return mockAdministracoes
@@ -288,7 +302,7 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
     let resolveAntiga: ((value: any) => void) | undefined
 
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
-      if (endpoint === '/membros') return []
+      if (endpoint.startsWith('/membros/paginados?')) return { itens: [], total: 0, totalPaginas: 1 }
       if (endpoint === '/casas') return mockCasas
       if (endpoint === '/setores') return mockSetores
       if (endpoint === '/administracoes') return mockAdministracoes
@@ -310,13 +324,14 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
 
     const busca = screen.getByLabelText(/Localizar pré-cadastro pelo nome/i)
     fireEvent.change(busca, { target: { value: 'Jo' } })
-    await new Promise(resolve => setTimeout(resolve, 350))
+    await waitFor(() => expect(resolveAntiga).toBeDefined())
 
     fireEvent.change(busca, { target: { value: 'Maria' } })
     expect(await screen.findByText('Maria Atual')).toBeInTheDocument()
 
-    resolveAntiga?.({ data: [{ id: 'pre-1', nome: 'João Antigo', vinculado: false }], meta: {} })
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await act(async () => {
+      resolveAntiga?.({ data: [{ id: 'pre-1', nome: 'João Antigo', vinculado: false }], meta: {} })
+    })
 
     expect(screen.queryByText('João Antigo')).not.toBeInTheDocument()
     expect(screen.getByText('Maria Atual')).toBeInTheDocument()
@@ -325,11 +340,13 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
   it('9. Excluir: remove cadastro indevido após confirmação', async () => {
     mockEstrutura([mockMembros[0]])
     vi.spyOn(window, 'confirm').mockReturnValue(true)
+    let excluido = false
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string, options?: RequestInit) => {
       if (endpoint === `/membros/${MEMBRO_1_ID}` && options?.method === 'DELETE') {
+        excluido = true
         return { message: 'Membro excluído', id: MEMBRO_1_ID } as any
       }
-      if (endpoint.startsWith('/membros/paginados?')) return { itens: [mockMembros[0]], total: 1, totalPaginas: 1 } as any
+      if (endpoint.startsWith('/membros/paginados?')) return { itens: excluido ? [] : [mockMembros[0]], total: excluido ? 0 : 1, totalPaginas: 1 } as any
       if (endpoint === '/casas') return mockCasas as any
       if (endpoint === '/setores') return mockSetores as any
       if (endpoint === '/administracoes') return mockAdministracoes as any
@@ -349,6 +366,81 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
       )
     })
     expect(window.confirm).toHaveBeenCalled()
+    await screen.findByText('Nenhum membro encontrado.')
+    expect(screen.queryByText('João da Silva')).not.toBeInTheDocument()
+  })
+
+  it('corrige a página após excluir o último membro e recarrega a página válida', async () => {
+    const lista = Array.from({ length: 51 }, (_, i) => ({ ...mockMembros[0], id: `m-${i}`, nome: `Pessoa ${i}` }))
+    mockEstrutura(lista)
+    const buscar = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint, options) => {
+      if (options?.method === 'DELETE') {
+        lista.pop()
+        return {}
+      }
+      return buscar(endpoint, options)
+    })
+    render(<MembrosView />)
+    await screen.findByText('Pessoa 0')
+    fireEvent.click(screen.getByRole('button', { name: 'Próxima' }))
+    await screen.findByText('Pessoa 50')
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir' }))
+    await screen.findByText('Pessoa 0')
+    expect(screen.queryByText('Pessoa 50')).not.toBeInTheDocument()
+    expect(screen.getByText('50 membros encontrados — exibindo 50 nesta página')).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Páginas de membros' })).not.toBeInTheDocument()
+  })
+
+  it('ignora resposta obsoleta da lista paginada, inclusive sua página inválida', async () => {
+    mockEstrutura()
+    const buscar = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    let responder: ((value: any) => void) | undefined
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint, options) => {
+      if (endpoint.includes('busca=Antiga')) return new Promise(resolve => { responder = resolve })
+      return buscar(endpoint, options)
+    })
+    render(<MembrosView />)
+    await screen.findByText('João da Silva')
+    const busca = screen.getByLabelText(/Buscar membro ou Casa/i)
+    fireEvent.change(busca, { target: { value: 'Antiga' } })
+    await waitFor(() => expect(responder).toBeDefined())
+    fireEvent.change(busca, { target: { value: 'Maria' } })
+    await waitFor(() => expect(screen.queryByText('João da Silva')).not.toBeInTheDocument())
+    await act(async () => {
+      responder!({ itens: [{ ...mockMembros[0], nome: 'Resposta Antiga' }], total: 0, totalPaginas: 0 })
+    })
+    await waitFor(() => expect(screen.getByText('1 membros encontrados — exibindo 1 nesta página')).toBeInTheDocument())
+    expect(screen.getByText('Maria Souza')).toBeInTheDocument()
+    expect(screen.queryByText('Resposta Antiga')).not.toBeInTheDocument()
+  })
+
+  it('recarrega os filtros atuais quando uma exclusão termina após mudar a pesquisa', async () => {
+    const lista = [...mockMembros, { ...mockMembros[0], id: 'terceiro', nome: 'Pedro Atual' }]
+    mockEstrutura(lista)
+    const buscar = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    let concluir: (() => void) | undefined
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint, options) => {
+      if (options?.method === 'DELETE') {
+        await new Promise<void>(resolve => { concluir = resolve })
+        lista.splice(0, 1)
+        return {}
+      }
+      return buscar(endpoint, options)
+    })
+    render(<MembrosView />)
+    await screen.findByText('João da Silva')
+    fireEvent.click(screen.getAllByRole('button', { name: 'Excluir' })[0])
+    await waitFor(() => expect(concluir).toBeDefined())
+    fireEvent.change(screen.getByLabelText(/Buscar membro ou Casa/i), { target: { value: 'Maria' } })
+    await waitFor(() => expect(screen.queryByText('Pedro Atual')).not.toBeInTheDocument())
+    await act(async () => { concluir!() })
+    await screen.findByText('Membro excluído com sucesso.')
+    expect(screen.getByText('Maria Souza')).toBeInTheDocument()
+    expect(screen.queryByText('Pedro Atual')).not.toBeInTheDocument()
+    expect(screen.getByText('1 membros encontrados — exibindo 1 nesta página')).toBeInTheDocument()
   })
 
 })

@@ -63,6 +63,7 @@ export function MembrosView() {
   const [totalMembros, setTotalMembros] = useState(0)
   const [totalPaginasServidor, setTotalPaginasServidor] = useState(1)
   const consultaMembrosSeq = useRef(0)
+  const carregarMembrosAtual = useRef<() => Promise<void>>(async () => {})
 
   const [modoForm, setModoForm] = useState<'criar' | 'editar' | null>(null)
   const [tipoCriacao, setTipoCriacao] = useState<'pre-cadastro' | 'manual'>('pre-cadastro')
@@ -117,6 +118,11 @@ export function MembrosView() {
         `/membros/paginados?${params.toString()}`
       )
       if (seq !== consultaMembrosSeq.current) return
+      const ultimaPagina = Math.max(1, resposta.totalPaginas)
+      if (paginaMembros > ultimaPagina) {
+        setPaginaMembros(ultimaPagina)
+        return
+      }
       setMembros(resposta.itens)
       setTotalMembros(resposta.total)
       setTotalPaginasServidor(resposta.totalPaginas)
@@ -127,6 +133,8 @@ export function MembrosView() {
       if (seq === consultaMembrosSeq.current) setLoading(false)
     }
   }
+
+  carregarMembrosAtual.current = carregarMembros
 
   useEffect(() => { void carregarDados() }, [])
   useEffect(() => {
@@ -345,7 +353,7 @@ export function MembrosView() {
       })
       setSucesso('Pré-cadastro finalizado e membro criado com sucesso!')
       fecharForm()
-      await carregarMembros()
+      await carregarMembrosAtual.current()
     } catch (err: any) {
       if (err instanceof ApiError && err.body?.error) {
         setErro(typeof err.body.error === 'string' ? err.body.error : 'Não foi possível finalizar o pré-cadastro.')
@@ -396,7 +404,7 @@ export function MembrosView() {
         setSucesso('Membro criado com sucesso!')
       }
       fecharForm()
-      await carregarDados()
+      await carregarMembrosAtual.current()
     } catch (err: any) {
       if (err instanceof ApiError && err.body?.error) {
         setErro(typeof err.body.error === 'string' ? err.body.error : 'Dados inválidos.')
@@ -425,7 +433,7 @@ export function MembrosView() {
       await fetchWithAuth(`/membros/${membro.id}`, { method: 'DELETE' })
       setSucesso('Membro excluído com sucesso.')
       if (membroEditandoId === membro.id) fecharForm()
-      await carregarDados()
+      await carregarMembrosAtual.current()
     } catch (err: any) {
       if (err instanceof ApiError && err.body?.error) {
         setErro(typeof err.body.error === 'string' ? err.body.error : 'Não foi possível excluir o membro.')

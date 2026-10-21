@@ -7,6 +7,7 @@ import { eq, and } from 'drizzle-orm'
 import { setupDb } from './setup'
 import { criarSessaoAutenticadaTeste, mesclarAutorizacao } from './auth-test-helper'
 import * as batch from '../db/batch'
+import { RESPONSABILIDADE_PMO_VERSAO_ATUAL } from '../security/responsabilidade-pmo'
 
 type MembroResponse = {
   id: string
@@ -936,18 +937,180 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     const primeira = await req('/api/v1/membros/paginados?pagina=1&limite=1&busca=PG-')
     expect(primeira.status).toBe(200)
     const dados = await primeira.json() as { itens: MembroResponse[]; total: number; totalPaginas: number }
-    expect(dados.total).toBeGreaterThanOrEqual(2)
+    expect(dados.total).toBe(2)
     expect(dados.itens).toHaveLength(1)
-    expect(dados.totalPaginas).toBeGreaterThanOrEqual(2)
+    expect(dados.totalPaginas).toBe(2)
+    expect(dados.itens.map(item => item.id)).toEqual(['paginado-1'])
+    const segunda = await req('/api/v1/membros/paginados?pagina=2&limite=1&busca=PG-')
+    expect((await segunda.json() as any).itens.map((item: any) => item.id)).toEqual(['paginado-2'])
     const setor = await req(`/api/v1/membros/paginados?setorId=${setorId}&limite=100`)
     expect(setor.status).toBe(200)
+    expect(await setor.json()).toMatchObject({ total: 3, totalPaginas: 1, itens: [{ id: 'paginado-1' }, { id: membroId }, { id: 'paginado-2' }] })
   })
 
   it('39. Paginação: rejeita páginas e limites inválidos', async () => {
-    for (const params of ['pagina=0', 'pagina=-1', 'pagina=abc', 'limite=0', 'limite=101', 'limite=1.5']) {
+    for (const params of ['pagina=0', 'pagina=-1', 'pagina=abc', 'limite=0', 'limite=101', 'limite=1.5', 'pagina=9007199254740991&limite=100']) {
       const resposta = await req(`/api/v1/membros/paginados?${params}`)
       expect(resposta.status).toBe(400)
     }
+  })
+
+  const perfil = (codigo: string, tipo: string, escopoId: string) => {
+    sqlite.prepare("UPDATE acessos_conta SET ativo = 0 WHERE conta_acesso_id = 'membros-auth-conta'").run()
+    sqlite.prepare(`INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id)
+      VALUES ('paginacao-acesso', 'membros-auth-conta', ?, ?, ?)`).run(codigo, tipo, escopoId)
+    if (codigo === 'ADMINISTRADOR_SISTEMA') {
+      sqlite.prepare(`INSERT INTO ciencias_responsabilidade
+        (id, conta_acesso_id, acesso_conta_id, tipo, versao_texto, texto_hash)
+        VALUES ('ciencia-paginacao', 'membros-auth-conta', 'paginacao-acesso', 'RESPONSAVEL_REGIONAL_PMO', ?, 'hash')`)
+        .run(RESPONSABILIDADE_PMO_VERSAO_ATUAL)
+    }
+  }
+
+  it.each([
+    ['REGIONAL', regionalId], ['ADMINISTRACAO', administracaoId],
+    ['SETOR', setorId], ['CASA', casaId], ['GRUPO_TRABALHO', 'gt-paginacao'],
+  ])('relatórios %s: preserva escopo legado, minimização e impede inferência de carteirinha', async (tipo, escopoId) => {
+    sqlite.prepare('UPDATE membros SET nome = ?, codigo_carteirinha = ? WHERE id = ?')
+      .run('Álvaro Visível', 'SEGREDO-123', membroId)
+    sqlite.exec(`INSERT INTO grupos_trabalho (id, nome) VALUES ('gt-paginacao', 'GT');`)
+    const funcao = sqlite.prepare("SELECT id FROM funcoes WHERE codigo = 'DCO'").get() as any
+    sqlite.prepare(`INSERT INTO vinculos_funcionais (id, membro_id, funcao_id, grupo_trabalho_id, ativo)
+      VALUES ('vinculo-paginacao', ?, ?, 'gt-paginacao', 1)`).run(membroId, funcao.id)
+    // Um vínculo inativo não concede visibilidade ao outro membro.
+    sqlite.prepare(`INSERT INTO membros (id, nome, codigo_carteirinha, casa_id)
+      VALUES ('fora-paginacao', 'Fora Escopo', 'FORA-999', 'membros-auth-casa')`).run()
+    sqlite.prepare(`INSERT INTO vinculos_funcionais (id, membro_id, funcao_id, grupo_trabalho_id, ativo)
+      VALUES ('vinculo-inativo', 'fora-paginacao', ?, 'gt-paginacao', 0)`).run(funcao.id)
+    perfil('GESTOR_RELATORIOS', tipo, escopoId)
+    const listar = async (query = '') => {
+      const res = await req(`/api/v1/membros/paginados?limite=100&${query}`)
+      expect(res.status).toBe(200)
+      return await res.json() as any
+    }
+    const dados = await listar()
+    expect(dados.total).toBe(2)
+    expect(dados.itens.map((i: any) => i.id)).toEqual([membroId, 'membros-auth-membro'])
+    expect(dados.itens[0]).toEqual({ id: membroId, nome: 'Álvaro Visível', casaId, ativo: true })
+    const legado = await req('/api/v1/membros')
+    expect(dados.itens).toEqual(await legado.json())
+    for (const busca of ['SEGREDO-123', 'SEGREDO', 'FORA-999']) {
+      expect(await listar(`busca=${busca}`)).toMatchObject({ itens: [], total: 0, totalPaginas: 1 })
+    }
+    for (const busca of ['ÁLVARO', 'álvaro', 'Casa 1']) {
+      const encontrado = await listar(`busca=${encodeURIComponent(busca)}`)
+      expect(encontrado.total).toBe(1)
+      expect(encontrado.itens).toEqual([dados.itens[0]])
+    }
+    sqlite.prepare("UPDATE casas SET codigo = 'CASA-CODIGO' WHERE id = ?").run(casaId)
+    expect((await listar('busca=CASA-CODIGO')).itens).toEqual([dados.itens[0]])
+    // O cadastro próprio continua completo e pesquisável, mesmo no perfil relatório.
+    sqlite.prepare("UPDATE membros SET codigo_carteirinha = 'PROPRIO-123' WHERE id = 'membros-auth-membro'").run()
+    const proprio = await listar('busca=PROPRIO-123')
+    expect(proprio.total).toBe(1)
+    expect(proprio.itens[0]).toMatchObject({ id: 'membros-auth-membro', codigoCarteirinha: 'PROPRIO-123' })
+  })
+
+  it('admin regional: mais de 100 membros, filtros, páginas e binds abaixo do limite D1', async () => {
+    perfil('ADMINISTRADOR_SISTEMA', 'REGIONAL', regionalId)
+    const inserir = sqlite.prepare('INSERT INTO membros (id, nome, codigo_carteirinha, casa_id) VALUES (?, ?, ?, ?)')
+    for (let i = 0; i < 125; i++) {
+      inserir.run(`grande-${String(i).padStart(3, '0')}`, `Pessoa ${String(i).padStart(3, '0')}`, `LOTE-${i}`, casaId)
+    }
+    inserir.run('acento-a', 'Álvaro', 'ORDEM-A', casaId)
+    inserir.run('acento-z', 'Zeca', 'ORDEM-Z', casaId)
+    inserir.run('acento-b', 'álvaro', 'ORDEM-B', casaId)
+    inserir.run('fora-grande', 'Álvaro Fora', 'LOTE-FORA', 'membros-auth-casa')
+    const bindings: number[] = []
+    db = drizzle(sqlite, { schema, logger: { logQuery(_query, params) {
+      bindings.push(params.length)
+      if (params.length > 100) throw new Error('D1: too many SQL variables')
+    } } })
+    app = createApp(db)
+    const pagina = async (p: number, busca: string, limite = 50) => {
+      const res = await req(`/api/v1/membros/paginados?pagina=${p}&limite=${limite}&setorId=${setorId}&busca=${encodeURIComponent(busca)}`)
+      expect(res.status).toBe(200)
+      return await res.json() as any
+    }
+    const primeira = await pagina(1, 'LOTE-')
+    const segunda = await pagina(2, 'LOTE-')
+    const terceira = await pagina(3, 'LOTE-')
+    expect([primeira.total, segunda.total, terceira.total]).toEqual([125, 125, 125])
+    expect([primeira.totalPaginas, segunda.totalPaginas, terceira.totalPaginas]).toEqual([3, 3, 3])
+    expect([...primeira.itens, ...segunda.itens, ...terceira.itens].map((i: any) => i.id))
+      .toEqual(Array.from({ length: 125 }, (_, i) => `grande-${String(i).padStart(3, '0')}`))
+    expect(primeira.itens[0]).toMatchObject({ codigoCarteirinha: 'LOTE-0' })
+    expect(await pagina(4, 'LOTE-')).toMatchObject({ itens: [], total: 125, totalPaginas: 3 })
+    expect((await pagina(1, 'ORDEM-', 1)).itens.map((i: any) => i.id)).toEqual(['acento-a'])
+    expect((await pagina(2, 'ORDEM-', 1)).itens.map((i: any) => i.id)).toEqual(['acento-b'])
+    expect((await pagina(3, 'ORDEM-', 1)).itens.map((i: any) => i.id)).toEqual(['acento-z'])
+    expect(await pagina(1, 'ÁLVARO')).toMatchObject({ total: 2, itens: [{ id: 'acento-a' }, { id: 'acento-b' }] })
+    expect(await pagina(1, '%')).toMatchObject({ total: 0, itens: [] })
+    expect(bindings.length).toBeGreaterThan(0)
+    expect(Math.max(...bindings)).toBeLessThanOrEqual(100)
+    const todos = await req('/api/v1/membros/paginados?limite=100')
+    expect(await todos.json()).toMatchObject({ total: 130, totalPaginas: 2 })
+  })
+
+  it('sem perfil de gestão: somente o próprio cadastro é visível', async () => {
+    sqlite.prepare("UPDATE acessos_conta SET ativo = 0 WHERE conta_acesso_id = 'membros-auth-conta'").run()
+    const res = await req('/api/v1/membros/paginados')
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ total: 1, itens: [{ id: 'membros-auth-membro' }] })
+    const proibido = await req('/api/v1/membros/paginados?busca=BASE-001')
+    expect(await proibido.json()).toMatchObject({ total: 0, itens: [] })
+  })
+
+  it('paginação exige autenticação', async () => {
+    const res = await app.request(new Request('http://localhost/api/v1/membros/paginados'))
+    expect(res.status).toBe(401)
+  })
+
+  it('perfis sobrepostos: só a administração autorizada amplia o cadastro completo', async () => {
+    perfil('ADMINISTRADOR_SISTEMA', 'REGIONAL', regionalId)
+    sqlite.prepare(`INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id)
+      VALUES ('relatorio-extra', 'membros-auth-conta', 'GESTOR_RELATORIOS', 'CASA', 'membros-auth-casa')`).run()
+    sqlite.prepare(`INSERT INTO membros (id, nome, codigo_carteirinha, casa_id)
+      VALUES ('somente-relatorio', 'Pessoa Relatório', 'PRIVADO-123', 'membros-auth-casa')`).run()
+    const res = await req('/api/v1/membros/paginados?limite=100')
+    const dados = await res.json() as any
+    expect(dados.total).toBe(3)
+    expect(dados.itens.find((i: any) => i.id === membroId)).toMatchObject({ codigoCarteirinha: 'BASE-001' })
+    expect(dados.itens.find((i: any) => i.id === 'somente-relatorio'))
+      .toEqual({ id: 'somente-relatorio', nome: 'Pessoa Relatório', casaId: 'membros-auth-casa', ativo: true })
+    const proibido = await req('/api/v1/membros/paginados?busca=PRIVADO-123')
+    expect(await proibido.json()).toMatchObject({ itens: [], total: 0 })
+    // Sem ciência PMO vigente, o acesso administrativo não amplia o escopo.
+    sqlite.prepare("DELETE FROM ciencias_responsabilidade WHERE id = 'ciencia-paginacao'").run()
+    const semCiencia = await req('/api/v1/membros/paginados?busca=BASE-001')
+    expect(await semCiencia.json()).toMatchObject({ itens: [], total: 0 })
+  })
+
+  it('paginação reflete criação, edição e exclusão, com totais exatos', async () => {
+    const criar = await req('/api/v1/membros', { method: 'POST', body: JSON.stringify({
+      nome: 'Novo Paginado', dataOrdenacao: '2000-01-01', codigoCarteirinha: 'CRUD-123', casaId,
+    }) })
+    expect(criar.status).toBe(201)
+    const criado = await criar.json() as any
+    const listar = async (busca: string) => {
+      const res = await req(`/api/v1/membros/paginados?busca=${encodeURIComponent(busca)}`)
+      expect(res.status).toBe(200)
+      return await res.json() as any
+    }
+    expect(await listar('Novo Paginado')).toMatchObject({ total: 1, itens: [{ id: criado.id }] })
+    const editar = await req(`/api/v1/membros/${criado.id}`, {
+      method: 'PATCH', body: JSON.stringify({ nome: 'Nome Alterado', ativo: false }),
+    })
+    expect(editar.status).toBe(200)
+    expect(await listar('Novo Paginado')).toMatchObject({ total: 0, itens: [] })
+    expect(await listar('Nome Alterado')).toMatchObject({ total: 1, itens: [{ id: criado.id, ativo: false }] })
+    // Cadastro indevido sem histórico é excluível; criação normal gera vínculo DCO.
+    sqlite.prepare('INSERT INTO membros (id, nome, casa_id) VALUES (?, ?, ?)')
+      .run('excluir-paginado', 'Indevido Paginado', casaId)
+    expect(await listar('Indevido Paginado')).toMatchObject({ total: 1, itens: [{ id: 'excluir-paginado' }] })
+    const excluir = await req('/api/v1/membros/excluir-paginado', { method: 'DELETE' })
+    expect(excluir.status).toBe(200)
+    expect(await listar('Indevido Paginado')).toMatchObject({ total: 0, itens: [] })
   })
 
 })
