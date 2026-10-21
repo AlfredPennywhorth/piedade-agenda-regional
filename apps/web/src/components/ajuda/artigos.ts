@@ -70,7 +70,7 @@ export const artigosAjuda: ArtigoAjuda[] = [
       'Em Nova Convocação, selecione o evento correto, preencha os campos apresentados e salve para criar um rascunho.',
       'No RASCUNHO, use Gerenciar Funções para configurar destinatários por função nos eventos institucionais compatíveis. Confira as funções e o evento antes de Publicar.',
       'Publicar exige confirmação e é diferente de salvar o rascunho. Editar só está disponível enquanto a convocação estiver em RASCUNHO.',
-      'Depois de publicada, use Acompanhar RSVP para consultar as respostas. Os membros respondem pelas telas pessoais.',
+      'Depois de publicada, Acompanhar RSVP permite consultar respostas somente ao organizador, Master ou gestor de relatórios autorizado para aquele evento. A capacidade de gestão de agenda, sozinha, não autoriza essa consulta; a API pode retornar 403. Os membros respondem pelas telas pessoais.',
       'Quando disponível, Sincronizar Diáconos atualiza destinatários DCO de convocação territorial publicada antes do encerramento. Confira as contagens antes e depois.',
     ],
     cuidados: [

@@ -29,6 +29,8 @@ Conferência na implementação: `MainLayout.tsx`, `App.tsx`, componentes dos no
 | Contas/Acessos | podeAdministrarAcessos |
 | Instruções de sessões | podeGerenciarSessoes, dentro de Contas/Acessos |
 
+O acompanhamento RSVP exige autorização específica para o evento (organizador, Master ou gestor de relatórios autorizado); `podeGerirAgenda` sozinha não permite essa consulta. Conferido na rota de acompanhamento de Convocações e em `eGestorRelatoriosAutorizadoParaEvento`.
+
 O filtro ocorre antes da busca e da seleção de artigos. Texto estático da aplicação não contém segredos; a filtragem editorial não substitui autorização do servidor. Toda escrita continua sujeita às regras existentes de perfil e escopo.
 
 ## Validação e integração
