@@ -194,6 +194,10 @@ export function MembrosView() {
   const paginaMembrosAtual = Math.min(paginaMembros, totalPaginasMembros)
   const membrosDaPagina = membrosFiltrados.slice((paginaMembrosAtual - 1) * itensPorPagina, paginaMembrosAtual * itensPorPagina)
 
+  useEffect(() => {
+    if (tabelaMembrosRef.current) tabelaMembrosRef.current.scrollTop = 0
+  }, [paginaMembrosAtual, filtroSetorId, filtroBusca])
+
   const definirHierarquiaPorCasa = (idCasa: string | null | undefined) => {
     if (!idCasa) {
       setCasaId('')
@@ -899,9 +903,9 @@ export function MembrosView() {
       </div>
       {membrosFiltrados.length > itensPorPagina && (
         <nav aria-label="Páginas de membros" className="flex items-center justify-end gap-3 text-sm">
-          <button type="button" disabled={paginaMembrosAtual <= 1} onClick={() => { setPaginaMembros(paginaMembrosAtual - 1); if (tabelaMembrosRef.current) tabelaMembrosRef.current.scrollTop = 0 }} className="rounded border px-3 py-2 disabled:opacity-40">Anterior</button>
+          <button type="button" disabled={paginaMembrosAtual <= 1} onClick={() => { setPaginaMembros(paginaMembrosAtual - 1) }} className="rounded border px-3 py-2 disabled:opacity-40">Anterior</button>
           <span role="status" aria-live="polite">Página {paginaMembrosAtual} de {totalPaginasMembros}</span>
-          <button type="button" disabled={paginaMembrosAtual >= totalPaginasMembros} onClick={() => { setPaginaMembros(paginaMembrosAtual + 1); if (tabelaMembrosRef.current) tabelaMembrosRef.current.scrollTop = 0 }} className="rounded border px-3 py-2 disabled:opacity-40">Próxima</button>
+          <button type="button" disabled={paginaMembrosAtual >= totalPaginasMembros} onClick={() => { setPaginaMembros(paginaMembrosAtual + 1) }} className="rounded border px-3 py-2 disabled:opacity-40">Próxima</button>
         </nav>
       )}
     </div>
