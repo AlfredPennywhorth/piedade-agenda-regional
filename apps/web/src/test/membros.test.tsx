@@ -94,7 +94,24 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
 
     expect(screen.getByText('João da Silva')).toBeInTheDocument()
     expect(screen.queryByText('Maria Souza')).not.toBeInTheDocument()
-    expect(screen.getByText('Exibindo 1 de 2 membros')).toBeInTheDocument()
+    expect(screen.getByText('1 de 2 membros encontrados — exibindo 1 nesta página')).toBeInTheDocument()
+  })
+
+  it('pagina listas extensas e mantém a pesquisa sobre todos os membros', async () => {
+    const lista = Array.from({ length: 51 }, (_, index) => ({
+      ...mockMembros[0], id: 'membro-' + index, nome: 'Membro ' + String(index).padStart(3, '0'),
+    }))
+    mockEstrutura(lista)
+    render(<MembrosView />)
+    await screen.findByText('Membro 000')
+    expect(screen.getByText('Membro 049')).toBeInTheDocument()
+    expect(screen.queryByText('Membro 050')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Próxima' }))
+    expect(screen.getByText('Membro 050')).toBeInTheDocument()
+    expect(screen.queryByText('Membro 000')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/Buscar membro ou Casa/i), { target: { value: 'Membro 000' } })
+    expect(screen.getByText('Membro 000')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Próxima' })).not.toBeInTheDocument()
   })
 
   it('3. Vazio: exibe estado vazio sem registros', async () => {
