@@ -254,6 +254,61 @@ membrosRouter.get('/', async (c) => {
   return c.json(data)
 })
 
+// Contrato isolado: a rota legada /membros permanece disponível às demais telas.
+// A visibilidade é calculada no servidor e os campos sensíveis são minimizados
+// para vínculos com permissão somente de relatório.
+membrosRouter.get('/paginados', async (c) => {
+  const pageRaw = Number(c.req.query('pagina') || '1')
+  const sizeRaw = Number(c.req.query('limite') || '50')
+  if (!Number.isInteger(pageRaw) || pageRaw < 1 || !Number.isInteger(sizeRaw) || sizeRaw < 1 || sizeRaw > 100) {
+    return c.json({ error: 'Paginação inválida' }, 400)
+  }
+  const busca = (c.req.query('busca') || '').trim().toLocaleLowerCase('pt-BR').slice(0, 120)
+  const setorId = (c.req.query('setorId') || '').trim()
+  const db = c.get('db')
+  const visibilidade = await idsMembrosVisiveis(c)
+  const linhas: any[] = []
+  if (visibilidade === null) {
+    linhas.push(...await db.select(membroPublico).from(membros).all())
+  } else {
+    // Mantém os limites de variáveis do D1 e a mesma projeção do endpoint legado.
+    const completos = Array.from(visibilidade.idsComCadastroCompleto)
+    const minimos = Array.from(visibilidade.ids).filter(id => !visibilidade.idsComCadastroCompleto.has(id))
+    for (const [ids, campos] of [[completos, membroPublico], [minimos, membroParaRelatorio]] as const) {
+      for (let i = 0; i < ids.length; i += 90) {
+        linhas.push(...await db.select(campos).from(membros).where(inArray(membros.id, ids.slice(i, i + 90))).all())
+      }
+    }
+  }
+  const casasSetores = setorId
+    ? await db.select({ id: casas.id }).from(casas).where(eq(casas.setorId, setorId)).all()
+    : []
+  const casasPermitidas = new Set(casasSetores.map((casa: { id: string }) => casa.id))
+  const casasLista = busca
+    ? await db.select({ id: casas.id, nome: casas.nome, codigo: casas.codigo }).from(casas).all()
+    : []
+  const casasCorrespondentes = new Set(casasLista
+    .filter((casa: { id: string; nome: string; codigo: string | null }) =>
+      casa.nome.toLocaleLowerCase('pt-BR').includes(busca) || (casa.codigo || '').toLocaleLowerCase('pt-BR').includes(busca))
+    .map((casa: { id: string }) => casa.id))
+  const filtrados = linhas.filter(membro => {
+    if (setorId && !casasPermitidas.has(membro.casaId)) return false
+    if (!busca) return true
+    return membro.nome.toLocaleLowerCase('pt-BR').includes(busca)
+      || (membro.codigoCarteirinha || '').toLocaleLowerCase('pt-BR').includes(busca)
+      || casasCorrespondentes.has(membro.casaId)
+  })
+  filtrados.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
+  const inicio = (pageRaw - 1) * sizeRaw
+  return c.json({
+    itens: filtrados.slice(inicio, inicio + sizeRaw),
+    total: filtrados.length,
+    pagina: pageRaw,
+    limite: sizeRaw,
+    totalPaginas: Math.max(1, Math.ceil(filtrados.length / sizeRaw)),
+  })
+})
+
 membrosRouter.get('/:id', async (c) => {
   const db = c.get('db')
   const id = c.req.param('id')
