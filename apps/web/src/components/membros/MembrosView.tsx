@@ -60,6 +60,9 @@ export function MembrosView() {
   const [paginaMembros, setPaginaMembros] = useState(1)
   const tabelaMembrosRef = useRef<HTMLDivElement | null>(null)
   const itensPorPagina = 50
+  const [totalMembros, setTotalMembros] = useState(0)
+  const [totalPaginasServidor, setTotalPaginasServidor] = useState(1)
+  const consultaMembrosSeq = useRef(0)
 
   const [modoForm, setModoForm] = useState<'criar' | 'editar' | null>(null)
   const [tipoCriacao, setTipoCriacao] = useState<'pre-cadastro' | 'manual'>('pre-cadastro')
@@ -87,32 +90,49 @@ export function MembrosView() {
   const buscaPreCadastroSeq = useRef(0)
 
   const carregarDados = async () => {
-    setLoading(true)
-    setErro(null)
     try {
-      const [membrosData, casasData, setoresData, administracoesData, regionaisData] = await Promise.all([
-        fetchWithAuth<Membro[]>('/membros'),
+      const [casasData, setoresData, administracoesData, regionaisData] = await Promise.all([
         fetchWithAuth<Casa[]>('/casas'),
         fetchWithAuth<Setor[]>('/setores'),
         fetchWithAuth<Administracao[]>('/administracoes'),
         fetchWithAuth<Regional[]>('/regionais'),
       ])
-
-      setMembros(ordenarPorNome(membrosData))
       setCasas(ordenarPorNome(casasData))
       setSetores(ordenarPorNome(setoresData))
       setAdministracoes(ordenarPorNome(administracoesData))
       setRegionais(ordenarPorNome(regionaisData))
     } catch (err: any) {
-      setErro(err.message || 'Erro ao carregar os dados de membros e estrutura territorial.')
-    } finally {
-      setLoading(false)
+      setErro(err.message || 'Erro ao carregar a estrutura territorial.')
     }
   }
 
+  const carregarMembros = async () => {
+    const seq = ++consultaMembrosSeq.current
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ pagina: String(paginaMembros), limite: String(itensPorPagina) })
+      if (filtroBusca.trim()) params.set('busca', filtroBusca.trim())
+      if (filtroSetorId) params.set('setorId', filtroSetorId)
+      const resposta = await fetchWithAuth<{ itens: Membro[]; total: number; totalPaginas: number }>(
+        `/membros/paginados?${params.toString()}`
+      )
+      if (seq !== consultaMembrosSeq.current) return
+      setMembros(resposta.itens)
+      setTotalMembros(resposta.total)
+      setTotalPaginasServidor(resposta.totalPaginas)
+      setErro(null)
+    } catch (err: any) {
+      if (seq === consultaMembrosSeq.current) setErro(err.message || 'Erro ao carregar os membros.')
+    } finally {
+      if (seq === consultaMembrosSeq.current) setLoading(false)
+    }
+  }
+
+  useEffect(() => { void carregarDados() }, [])
   useEffect(() => {
-    carregarDados()
-  }, [])
+    const espera = setTimeout(() => { void carregarMembros() }, filtroBusca ? 250 : 0)
+    return () => { clearTimeout(espera); consultaMembrosSeq.current += 1 }
+  }, [paginaMembros, filtroSetorId, filtroBusca])
 
   useEffect(() => {
     if (tipoCriacao !== 'pre-cadastro' || modoForm !== 'criar') return
@@ -176,23 +196,10 @@ export function MembrosView() {
     )
   }, [buscaCasa, casas, setorId])
 
-  const membrosFiltrados = useMemo(() => {
-    const termo = filtroBusca.trim().toLocaleLowerCase('pt-BR')
-    return membros.filter(membro => {
-      const casa = casas.find(item => item.id === membro.casaId)
-      if (filtroSetorId && casa?.setorId !== filtroSetorId) return false
-      if (!termo) return true
-      return (
-        membro.nome.toLocaleLowerCase('pt-BR').includes(termo) ||
-        (membro.codigoCarteirinha || '').toLocaleLowerCase('pt-BR').includes(termo) ||
-        (casa?.nome || '').toLocaleLowerCase('pt-BR').includes(termo) ||
-        (casa?.codigo || '').toLocaleLowerCase('pt-BR').includes(termo)
-      )
-    })
-  }, [casas, filtroBusca, filtroSetorId, membros])
-  const totalPaginasMembros = Math.max(1, Math.ceil(membrosFiltrados.length / itensPorPagina))
+  const membrosFiltrados = membros
+  const totalPaginasMembros = totalPaginasServidor
   const paginaMembrosAtual = Math.min(paginaMembros, totalPaginasMembros)
-  const membrosDaPagina = membrosFiltrados.slice((paginaMembrosAtual - 1) * itensPorPagina, paginaMembrosAtual * itensPorPagina)
+  const membrosDaPagina = membros
 
   useEffect(() => {
     if (tabelaMembrosRef.current) tabelaMembrosRef.current.scrollTop = 0
@@ -338,7 +345,7 @@ export function MembrosView() {
       })
       setSucesso('Pré-cadastro finalizado e membro criado com sucesso!')
       fecharForm()
-      await carregarDados()
+      await carregarMembros()
     } catch (err: any) {
       if (err instanceof ApiError && err.body?.error) {
         setErro(typeof err.body.error === 'string' ? err.body.error : 'Não foi possível finalizar o pré-cadastro.')
@@ -605,7 +612,7 @@ export function MembrosView() {
           />
         </div>
         <div className="sm:col-span-2 text-xs text-slate-500 font-medium">
-          {membrosFiltrados.length} de {membros.length} membros encontrados — exibindo {membrosDaPagina.length} nesta página
+          {totalMembros} membros encontrados — exibindo {membrosDaPagina.length} nesta página
         </div>
       </div>
 
@@ -901,7 +908,7 @@ export function MembrosView() {
           </div>
         )}
       </div>
-      {membrosFiltrados.length > itensPorPagina && (
+      {totalMembros > itensPorPagina && (
         <nav aria-label="Páginas de membros" className="flex items-center justify-end gap-3 text-sm">
           <button type="button" disabled={paginaMembrosAtual <= 1} onClick={() => { setPaginaMembros(paginaMembrosAtual - 1) }} className="rounded border px-3 py-2 disabled:opacity-40">Anterior</button>
           <span role="status" aria-live="polite">Página {paginaMembrosAtual} de {totalPaginasMembros}</span>
