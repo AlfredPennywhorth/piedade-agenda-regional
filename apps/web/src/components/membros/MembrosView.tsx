@@ -58,6 +58,7 @@ export function MembrosView() {
   const [filtroSetorId, setFiltroSetorId] = useState('')
   const [filtroBusca, setFiltroBusca] = useState('')
   const [paginaMembros, setPaginaMembros] = useState(1)
+  const tabelaMembrosRef = useRef<HTMLDivElement | null>(null)
   const itensPorPagina = 50
 
   const [modoForm, setModoForm] = useState<'criar' | 'editar' | null>(null)
@@ -847,7 +848,7 @@ export function MembrosView() {
         ) : membrosFiltrados.length === 0 ? (
           <div className="p-8 text-center text-slate-400 text-sm">Nenhum membro encontrado.</div>
         ) : (
-          <div className="master-table-scroll">
+          <div className="master-table-scroll" ref={tabelaMembrosRef}>
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                 <tr>
@@ -898,9 +899,9 @@ export function MembrosView() {
       </div>
       {membrosFiltrados.length > itensPorPagina && (
         <nav aria-label="Páginas de membros" className="flex items-center justify-end gap-3 text-sm">
-          <button type="button" disabled={paginaMembrosAtual <= 1} onClick={() => setPaginaMembros(paginaMembrosAtual - 1)} className="rounded border px-3 py-2 disabled:opacity-40">Anterior</button>
-          <span>Página {paginaMembrosAtual} de {totalPaginasMembros}</span>
-          <button type="button" disabled={paginaMembrosAtual >= totalPaginasMembros} onClick={() => setPaginaMembros(paginaMembrosAtual + 1)} className="rounded border px-3 py-2 disabled:opacity-40">Próxima</button>
+          <button type="button" disabled={paginaMembrosAtual <= 1} onClick={() => { setPaginaMembros(paginaMembrosAtual - 1); if (tabelaMembrosRef.current) tabelaMembrosRef.current.scrollTop = 0 }} className="rounded border px-3 py-2 disabled:opacity-40">Anterior</button>
+          <span role="status" aria-live="polite">Página {paginaMembrosAtual} de {totalPaginasMembros}</span>
+          <button type="button" disabled={paginaMembrosAtual >= totalPaginasMembros} onClick={() => { setPaginaMembros(paginaMembrosAtual + 1); if (tabelaMembrosRef.current) tabelaMembrosRef.current.scrollTop = 0 }} className="rounded border px-3 py-2 disabled:opacity-40">Próxima</button>
         </nav>
       )}
     </div>
