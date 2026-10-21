@@ -31,4 +31,4 @@ O filtro ocorre antes da busca e da seleção de artigos. Texto estático da apl
 
 ## Validação e integração
 
-Testes de ajuda exercitam as nove telas, busca, ausência de resultados, capacidades, retorno de foco, fechamento e preservação de campos. Integram a etapa `pnpm test` da CI existente. Nenhuma alteração de banco, API ou política de promoção. PR para develop independente de #344/#345 (reconciliação de branches) e #346 (testes do preflight); não inclui merge ou deploy.
+Testes de ajuda exercitam as nove telas, busca, ausência de resultados, capacidades, retorno de foco, fechamento e preservação de campos. Integram a etapa `pnpm test` da CI existente. O Playwright valida o formulário real de Local em celular e desktop, com API simulada, incluindo Escape, retorno de foco, busca e conservação dos dados. Esse teste também roda na CI. Nenhuma alteração de banco, API ou política de promoção. PR para develop independente de #344/#345 (reconciliação de branches) e #346 (testes do preflight); não inclui merge ou deploy.

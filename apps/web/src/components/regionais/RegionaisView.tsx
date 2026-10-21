@@ -374,7 +374,7 @@ export function RegionaisView({ podeEditar = true }: { podeEditar?: boolean }) {
         <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200">
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-              <h3 className="font-bold text-slate-800 text-base">Detalhes da Regional</h3>
+              <h3 className="font-bold text-slate-800 text-base">Detalhes da Regional</h3><AjudaContextual />
               <button
                 onClick={() => setRegionalDetalhe(null)}
                 className="text-slate-400 hover:text-slate-600 text-sm font-semibold"

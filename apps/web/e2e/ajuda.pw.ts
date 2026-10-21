@@ -2,10 +2,13 @@ import { expect, test } from '@playwright/test'
 
 test('ajuda sobre formulário real mantém dados, foco e busca em viewport responsivo', async ({
   page,
-}) => {
-  await page.route('**/api/**', route =>
+}, testInfo) => {
+  page.on('pageerror', error => {
+    throw error
+  })
+  await page.route('**/api/v1/**', route =>
     route.fulfill({
-      json: route.request().url().endswith('/escopos-autorizados')
+      json: route.request().url().endsWith('/escopos-autorizados')
         ? { master: true, escopos: [] }
         : [],
     })
@@ -18,6 +21,7 @@ test('ajuda sobre formulário real mantém dados, foco e busca em viewport respo
   await ajuda.click()
   const painel = page.getByRole('dialog', { name: 'Central de Ajuda' })
   await expect(painel.getByRole('heading', { name: 'Locais e Espaços' })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('ajuda.png') })
   const box = await painel.boundingBox()
   expect(box!.width).toBeLessThanOrEqual(page.viewportSize()!.width)
   await page.keyboard.press('Escape')
