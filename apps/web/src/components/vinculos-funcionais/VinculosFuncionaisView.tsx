@@ -1,3 +1,4 @@
+import { AjudaContextual } from '../ajuda/AjudaContextual'
 import { useState, useEffect, useRef } from 'react'
 import { CreateVinculoFuncionalSchema, UpdateVinculoFuncionalSchema } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
@@ -459,7 +460,7 @@ export function VinculosFuncionaisView() {
 
       {modoForm && (
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-md space-y-4">
-          <span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-052' : 'AGD-ADM-053'} className="block text-right text-[10px] font-medium text-slate-500">Tela {modoForm === 'criar' ? 'AGD-ADM-052' : 'AGD-ADM-053'}</span>
+          <AjudaContextual /><span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-052' : 'AGD-ADM-053'} className="block text-right text-[10px] font-medium text-slate-500">Tela {modoForm === 'criar' ? 'AGD-ADM-052' : 'AGD-ADM-053'}</span>
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <h3 className="font-bold text-slate-800 text-base">
               {modoForm === 'criar' ? 'Cadastrar Novo Vínculo' : 'Editar Vínculo'}
@@ -868,7 +869,7 @@ export function VinculosFuncionaisView() {
             aria-modal="true"
             aria-labelledby="modal-detalhes-titulo"
           >
-            <span data-screen-code="AGD-ADM-054" className="block text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-054</span>
+            <AjudaContextual /><span data-screen-code="AGD-ADM-054" className="block text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-054</span>
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
               <h3 id="modal-detalhes-titulo" className="font-bold text-slate-800 text-base">Detalhes do Vínculo</h3>
               <button

@@ -65,8 +65,20 @@ jobs:
         run: pnpm test
 
       # --------------------------------------------------------
-      # 8. Build (todos os workspaces, ordem topológica)
+      # 8. Regressão do Preflight (isolada, sem credenciais ou rede)
       # --------------------------------------------------------
+      - name: Test preflight policy
+        run: node --test scripts/preflight.test.mjs
+
+      # --------------------------------------------------------
+      # 9. Build (todos os workspaces, ordem topológica)
+      # --------------------------------------------------------
+      - name: Install Chromium for help navigation tests
+        run: pnpm --filter @piedade/web exec playwright install --with-deps chromium
+
+      - name: Help navigation on mobile and desktop
+        run: pnpm --filter @piedade/web test:e2e
+
       - name: Build
         run: pnpm build
 

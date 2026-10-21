@@ -1,0 +1,38 @@
+[
+  {
+    "arquivo": "originais/AGD-ADM-013-listagem-desktop.html",
+    "nome_recebido": "Texto colado(20261015-194638)(1).txt",
+    "bytes": 18403,
+    "sha256": "afb62db71e25858df4a86eb1d64f9205c900d4b94be583f7cfe3534d010cd8c8"
+  },
+  {
+    "arquivo": "originais/AGD-ADM-013-listagem-mobile.html",
+    "nome_recebido": "Texto colado (2)(8)(1).txt",
+    "bytes": 27887,
+    "sha256": "beea02fb2fff47c0f07f5a8483728e67c281dbbc2a8108d77cb5d328c08a6e72"
+  },
+  {
+    "arquivo": "originais/AGD-ADM-055-novo-local.html",
+    "nome_recebido": "Texto colado (4)(5)(1).txt",
+    "bytes": 15098,
+    "sha256": "cc55730d667cda86a56df1178a670cdb4a2531b92b1b31eeb3c41feb240dae0c"
+  },
+  {
+    "arquivo": "originais/AGD-ADM-056-editar-local.html",
+    "nome_recebido": "Texto colado (3)(7)(1).txt",
+    "bytes": 15658,
+    "sha256": "f93ec5978a9d78479fd10a925e7eb03105a3f59eb5c9656f1dabbc5e2b40b144"
+  },
+  {
+    "arquivo": "originais/AGD-ADM-057-detalhes-local.html",
+    "nome_recebido": "AGD-ADM-057 — Detalhes do Local.html",
+    "bytes": 7386,
+    "sha256": "167df439eee2482f8f3ac24179fb522de7d00277e35e7d33b974b5afcbd5f429"
+  },
+  {
+    "arquivo": "originais/AGD-ADM-058-espacos-do-local.html",
+    "nome_recebido": "Texto colado (5)(4)(1).txt",
+    "bytes": 18399,
+    "sha256": "13d689dbb0ac2b59efd89ffaf0838d85fb8913e2a0519456219692d8d8de98c6"
+  }
+]

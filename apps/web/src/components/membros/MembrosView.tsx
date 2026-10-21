@@ -1,3 +1,4 @@
+import { AjudaContextual } from '../ajuda/AjudaContextual'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { ApiError, fetchWithAuth, patchWithAuth, postWithAuth } from '../../api/apiClient'
@@ -600,7 +601,7 @@ export function MembrosView() {
 
       {modoForm && (
         <div data-pwa-editor="membro" className="bg-white p-5 rounded-xl border border-slate-200 shadow-md space-y-5">
-          <span data-screen-code={modoForm === 'editar' ? 'AGD-ADM-036' : tipoCriacao === 'pre-cadastro' ? 'AGD-ADM-048' : 'AGD-ADM-035'} className="block text-right text-[10px] font-medium tracking-wide text-slate-500">Tela {modoForm === 'editar' ? 'AGD-ADM-036' : tipoCriacao === 'pre-cadastro' ? 'AGD-ADM-048' : 'AGD-ADM-035'}</span>
+          <AjudaContextual /><span data-screen-code={modoForm === 'editar' ? 'AGD-ADM-036' : tipoCriacao === 'pre-cadastro' ? 'AGD-ADM-048' : 'AGD-ADM-035'} className="block text-right text-[10px] font-medium tracking-wide text-slate-500">Tela {modoForm === 'editar' ? 'AGD-ADM-036' : tipoCriacao === 'pre-cadastro' ? 'AGD-ADM-048' : 'AGD-ADM-035'}</span>
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <h3 className="font-bold text-slate-800 text-base">
               {modoForm === 'editar' ? 'Editar Membro' : 'Cadastrar Membro'}

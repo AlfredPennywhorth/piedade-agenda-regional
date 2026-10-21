@@ -42,6 +42,15 @@ Fonte canônica atual: `apps/web/src/components/layout/MainLayout.tsx` (abas) e 
 | AGD-ADM-022 | Confirmar alteração apenas desta ocorrência | Confirmação | AGD-ADM-021 |
 | AGD-ADM-023 | Confirmar alteração desta e próximas ocorrências | Confirmação | AGD-ADM-021 |
 
+## Códigos compartilhados já publicados (reservados)
+
+| Código | Superfície | Componente |
+|---|---|---|
+| AGD-SHR-002 | Login | `AuthView.tsx` |
+| AGD-SHR-003 | Ativação | `AuthView.tsx` |
+| AGD-SHR-004 | Recuperação de PIN | `AuthView.tsx` |
+| AGD-SHR-005 | Ciência/responsabilidade regional | `ResponsabilidadeRegionalGate.tsx` |
+
 ## A completar
 
 Subtelas de Séries, Convocações, Administração, Portaria, Relatórios, Meu Cadastro e demais módulos; diálogos de confirmação, fluxos públicos adicionais e variantes de componentes compartilhados. Inventariar código, rota/aba, superfície pai, perfil autorizado, ação, componente e estados antes de declarar #247 concluída.
@@ -111,3 +120,12 @@ O formulário de Membros possui operações distintas: `AGD-ADM-035` no cadastro
 | AGD-ADM-058 | Gerenciar espaços de um local (inclui formulário inline) | AGD-ADM-013 |
 
 O diálogo de espaços (`AGD-ADM-058`) contém formulário e listagem no mesmo contexto. Uma evolução futura deverá distinguir operações de criar e editar Espaço se houver estados CRUD independentes; este código identifica somente a superfície atual. As confirmações nativas do navegador e demais operações permanecem pendentes no inventário global.
+
+
+## Central de Ajuda
+
+| Código | Superfície | Navegação |
+|---|---|---|
+| AGD-SHR-006 | Central de Ajuda pesquisável e artigo contextual | Mais → Central de Ajuda ou Ajuda na tela atual |
+
+Preserva a tela e os formulários de origem; códigos citados nos artigos identificam as telas documentadas, sem renumerá-las.

@@ -1,3 +1,4 @@
+import { AjudaIsolada } from '../ajuda/AjudaIsolada'
 import { ReactNode, useEffect, useState } from 'react'
 import { ApiError, fetchWithAuth, postWithAuth } from '../../api/apiClient'
 
@@ -103,6 +104,7 @@ export function ResponsabilidadeRegionalGate({ children, onCienciaRegistrada }: 
           <h1 className="text-2xl font-bold text-slate-900 mt-1">
             Ciência do responsável PMO
           </h1>
+          <AjudaIsolada assunto="responsabilidade" />
           <p className="text-sm text-slate-500 mt-1">
             Regional vinculada: {pendente.regionalNome || pendente.regionalId}
           </p>

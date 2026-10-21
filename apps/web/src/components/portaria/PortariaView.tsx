@@ -1,3 +1,4 @@
+import { AjudaContextual } from '../ajuda/AjudaContextual'
 import { useState, useEffect, useRef } from 'react'
 import * as apiClient from '../../api/apiClient'
 import { PortariaEventosResponseSchema, RetificarCheckinSchema } from '@piedade/shared'
@@ -985,6 +986,7 @@ export function PortariaView() {
                   value={modalRetificacao.motivo}
                   onChange={e => setModalRetificacao(prev => prev ? { ...prev, motivo: e.target.value, error: null } : null)}
                 />
+                <AjudaContextual disabled={modalRetificacao.isSubmitting} />
                 <p className="text-xs text-amber-700 font-medium bg-amber-50 p-2 rounded border border-amber-200">
                   Descreva apenas o erro operacional. Não informe dados pessoais ou sensíveis.
                 </p>

@@ -49,3 +49,21 @@ pnpm --filter @piedade/worker deploy
 ## Runbook de produção
 
 - [Liberação, smoke e rollback de produção](./runbook-producao.md)
+
+
+## Manual de Uso — navegação M2.1–M2.8
+
+> Capítulos documentados na `develop`. Confirmar versão publicada, permissões e telas reais antes de distribuir o manual.
+
+| Capítulo | Assunto | Documento |
+|---|---|---|
+| M2.1 | Acesso e ativação | [Abrir](manual-uso-acesso-cadastro.md) |
+| M2.2 | Minha Agenda e Calendário | [Abrir](manual-uso-minha-agenda-calendario.md) |
+| M2.3 | Eventos, Convocações e Séries | [Abrir](manual-uso-gestao-eventos-convocacoes-series.md) |
+| M2.4 | Locais e Espaços | [Abrir](manual-uso-locais-espacos-territorio.md) |
+| M2.5 | GTs, Membros e Vínculos | [Abrir](manual-uso-gt-membros-funcoes-vinculos.md) |
+| M2.6 | Contas e Segurança | [Abrir](manual-uso-contas-acessos-permissoes-seguranca.md) |
+| M2.7 | Portaria e Presenças | [Abrir](manual-uso-portaria-recepcao-presencas.md) |
+| M2.8 | Relatórios e Auditoria | [Abrir](manual-uso-relatorios-indicadores-auditoria.md) |
+
+**Atenções editoriais:** filtros nominais corrigidos na PR #340 e validados em smoke Beta (na aba **Relatório do Evento**); relatório agregado requer UUID de escopo fornecido pela administração; capturas e exemplos devem ser anonimizados. Nenhuma publicação em `main` está implícita nesta documentação.

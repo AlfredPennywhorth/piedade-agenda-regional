@@ -1,3 +1,4 @@
+import { AjudaContextual } from '../ajuda/AjudaContextual'
 import { useState, useEffect, useRef } from 'react'
 import { fetchWithAuth, postWithAuth } from '../../api/apiClient'
 import { ConvocacaoFuncaoCreate, ConvocacaoFuncaoCreatePayload } from '@piedade/shared'
@@ -178,7 +179,7 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose, returnFocusRef }
         <div className="p-6 border-b border-slate-200 flex justify-between items-center">
           <h2 id="modal-funcoes-title" className="text-xl font-bold text-slate-900">
             Gerenciar Funções do Rascunho
-          </h2>
+          </h2><AjudaContextual />
           <button
             ref={closeButtonRef}
             onClick={onClose}

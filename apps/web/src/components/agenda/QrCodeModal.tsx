@@ -1,3 +1,4 @@
+import { AjudaContextual } from '../ajuda/AjudaContextual'
 import { useEffect, useRef, useMemo } from 'react'
 import { generateQrMatrix } from './qrGenerator'
 
@@ -57,6 +58,7 @@ export function QrCodeModal({ destinatarioId, tituloEvento, onClose }: QrCodeMod
       </div>
 
       <div className="p-6 flex flex-col items-center text-center space-y-4">
+        <AjudaContextual />
         <p className="text-sm font-medium text-slate-700">{tituloEvento}</p>
 
         {/* QR Code SVG dinâmico codificando destinatarioId */}

@@ -1,0 +1,62 @@
+[
+  {
+    "arquivo": "unificados-em-avaliacao/AGD-ADM-007-desktop-unificado.html",
+    "bytes": 47347,
+    "sha256": "61ecb7dc240cb16188d50541998171cf3535ba3d96772870318fc58b97f3d987"
+  },
+  {
+    "arquivo": "originais/claro/AGD-ADM-007-desktop.html",
+    "bytes": 38920,
+    "sha256": "41b160d9068b2921f1378af2beeda1c6ff97529befcf2629f0ada6c0da99232b"
+  },
+  {
+    "arquivo": "originais/escuro/AGD-ADM-007-desktop.html",
+    "bytes": 37510,
+    "sha256": "0ff39d376cc8a3df37b7a86a93e714b105d6e499c497926da65a2ef6ad224e84"
+  },
+  {
+    "arquivo": "unificados-em-avaliacao/AGD-ADM-007-mobile-unificado.html",
+    "bytes": 36864,
+    "sha256": "68e576a27eb72c81f3d22f338d1a4af0593331a65c04551e43b804a34dc4390c"
+  },
+  {
+    "arquivo": "originais/claro/AGD-ADM-007-mobile.html",
+    "bytes": 28437,
+    "sha256": "1292139aaf49a5f25ef54fd262d16315fb1a899273d86a341b1dd903e5059384"
+  },
+  {
+    "arquivo": "originais/escuro/AGD-ADM-007-mobile.html",
+    "bytes": 27520,
+    "sha256": "38ef26c13f166d02f388cbeb8fcc62befd1f3b1a9860f7771b26137dcb7c2cf9"
+  },
+  {
+    "arquivo": "unificados-em-avaliacao/AGD-ADM-041-cadastro-unificado.html",
+    "bytes": 26667,
+    "sha256": "16a32e203f6e2814c49267bd900d6db88f2d2cbf043c8d01e36ab541bd3b396d"
+  },
+  {
+    "arquivo": "originais/claro/AGD-ADM-041-cadastro.html",
+    "bytes": 18240,
+    "sha256": "62d79bc5e874266045d67a2c425890b6067d7b5b543d8045aabd043485d54d84"
+  },
+  {
+    "arquivo": "originais/escuro/AGD-ADM-041-cadastro.html",
+    "bytes": 17346,
+    "sha256": "f09e8e1df62b19853fce95e53e1997033c17aae7c3a75ac238d59bed572fcd4b"
+  },
+  {
+    "arquivo": "unificados-em-avaliacao/AGD-ADM-042-edicao-unificado.html",
+    "bytes": 28053,
+    "sha256": "cbafa8aff28a4097d6b32711ea58648c403c3d0be6ed5f150215c4156e7dc617"
+  },
+  {
+    "arquivo": "originais/claro/AGD-ADM-042-edicao.html",
+    "bytes": 19626,
+    "sha256": "20b73f3e2236040eeb6288f151b18140e645d54c85e83f132cf9accd2e46a1a2"
+  },
+  {
+    "arquivo": "originais/escuro/AGD-ADM-042-edicao.html",
+    "bytes": 15471,
+    "sha256": "ed006156ea0501f3acb607ffb182c950c40ba76eca713eac5475919ae513fe20"
+  }
+]
