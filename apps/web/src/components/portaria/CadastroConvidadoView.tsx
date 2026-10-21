@@ -1,3 +1,4 @@
+import { AjudaIsolada } from '../ajuda/AjudaIsolada'
 import { FormEvent, useEffect, useState } from 'react'
 import { ApiError, fetchPublic, postPublic } from '../../api/apiClient'
 
@@ -121,7 +122,7 @@ export function CadastroConvidadoView({ token }: CadastroConvidadoProps) {
     return (
       <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-sm border border-slate-200">
-          <h1 className="text-xl font-semibold text-slate-900">{tituloIndisponivel}</h1>
+          <h1 className="text-xl font-semibold text-slate-900">{tituloIndisponivel}</h1><AjudaIsolada assunto="convidado" />
           <p role="alert" className="mt-3 text-sm text-red-700">{erro}</p>
         </div>
       </main>
@@ -132,7 +133,7 @@ export function CadastroConvidadoView({ token }: CadastroConvidadoProps) {
     return (
       <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-sm border border-slate-200 text-center">
-          <h1 className="text-xl font-semibold text-slate-900">Cadastro enviado</h1>
+          <h1 className="text-xl font-semibold text-slate-900">Cadastro enviado</h1><AjudaIsolada assunto="convidado" />
           <p role="status" aria-live="polite" className="mt-3 text-sm text-slate-600">
             Seus dados foram recebidos. Apresente-se ao porteiro para validar sua presença.
           </p>
@@ -145,7 +146,7 @@ export function CadastroConvidadoView({ token }: CadastroConvidadoProps) {
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
       <div className="mx-auto w-full max-w-md rounded-2xl bg-white p-5 sm:p-6 shadow-sm border border-slate-200">
-        <h1 className="text-xl font-semibold text-slate-900">Cadastro de convidado</h1>
+        <h1 className="text-xl font-semibold text-slate-900">Cadastro de convidado</h1><AjudaIsolada assunto="convidado" />
         <p className="mt-1 text-sm text-slate-600">{info.evento.titulo}</p>
         <p className="mt-3 text-xs text-slate-500">
           Preencha seus dados. A presença será confirmada pelo porteiro na entrada.

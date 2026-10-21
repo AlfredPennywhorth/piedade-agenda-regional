@@ -7,17 +7,19 @@ export function CentralAjuda({
   assunto,
   retornoFoco,
   onClose,
+  assuntosPermitidos,
 }: {
   capacidades?: CapacidadesFrontend
   assunto: string
   retornoFoco: HTMLElement | null
+  assuntosPermitidos?: readonly string[]
   onClose: () => void
 }) {
   const [busca, setBusca] = useState('')
   const [selecionado, setSelecionado] = useState(assunto)
   const dialogo = useRef<HTMLDialogElement>(null)
   const buscaRef = useRef<HTMLInputElement>(null)
-  const artigos = obterArtigos(capacidades)
+  const artigos = obterArtigos(capacidades, assuntosPermitidos)
   const artigo = artigos.find(a => a.id === selecionado)
   const voltarCentral = () => {
     setSelecionado('')

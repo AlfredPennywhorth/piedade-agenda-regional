@@ -1,8 +1,10 @@
+import { AjudaIsolada } from '../components/ajuda/AjudaIsolada'
+import { AuthView } from '../components/auth/AuthView'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
-import { MainLayout } from '../components/layout/MainLayout'
+import { MainLayout, SCREEN_CODES, type CapacidadesFrontend } from '../components/layout/MainLayout'
 import { AjudaContextual } from '../components/ajuda/AjudaContextual'
-import { obterArtigos, pesquisarArtigos } from '../components/ajuda/artigos'
+import { artigosAjuda, obterArtigos, pesquisarArtigos } from '../components/ajuda/artigos'
 
 beforeAll(() => {
   HTMLDialogElement.prototype.showModal = function () {
@@ -14,6 +16,110 @@ beforeAll(() => {
 })
 
 describe('Central de Ajuda', () => {
+  const todasCapacidades: CapacidadesFrontend = {
+    podeGerirAgenda: true,
+    podeOperarPortaria: true,
+    podeVisualizarRelatorios: true,
+    podeVisualizarAuditoria: true,
+    podeAdministrarEstrutura: true,
+    podeAdministrarPessoas: true,
+    podeAdministrarFuncoes: true,
+    podeAdministrarAcessos: true,
+    podeAdministrarRegionais: true,
+    podeGerenciarSessoes: true,
+  }
+
+  it.each(Object.entries(SCREEN_CODES))(
+    'toda aba %s tem artigo, código oficial e botão de ajuda',
+    (id, codigo) => {
+      const artigo = obterArtigos(todasCapacidades).find(a => a.id === id)
+      expect(artigo?.codigos).toContain(codigo)
+      expect(artigo?.passos.length).toBeGreaterThan(0)
+      expect(artigo?.cuidados.length).toBeGreaterThan(0)
+      render(
+        <MainLayout
+          currentTab={id as keyof typeof SCREEN_CODES}
+          capacidades={todasCapacidades}
+          onTabChange={vi.fn()}
+        >
+          <div />
+        </MainLayout>
+      )
+      fireEvent.click(screen.getByRole('button', { name: 'Ajuda' }))
+      expect(
+        within(screen.getByRole('dialog')).getByRole('heading', { level: 3 })
+      ).toHaveTextContent(artigo!.titulo)
+    }
+  )
+
+  it('cobre todos os códigos oficiais publicados sem duplicar identificadores', () => {
+    const codigos = artigosAjuda.flatMap(a => a.codigos)
+    expect(new Set(codigos).size).toBe(codigos.length)
+    const oficiais = [
+      ...Array.from({ length: 59 }, (_, i) => `AGD-ADM-${String(i + 1).padStart(3, '0')}`),
+      ...Array.from({ length: 6 }, (_, i) => `AGD-MOB-${String(i + 1).padStart(3, '0')}`),
+      ...Array.from({ length: 6 }, (_, i) => `AGD-SHR-${String(i + 1).padStart(3, '0')}`),
+    ]
+    expect(codigos.sort()).toEqual(oficiais.sort())
+  })
+
+  it('restringe cada capacidade e admite as duas formas de acesso à Portaria', () => {
+    expect(
+      obterArtigos({})
+        .map(a => a.id)
+        .sort()
+    ).toEqual(['inicio', 'agenda', 'calendario', 'avisos', 'cadastro'].sort())
+    for (const capacidades of [{ podeOperarPortaria: true }, { podeGerirAgenda: true }]) {
+      expect(obterArtigos(capacidades).some(a => a.id === 'portaria')).toBe(true)
+    }
+    expect(obterArtigos({ podeVisualizarRelatorios: true }).some(a => a.id === 'auditoria')).toBe(
+      false
+    )
+    expect(obterArtigos({ podeVisualizarAuditoria: true }).some(a => a.id === 'relatorios')).toBe(
+      false
+    )
+  })
+
+  it.each([
+    'login',
+    'ativacao',
+    'recuperacao',
+    'responsabilidade',
+    'portaria-temporaria',
+    'convidado',
+  ])('ajuda isolada de %s não expõe artigos de outras telas', assunto => {
+    render(<AjudaIsolada assunto={assunto} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Ajuda' }))
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent(
+      artigosAjuda.find(a => a.id === assunto)!.titulo
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar à Central de Ajuda' }))
+    expect(screen.getByRole('status')).toHaveTextContent('2 assuntos')
+    expect(screen.queryByRole('button', { name: /Contas e Acessos/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Minha Agenda/ })).not.toBeInTheDocument()
+  })
+
+  it.each([false, true])('ajuda de acesso mantém dados no formulário (ativação: %s)', ativando => {
+    const autenticado = vi.fn()
+    render(
+      <AuthView
+        tokenAtivacao={ativando ? 'token-ficticio-nao-enviado' : undefined}
+        onAuthenticated={autenticado}
+      />
+    )
+    const telefone = screen.getByLabelText('Celular')
+    fireEvent.change(telefone, { target: { value: '11999999999' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ajuda' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar ajuda' }))
+    expect(telefone).toHaveValue('11999999999')
+    expect(autenticado).not.toHaveBeenCalled()
+    if (!ativando) {
+      fireEvent.click(screen.getByRole('button', { name: 'Esqueci meu PIN' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Ajuda' }))
+      expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Recuperar PIN')
+    }
+  })
+
   it('abre no Mais sem navegar e preserva dados digitados e foco', () => {
     const navegar = vi.fn()
     render(

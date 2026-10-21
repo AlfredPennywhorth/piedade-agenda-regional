@@ -1,3 +1,4 @@
+import { AjudaContextual } from '../ajuda/AjudaContextual'
 import { useState, useEffect, useRef } from 'react'
 import { SerieCreate, SerieCreateInput, LocalCreate, EspacoLocalCreate } from '@piedade/shared'
 import { ApiError, fetchWithAuth, postWithAuth } from '../../api/apiClient'
@@ -460,7 +461,7 @@ export function SerieFormModal({
     <>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in overflow-y-auto">
           <div role="dialog" aria-modal="true" aria-labelledby="modal-form-title" className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden my-8">
-          <span data-screen-code={operation === 'editar' ? 'AGD-ADM-025' : 'AGD-ADM-024'} className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela {operation === 'editar' ? 'AGD-ADM-025' : 'AGD-ADM-024'}</span>
+          <AjudaContextual /><span data-screen-code={operation === 'editar' ? 'AGD-ADM-025' : 'AGD-ADM-024'} className="block px-4 pt-2 text-right text-[10px] font-medium text-slate-500">Tela {operation === 'editar' ? 'AGD-ADM-025' : 'AGD-ADM-024'}</span>
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
               <h3 id="modal-form-title" className="text-lg font-semibold text-slate-900">
                 {title}
@@ -993,7 +994,7 @@ export function SerieFormModal({
                   }} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm uppercase" />
                 </div>
                 <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
-                  <button type="button" disabled={salvandoLocalRapido} onClick={() => {
+                  <AjudaContextual /><button type="button" disabled={salvandoLocalRapido} onClick={() => {
                     fecharLocalRapido()
                     if (localRapidoTriggerRef.current?.isConnected) localRapidoTriggerRef.current.focus()
                   }} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Voltar à série</button>
@@ -1016,7 +1017,7 @@ export function SerieFormModal({
                 {espacoRapidoErro && <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{espacoRapidoErro}</p>}
                 <input autoFocus aria-label="Nome do novo espaço" placeholder="Nome do espaço *" value={espacoRapidoNome} onChange={e => setEspacoRapidoNome(e.target.value)} className="w-full rounded-lg border border-slate-300 p-2.5 text-sm" />
                 <div className="flex justify-end gap-3 border-t border-slate-100 pt-4">
-                  <button type="button" disabled={salvandoEspacoRapido} onClick={() => {
+                  <AjudaContextual /><button type="button" disabled={salvandoEspacoRapido} onClick={() => {
                     setEspacoRapidoOpen(false)
                     if (espacoRapidoTriggerRef.current?.isConnected) espacoRapidoTriggerRef.current.focus()
                   }} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">Voltar à série</button>

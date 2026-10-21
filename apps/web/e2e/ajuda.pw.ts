@@ -104,3 +104,51 @@ for (const tela of ['eventos', 'convocacoes'] as const) {
     await expect(botao).toBeFocused()
   })
 }
+
+for (const tela of ['agenda', 'calendario'] as const) {
+  test(`ajuda disponível na tela inicial ${tela} e na central`, async ({ page }) => {
+    await page.route('**/api/v1/**', route => route.fulfill({ json: [] }))
+    await page.goto(`/e2e/ajuda.html?tela=${tela}`)
+    await page.getByRole('button', { name: 'Ajuda', exact: true }).click()
+    const painel = page.getByRole('dialog', { name: 'Central de Ajuda' })
+    await expect(painel.getByRole('heading', { level: 3 })).toContainText(
+      tela === 'agenda' ? 'Minha Agenda' : 'Calendário'
+    )
+    await painel.getByRole('button', { name: 'Voltar à Central de Ajuda' }).click()
+    await expect(painel.getByRole('button', { name: /Minha Agenda —/ })).toBeVisible()
+    await painel.getByRole('searchbox').fill('AGD-MOB-002')
+    await painel.getByRole('button', { name: /Calendário —/ }).click()
+    await painel.getByRole('button', { name: 'Fechar ajuda' }).click()
+    await expect(page.getByRole('button', { name: 'Ajuda', exact: true })).toBeFocused()
+  })
+}
+
+for (const tela of ['login', 'ativacao'] as const) {
+  test(`ajuda pública de ${tela} mantém dados sem chamadas ou conteúdo administrativo`, async ({
+    page,
+  }) => {
+    const requisicoes: string[] = []
+    page.on('request', request => {
+      if (request.url().includes('/api/v1/')) requisicoes.push(request.url())
+    })
+    await page.goto(`/e2e/ajuda.html?tela=${tela}`)
+    const telefone = page.getByLabel('Celular', { exact: true })
+    await telefone.fill('11999999999')
+    await page.getByRole('button', { name: 'Ajuda', exact: true }).click()
+    const painel = page.getByRole('dialog', { name: 'Central de Ajuda' })
+    await expect(painel.getByRole('heading', { level: 3 })).toContainText(
+      tela === 'login' ? 'Entrar' : 'Ativar conta'
+    )
+    await painel.getByRole('button', { name: 'Voltar à Central de Ajuda' }).click()
+    await expect(painel.getByRole('button', { name: /Contas e Acessos/ })).toHaveCount(0)
+    await expect(painel.getByRole('button', { name: /Minha Agenda/ })).toHaveCount(0)
+    await painel.getByRole('button', { name: 'Fechar ajuda' }).click()
+    await expect(telefone).toHaveValue('11999999999')
+    expect(requisicoes).toEqual([])
+    if (tela === 'login') {
+      await page.getByRole('button', { name: 'Esqueci meu PIN' }).click()
+      await page.getByRole('button', { name: 'Ajuda', exact: true }).click()
+      await expect(painel.getByRole('heading', { level: 3 })).toContainText('Recuperar PIN')
+    }
+  })
+}

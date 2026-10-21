@@ -1,3 +1,4 @@
+import { AjudaIsolada } from '../ajuda/AjudaIsolada'
 import { IdentificacaoVersao } from '../versao/VersaoPwa'
 import { FormEvent, useState } from 'react'
 import {
@@ -111,6 +112,7 @@ export function AuthView({
           Tela AGD-SHR-004
         </span>
         <section className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-lg p-6 space-y-6">
+          <AjudaIsolada assunto="recuperacao" assuntosPermitidos={['inicio', 'login', 'ativacao', 'recuperacao']} />
           <header className="space-y-2 text-center">
             <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">
               Agenda Regional São Paulo
@@ -206,6 +208,7 @@ export function AuthView({
           <h1 className="text-2xl font-bold text-slate-900">
             {ativando ? 'Ativar conta de acesso' : 'Entrar'}
           </h1>
+          <AjudaIsolada assunto={ativando ? 'ativacao' : 'login'} assuntosPermitidos={['inicio', 'login', 'ativacao', 'recuperacao']} />
           <p className="text-sm text-slate-600">
             {ativando
               ? 'Confirme sua carteirinha e seu celular cadastrado, depois escolha um PIN pessoal de seis dígitos.'

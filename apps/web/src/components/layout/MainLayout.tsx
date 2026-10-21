@@ -17,7 +17,7 @@ export interface CapacidadesFrontend {
   podeGerirAgenda?: boolean
 }
 
-const SCREEN_CODES = {
+export const SCREEN_CODES = {
   agenda: 'AGD-MOB-001',
   eventos: 'AGD-ADM-001',
   series: 'AGD-ADM-002',

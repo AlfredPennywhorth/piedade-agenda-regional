@@ -35,4 +35,9 @@ O filtro ocorre antes da busca e da seleção de artigos. Texto estático da apl
 
 ## Validação e integração
 
-Testes unitários de ajuda exercitam os onze contextos de aba no `MainLayout` com campos de teste, além de busca, ausência de resultados, capacidades, retorno de foco e fechamento. Eles rodam na etapa `pnpm test` da CI. O Playwright usa os formulários reais de `LocaisView`, `EventosView` e `ConvocacoesView` em celular e desktop, com API simulada, verificando Escape, retorno de foco, busca e conservação dos dados. Roda na etapa separada `pnpm --filter @piedade/web test:e2e` da CI. Os outros oito módulos permanecem cobertos por testes unitários de contexto, sem E2E de seus formulários reais nesta entrega. Nenhuma alteração de banco, API ou política de promoção. PR para develop independente de #344/#345 (reconciliação de branches) e #346 (testes do preflight); não inclui merge ou deploy.
+Testes unitários de ajuda exercitam os 20 contextos de aba no `MainLayout` com campos de teste, além de busca, ausência de resultados, capacidades, retorno de foco e fechamento. Eles rodam na etapa `pnpm test` da CI. O Playwright usa os formulários reais de `LocaisView`, `EventosView` e `ConvocacoesView` em celular e desktop, com API simulada, verificando Escape, retorno de foco, busca e conservação dos dados. Roda na etapa separada `pnpm --filter @piedade/web test:e2e` da CI. Os demais módulos permanecem cobertos por testes unitários de contexto, sem E2E de seus formulários reais nesta entrega. Nenhuma alteração de banco, API ou política de promoção. PR para develop independente de #344/#345 (reconciliação de branches) e #346 (testes do preflight); não inclui merge ou deploy.
+
+
+## Cobertura completa das telas principais
+
+A auditoria e a matriz de acesso estão em [cobertura-ajuda.md](cobertura-ajuda.md). A ampliação cobre todas as 20 abas principais e seis fluxos isolados (login, ativação, recuperação, ciência PMO, operador temporário e convidado), com ajuda pública restrita. Os códigos das subtelas apontam para o artigo do módulo pai. O documento de cobertura detalha os testes reais e seus limites.

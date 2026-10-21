@@ -1,3 +1,4 @@
+import { artigosComplementares } from './artigosComplementares'
 import type { CapacidadesFrontend } from '../layout/MainLayout'
 
 export interface ArtigoAjuda {
@@ -5,17 +6,20 @@ export interface ArtigoAjuda {
   titulo: string
   codigos: string[]
   capacidade?: keyof CapacidadesFrontend
+  capacidadesAlternativas?: (keyof CapacidadesFrontend)[]
+  isolado?: boolean
   passos: string[]
   cuidados: string[]
 }
 
 export const artigosAjuda: ArtigoAjuda[] = [
+  ...artigosComplementares,
   {
     id: 'inicio',
     titulo: 'Como usar a ajuda',
-    codigos: [],
+    codigos: ['AGD-SHR-006'],
     passos: [
-      'Abra Mais → Central de Ajuda e pesquise por assunto ou código de tela.',
+      'Após entrar, abra Mais → Central de Ajuda e pesquise por assunto ou código de tela. Nas telas de acesso, use o botão Ajuda para orientações daquele fluxo.',
       'Nas telas administrativas, Ajuda abre as orientações da tela atual. Feche a ajuda para continuar de onde parou.',
     ],
     cuidados: [
@@ -215,9 +219,17 @@ export const artigosAjuda: ArtigoAjuda[] = [
   },
 ]
 
-export function obterArtigos(capacidades: CapacidadesFrontend = {}): ArtigoAjuda[] {
+export function obterArtigos(
+  capacidades: CapacidadesFrontend = {},
+  assuntosPermitidos?: readonly string[]
+): ArtigoAjuda[] {
   return artigosAjuda
-    .filter(a => !a.capacidade || capacidades[a.capacidade] === true)
+    .filter(a => (assuntosPermitidos ? assuntosPermitidos.includes(a.id) : !a.isolado))
+    .filter(
+      a =>
+        (!a.capacidade || capacidades[a.capacidade] === true) &&
+        (!a.capacidadesAlternativas || a.capacidadesAlternativas.some(c => capacidades[c] === true))
+    )
     .map(a => {
       if (a.id === 'regionais')
         return {

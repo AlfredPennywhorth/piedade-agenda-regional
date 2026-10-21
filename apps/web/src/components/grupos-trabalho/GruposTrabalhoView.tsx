@@ -1,3 +1,4 @@
+import { AjudaContextual } from '../ajuda/AjudaContextual'
 import { useState, useEffect, useMemo } from 'react'
 import { CreateGrupoTrabalhoSchema, UpdateGrupoTrabalhoSchema } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
@@ -314,7 +315,7 @@ export function GruposTrabalhoView() {
       {/* Form de Criação / Edição */}
       {modoForm && (
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-md space-y-4">
-          <span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-045' : 'AGD-ADM-046'} className="block text-right text-[10px] font-medium tracking-wide text-slate-500">Tela {modoForm === 'criar' ? 'AGD-ADM-045' : 'AGD-ADM-046'}</span>
+          <AjudaContextual /><span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-045' : 'AGD-ADM-046'} className="block text-right text-[10px] font-medium tracking-wide text-slate-500">Tela {modoForm === 'criar' ? 'AGD-ADM-045' : 'AGD-ADM-046'}</span>
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <h3 className="font-bold text-slate-800 text-base">
               {modoForm === 'criar' ? 'Cadastrar Novo Grupo' : 'Editar Grupo'}
@@ -489,7 +490,7 @@ export function GruposTrabalhoView() {
             aria-modal="true"
             aria-labelledby="modal-detalhes-titulo"
           >
-            <span data-screen-code="AGD-ADM-047" className="block text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-047</span>
+            <AjudaContextual /><span data-screen-code="AGD-ADM-047" className="block text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-047</span>
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
               <h3 id="modal-detalhes-titulo" className="font-bold text-slate-800 text-base">Detalhes do Grupo de Trabalho</h3>
               <button
