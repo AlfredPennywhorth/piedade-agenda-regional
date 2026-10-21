@@ -57,6 +57,8 @@ export function MembrosView() {
 
   const [filtroSetorId, setFiltroSetorId] = useState('')
   const [filtroBusca, setFiltroBusca] = useState('')
+  const [paginaMembros, setPaginaMembros] = useState(1)
+  const itensPorPagina = 50
 
   const [modoForm, setModoForm] = useState<'criar' | 'editar' | null>(null)
   const [tipoCriacao, setTipoCriacao] = useState<'pre-cadastro' | 'manual'>('pre-cadastro')
@@ -187,6 +189,9 @@ export function MembrosView() {
       )
     })
   }, [casas, filtroBusca, filtroSetorId, membros])
+  const totalPaginasMembros = Math.max(1, Math.ceil(membrosFiltrados.length / itensPorPagina))
+  const paginaMembrosAtual = Math.min(paginaMembros, totalPaginasMembros)
+  const membrosDaPagina = membrosFiltrados.slice((paginaMembrosAtual - 1) * itensPorPagina, paginaMembrosAtual * itensPorPagina)
 
   const definirHierarquiaPorCasa = (idCasa: string | null | undefined) => {
     if (!idCasa) {
@@ -572,7 +577,7 @@ export function MembrosView() {
           <select
             id="filtro-setor"
             value={filtroSetorId}
-            onChange={event => setFiltroSetorId(event.target.value)}
+            onChange={event => { setFiltroSetorId(event.target.value); setPaginaMembros(1) }}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50"
           >
             <option value="">Todos os Setores</option>
@@ -589,13 +594,13 @@ export function MembrosView() {
             id="filtro-busca"
             type="search"
             value={filtroBusca}
-            onChange={event => setFiltroBusca(event.target.value)}
+            onChange={event => { setFiltroBusca(event.target.value); setPaginaMembros(1) }}
             placeholder="Nome, carteirinha, Casa ou código..."
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50"
           />
         </div>
         <div className="sm:col-span-2 text-xs text-slate-500 font-medium">
-          Exibindo {membrosFiltrados.length} de {membros.length} membros
+          {membrosFiltrados.length} de {membros.length} membros encontrados — exibindo {membrosDaPagina.length} nesta página
         </div>
       </div>
 
@@ -853,7 +858,7 @@ export function MembrosView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {membrosFiltrados.map(membro => (
+                {membrosDaPagina.map(membro => (
                   <tr key={membro.id} className="hover:bg-slate-50">
                     <td className="p-3 font-semibold text-slate-800">{membro.nome}</td>
                     <td className="p-3 text-xs text-slate-600 font-medium">{getCasaNome(membro.casaId)}</td>
@@ -891,6 +896,13 @@ export function MembrosView() {
           </div>
         )}
       </div>
+      {membrosFiltrados.length > itensPorPagina && (
+        <nav aria-label="Páginas de membros" className="flex items-center justify-end gap-3 text-sm">
+          <button type="button" disabled={paginaMembrosAtual <= 1} onClick={() => setPaginaMembros(paginaMembrosAtual - 1)} className="rounded border px-3 py-2 disabled:opacity-40">Anterior</button>
+          <span>Página {paginaMembrosAtual} de {totalPaginasMembros}</span>
+          <button type="button" disabled={paginaMembrosAtual >= totalPaginasMembros} onClick={() => setPaginaMembros(paginaMembrosAtual + 1)} className="rounded border px-3 py-2 disabled:opacity-40">Próxima</button>
+        </nav>
+      )}
     </div>
   )
 }
