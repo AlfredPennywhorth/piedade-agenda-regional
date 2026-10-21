@@ -1146,4 +1146,16 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     expect(await listar('Indevido Paginado')).toMatchObject({ total: 0, itens: [] })
   })
 
+
+  it('paginação pesquisa nomes sem diferença de acentos ou caixa, sem perder o escopo', async () => {
+    sqlite.prepare('INSERT INTO membros (id, nome, casa_id, ativo) VALUES (?, ?, ?, 1)')
+      .run('busca-acento-paginada', 'André ÚnicoBusca', casaId)
+    for (const termo of ['andre unicobusca', 'ANDRÉ ÚNICOBUSCA', 'Andre UnicoBusca', 'andré únicobusca']) {
+      const resposta = await req(`/api/v1/membros/paginados?busca=${encodeURIComponent(termo)}`)
+      expect(resposta.status).toBe(200)
+      const dados = await resposta.json() as { total: number; itens: { id: string }[] }
+      expect(dados.total).toBe(1)
+      expect(dados.itens.map(item => item.id)).toEqual(['busca-acento-paginada'])
+    }
+  })
 })
