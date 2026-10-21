@@ -273,13 +273,14 @@ membrosRouter.get('/paginados', async (c) => {
   if (setorId) filtros.push(inArray(membros.casaId,
     db.select({ id: casas.id }).from(casas).where(eq(casas.setorId, setorId))))
   if (busca) {
-    const termo = '%' + busca.toLocaleLowerCase('pt-BR').replace(/[\\%_]/g, '\\$&') + '%'
     filtros.push(or(
-      sql`LOWER(${membros.nome}) LIKE ${termo} ESCAPE '\\'`,
-      sql`LOWER(${membros.codigoCarteirinha}) LIKE ${termo} ESCAPE '\\'`,
+      sql`instr(lower(${membros.nome}), lower(${busca})) > 0`,
+      sql`instr(lower(${membros.codigoCarteirinha}), lower(${busca})) > 0`,
       inArray(membros.casaId, db.select({ id: casas.id }).from(casas)
-        .where(or(sql`LOWER(${casas.nome}) LIKE ${termo} ESCAPE '\\'`,
-          sql`LOWER(${casas.codigo}) LIKE ${termo} ESCAPE '\\'`)))
+        .where(or(
+          sql`instr(lower(${casas.nome}), lower(${busca})) > 0`,
+          sql`instr(lower(${casas.codigo}), lower(${busca})) > 0`
+        )))
     ))
   }
   const ids = visibilidade === null ? null : Array.from(visibilidade.ids)
