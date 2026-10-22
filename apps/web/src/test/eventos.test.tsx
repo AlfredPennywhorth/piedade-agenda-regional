@@ -79,13 +79,24 @@ describe('EventosView', () => {
     await screen.findByText('Zulu')
     const titles = () => Array.from(document.querySelectorAll('tbody tr td:first-child'))
       .map(cell => cell.textContent?.trim())
+    const sortHeader = (name: string) => screen.getByRole('button', { name }).closest('th')
+    const inicio = 'Ordenar eventos por início'
+    const titulo = 'Ordenar eventos por título'
     expect(titles()).toEqual(['Zulu', 'Meio', 'Alfa'])
-    fireEvent.click(screen.getByRole('button', { name: 'Ordenar eventos por início' }))
+    expect(sortHeader(inicio)).toHaveAttribute('aria-sort', 'ascending')
+    expect(sortHeader(titulo)).toHaveAttribute('aria-sort', 'none')
+    fireEvent.click(screen.getByRole('button', { name: inicio }))
     expect(titles()).toEqual(['Alfa', 'Meio', 'Zulu'])
-    fireEvent.click(screen.getByRole('button', { name: 'Ordenar eventos por título' }))
+    expect(sortHeader(inicio)).toHaveAttribute('aria-sort', 'descending')
+    expect(sortHeader(titulo)).toHaveAttribute('aria-sort', 'none')
+    fireEvent.click(screen.getByRole('button', { name: titulo }))
     expect(titles()).toEqual(['Alfa', 'Meio', 'Zulu'])
-    fireEvent.click(screen.getByRole('button', { name: 'Ordenar eventos por título' }))
+    expect(sortHeader(inicio)).toHaveAttribute('aria-sort', 'none')
+    expect(sortHeader(titulo)).toHaveAttribute('aria-sort', 'ascending')
+    fireEvent.click(screen.getByRole('button', { name: titulo }))
     expect(titles()).toEqual(['Zulu', 'Meio', 'Alfa'])
+    expect(sortHeader(inicio)).toHaveAttribute('aria-sort', 'none')
+    expect(sortHeader(titulo)).toHaveAttribute('aria-sort', 'descending')
   })
 
   it('gestor filtra a Administração incluindo eventos de Casas subordinadas', async () => {
