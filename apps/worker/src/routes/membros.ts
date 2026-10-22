@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
-import { and, eq, inArray, or } from 'drizzle-orm'
+import { and, eq, inArray, or, sql, type AnyColumn } from 'drizzle-orm'
 import { acessosConta, administracoes, casas, contasAcesso, funcoes, membros, setores, tentativasAcesso, vinculosFuncionais } from '../db/schema'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
-import { eMasterSistema, regionaisAdministradas } from '../security/permissoes'
+import { eMasterSistema, regionaisAdministradas, obterEscoposTerritoriaisVisiveis, type ContextoPermissoes } from '../security/permissoes'
 import { listarVinculosVisiveis, prepararSincronizacaoConvocacoes, queriesSincronizacaoConvocacoes } from './vinculos_funcionais'
 import { executarOperacaoComAudit, executarOperacaoComAudits } from '../services/auditoria'
 import { queriesSincronizacaoDcoAtual } from '../services/sincronizacao-dco'
@@ -252,6 +252,105 @@ membrosRouter.get('/', async (c) => {
 
   data.sort((a: { id: string; nome: string }, b: { id: string; nome: string }) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
   return c.json(data)
+})
+
+// Cada conjunto ocupa um binding, independentemente do número de escopos.
+function emConjuntoJson(coluna: AnyColumn, valores: string[]) {
+  return sql`${coluna} in (select value from json_each(${JSON.stringify(valores)}))`
+}
+
+// Mesma semântica da rota legada, sem materializar IDs por membro nem alterar
+// aquela rota. Apenas cadastro próprio e administração regional dão acesso completo.
+function escopoMembrosPaginados(contexto: ContextoPermissoes) {
+  if (eMasterSistema(contexto)) return { visivel: sql`1 = 1`, completo: sql`1 = 1` }
+  const completo = or(
+    eq(membros.id, contexto.membroId),
+    emConjuntoJson(administracoes.regionalId, [...regionaisAdministradas(contexto)])
+  )!
+  const relatorios = contexto.acessosAtivos.filter(a =>
+    a.perfilCodigo === 'GESTOR_RELATORIOS' && a.escopoId)
+  const ids = (tipo: string): string[] => relatorios
+    .filter(a => a.escopoTipo === tipo).map(a => a.escopoId!)
+  const visivel = or(
+    completo,
+    emConjuntoJson(administracoes.regionalId, ids('REGIONAL')),
+    emConjuntoJson(administracoes.id, ids('ADMINISTRACAO')),
+    emConjuntoJson(setores.id, ids('SETOR')),
+    emConjuntoJson(casas.id, ids('CASA')),
+    sql`exists (select 1 from ${vinculosFuncionais}
+      where ${vinculosFuncionais.membroId} = ${membros.id}
+      and ${vinculosFuncionais.ativo} = 1
+      and ${emConjuntoJson(vinculosFuncionais.grupoTrabalhoId, ids('GRUPO_TRABALHO'))})`
+  )!
+  return { visivel, completo }
+}
+
+// Normaliza apenas a pesquisa, sem alterar a comparação institucional de nomes.
+// Evita que "andre" deixe de encontrar "André".
+function normalizarBusca(valor: string): string {
+  return valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
+}
+
+membrosRouter.get('/paginados', async (c) => {
+  const pagina = Number(c.req.query('pagina') || '1')
+  const limite = Number(c.req.query('limite') || '50')
+  const offset = (pagina - 1) * limite
+  if (!Number.isSafeInteger(pagina) || pagina < 1 || !Number.isSafeInteger(limite) || limite < 1 || limite > 100 || !Number.isSafeInteger(offset)) {
+    return c.json({ error: 'Paginação inválida' }, 400)
+  }
+  const busca = normalizarBusca((c.req.query('busca') || '').trim().slice(0, 120))
+  const setorId = (c.req.query('setorId') || '').trim()
+  const db = c.get('db')
+  const contexto = c.get('contextoPermissoes')
+  const { visivel, completo } = escopoMembrosPaginados(contexto)
+  // Reutiliza a mesma autorização de /casas. Acesso ao membro via GT não
+  // concede acesso aos metadados da Casa dele, nem à filtragem pelo seu setor.
+  const territorios = await obterEscoposTerritoriaisVisiveis(db, contexto)
+  const casaVisivel = territorios.tudo
+    ? sql`1 = 1`
+    : emConjuntoJson(casas.id, [...territorios.casasIds])
+  const where = and(visivel, setorId ? and(casaVisivel, eq(casas.setorId, setorId)) : undefined)
+
+  // D1 não oferece collation ICU pt-BR. Ordenamos só metadados autorizados no
+  // runtime antes de recortar a página; os cadastros completos vêm apenas nela.
+  // CASE impede inclusive a pesquisa/inferência da carteirinha de relatório.
+  const candidatos: {
+    id: string
+    nome: string
+    codigoCarteirinha: string | null
+    casaNome: string | null
+    casaCodigo: string | null
+  }[] = await db.select({
+    id: membros.id, nome: membros.nome,
+    codigoCarteirinha: sql<string | null>`case when ${completo} then ${membros.codigoCarteirinha} else null end`,
+    casaNome: sql<string | null>`case when ${casaVisivel} then ${casas.nome} else null end`,
+    casaCodigo: sql<string | null>`case when ${casaVisivel} then ${casas.codigo} else null end`,
+  }).from(membros)
+    .leftJoin(casas, eq(membros.casaId, casas.id))
+    .leftJoin(setores, eq(casas.setorId, setores.id))
+    .leftJoin(administracoes, eq(setores.administracaoId, administracoes.id))
+    .where(where).all()
+  const filtrados = candidatos.filter(item => !busca ||
+    [item.nome, item.codigoCarteirinha, item.casaNome, item.casaCodigo]
+      .some(valor => normalizarBusca(valor || '').includes(busca)))
+  filtrados.sort((a, b) =>
+    a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }) || a.id.localeCompare(b.id))
+  const total = filtrados.length
+  // Envia ao D1 apenas os IDs da página (no máximo 100), em um binding.
+  const idsPagina = filtrados.slice(offset, offset + limite).map(item => item.id)
+  const ordem = JSON.stringify(idsPagina)
+  const selecionados: (Pick<typeof membros.$inferSelect, keyof typeof membroPublico> & { completo: number })[] =
+    idsPagina.length === 0 ? [] : await db.select({ ...membroPublico, completo: sql<number>`${completo}` })
+    .from(membros)
+    .leftJoin(casas, eq(membros.casaId, casas.id))
+    .leftJoin(setores, eq(casas.setorId, setores.id))
+    .leftJoin(administracoes, eq(setores.administracaoId, administracoes.id))
+    .innerJoin(sql`json_each(${ordem}) as ordem`, sql`ordem.value = ${membros.id}`)
+    .where(where).orderBy(sql`cast(ordem.key as integer)`)
+    .all()
+  const itens = selecionados.map(({ completo: cadastroCompleto, ...item }) => cadastroCompleto
+    ? item : { id: item.id, nome: item.nome, casaId: item.casaId, ativo: item.ativo })
+  return c.json({ itens, total, pagina, limite, totalPaginas: Math.max(1, Math.ceil(total / limite)) })
 })
 
 membrosRouter.get('/:id', async (c) => {

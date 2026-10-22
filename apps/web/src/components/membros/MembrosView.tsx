@@ -1,5 +1,5 @@
 import { AjudaContextual } from '../ajuda/AjudaContextual'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { CreateMembroSchema, UpdateMembroSchema } from '@piedade/shared'
 import { ApiError, fetchWithAuth, patchWithAuth, postWithAuth } from '../../api/apiClient'
 import type { Regional } from '../regionais/RegionaisView'
@@ -53,10 +53,19 @@ export function MembrosView() {
   const [regionais, setRegionais] = useState<Regional[]>([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [erroTerritorial, setErroTerritorial] = useState<string | null>(null)
+  const [erroMembros, setErroMembros] = useState<string | null>(null)
   const [sucesso, setSucesso] = useState<string | null>(null)
 
   const [filtroSetorId, setFiltroSetorId] = useState('')
   const [filtroBusca, setFiltroBusca] = useState('')
+  const [paginaMembros, setPaginaMembros] = useState(1)
+  const tabelaMembrosRef = useRef<HTMLDivElement | null>(null)
+  const itensPorPagina = 50
+  const [totalMembros, setTotalMembros] = useState(0)
+  const [totalPaginasServidor, setTotalPaginasServidor] = useState(1)
+  const consultaMembrosSeq = useRef(0)
+  const carregarMembrosAtual = useRef<() => Promise<void>>(async () => {})
 
   const [modoForm, setModoForm] = useState<'criar' | 'editar' | null>(null)
   const [tipoCriacao, setTipoCriacao] = useState<'pre-cadastro' | 'manual'>('pre-cadastro')
@@ -84,32 +93,64 @@ export function MembrosView() {
   const buscaPreCadastroSeq = useRef(0)
 
   const carregarDados = async () => {
-    setLoading(true)
-    setErro(null)
     try {
-      const [membrosData, casasData, setoresData, administracoesData, regionaisData] = await Promise.all([
-        fetchWithAuth<Membro[]>('/membros'),
+      const [casasData, setoresData, administracoesData, regionaisData] = await Promise.all([
         fetchWithAuth<Casa[]>('/casas'),
         fetchWithAuth<Setor[]>('/setores'),
         fetchWithAuth<Administracao[]>('/administracoes'),
         fetchWithAuth<Regional[]>('/regionais'),
       ])
-
-      setMembros(ordenarPorNome(membrosData))
       setCasas(ordenarPorNome(casasData))
       setSetores(ordenarPorNome(setoresData))
       setAdministracoes(ordenarPorNome(administracoesData))
       setRegionais(ordenarPorNome(regionaisData))
+      setErroTerritorial(null)
     } catch (err: any) {
-      setErro(err.message || 'Erro ao carregar os dados de membros e estrutura territorial.')
-    } finally {
-      setLoading(false)
+      setErroTerritorial(err.message || 'Erro ao carregar a estrutura territorial.')
     }
   }
 
+  const carregarMembros = async () => {
+    const seq = ++consultaMembrosSeq.current
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ pagina: String(paginaMembros), limite: String(itensPorPagina) })
+      if (filtroBusca.trim()) params.set('busca', filtroBusca.trim())
+      if (filtroSetorId) params.set('setorId', filtroSetorId)
+      const resposta = await fetchWithAuth<{ itens: Membro[]; total: number; totalPaginas: number }>(
+        `/membros/paginados?${params.toString()}`
+      )
+      if (seq !== consultaMembrosSeq.current) return
+      const ultimaPagina = Math.max(1, resposta.totalPaginas)
+      if (paginaMembros > ultimaPagina) {
+        setPaginaMembros(ultimaPagina)
+        return
+      }
+      setMembros(resposta.itens)
+      setTotalMembros(resposta.total)
+      setTotalPaginasServidor(resposta.totalPaginas)
+      setErroMembros(null)
+    } catch (err: any) {
+      if (seq === consultaMembrosSeq.current) {
+        setMembros([])
+        setTotalMembros(0)
+        setTotalPaginasServidor(1)
+        setErroMembros(err.message || 'Erro ao carregar os membros.')
+      }
+    } finally {
+      if (seq === consultaMembrosSeq.current) setLoading(false)
+    }
+  }
+
+  useLayoutEffect(() => {
+    carregarMembrosAtual.current = carregarMembros
+  })
+
+  useEffect(() => { void carregarDados() }, [])
   useEffect(() => {
-    carregarDados()
-  }, [])
+    const espera = setTimeout(() => { void carregarMembros() }, filtroBusca ? 250 : 0)
+    return () => { clearTimeout(espera); consultaMembrosSeq.current += 1 }
+  }, [paginaMembros, filtroSetorId, filtroBusca])
 
   useEffect(() => {
     if (tipoCriacao !== 'pre-cadastro' || modoForm !== 'criar') return
@@ -173,20 +214,14 @@ export function MembrosView() {
     )
   }, [buscaCasa, casas, setorId])
 
-  const membrosFiltrados = useMemo(() => {
-    const termo = filtroBusca.trim().toLocaleLowerCase('pt-BR')
-    return membros.filter(membro => {
-      const casa = casas.find(item => item.id === membro.casaId)
-      if (filtroSetorId && casa?.setorId !== filtroSetorId) return false
-      if (!termo) return true
-      return (
-        membro.nome.toLocaleLowerCase('pt-BR').includes(termo) ||
-        (membro.codigoCarteirinha || '').toLocaleLowerCase('pt-BR').includes(termo) ||
-        (casa?.nome || '').toLocaleLowerCase('pt-BR').includes(termo) ||
-        (casa?.codigo || '').toLocaleLowerCase('pt-BR').includes(termo)
-      )
-    })
-  }, [casas, filtroBusca, filtroSetorId, membros])
+  const membrosFiltrados = membros
+  const totalPaginasMembros = totalPaginasServidor
+  const paginaMembrosAtual = Math.min(paginaMembros, totalPaginasMembros)
+  const membrosDaPagina = membros
+
+  useEffect(() => {
+    if (tabelaMembrosRef.current) tabelaMembrosRef.current.scrollTop = 0
+  }, [paginaMembrosAtual, filtroSetorId, filtroBusca])
 
   const definirHierarquiaPorCasa = (idCasa: string | null | undefined) => {
     if (!idCasa) {
@@ -328,7 +363,7 @@ export function MembrosView() {
       })
       setSucesso('Pré-cadastro finalizado e membro criado com sucesso!')
       fecharForm()
-      await carregarDados()
+      await carregarMembrosAtual.current()
     } catch (err: any) {
       if (err instanceof ApiError && err.body?.error) {
         setErro(typeof err.body.error === 'string' ? err.body.error : 'Não foi possível finalizar o pré-cadastro.')
@@ -379,7 +414,7 @@ export function MembrosView() {
         setSucesso('Membro criado com sucesso!')
       }
       fecharForm()
-      await carregarDados()
+      await carregarMembrosAtual.current()
     } catch (err: any) {
       if (err instanceof ApiError && err.body?.error) {
         setErro(typeof err.body.error === 'string' ? err.body.error : 'Dados inválidos.')
@@ -408,7 +443,7 @@ export function MembrosView() {
       await fetchWithAuth(`/membros/${membro.id}`, { method: 'DELETE' })
       setSucesso('Membro excluído com sucesso.')
       if (membroEditandoId === membro.id) fecharForm()
-      await carregarDados()
+      await carregarMembrosAtual.current()
     } catch (err: any) {
       if (err instanceof ApiError && err.body?.error) {
         setErro(typeof err.body.error === 'string' ? err.body.error : 'Não foi possível excluir o membro.')
@@ -550,12 +585,16 @@ export function MembrosView() {
         </button>
       </div>
 
-      {erro && (
-        <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm flex justify-between items-center">
-          <span>{erro}</span>
-          <button onClick={() => setErro(null)} className="font-bold ml-2">✕</button>
+      {[
+        { origem: 'territorio', rotulo: 'território', mensagem: erroTerritorial, limpar: () => setErroTerritorial(null) },
+        { origem: 'membros', rotulo: 'membros', mensagem: erroMembros, limpar: () => setErroMembros(null) },
+        { origem: 'operacao', rotulo: 'operação', mensagem: erro, limpar: () => setErro(null) },
+      ].map(({ origem, rotulo, mensagem, limpar }) => mensagem && (
+        <div key={origem} role="alert" className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm flex justify-between items-center">
+          <span>{mensagem}</span>
+          <button onClick={limpar} aria-label={`Fechar erro de ${rotulo}`} className="font-bold ml-2">✕</button>
         </div>
-      )}
+      ))}
 
       {sucesso && (
         <div className="p-3 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-sm flex justify-between items-center">
@@ -572,7 +611,7 @@ export function MembrosView() {
           <select
             id="filtro-setor"
             value={filtroSetorId}
-            onChange={event => setFiltroSetorId(event.target.value)}
+            onChange={event => { setFiltroSetorId(event.target.value); setPaginaMembros(1) }}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50"
           >
             <option value="">Todos os Setores</option>
@@ -589,13 +628,13 @@ export function MembrosView() {
             id="filtro-busca"
             type="search"
             value={filtroBusca}
-            onChange={event => setFiltroBusca(event.target.value)}
+            onChange={event => { setFiltroBusca(event.target.value); setPaginaMembros(1) }}
             placeholder="Nome, carteirinha, Casa ou código..."
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-slate-50"
           />
         </div>
         <div className="sm:col-span-2 text-xs text-slate-500 font-medium">
-          Exibindo {membrosFiltrados.length} de {membros.length} membros
+          {totalMembros} membros encontrados — exibindo {membrosDaPagina.length} nesta página
         </div>
       </div>
 
@@ -842,7 +881,7 @@ export function MembrosView() {
         ) : membrosFiltrados.length === 0 ? (
           <div className="p-8 text-center text-slate-400 text-sm">Nenhum membro encontrado.</div>
         ) : (
-          <div className="master-table-scroll">
+          <div className="master-table-scroll" ref={tabelaMembrosRef}>
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                 <tr>
@@ -853,7 +892,7 @@ export function MembrosView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {membrosFiltrados.map(membro => (
+                {membrosDaPagina.map(membro => (
                   <tr key={membro.id} className="hover:bg-slate-50">
                     <td className="p-3 font-semibold text-slate-800">{membro.nome}</td>
                     <td className="p-3 text-xs text-slate-600 font-medium">{getCasaNome(membro.casaId)}</td>
@@ -891,6 +930,13 @@ export function MembrosView() {
           </div>
         )}
       </div>
+      {totalMembros > itensPorPagina && (
+        <nav aria-label="Páginas de membros" className="flex items-center justify-end gap-3 text-sm">
+          <button type="button" disabled={paginaMembrosAtual <= 1} onClick={() => { setPaginaMembros(paginaMembrosAtual - 1) }} className="rounded border px-3 py-2 disabled:opacity-40">Anterior</button>
+          <span role="status" aria-live="polite">Página {paginaMembrosAtual} de {totalPaginasMembros}</span>
+          <button type="button" disabled={paginaMembrosAtual >= totalPaginasMembros} onClick={() => { setPaginaMembros(paginaMembrosAtual + 1) }} className="rounded border px-3 py-2 disabled:opacity-40">Próxima</button>
+        </nav>
+      )}
     </div>
   )
 }

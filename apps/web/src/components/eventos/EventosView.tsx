@@ -115,6 +115,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   const [setorFiltroId, setSetorFiltroId] = useState('')
   const [statusEventoFiltro, setStatusEventoFiltro] = useState<'ATIVOS' | 'CANCELADOS' | 'TODOS'>('ATIVOS')
   const [periodoFiltro, setPeriodoFiltro] = useState<'FUTUROS' | 'PASSADOS' | 'TODOS'>('FUTUROS')
+  const [ordenacaoEventos, setOrdenacaoEventos] = useState<'inicio-asc' | 'inicio-desc' | 'titulo-asc' | 'titulo-desc'>('inicio-asc')
   const pessoaConsultaSeq = useRef(0)
 
   // Lookups
@@ -425,6 +426,22 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     }
     return false
   })
+
+  const eventosOrdenados = [...eventosFiltrados].sort((a, b) => {
+    const porInicio = new Date(a.inicioEm).getTime() - new Date(b.inicioEm).getTime()
+    const porTitulo = a.titulo.localeCompare(b.titulo, 'pt-BR', { sensitivity: 'base' })
+    switch (ordenacaoEventos) {
+      case 'inicio-desc': return -porInicio || porTitulo || a.id.localeCompare(b.id)
+      case 'titulo-asc': return porTitulo || porInicio || a.id.localeCompare(b.id)
+      case 'titulo-desc': return -porTitulo || porInicio || a.id.localeCompare(b.id)
+      default: return porInicio || porTitulo || a.id.localeCompare(b.id)
+    }
+  })
+  const alterarOrdenacaoEventos = (coluna: 'inicio' | 'titulo') => {
+    setOrdenacaoEventos(atual => coluna === 'inicio'
+      ? (atual === 'inicio-asc' ? 'inicio-desc' : 'inicio-asc')
+      : (atual === 'titulo-asc' ? 'titulo-desc' : 'titulo-asc'))
+  }
 
   const parseDatetimeLocal = (val: string) => {
     if (!val) return ''
@@ -1379,15 +1396,23 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
                 <tr>
-                  <th className="px-6 py-4">Título</th>
-                  <th className="px-6 py-4">Início</th>
+                  <th className="px-6 py-4" aria-sort={ordenacaoEventos === 'titulo-asc' ? 'ascending' : ordenacaoEventos === 'titulo-desc' ? 'descending' : 'none'}>
+                    <button type="button" onClick={() => alterarOrdenacaoEventos('titulo')} aria-label="Ordenar eventos por título" className="inline-flex items-center gap-1 hover:underline">
+                      Título {ordenacaoEventos === 'titulo-asc' ? '↑' : ordenacaoEventos === 'titulo-desc' ? '↓' : '↕'}
+                    </button>
+                  </th>
+                  <th className="px-6 py-4" aria-sort={ordenacaoEventos === 'inicio-asc' ? 'ascending' : ordenacaoEventos === 'inicio-desc' ? 'descending' : 'none'}>
+                    <button type="button" onClick={() => alterarOrdenacaoEventos('inicio')} aria-label="Ordenar eventos por início" className="inline-flex items-center gap-1 hover:underline">
+                      Início {ordenacaoEventos === 'inicio-asc' ? '↑' : ordenacaoEventos === 'inicio-desc' ? '↓' : '↕'}
+                    </button>
+                  </th>
                   <th className="px-6 py-4">Modalidade</th>
                   <th className="px-6 py-4 text-center">Status</th>
                   <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {eventosFiltrados.map((item) => (
+                {eventosOrdenados.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 font-medium text-slate-900">
                       {item.titulo}{item.pessoal && <span className="ml-2 text-xs text-brand-700">Próprio</span>}
