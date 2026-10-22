@@ -3,6 +3,7 @@
 **Situação em 22/10/2026:** planejamento e revisão editorial; sem autorização para implementar UX no React, mesclar em main ou publicar.
 
 ## Trilha A — Manual da versão de produção
+
 Fonte: release #352, SHA `f8610c26`; capítulos existentes M2.1–M2.8 em `docs/08-operacao/`. A PR #353 consolida registro do release e complementos de Membros/Eventos.
 
 | Passo | Entrega verificável | Aceite |
@@ -15,6 +16,7 @@ Fonte: release #352, SHA `f8610c26`; capítulos existentes M2.1–M2.8 em `docs/
 **Ordem recomendada:** acesso/ativação, Minha Agenda/Calendário, Eventos/Convocações, Membros e permissões, demais módulos.
 
 ## Trilha B — Fechamento do Gate A visual, lote 1
+
 Referências: `docs/11-ux-stitch/DESIGN.md`, `gate-a-lote-1-rastreabilidade.md` e handoffs de Setores, Casas, Locais/Espaços, Regionais/Administrações, GTs.
 
 | Subárea | Aceite atual | Itens para encerrar Gate A |
@@ -26,12 +28,15 @@ Referências: `docs/11-ux-stitch/DESIGN.md`, `gate-a-lote-1-rastreabilidade.md` 
 | GTs | Cinco propostas com aceite condicionado | Verificar subestados, campos/ações e variantes de viewport |
 
 ### Matriz obrigatória para encerramento
-Para cada código e variante: código AGD; tela/subestado; artefato original e hash; desktop/mobile; tema; decisão PO e ressalvas; equivalência com código funcional; critérios de acessibilidade; evidência de aprovação final.
+
+Para cada código e variante, aplicar integralmente a [matriz de fechamento do Gate A](../11-ux-stitch/matriz-fechamento-gate-a-lote-1-2026-10-22.md): código AGD; tela/subestado; arquivo original e hash; variante desktop, mobile ou ambas conforme aplicável; tema; **ressalvas comprovadamente corrigidas**; **confronto com o comportamento real do produto** (campos, ações, permissões e filtros); critérios de acessibilidade; **aceite expresso do PO registrado**.
 
 **Gate A fechado** só com cobertura, rastreabilidade e aceite expresso do PO para o conjunto. Aceite estético condicionado ≠ implementação autorizada. O Gate B (React/Tailwind, CI, Beta, smoke) começa apenas depois de autorização específica.
 
 ## Controle de escopo
+
 Nenhum protótipo HTML gerado pelo Stitch será incorporado diretamente. Não inventar campos, permissões ou ícones religiosos incompatíveis. Padronizar azul do cabeçalho e colocar build/versão dinâmicos no rodapé. Manter `main` intacta.
 
 ## Próxima decisão do PO
+
 Após concluir inventário e checklist das ressalvas, submeter o fechamento de Gate A do lote 1 por código e, separadamente, pedir autorização para iniciar implementação em `develop`.
