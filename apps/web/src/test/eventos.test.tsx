@@ -69,22 +69,42 @@ describe('EventosView', () => {
 
   it('ordena eventos pelo inicio e permite alternar inicio e titulo sem alterar filtros', async () => {
     const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
-    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => url === '/eventos'
-      ? [
-          { ...mockEventos[0], id: 'z', titulo: 'Zulu', inicioEm: '2026-10-11T10:00:00.000Z', fimEm: '2026-10-11T12:00:00.000Z' },
-          { ...mockEventos[0], id: 'a', titulo: 'Alfa', inicioEm: '2026-10-13T10:00:00.000Z', fimEm: '2026-10-13T12:00:00.000Z' },
-          { ...mockEventos[0], id: 'm', titulo: 'Meio', inicioEm: '2026-10-12T10:00:00.000Z', fimEm: '2026-10-12T12:00:00.000Z' },
-        ] : original(url))
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos/filtros') return { master: false, filtrarEscopo: true, pessoas: [] }
+      if (url === '/eventos') return [
+        { ...mockEventos[0], id: 'z', titulo: 'Zulu', inicioEm: '2026-10-11T10:00:00.000Z', fimEm: '2026-10-11T12:00:00.000Z' },
+        { ...mockEventos[0], id: 'a', titulo: 'Alfa', inicioEm: '2026-10-13T10:00:00.000Z', fimEm: '2026-10-13T12:00:00.000Z' },
+        { ...mockEventos[0], id: 'm', titulo: 'Meio', inicioEm: '2026-10-12T10:00:00.000Z', fimEm: '2026-10-12T12:00:00.000Z' },
+        { ...mockEventos[0], id: 'fora', titulo: 'Fora do escopo', regionalId: 'outra-regional', inicioEm: '2026-10-12T10:00:00.000Z', fimEm: '2026-10-12T12:00:00.000Z' },
+      ]
+      return original(url)
+    })
     render(<EventosView />)
     await screen.findByText('Zulu')
+    const tipoEscopo = await screen.findByLabelText('Filtrar por tipo de escopo')
+    fireEvent.change(tipoEscopo, { target: { value: 'regionalId' } })
+    const regional = screen.getByLabelText('Filtrar por Regional')
+    fireEvent.change(regional, { target: { value: REGIONAL_ID } })
+    const periodo = screen.getByLabelText('Filtrar eventos por período')
+    const status = screen.getByLabelText('Filtrar por status do evento')
+    const verificarFiltros = () => {
+      expect(tipoEscopo).toHaveValue('regionalId')
+      expect(regional).toHaveValue(REGIONAL_ID)
+      expect(periodo).toHaveValue('FUTUROS')
+      expect(status).toHaveValue('ATIVOS')
+      expect(screen.queryByText('Fora do escopo')).not.toBeInTheDocument()
+      expect(screen.getByText('3 evento(s)')).toBeInTheDocument()
+    }
     const titles = () => Array.from(document.querySelectorAll('tbody tr td:first-child'))
       .map(cell => cell.textContent?.trim())
+    verificarFiltros()
     const sortHeader = (name: string) => screen.getByRole('button', { name }).closest('th')
     const inicio = 'Ordenar eventos por início'
     const titulo = 'Ordenar eventos por título'
     expect(titles()).toEqual(['Zulu', 'Meio', 'Alfa'])
     expect(sortHeader(inicio)).toHaveAttribute('aria-sort', 'ascending')
     expect(sortHeader(titulo)).toHaveAttribute('aria-sort', 'none')
+    verificarFiltros()
     fireEvent.click(screen.getByRole('button', { name: inicio }))
     expect(titles()).toEqual(['Alfa', 'Meio', 'Zulu'])
     expect(sortHeader(inicio)).toHaveAttribute('aria-sort', 'descending')
@@ -93,10 +113,12 @@ describe('EventosView', () => {
     expect(titles()).toEqual(['Alfa', 'Meio', 'Zulu'])
     expect(sortHeader(inicio)).toHaveAttribute('aria-sort', 'none')
     expect(sortHeader(titulo)).toHaveAttribute('aria-sort', 'ascending')
+    verificarFiltros()
     fireEvent.click(screen.getByRole('button', { name: titulo }))
     expect(titles()).toEqual(['Zulu', 'Meio', 'Alfa'])
     expect(sortHeader(inicio)).toHaveAttribute('aria-sort', 'none')
     expect(sortHeader(titulo)).toHaveAttribute('aria-sort', 'descending')
+    verificarFiltros()
   })
 
   it('gestor filtra a Administração incluindo eventos de Casas subordinadas', async () => {
