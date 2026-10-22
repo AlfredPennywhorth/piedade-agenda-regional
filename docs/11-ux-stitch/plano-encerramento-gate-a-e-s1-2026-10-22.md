@@ -25,7 +25,7 @@
 1. Fechar referência visual e matriz de ressalvas por subgrupo, sem alterar originais.
 2. Registrar termo de aceite explícito do PO, por tela ou por lote, e encerrar Gate A **apenas se todas as exigências estiverem satisfeitas**.
 3. Abrir backlog de implementação visual (Gate B), preservando testes funcionais e produção; o início do React requer autorização própria.
-4. Na sequência, iniciar hardening **S1** em PRs independentes: proteção de requisições de login/portaria com atenção a NAT e falsos bloqueios; limites de body por rota; CI/GitHub Actions com privilégio mínimo; bootstrap Master sob controle e recuperação documentada.
+4. Na sequência, iniciar hardening **S1** em PRs independentes: proteção complementar por origem no login (além do rate limiting por identificador homologado na S13.01) e proteção de portaria com atenção a NAT e falsos bloqueios; limites de body por rota; CI/GitHub Actions com privilégio mínimo; bootstrap Master sob controle e recuperação documentada.
 5. Fazer todas as alterações em `develop`; nada para `main` ou deploy de produção sem liberação explícita.
 
 ## Critérios mínimos da S1
@@ -37,4 +37,4 @@
 - `permissions` mínimos no CI; ações externas por SHA verificado; CI verde.
 - Smoke Beta completo de login, ativação, Portaria, perfis, PWA, auditoria e regressões antes de considerar produção.
 
-**Estado:** Gate A aberto, hardening S1 planejado e não iniciado.
+**Estado:** Gate A aberto, hardening S1 complementar planejado e não iniciado; a S13.01 de autenticação e sessão já foi homologada, incluindo rate limiting por identificador com D1, HTTP 429 e Retry-After. A S1 proposta deve evitar duplicação e focar IP/origem, portaria, limites por rota, workflow e bootstrap.
