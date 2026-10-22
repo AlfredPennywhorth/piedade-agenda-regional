@@ -60,16 +60,19 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
       if (endpoint.startsWith('/membros/paginados?')) {
         const params = new URLSearchParams(endpoint.split('?')[1])
-        const busca = (params.get('busca') || '').toLocaleLowerCase('pt-BR')
+        const normalizarBusca = (valor: string) =>
+          valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
+        const busca = normalizarBusca(params.get('busca') || '')
         const setorId = params.get('setorId')
         const pagina = Number(params.get('pagina') || 1)
         const limite = Number(params.get('limite') || 50)
         const filtrados = membros.filter(membro => {
           const casa = mockCasas.find(c => c.id === membro.casaId)
           if (setorId && !mockSetores.some(s => s.id === setorId && s.id === casa?.setorId)) return false
-          return !busca || membro.nome.toLocaleLowerCase('pt-BR').includes(busca)
-            || membro.codigoCarteirinha?.toLocaleLowerCase('pt-BR').includes(busca)
-            || (casa?.nome || '').toLocaleLowerCase('pt-BR').includes(busca)
+          return !busca || normalizarBusca(membro.nome).includes(busca)
+            || normalizarBusca(membro.codigoCarteirinha || '').includes(busca)
+            || normalizarBusca(casa?.nome || '').includes(busca)
+            || normalizarBusca(casa?.codigo || '').includes(busca)
         })
         return { itens: filtrados.slice((pagina - 1) * limite, pagina * limite), total: filtrados.length,
           totalPaginas: Math.max(1, Math.ceil(filtrados.length / limite)) }
@@ -127,6 +130,20 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
     fireEvent.change(screen.getByLabelText(/Buscar membro ou Casa/i), { target: { value: 'Membro 000' } })
     expect(await screen.findByText('Membro 000')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Próxima' })).not.toBeInTheDocument())
+  })
+
+  it('pesquisa sem acentos e por código da Casa de Oração', async () => {
+    mockEstrutura()
+    render(<MembrosView />)
+    await screen.findByText('João da Silva')
+
+    fireEvent.change(screen.getByLabelText(/Buscar membro ou Casa/i), { target: { value: 'Joao' } })
+    await waitFor(() => expect(screen.queryByText('Maria Souza')).not.toBeInTheDocument())
+    expect(screen.getByText('João da Silva')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText(/Buscar membro ou Casa/i), { target: { value: 'C-JND-02' } })
+    expect(await screen.findByText('Maria Souza')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('João da Silva')).not.toBeInTheDocument())
   })
 
   it('3. Vazio: exibe estado vazio sem registros', async () => {
