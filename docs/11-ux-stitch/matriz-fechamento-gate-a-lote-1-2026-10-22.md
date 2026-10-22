@@ -27,6 +27,7 @@
 | GTs | AGD-ADM-045 cadastro, 046 edição, 047 detalhes | Condicionado | Validar subfluxos e ações por permissão | Protótipos finais + aceite |
 
 ## Condições globais — sem exceção
+
 - Proibição de cruzes e iconografia religiosa inadequada; conferir pictogramas visualmente.
 - Azul de cabeçalho padronizado; versão, ambiente e build reais no rodapé.
 - Sem dados fictícios importados para a base ou elementos funcionais inventados.
@@ -35,6 +36,7 @@
 - Matriz de permissões e fluxos do código atual prevalece sobre o HTML do Stitch.
 
 ## Critério de decisão
-Para cada linha: [ ] arquivo original rastreável; [ ] versão desktop/mobile aplicável; [ ] ressalvas corrigidas; [ ] confronto com produto real; [ ] aceite explícito PO registrado.
+
+Para cada linha: [ ] arquivo original rastreável; [ ] versão aplicável (desktop, mobile ou ambas); [ ] ressalvas corrigidas; [ ] confronto com produto real; [ ] aceite explícito PO registrado.
 
 **Status geral: Gate A aberto.** O fechamento de cada item deverá ser comprovado; não se presume aceite final pela existência de um mockup. Somente após o fechamento do lote e autorização expressa poderá começar sua implementação React/Tailwind em `develop`.
