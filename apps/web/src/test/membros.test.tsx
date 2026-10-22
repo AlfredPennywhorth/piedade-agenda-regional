@@ -468,7 +468,7 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
       fireEvent.change(screen.getByLabelText(/Buscar membro ou Casa/i), { target: { value: 'Maria' } })
       await waitFor(() => expect(screen.queryByText('João da Silva')).not.toBeInTheDocument())
       expect(screen.getByRole('alert')).toHaveTextContent('Estrutura territorial indisponível')
-      fireEvent.click(screen.getByRole('button', { name: 'Fechar erro de territorio' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Fechar erro de território' }))
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     }
   )
