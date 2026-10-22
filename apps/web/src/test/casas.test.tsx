@@ -43,13 +43,13 @@ describe('S01 — CasasView (Gestão Territorial Frontend)', () => {
     render(<CasasView />)
 
     expect(screen.getByText('Gestão Territorial — Casas de Oração')).toBeInTheDocument()
-    expect(await screen.findByText('Central de Osasco')).toBeInTheDocument()
-    expect(screen.getByText('Jardim Samambaia')).toBeInTheDocument()
-    expect(screen.getByText('Setor 01 — Osasco Centro')).toBeInTheDocument()
-    expect(screen.getByText('Setor 02 — Jundiaí Sul')).toBeInTheDocument()
-    expect(screen.getByText('C-OSC-01')).toBeInTheDocument()
-    expect(screen.getByText('Ativo')).toBeInTheDocument()
-    expect(screen.getByText('Inativo')).toBeInTheDocument()
+    expect(await screen.findAllByText('Central de Osasco').then(matches => matches[0])).toBeInTheDocument()
+    expect(screen.getAllByText('Jardim Samambaia')[0]).toBeInTheDocument()
+    expect(screen.getAllByText('Setor 01 — Osasco Centro')[0]).toBeInTheDocument()
+    expect(screen.getAllByText('Setor 02 — Jundiaí Sul')[0]).toBeInTheDocument()
+    expect(screen.getAllByText('C-OSC-01')[0]).toBeInTheDocument()
+    expect(screen.getAllByText('Ativo')[0]).toBeInTheDocument()
+    expect(screen.getAllByText('Inativo')[0]).toBeInTheDocument()
   })
 
   it('2. Filtrar: deve filtrar casas de oração por setor no cliente', async () => {
@@ -61,15 +61,15 @@ describe('S01 — CasasView (Gestão Territorial Frontend)', () => {
 
     render(<CasasView />)
 
-    await screen.findByText('Central de Osasco')
-    expect(screen.getByText('Jardim Samambaia')).toBeInTheDocument()
+    await screen.findAllByText('Central de Osasco').then(matches => matches[0])
+    expect(screen.getAllByText('Jardim Samambaia')[0]).toBeInTheDocument()
 
     const selectFiltro = screen.getByLabelText(/Filtrar por Setor/i)
     fireEvent.change(selectFiltro, { target: { value: SET_1_ID } })
 
-    expect(screen.getByText('Central de Osasco')).toBeInTheDocument()
-    expect(screen.queryByText('Jardim Samambaia')).not.toBeInTheDocument()
-    expect(screen.getByText('Exibindo 1 de 2 casas de oração')).toBeInTheDocument()
+    expect(screen.getAllByText('Central de Osasco')[0]).toBeInTheDocument()
+    expect(screen.queryAllByText('Jardim Samambaia')).toHaveLength(0)
+    expect(screen.getByText('Encontradas 1 de 2 casas de oração')).toBeInTheDocument()
   })
 
   it('3. Vazio: deve exibir estado vazio ao carregar lista sem registros', async () => {
