@@ -71,20 +71,22 @@ Os arquivos originais devem permanecer preservados, sem alterações de conteúd
 - Confirmar a completude dos protótipos de Setores.
 - Validar o código AGD-ADM-041, que aparece em um protótipo de navegação denominado "Mais" e também como referência secundária em um arquivo de Casas de Oração.
 - Conferir os quatro protótipos principais e as duas variantes da `main` com o inventário e o aceite visual condicionado.
-- Atualizar a rastreabilidade do Gate A após a incorporação dos arquivos na branch `develop`.
+- Conferir e concluir a rastreabilidade do Gate A com variantes e ressalvas; os seis arquivos já foram incorporados à branch `develop`.
 
 O protótipo do menu "Mais" deve permanecer separado desta pasta até a confirmação de seu código oficial.
 
 ## 7. Situação do arquivamento
+
+Atualização em 22/10/2026: a situação abaixo substitui o registro histórico de pendência de arquivamento, sem declarar concluído o Gate A.
 
 | Etapa | Situação |
 |---|---|
 | Identificação dos quatro protótipos principais e duas variantes | Concluída |
 | Identificação de duplicatas | Concluída |
 | Padronização dos nomes | Concluída |
-| Conferência com o inventário oficial | Pendente |
-| Arquivamento no GitHub | Pendente |
-| Validação de integridade após arquivamento | Pendente |
+| Conferência com o inventário oficial | Parcial — ainda validar referência do menu Mais e estados |
+| Arquivamento no GitHub | Concluído — seis HTMLs presentes na `develop` em 22/10/2026 |
+| Validação de integridade após arquivamento | Parcial — manifesto de 043/044 e variantes; conferir 008 e procedência final |
 | Encerramento do Gate A integral | Pendente |
 | Autorização de implementação | Não concedida |
 
