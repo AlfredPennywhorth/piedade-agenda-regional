@@ -23,6 +23,8 @@ export function CasasView() {
 
   // Filtro estritamente no cliente por Setor
   const [filtroSetorId, setFiltroSetorId] = useState<string>('')
+  const [paginaMobile, setPaginaMobile] = useState(1)
+  const TAMANHO_PAGINA_MOBILE = 10
 
   // Estado do formulário ('criar' | 'editar' | null)
   const [modoForm, setModoForm] = useState<'criar' | 'editar' | null>(null)
@@ -193,6 +195,10 @@ export function CasasView() {
     return casa.setorId === filtroSetorId
   })
 
+  const totalPaginasMobile = Math.max(1, Math.ceil(casasFiltradas.length / TAMANHO_PAGINA_MOBILE))
+  const paginaAtualMobile = Math.min(paginaMobile, totalPaginasMobile)
+  const casasPaginaMobile = casasFiltradas.slice((paginaAtualMobile - 1) * TAMANHO_PAGINA_MOBILE, paginaAtualMobile * TAMANHO_PAGINA_MOBILE)
+
   const getSetorNome = (sId: string) => {
     const s = setores.find((item) => item.id === sId)
     return s ? s.nome : sId
@@ -238,7 +244,7 @@ export function CasasView() {
           <select
             id="select-filtro-setor"
             value={filtroSetorId}
-            onChange={(e) => setFiltroSetorId(e.target.value)}
+            onChange={(e) => { setFiltroSetorId(e.target.value); setPaginaMobile(1) }}
             className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-200"
           >
             <option value="">Todos os Setores</option>
@@ -388,7 +394,28 @@ export function CasasView() {
               : 'Nenhuma casa de oração cadastrada até o momento.'}
           </div>
         ) : (
-          <div className="master-table-scroll">
+
+          <>
+          <div className="md:hidden p-3 space-y-3" data-testid="casas-lista-mobile">
+            {casasPaginaMobile.map((casa) => (
+              <article key={casa.id} className="rounded-lg border border-slate-200 bg-white p-3 space-y-2 min-w-0">
+                <h3 className="font-semibold text-slate-800 whitespace-normal break-words [overflow-wrap:anywhere]">{casa.nome}</h3>
+                <div className="text-xs text-slate-600 break-words"><strong>Setor:</strong> {getSetorNome(casa.setorId)}</div>
+                <div className="text-xs text-slate-600 break-words"><strong>Código:</strong> {casa.codigo || '-'}</div>
+                <div className="text-xs text-slate-600"><strong>Status:</strong> {casa.ativo ? 'Ativo' : 'Inativo'}</div>
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+                  <button type="button" onClick={() => verDetalhes(casa.id)} className="flex-1 min-w-0 px-3 py-2 text-xs font-medium rounded bg-slate-100 text-slate-700">Detalhes</button>
+                  <button type="button" onClick={() => { void abrirFormEditar(casa.id); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className="flex-1 min-w-0 px-3 py-2 text-xs font-medium rounded bg-brand-50 text-brand-700">Editar</button>
+                </div>
+              </article>
+            ))}
+            <nav aria-label="Paginação das Casas de Oração" className="flex items-center justify-between gap-2 pt-2">
+              <button type="button" disabled={paginaAtualMobile <= 1} onClick={() => setPaginaMobile(p => Math.max(1, p - 1))} className="px-3 py-2 rounded bg-slate-100 text-xs font-semibold disabled:opacity-40">Anterior</button>
+              <span className="text-xs text-slate-600 text-center" aria-live="polite">Página {paginaAtualMobile} de {totalPaginasMobile}</span>
+              <button type="button" disabled={paginaAtualMobile >= totalPaginasMobile} onClick={() => setPaginaMobile(p => Math.min(totalPaginasMobile, p + 1))} className="px-3 py-2 rounded bg-slate-100 text-xs font-semibold disabled:opacity-40">Próxima</button>
+            </nav>
+          </div>
+          <div className="hidden md:block master-table-scroll">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                 <tr>
@@ -441,6 +468,7 @@ export function CasasView() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 
