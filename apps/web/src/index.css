@@ -115,3 +115,10 @@
     padding-bottom: calc(4rem + env(safe-area-inset-bottom));
   }
 }
+
+/* Casas de Oração: dispositivos móveis em paisagem não devem ativar a tabela desktop.
+   A largura sozinha ultrapassa md em vários telefones girados. */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 1024px) {
+  .casas-mobile-cards { display: block !important; }
+  .casas-desktop-table { display: none !important; }
+}

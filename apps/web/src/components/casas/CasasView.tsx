@@ -407,7 +407,7 @@ export function CasasView() {
         ) : (
 
           <>
-          <div className="md:hidden p-3 space-y-3" data-testid="casas-lista-mobile">
+          <div className="casas-mobile-cards md:hidden p-3 space-y-3" data-testid="casas-lista-mobile">
             {casasPaginaMobile.map((casa) => (
               <article key={casa.id} id={`casa-card-${casa.id}`} className="rounded-lg border border-slate-200 bg-white p-3 space-y-2 min-w-0">
                 <h3 className="font-semibold text-slate-800 whitespace-normal break-words [overflow-wrap:anywhere]">{casa.nome}</h3>
@@ -426,7 +426,7 @@ export function CasasView() {
               <button type="button" disabled={paginaAtualMobile >= totalPaginasMobile} onClick={() => setPaginaMobile(Math.min(totalPaginasMobile, paginaAtualMobile + 1))} className="px-3 py-2 rounded bg-slate-100 text-xs font-semibold disabled:opacity-40">Próxima</button>
             </nav>
           </div>
-          <div className="hidden md:block master-table-scroll">
+          <div className="casas-desktop-table hidden md:block master-table-scroll">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                 <tr>
