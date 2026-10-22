@@ -146,6 +146,25 @@ describe('S02-A — MembrosView (Diretório de Membros Frontend)', () => {
     await waitFor(() => expect(screen.queryByText('João da Silva')).not.toBeInTheDocument())
   })
 
+  it('limpa membros obsoletos quando falha a pesquisa paginada', async () => {
+    mockEstrutura()
+    const buscar = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint, options) => {
+      if (endpoint.startsWith('/membros/paginados?') && endpoint.includes('busca=Falha')) {
+        throw new Error('Falha ao consultar membros')
+      }
+      return buscar(endpoint, options)
+    })
+
+    render(<MembrosView />)
+    await screen.findByText('João da Silva')
+    fireEvent.change(screen.getByLabelText(/Buscar membro ou Casa/i), { target: { value: 'Falha' } })
+    expect(await screen.findByText('Falha ao consultar membros')).toBeInTheDocument()
+    expect(screen.queryByText('João da Silva')).not.toBeInTheDocument()
+    expect(screen.queryByText('Maria Souza')).not.toBeInTheDocument()
+    expect(screen.getByText('Nenhum membro encontrado.')).toBeInTheDocument()
+  })
+
   it('3. Vazio: exibe estado vazio sem registros', async () => {
     mockEstrutura([])
     render(<MembrosView />)
