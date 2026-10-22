@@ -31,8 +31,14 @@ Tratar C1–C6 como checklist de correção e conferência final dos artefatos, 
 ## Inspeção estática adicional — HTMLs arquivados
 
 - `AGD-ADM-008-mobile.html`: a meta viewport contém `user-scalable=no` e `maximum-scale=1.0`; ambos deverão ser eliminados da **futura implementação React**, para permitir zoom. O HTML original de referência permanece intocado.
-- O mesmo HTML contém oito ocorrências textuais de `truncate`; isso **não comprova** que todas afetam o nome da Casa, mas exige inspeção visual do conteúdo e teste com nomes longos (até 255 caracteres) antes do aceite final.
+- O mesmo HTML contém oito ocorrências textuais de `truncate`; inspeção das ocorrências identificou **seis nos nomes das Casas** e duas no cabeçalho (título da aplicação e nome do usuário). Isso confirma a necessidade de remover truncamento dos nomes na futura implementação e testar nomes longos (até 255 caracteres).
 - O HTML de cadastro B (`AGD-ADM-043-cadastro.html`) usa viewport com `width=device-width, initial-scale=1.0`, sem a mesma restrição explícita de zoom identificada na lista mobile.
 - Os arquivos Stitch usam recursos demonstrativos (incluindo CDN de Tailwind em uma variante), que não serão copiados diretamente para o produto.
 
 Estas são verificações de texto-fonte, **não** testes reais de responsividade ou acessibilidade em navegador. Nenhum item C1–C7 foi marcado como aprovado por isso.
+
+## Evidência enviada pelo PO — produção ainda sem UX Stitch
+
+O PO compartilhou captura de **PRODUÇÃO · v1.1.0 · build f8610c2**, tela `AGD-ADM-008`, mostrando tabela de Casas dentro de região com **rolagem horizontal** e vertical em viewport estreita. Isso comprova um problema do **layout React atual publicado**, não um fracasso de homologação do novo layout Stitch, que ainda não foi implementado. O requisito do lote UX permanece: substituir a tabela por cards completos no mobile, sem rolagem horizontal da página ou da listagem, mantendo ações e nomes legíveis. A captura não mede automaticamente larguras de 360/390/430 px; tais critérios devem ser verificados no preview de Beta após implementação, via emulação responsiva ou dispositivo. Não solicitar ao PO validação de telas que ainda não existem no sistema.
+
+**Revisão documental do Codex (PR #354):** corrigida a inconsistência de status no README do pacote de Casas, que apresentava arquivamento pendente apesar dos arquivos versionados.
