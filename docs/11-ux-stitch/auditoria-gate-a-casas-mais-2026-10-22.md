@@ -27,3 +27,12 @@
 ## Recomendação
 
 Tratar C1–C6 como checklist de correção e conferência final dos artefatos, com demonstração por variante e decisão expressa do PO. Escalar C7 para decisão funcional antes do Gate B. O **Gate A do lote 1 permanece aberto** e a autorização de implementação é independente.
+
+## Inspeção estática adicional — HTMLs arquivados
+
+- `AGD-ADM-008-mobile.html`: a meta viewport contém `user-scalable=no` e `maximum-scale=1.0`; ambos deverão ser eliminados da **futura implementação React**, para permitir zoom. O HTML original de referência permanece intocado.
+- O mesmo HTML contém oito ocorrências textuais de `truncate`; isso **não comprova** que todas afetam o nome da Casa, mas exige inspeção visual do conteúdo e teste com nomes longos (até 255 caracteres) antes do aceite final.
+- O HTML de cadastro B (`AGD-ADM-043-cadastro.html`) usa viewport com `width=device-width, initial-scale=1.0`, sem a mesma restrição explícita de zoom identificada na lista mobile.
+- Os arquivos Stitch usam recursos demonstrativos (incluindo CDN de Tailwind em uma variante), que não serão copiados diretamente para o produto.
+
+Estas são verificações de texto-fonte, **não** testes reais de responsividade ou acessibilidade em navegador. Nenhum item C1–C7 foi marcado como aprovado por isso.
