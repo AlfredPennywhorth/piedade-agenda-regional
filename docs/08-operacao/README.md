@@ -74,3 +74,8 @@ pnpm --filter @piedade/worker deploy
 - [Complemento ao Manual de Uso — release #352](manual-uso-complemento-release-352.md) — pesquisa e paginação de Membros, filtros e ordenação de Eventos na versão publicada.
 
 > A documentação acima descreve o código já publicado; capturas e rótulos finais dependem de conferência editorial. O redesenho Stitch ainda não faz parte desta versão.
+
+## Continuidade após o release #352
+
+- [Plano de trabalho: Manual e fechamento do Gate A Stitch](plano-manual-gate-a-2026-10-22.md) — trilhas, matrizes e critérios de aceite sem autorização de implementação.
+- [Proposta funcional: Avisos por função](../10-planejamento-s13/avisos-convocacoes-funcoes-proposta.md) — pop-ups contextuais, elegibilidade por função e distinção entre aviso interno e push, pendente de refinamento funcional.
