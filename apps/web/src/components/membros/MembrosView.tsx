@@ -131,7 +131,12 @@ export function MembrosView() {
       setTotalPaginasServidor(resposta.totalPaginas)
       setErroMembros(null)
     } catch (err: any) {
-      if (seq === consultaMembrosSeq.current) setErroMembros(err.message || 'Erro ao carregar os membros.')
+      if (seq === consultaMembrosSeq.current) {
+        setMembros([])
+        setTotalMembros(0)
+        setTotalPaginasServidor(1)
+        setErroMembros(err.message || 'Erro ao carregar os membros.')
+      }
     } finally {
       if (seq === consultaMembrosSeq.current) setLoading(false)
     }
