@@ -581,13 +581,13 @@ export function MembrosView() {
       </div>
 
       {[
-        { origem: 'territorio', mensagem: erroTerritorial, limpar: () => setErroTerritorial(null) },
-        { origem: 'membros', mensagem: erroMembros, limpar: () => setErroMembros(null) },
-        { origem: 'operacao', mensagem: erro, limpar: () => setErro(null) },
-      ].map(({ origem, mensagem, limpar }) => mensagem && (
+        { origem: 'territorio', rotulo: 'território', mensagem: erroTerritorial, limpar: () => setErroTerritorial(null) },
+        { origem: 'membros', rotulo: 'membros', mensagem: erroMembros, limpar: () => setErroMembros(null) },
+        { origem: 'operacao', rotulo: 'operação', mensagem: erro, limpar: () => setErro(null) },
+      ].map(({ origem, rotulo, mensagem, limpar }) => mensagem && (
         <div key={origem} role="alert" className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm flex justify-between items-center">
           <span>{mensagem}</span>
-          <button onClick={limpar} aria-label={`Fechar erro de ${origem}`} className="font-bold ml-2">✕</button>
+          <button onClick={limpar} aria-label={`Fechar erro de ${rotulo}`} className="font-bold ml-2">✕</button>
         </div>
       ))}
 
