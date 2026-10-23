@@ -1,36 +1,26 @@
-# Portal independente de homologação Stitch
+# Homologação visual Stitch — Beta existente
 
-Página de índice com 27 referências HTML versionadas para avaliação do Gate A (Setores, Regionais, Administrações, GTs, Locais/Espaços e Casas de Oração).
+Os **27 protótipos HTML** são copiados sem modificações para um catálogo acessível no Pages Beta, sem criar outro projeto Cloudflare.
 
-## Build
+## Publicação
 
-A partir da raiz do repositório, com Node.js 20+:
+O workflow existente `Deploy Pages — Beta` executa:
+1. build normal do frontend;
+2. `node tools/homologacao-stitch/build.mjs`;
+3. deploy da pasta `apps/web/dist` no projeto Pages existente, branch `beta`.
 
-```bash
-node tools/homologacao-stitch/build.mjs
-```
+O catálogo fica em **`https://beta.piedade-agenda-regional.pages.dev/homologacao-stitch/`** depois de CI, aprovação do merge e deploy manual no Actions. Antes disso, a URL não deve ser tratada como publicada.
 
-Publicar **somente** a pasta `dist-homologacao`. O comando copia arquivos HTML versionados, sem alteração, e cria a página `index.html` com links locais clicáveis. O portal não faz chamadas à API da Agenda e não acessa D1.
+**Apenas o workflow Beta** recebe a etapa adicional; o workflow de produção não é alterado. Nenhum Worker, banco D1, esquema ou endpoint novo.
 
-## Publicação segura — Cloudflare Pages
+## Cuidados de isolamento
 
-Criar **outro projeto Pages**, por exemplo `piedade-homologacao-stitch`, separado de `piedade-agenda-regional`.
+- Os HTMLs vêm dos originais já versionados e têm JavaScript demonstrativo. O catálogo não integra a interface autenticada e não carrega dados da Agenda.
+- O gerador emite `_headers` na raiz do build Pages. A rota `/homologacao-stitch/referencias/*` recebe CSP `sandbox allow-scripts allow-forms allow-popups`, **sem allow-same-origin**, para isolar os scripts dos protótipos dos cookies e storage da aplicação.
+- `noindex`, `nosniff` e `no-referrer` reduzem exposição incidental; **não são controle de acesso**. Conteúdo demonstrativo permanece publicamente acessível após o deploy.
+- Validar os links e o isolamento no Chrome. Não inserir dados reais ou credenciais nos formulários demonstrativos.
+- Se algum protótipo depender de recursos externos bloqueados por CSP/ambiente, registrar a limitação; não relaxar o isolamento para recuperar funcionalidade demonstrativa.
 
-- Git: repositório `AlfredPennywhorth/piedade-agenda-regional`; branch de publicação **develop** depois do merge autorizado desta PR, ou branch específica da PR para pré-visualização.
-- Root directory: raiz do repositório.
-- Framework preset: None.
-- Build command: `node tools/homologacao-stitch/build.mjs`.
-- Build output directory: `dist-homologacao`.
-- Node: 20+.
+## Homologação
 
-**Nunca reutilizar os nomes do projeto Pages de produção/Beta nem seus workflows.** O URL público só poderá ser informado após a Cloudflare criar o novo projeto e efetuar o primeiro deploy. Não é necessário Worker/D1, token de usuário ou qualquer segredo da Agenda.
-
-## Critérios de QA
-
-1. Abrir o índice no Chrome desktop e mobile.
-2. Abrir HTML 007 mobile, 005 desktop, 006 mobile, 009 desktop, 013 mobile e 008 mobile.
-3. Conferir que cada link abre o HTML **renderizado** em nova aba, sem depender de HTMLPreview.
-4. Verificar tema/zoom e links em grupo.
-5. Tratar imagens, textos, estados e comportamentos dos protótipos como **fictícios**; os originais não são código de produção.
-
-**Segurança:** os arquivos são HTML de referência com scripts/CDNs de demonstração; não introduzir credenciais, cookies, autenticação ou dados pessoais no portal. Se necessário, proteger acesso na borda separadamente. A homologação só significa aceite de aparência sob ressalvas, não de código nem funcionalidade.
+Abrir a rota na Beta, clicar em cada uma das 27 referências, registrar aceite visual por código. A direção visual aprovada **não equivale** ao Gate A global nem autoriza aplicação do HTML Stitch como React. Implementação real permanece em PRs independentes na `develop`, com testes Beta e liberação explícita para produção.
