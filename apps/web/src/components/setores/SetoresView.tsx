@@ -553,7 +553,6 @@ export function SetoresView() {
                 <div>
                   <span className="text-xs font-semibold text-slate-500 block">Administração:</span>
                   <span className="text-slate-700 font-medium">{getAdministracaoNome(setorDetalhe.administracaoId)}</span>
-                  <span className="text-[10px] font-mono text-slate-400 block">{setorDetalhe.administracaoId}</span>
                 </div>
                 <div>
                   <span className="text-xs font-semibold text-slate-500 block">Código:</span>
