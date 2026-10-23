@@ -61,6 +61,6 @@ writeFileSync(join(destination,'index.html'),html);
 const headersPath = join(root, 'apps/web/dist/_headers');
 if (!existsSync(headersPath)) throw new Error('Headers globais ausentes no build do Vite');
 const existingHeaders = readFileSync(headersPath, 'utf8');
-const prototypeHeaders = '\n/homologacao-stitch/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  X-Robots-Tag: noindex, nofollow\n/homologacao-stitch/referencias/*\n  Content-Security-Policy: sandbox allow-scripts allow-forms allow-popups\n';
+const prototypeHeaders = '\n/homologacao-stitch/*\n  ! Content-Security-Policy\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  X-Robots-Tag: noindex, nofollow\n/homologacao-stitch/referencias/*\n  Content-Security-Policy: sandbox allow-scripts allow-forms allow-popups\n';
 writeFileSync(headersPath, existingHeaders.replace(/\s*$/, '\n') + prototypeHeaders);
 console.log('Portal preparado: '+total+' HTMLs. Saída: apps/web/dist/homologacao-stitch');
