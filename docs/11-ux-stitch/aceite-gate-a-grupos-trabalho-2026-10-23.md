@@ -9,4 +9,4 @@ Referências versionadas: `prototipos/lote-1/grupos-trabalho/`.
 
 Validar layout, campos reais, ações e capabilities. GT vincula-se à Regional, sem dependência de Administração ou Setor. Revisar estados, foco, zoom, navegação e mobile sem rolagem horizontal. Dados de demonstração não devem ser usados na aplicação.
 
-Aguardando aceite visual expresso do PO antes de qualquer implementação ou deploy.
+A direção visual das cinco propostas foi **aprovada com ressalvas pelo PO em 16/10/2026**, conforme `docs/11-ux-stitch/handoff-grupos-trabalho.md`. Resta o **aceite final do Gate A**, após conferir rastreabilidade dos originais, variantes, permissões reais e condições globais da matriz. A autorização de implementação React é uma decisão posterior e independente; nenhum deploy foi autorizado.
