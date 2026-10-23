@@ -49,6 +49,32 @@ A lista de contas **não deve ser uma sequência extensa de cards com rolagem co
 
 Em 23/10/2026, o PO observou que o navegador abriu uma versão anterior e só exibiu filtros já existentes após atualizar manualmente a página. Registrar demanda independente: verificar comportamento da atualização automática em primeiro acesso, reinstalação/aba suspensa, controle do service worker, cache de `index.html` e retorno de operações sensíveis; exigir teste real na Beta antes de autorizar produção. Identificação relatada da produção: `v1.1.0 · build f8610c2`, **ainda sem confirmação de implantação do gatilho de atualização nesse build**.
 
+
+## Ajuda para concessão de atribuições — solicitação do PO
+
+Na AGD-ADM-015, junto ao seletor **Tipo de acesso / Atribuição** (painel `GerenciarAcessosPanel`), inserir ajuda contextual consultável **antes de conceder** privilégios. A captura enviada pelo PO mostra sete opções existentes no código:
+
+| Atribuição exibida | Orientação resumida a ser apresentada (sujeita à matriz de permissões efetiva) |
+|---|---|
+| Administrador do Sistema | Administração de contas, acessos e recursos autorizados **na Regional definida**; não equiparar ao Master global. |
+| Gestor de Agenda | Gestão de agenda/eventos dentro do escopo territorial ou GT autorizado; verificar capacidades concretas antes do texto definitivo. |
+| Gestor de Eventos Externos (Viajante) | Operações específicas de eventos externos no escopo Regional; não confundir com administração irrestrita da Agenda. |
+| Operador de Portaria | Atividades autorizadas de portaria e recepção, restritas ao escopo conferido; não autoriza gestão geral de contas. |
+| Gestor de Relatórios | Consulta e utilização dos relatórios permitidos conforme escopo, sem acesso administrativo irrestrito. |
+| Auditor | Funções de consulta/auditoria autorizadas em Regional ou Administração; confirmar caráter de leitura e exceções na matriz. |
+| Master do Sistema | Privilégios globais e administração de sessões; **acesso altamente restrito**, com proteções para o último Master operacional. |
+
+A descrição é **texto de trabalho, não especificação definitiva de permissões**. Antes de publicar a ajuda, confrontar cada frase com `apps/worker/src/security/permissoes.ts`, guardas das rotas e com o manual `docs/08-operacao/manual-uso-contas-acessos-permissoes-seguranca.md`; registrar capacidade, limites, nível permitido e ações que **não** são concedidas. Explicitar também que vínculos funcionais podem conferir capacidades adicionais sem atribuição manual.
+
+Requisitos de UX:
+- Título "O que cada acesso permite?" com descrições em linguagem não técnica, consultáveis por botão de ajuda ao lado da seleção e também pelo manual.
+- Para cada perfil: **Pode fazer**, **Não permite / limitações**, **Onde se aplica (escopo)** e **Quando atribuir**, e link para explicação completa; evitar promessas abrangentes que não correspondam à API.
+- Ao selecionar um perfil, mostrar resumo contextual **antes de Conceder acesso**, inclusive avisos mais destacados para Administrador do Sistema e Master.
+- Diferenciar **perfil (atribuição)**, **nível/unidade territorial** e **vínculo de função**, evitando que o administrador escolha um perfil excessivo por desconhecimento.
+- Ajuda acessível no celular e por teclado, sem revelar dados individuais ou incentivar concessão excessiva; validações continuam na API.
+
+O conteúdo da ajuda deverá ser sincronizado ao manual M2.6 e testado com permissões reais. **Esta PR apenas documenta a demanda; não altera permissões.**
+
 ## Gate
 
 **Gate A aberto** para esta tela; não há protótipo Stitch aprovado, nem autorização para redesign funcional nesta PR. Proposta de tela desktop/mobile e verificação do código definitivo são próximas tarefas.
