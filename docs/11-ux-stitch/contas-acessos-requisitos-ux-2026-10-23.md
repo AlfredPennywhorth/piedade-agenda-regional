@@ -31,6 +31,20 @@ Arquivo: `apps/web/src/components/acessos/ContasAcessoView.tsx`.
 - Sem uso de código Stitch diretamente: HTML é referência; implementação real React/Tailwind em PR separada após aceite visual.
 - Cobertura de testes para cascata territorial, GT x território, tipo de acesso, status, nomes e permissões.
 
+
+## Agrupamento e controle do volume — solicitação complementar do PO
+
+A lista de contas **não deve ser uma sequência extensa de cards com rolagem contínua**. Preparar grupos recolhíveis/expansíveis com cabeçalho, contagem e estado aberto/fechado. Agrupamento inicial proposto: por **letra inicial do nome (A–Z)**, coerente com a ordenação nominal pedida; oferecer agrupamento alternativo por **Administração, Setor ou GT**, conforme viabilidade e sem confundir participação em GT com território de origem. Uma pessoa vinculada a vários GTs poderá aparecer em mais de um grupo de GT, com contagem de pessoas distintas no total.
+
+- Cabeçalho dos grupos deve permitir abrir/fechar de forma acessível; preferir grupos fechados inicialmente em conjuntos extensos.
+- Aplicar busca e filtros **antes** de formar os grupos; esconder grupos vazios e apresentar contadores de resultados.
+- Dentro de cada grupo, ordenar nome em pt-BR, A–Z (padrão) ou Z–A; controlar volume com **paginação ou botão “Mostrar mais” em lotes** para impedir rolagem infinita mesmo com um único grupo grande.
+- Em dispositivos móveis, cada conta usa card compacto, com ações secundárias recolhíveis; no desktop, avaliar linhas/tabela sem rolagem horizontal.
+- Ao editar acessos, gerar link ou receber retorno de recuperação de PIN, manter a pessoa identificável/visível e preservar grupo, filtros e posição; não exibir tokens temporários ao navegar por outros registros.
+- Registrar testes para grupos com muitos itens, letras acentuadas, mesma pessoa em vários GTs e estados de filtro/expansão.
+
+**Referência indicada pelo PO:** tela de Funções. A inspeção de `FuncoesView.tsx` na `develop` identificou uma tabela com `funcoes.map(...)` (sem agrupamento ou paginação explícitos nesse componente). Portanto, reproduzir a **intenção de organização** informada pelo PO, mas confirmar a referência visual exata antes de afirmar paridade funcional com Funções.
+
 ## Gate
 
 **Gate A aberto** para esta tela; não há protótipo Stitch aprovado, nem autorização para redesign funcional nesta PR. Proposta de tela desktop/mobile e verificação do código definitivo são próximas tarefas.
