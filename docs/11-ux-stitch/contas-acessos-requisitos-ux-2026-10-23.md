@@ -1,6 +1,6 @@
-# AGD-ADM-059 (provisório) — Contas e Acessos: revisão UX
+# AGD-ADM-015 — Contas e Acessos: revisão UX
 
-**Status:** demanda registrada para desenho, validação Gate A e implementação independente. **Código 059 provisório:** conferir contra inventário canônico antes de publicação definitiva.
+**Status:** demanda registrada para desenho, validação Gate A e implementação independente. **Código confirmado pelo PO:** AGD-ADM-015 (Contas e Acessos).
 
 ## Necessidade do PO (23/10/2026)
 
@@ -44,6 +44,10 @@ A lista de contas **não deve ser uma sequência extensa de cards com rolagem co
 - Registrar testes para grupos com muitos itens, letras acentuadas, mesma pessoa em vários GTs e estados de filtro/expansão.
 
 **Referência indicada pelo PO:** tela de Funções. A inspeção de `FuncoesView.tsx` na `develop` identificou uma tabela com `funcoes.map(...)` (sem agrupamento ou paginação explícitos nesse componente). Portanto, reproduzir a **intenção de organização** informada pelo PO, mas confirmar a referência visual exata antes de afirmar paridade funcional com Funções.
+
+## Atualização do PWA — observação do PO
+
+Em 23/10/2026, o PO observou que o navegador abriu uma versão anterior e só exibiu filtros já existentes após atualizar manualmente a página. Registrar demanda independente: verificar comportamento da atualização automática em primeiro acesso, reinstalação/aba suspensa, controle do service worker, cache de `index.html` e retorno de operações sensíveis; exigir teste real na Beta antes de autorizar produção. Identificação relatada da produção: `v1.1.0 · build f8610c2`, **ainda sem confirmação de implantação do gatilho de atualização nesse build**.
 
 ## Gate
 
