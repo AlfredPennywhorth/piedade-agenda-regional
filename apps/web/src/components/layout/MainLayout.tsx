@@ -237,7 +237,7 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
                     {mostrarEstrutura && <button type="button" onClick={() => navegar('regionais')} className="rounded-lg bg-slate-50 p-3 text-left">Regionais</button>}
                     {mostrarEstrutura && <button type="button" onClick={() => navegar('administracoes')} className="rounded-lg bg-slate-50 p-3 text-left">Administrações</button>}
                     {mostrarEstrutura && <button type="button" onClick={() => navegar('setores')} className="rounded-lg bg-slate-50 p-3 text-left">Setores</button>}
-                    {mostrarEstrutura && <button type="button" onClick={() => navegar('casas')} className="rounded-lg bg-slate-50 p-3 text-left">Casas</button>}
+                    {mostrarEstrutura && <button type="button" onClick={() => navegar('casas')} className="rounded-lg bg-slate-50 p-3 text-left">Casas de Oração</button>}
                     {mostrarEstrutura && <button type="button" onClick={() => navegar('grupos-trabalho')} className="rounded-lg bg-slate-50 p-3 text-left">Grupos de Trabalho</button>}
                     {mostrarGestaoAgenda && <button type="button" onClick={() => navegar('locais')} className="rounded-lg bg-slate-50 p-3 text-left">Locais</button>}
                   </div>
