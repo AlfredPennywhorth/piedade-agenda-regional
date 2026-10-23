@@ -508,7 +508,6 @@ export function CasasView() {
                 <div>
                   <span className="text-xs font-semibold text-slate-500 block">Setor:</span>
                   <span className="text-slate-700 font-medium">{getSetorNome(casaDetalhe.setorId)}</span>
-                  <span className="text-[10px] font-mono text-slate-400 block">{casaDetalhe.setorId}</span>
                 </div>
                 <div>
                   <span className="text-xs font-semibold text-slate-500 block">Código:</span>
