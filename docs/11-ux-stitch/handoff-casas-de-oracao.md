@@ -28,3 +28,7 @@
 - **Antes de implementação:** inventariar estados mobile de cadastro/edição e conferir o aceite final por código e permissões, no fluxo de Gate A aplicável ao sublote.
 - **Depois de autorização específica para codificar:** PR React/Tailwind independente em `develop`, revisão/CI, smoke Beta por capacidade/viewport e liberação expressa. Nunca incorporar o HTML do Stitch diretamente.
 - **Próximo trabalho Stitch:** Locais e Espaços, mantendo o Design System e a regra religiosa.
+
+## Confirmação do PO — 24/10/2026
+
+O PO **ratificou a aprovação dos layouts de Casas de Oração**, com todas as ressalvas anteriores deste documento (incluindo cards mobile com nomes completos, campos reais, proibição de cruzes e fluxo de edição). **As versões escuras não estão disponíveis para homologação no catálogo**; preparar prévias escuras como variantes de avaliação, preservando originais, logotipo institucional e tokens compartilhados. Gate A final depende dessa comparação e dos demais ajustes. Sem autorização de implementação React ou deploy. Issue #378.
