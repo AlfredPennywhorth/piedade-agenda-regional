@@ -97,6 +97,8 @@ html body [class~="text-secondary"],html body [class~="text-on-secondary"],
 html body [class~="text-outline"],html body [class~="text-outline-variant"]{color:#d3deed!important}
 html body [class~="bg-primary-container"]{background-color:#2563eb!important;color:#fff!important}
 html body [class~="text-primary"],html body [class~="text-primary-container"]{color:#93c5fd!important}
+/* Emparelhar texto azul claro com superfícies escuras, inclusive badges e ícones. */
+html body [class~="bg-primary-fixed"],html body [class~="bg-primary-fixed-dim"]{background-color:#1e3a5f!important;color:#eaf3ff!important}
 html body button[class~="bg-primary-container"],html body button[class~="bg-primary"]{background:#2563eb!important;color:white!important}
 html body button[class~="bg-primary-container"]:hover,html body button[class~="bg-primary"]:hover{background:#1d4ed8!important}
 html body input,html body select,html body textarea{color:#f8fafc!important;caret-color:#f8fafc!important}
