@@ -95,8 +95,8 @@ function needsContrastReview(group, filename) {
 const gtButtonsCSS = `<style id="gate-a-gt-button-pattern">
 button.bg-primary-container,button.bg-primary,button.bg-blue-600{background-color:#2563eb!important;color:#fff!important}
 button.bg-primary-container:hover,button.bg-primary:hover,button.bg-blue-600:hover{background-color:#1d4ed8!important}
-button.bg-surface-container-low{background-color:#2563eb!important;color:#fff!important}
-button.bg-surface-container-low:hover{background-color:#1d4ed8!important;color:#fff!important}
+button.bg-surface-container-low{background-color:#1e293b!important;color:#e2e8f0!important}
+button.bg-surface-container-low:hover{background-color:#334155!important;color:#fff!important}
 button.bg-surface-container-high{background-color:#1e293b!important;color:#e2e8f0!important;border-color:#334155!important}
 button.bg-surface-container-high:hover{background-color:#334155!important}
 button:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
