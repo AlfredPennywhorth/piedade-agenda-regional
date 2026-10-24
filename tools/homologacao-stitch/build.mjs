@@ -106,6 +106,18 @@ html body input::placeholder,html body textarea::placeholder{color:#cbd5e1!impor
 html body a{color:#93c5fd}
 html body button:focus-visible,html body a:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
 </style>`;
+// Diretriz PO: cinza claro = texto escuro, preservando a estrutura original.
+// Somente superficies da revisao pendente; nunca interfere nos temas ja aprovados.
+const approvedGrayContrastCSS = `<style id="gate-a-approved-gray-contrast">
+html body [class~="bg-gray-300"],html body [class~="bg-slate-300"],
+html body [class~="bg-gray-200"],html body [class~="bg-slate-200"],
+html body [class~="bg-surface-container-highest"]{background-color:#cbd5e1!important;color:#0f172a!important}
+html body [class~="bg-gray-300"] :is(h1,h2,h3,h4,p,span,label,small,strong),
+html body [class~="bg-slate-300"] :is(h1,h2,h3,h4,p,span,label,small,strong),
+html body [class~="bg-gray-200"] :is(h1,h2,h3,h4,p,span,label,small,strong),
+html body [class~="bg-slate-200"] :is(h1,h2,h3,h4,p,span,label,small,strong),
+html body [class~="bg-surface-container-highest"] :is(h1,h2,h3,h4,p,span,label,small,strong){color:#0f172a!important}
+</style>`;
 function needsContrastReview(group, filename) {
   return group.folder.startsWith('locais-espacos/') ||
     group.folder === 'casas-de-oracao' ||
@@ -126,7 +138,7 @@ button:disabled{opacity:.65}
 function darkPreview(html, needsReview = false, groupFolder = '', filename = '') {
   // O marcador e proposital: evita transmitir a impressao de que o tema ja foi homologado.
   const notice = '<div role="note" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;background:#111827;color:white;padding:8px 12px;border:1px solid #64748b;border-radius:8px;font:12px system-ui;max-width:75vw">PRÉVIA ESCURA PARA AVALIAÇÃO · NÃO HOMOLOGADA</div>';
-  return html.replace(/<\/head>/i, darkPreviewCSS+(needsReview ? pendingDarkCSS : '')+(groupFolder === 'grupos-trabalho' ? gtButtonsCSS : '')+(needsReview && (groupFolder.startsWith('locais-espacos/') || filename === 'AGD-ADM-047-detalhes.html') ? reviewByScreenCSS : '')+'</head>').replace(/<\/body>/i,notice+'</body>');
+  return html.replace(/<\/head>/i, darkPreviewCSS+(needsReview ? pendingDarkCSS : '')+(groupFolder === 'grupos-trabalho' ? gtButtonsCSS : '')+(needsReview && (groupFolder.startsWith('locais-espacos/') || filename === 'AGD-ADM-047-detalhes.html') ? reviewByScreenCSS : '')+(needsReview ? approvedGrayContrastCSS : '')+'</head>').replace(/<\/body>/i,notice+'</body>');
 }
 let total = 0;
 const panels = groups.map((group, index) => {
