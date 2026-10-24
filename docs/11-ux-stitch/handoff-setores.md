@@ -15,3 +15,9 @@
 **Pendências para Gate A final do sublote:** referência rastreável dos arquivos finais do Stitch, validação de layouts de cadastro/edição mobile, revisão de acessibilidade/contraste e confirmação do PO da versão final por código. Aceite desta direção visual não equivale ao Gate A do **lote 1 inteiro** (que inclui outras superfícies).
 
 **Implementação futura (PR independente):** tema com tokens compartilhados; versão/build reais no rodapé; nenhum código funcional nesta etapa. Smoke Beta com perfis autorizados/não autorizados, filtros em cascata, CRUD, estados, acessibilidade, larguras 360/390/430/768/1280/1440 e modo claro/escuro/automático.
+
+## Decisão do PO — 24/10/2026
+
+O PO **aprovou os layouts originais de Setores em tema claro e escuro**, mantendo obrigatoriamente o **logotipo institucional anteriormente aprovado**, sem substituição ou redesenho. Referências: `prototipos/lote-1/setores/originais/claro/` e `originais/escuro/` (AGD-ADM-007, AGD-ADM-041 e AGD-ADM-042). As derivações `unificados-em-avaliacao/` não substituem as referências aprovadas.
+
+Este aceite é **apenas de layout**: não libera erros de rolagem, UUID nos detalhes, variante escura defeituosa com filtros duplicados, dados ilustrativos, responsividade ainda não testada, implementação React ou deploy. Manter Issue #371 e Gate A com essas ressalvas abertas, bem como validação funcional separada.
