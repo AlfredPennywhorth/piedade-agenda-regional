@@ -85,6 +85,27 @@ a:not([class*="text-white"]){text-decoration-thickness:1px}
 table th{color:#f3f7ff!important}
 table td{color:#e4ebf8!important}
 </style>`;
+// Ajustes por tela após inspeção das cinco capturas PO — isolados das telas homologadas.
+const reviewByScreenCSS = `<style id="gate-a-review-by-screen">
+/* Superfícies sempre escuras; bloquear fundos claros herdados de utilitários e estilos inline. */
+html body [class~="bg-surface-container-highest"],html body [class~="bg-surface-variant"],
+html body [class~="bg-gray-200"],html body [class~="bg-slate-200"],
+html body [class~="bg-gray-300"],html body [class~="bg-slate-300"]{background-color:#334155!important;color:#f1f5f9!important}
+html body [class~="bg-surface-container-lowest"],html body [class~="bg-white"]{background-color:#1e293b!important;color:#f1f5f9!important}
+html body [class~="text-white"],html body [class~="text-on-primary"]{color:#fff!important}
+html body [class~="text-secondary"],html body [class~="text-on-secondary"],
+html body [class~="text-outline"],html body [class~="text-outline-variant"]{color:#d3deed!important}
+html body [class~="bg-primary-container"]{background-color:#2563eb!important;color:#fff!important}
+html body [class~="text-primary"],html body [class~="text-primary-container"]{color:#93c5fd!important}
+/* Emparelhar texto azul claro com superfícies escuras, inclusive badges e ícones. */
+html body [class~="bg-primary-fixed"],html body [class~="bg-primary-fixed-dim"]{background-color:#1e3a5f!important;color:#eaf3ff!important}
+html body button[class~="bg-primary-container"],html body button[class~="bg-primary"]{background:#2563eb!important;color:white!important}
+html body button[class~="bg-primary-container"]:hover,html body button[class~="bg-primary"]:hover{background:#1d4ed8!important}
+html body input,html body select,html body textarea{color:#f8fafc!important;caret-color:#f8fafc!important}
+html body input::placeholder,html body textarea::placeholder{color:#cbd5e1!important;opacity:1}
+html body a{color:#93c5fd}
+html body button:focus-visible,html body a:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
+</style>`;
 function needsContrastReview(group, filename) {
   return group.folder.startsWith('locais-espacos/') ||
     group.folder === 'casas-de-oracao' ||
@@ -102,10 +123,10 @@ button.bg-surface-container-high:hover{background-color:#334155!important}
 button:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
 button:disabled{opacity:.65}
 </style>`;
-function darkPreview(html, needsReview = false, groupFolder = '') {
+function darkPreview(html, needsReview = false, groupFolder = '', filename = '') {
   // O marcador e proposital: evita transmitir a impressao de que o tema ja foi homologado.
   const notice = '<div role="note" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;background:#111827;color:white;padding:8px 12px;border:1px solid #64748b;border-radius:8px;font:12px system-ui;max-width:75vw">PRÉVIA ESCURA PARA AVALIAÇÃO · NÃO HOMOLOGADA</div>';
-  return html.replace(/<\/head>/i, darkPreviewCSS+(needsReview ? pendingDarkCSS : '')+(groupFolder === 'grupos-trabalho' ? gtButtonsCSS : '')+'</head>').replace(/<\/body>/i,notice+'</body>');
+  return html.replace(/<\/head>/i, darkPreviewCSS+(needsReview ? pendingDarkCSS : '')+(groupFolder === 'grupos-trabalho' ? gtButtonsCSS : '')+(needsReview && (groupFolder.startsWith('locais-espacos/') || filename === 'AGD-ADM-047-detalhes.html') ? reviewByScreenCSS : '')+'</head>').replace(/<\/body>/i,notice+'</body>');
 }
 let total = 0;
 const panels = groups.map((group, index) => {
@@ -120,7 +141,7 @@ const panels = groups.map((group, index) => {
     const preview = !group.folder.startsWith('setores/');
     if (preview) {
       const darkName = filename.replace(/\.html$/i, '-previa-escura.html');
-      writeFileSync(join(target,darkName),darkPreview(readFileSync(src,'utf8'),needsContrastReview(group,filename),group.folder));
+      writeFileSync(join(target,darkName),darkPreview(readFileSync(src,'utf8'),needsContrastReview(group,filename),group.folder,filename));
       total++;
     }
     const baseCard = '<a class="item" href="./referencias/'+group.folder+'/'+filename+'" target="_blank" rel="noopener noreferrer"><span>'+esc(label)+'</span><small>Original ↗</small></a>';
