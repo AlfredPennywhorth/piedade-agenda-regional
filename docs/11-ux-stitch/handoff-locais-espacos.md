@@ -46,3 +46,7 @@ Na rodada inicial de 15/10/2026, o PO enviou cinco anexos HTML e forneceu o AGD-
 - **Esta PR:** documentação de aceite condicionado apenas; revisão Codex e CI antes de qualquer merge documental.
 - **Antes da implementação:** verificar referência de cada proposta Stitch, telas e subestados, confirmar permissões/escopos e obter autorização **específica** do PO conforme Gate A aplicável.
 - **Se autorizada posteriormente:** PR React/Tailwind independente, CI, revisão, smoke Beta por perfis e somente depois decisão de release. Nada altera a produção por este registro.
+
+## Confirmação do PO — 24/10/2026
+
+O PO **ratificou a aprovação dos layouts de Locais e Espaços**, preservando integralmente as restrições e ajustes anteriores deste documento. A **visualização em tema escuro está pendente**: os seis HTMLs originais presentes no catálogo não possuem variantes escuras separadas. Manter logotipo institucional aprovado, dados reais, iconografia adequada, filtros e ações existentes, responsividade e ausência de rolagem horizontal. Gerar prévia escura identificada para comparação antes de aceite final; não substituir os originais nem implementar React/deploy sem autorização. Acompanhar pela Issue #378.
