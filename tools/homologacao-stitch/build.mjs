@@ -90,10 +90,22 @@ function needsContrastReview(group, filename) {
     group.folder === 'casas-de-oracao' ||
     (group.folder === 'grupos-trabalho' && filename === 'AGD-ADM-047-detalhes.html');
 }
-function darkPreview(html, needsReview = false) {
+// Correspondencia visual com a referencia Setores escura (somente GT, so na previa).
+// Acoes primarias e Editar: azul; Detalhes: neutro. Estados hover preservados.
+const gtButtonsCSS = `<style id="gate-a-gt-button-pattern">
+button.bg-primary-container,button.bg-primary,button.bg-blue-600{background-color:#2563eb!important;color:#fff!important}
+button.bg-primary-container:hover,button.bg-primary:hover,button.bg-blue-600:hover{background-color:#1d4ed8!important}
+button.bg-surface-container-low{background-color:#2563eb!important;color:#fff!important}
+button.bg-surface-container-low:hover{background-color:#1d4ed8!important;color:#fff!important}
+button.bg-surface-container-high{background-color:#1e293b!important;color:#e2e8f0!important;border-color:#334155!important}
+button.bg-surface-container-high:hover{background-color:#334155!important}
+button:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
+button:disabled{opacity:.65}
+</style>`;
+function darkPreview(html, needsReview = false, groupFolder = '') {
   // O marcador e proposital: evita transmitir a impressao de que o tema ja foi homologado.
   const notice = '<div role="note" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;background:#111827;color:white;padding:8px 12px;border:1px solid #64748b;border-radius:8px;font:12px system-ui;max-width:75vw">PRÉVIA ESCURA PARA AVALIAÇÃO · NÃO HOMOLOGADA</div>';
-  return html.replace(/<\/head>/i, darkPreviewCSS+(needsReview ? pendingDarkCSS : '')+'</head>').replace(/<\/body>/i,notice+'</body>');
+  return html.replace(/<\/head>/i, darkPreviewCSS+(needsReview ? pendingDarkCSS : '')+(groupFolder === 'grupos-trabalho' ? gtButtonsCSS : '')+'</head>').replace(/<\/body>/i,notice+'</body>');
 }
 let total = 0;
 const panels = groups.map((group, index) => {
@@ -108,7 +120,7 @@ const panels = groups.map((group, index) => {
     const preview = !group.folder.startsWith('setores/');
     if (preview) {
       const darkName = filename.replace(/\.html$/i, '-previa-escura.html');
-      writeFileSync(join(target,darkName),darkPreview(readFileSync(src,'utf8'),needsContrastReview(group,filename)));
+      writeFileSync(join(target,darkName),darkPreview(readFileSync(src,'utf8'),needsContrastReview(group,filename),group.folder));
       total++;
     }
     const baseCard = '<a class="item" href="./referencias/'+group.folder+'/'+filename+'" target="_blank" rel="noopener noreferrer"><span>'+esc(label)+'</span><small>Original ↗</small></a>';
