@@ -586,8 +586,29 @@ export function LocaisView() {
           <p className="text-slate-500">Nenhum local encontrado para a pesquisa informada.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
+        <>
+          {/* Mobile: cartões completos; tabela exclusiva do desktop, sem colunas comprimidas. */}
+          <div className="md:hidden space-y-3" aria-label="Lista de locais">
+            {locaisFiltrados.map((local) => (
+              <article key={local.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm text-slate-900">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-semibold text-base break-words min-w-0">{local.nome}</h3>
+                  <span className={`shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${local.ativo ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'}`}>
+                    {local.ativo ? 'Ativo' : 'Inativo'}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-slate-700 break-words">{local.endereco}, {local.numero}</p>
+                <p className="mt-1 text-sm text-slate-600">{local.cidade} - {local.uf}</p>
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  <button type="button" onClick={() => handleOpenDetail(local.id)} className="min-w-0 rounded-lg border border-slate-300 bg-slate-100 px-2 py-2.5 text-sm font-medium text-slate-900 hover:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600">Ver</button>
+                  <button type="button" onClick={() => void abrirEspacos(local)} className="min-w-0 rounded-lg border border-blue-300 bg-blue-50 px-2 py-2.5 text-sm font-medium text-blue-900 hover:bg-blue-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600">Espaços</button>
+                  <button type="button" onClick={() => handleOpenEdit(local.id)} className="min-w-0 rounded-lg border border-amber-300 bg-amber-50 px-2 py-2.5 text-sm font-medium text-amber-900 hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600">Editar</button>
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-800 text-slate-50 font-medium border-b border-slate-600">
                 <tr>
@@ -633,8 +654,9 @@ export function LocaisView() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Formulário Modal */}

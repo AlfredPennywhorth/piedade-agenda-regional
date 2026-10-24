@@ -38,10 +38,26 @@ describe('LocaisView', () => {
     expect(screen.getByText('Gestão de Locais')).toBeInTheDocument()
     
     await waitFor(() => {
-      expect(screen.getByText('Templo Central')).toBeInTheDocument()
-      expect(screen.getByText('Rua A, 100')).toBeInTheDocument()
-      expect(screen.getByText('São Paulo - SP')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Templo Central')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Rua A, 100')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('São Paulo - SP')).toBeInTheDocument()
     })
+  })
+
+  it('deve exibir cartões mobile com as três ações sem perder dados', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValueOnce(mockLocais)
+    render(<LocaisView />)
+    const cards = await screen.findAllByRole('article')
+    expect(cards).toHaveLength(1)
+    const card = within(cards[0])
+    expect(card.getByText('Templo Central')).toBeInTheDocument()
+    expect(card.getByText('Rua A, 100')).toBeInTheDocument()
+    expect(card.getByText('São Paulo - SP')).toBeInTheDocument()
+    expect(card.getByText('Ativo')).toBeInTheDocument()
+    expect(card.getByRole('button', { name: 'Ver' })).toBeInTheDocument()
+    expect(card.getByRole('button', { name: 'Espaços' })).toBeInTheDocument()
+    expect(card.getByRole('button', { name: 'Editar' })).toBeInTheDocument()
+    expect(within(screen.getByRole('table')).getByText('Templo Central')).toBeInTheDocument()
   })
 
   it('deve exibir empty state quando não houver locais', async () => {
@@ -74,20 +90,20 @@ describe('LocaisView', () => {
     render(<LocaisView />)
 
     await waitFor(() => {
-      expect(screen.getByText('Templo Central')).toBeInTheDocument()
-      expect(screen.getByText('Salão Regional')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Templo Central')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Salão Regional')).toBeInTheDocument()
     })
 
     const filtro = screen.getByLabelText('Pesquisar locais')
     fireEvent.change(filtro, { target: { value: '13000' } })
 
-    expect(screen.queryByText('Templo Central')).not.toBeInTheDocument()
-    expect(screen.getByText('Salão Regional')).toBeInTheDocument()
+    expect(within(screen.getByRole('table')).queryByText('Templo Central')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('table')).getByText('Salão Regional')).toBeInTheDocument()
 
     fireEvent.change(filtro, { target: { value: '13000000' } })
 
-    expect(screen.queryByText('Templo Central')).not.toBeInTheDocument()
-    expect(screen.getByText('Salão Regional')).toBeInTheDocument()
+    expect(within(screen.getByRole('table')).queryByText('Templo Central')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('table')).getByText('Salão Regional')).toBeInTheDocument()
 
     fireEvent.change(filtro, { target: { value: 'inexistente' } })
     expect(screen.getByText('Nenhum local encontrado para a pesquisa informada.')).toBeInTheDocument()
@@ -106,10 +122,10 @@ describe('LocaisView', () => {
     render(<LocaisView />)
 
     await waitFor(() => {
-      expect(screen.getByText('Templo Central')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Templo Central')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /ver/i }))
+    fireEvent.click(within(screen.getByRole('table')).getByRole('button', { name: 'Ver' }))
 
     await waitFor(() => {
       const dialog = screen.getByRole('dialog', { name: /detalhes do local/i })
@@ -352,10 +368,10 @@ describe('LocaisView', () => {
     render(<LocaisView />)
 
     await waitFor(() => {
-      expect(screen.getByText('Templo Central')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Templo Central')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /editar/i }))
+    fireEvent.click(within(screen.getByRole('table')).getByRole('button', { name: 'Editar' }))
 
     await waitFor(() => {
       const dialog = screen.getByRole('dialog', { name: /editar local/i })
@@ -408,18 +424,18 @@ describe('LocaisView', () => {
 
     render(<LocaisView />)
     await waitFor(() => {
-      expect(screen.getByText('Templo Central')).toBeInTheDocument()
-      expect(screen.getByText('Anexo Regional')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Templo Central')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Anexo Regional')).toBeInTheDocument()
     })
 
-    const linhaA = screen.getByText('Templo Central').closest('tr')
+    const linhaA = within(screen.getByRole('table')).getByText('Templo Central').closest('tr')
     expect(linhaA).not.toBeNull()
     fireEvent.click(within(linhaA!).getByRole('button', { name: 'Espaços' }))
 
     let dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
     fireEvent.click(within(dialog).getByText('✕'))
 
-    const linhaB = screen.getByText('Anexo Regional').closest('tr')
+    const linhaB = within(screen.getByRole('table')).getByText('Anexo Regional').closest('tr')
     expect(linhaB).not.toBeNull()
     fireEvent.click(within(linhaB!).getByRole('button', { name: 'Espaços' }))
 
@@ -473,11 +489,11 @@ describe('LocaisView', () => {
 
     render(<LocaisView />)
     await waitFor(() => {
-      expect(screen.getByText('Templo Central')).toBeInTheDocument()
-      expect(screen.getByText('Anexo Regional')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Templo Central')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Anexo Regional')).toBeInTheDocument()
     })
 
-    const linhaA = screen.getByText('Templo Central').closest('tr')
+    const linhaA = within(screen.getByRole('table')).getByText('Templo Central').closest('tr')
     expect(linhaA).not.toBeNull()
     fireEvent.click(within(linhaA!).getByRole('button', { name: 'Espaços' }))
 
@@ -495,7 +511,7 @@ describe('LocaisView', () => {
 
     fireEvent.click(within(dialog).getByText('✕'))
 
-    const linhaB = screen.getByText('Anexo Regional').closest('tr')
+    const linhaB = within(screen.getByRole('table')).getByText('Anexo Regional').closest('tr')
     expect(linhaB).not.toBeNull()
     fireEvent.click(within(linhaB!).getByRole('button', { name: 'Espaços' }))
 
@@ -537,9 +553,9 @@ describe('LocaisView', () => {
     vi.mocked(apiClient.postWithAuth).mockReturnValueOnce(savePendente as any)
 
     render(<LocaisView />)
-    await waitFor(() => expect(screen.getByText('Templo Central')).toBeInTheDocument())
+    await waitFor(() => expect(within(screen.getByRole('table')).getByText('Templo Central')).toBeInTheDocument())
 
-    const linha = screen.getByText('Templo Central').closest('tr')
+    const linha = within(screen.getByRole('table')).getByText('Templo Central').closest('tr')
     expect(linha).not.toBeNull()
     fireEvent.click(within(linha!).getByRole('button', { name: 'Espaços' }))
 
