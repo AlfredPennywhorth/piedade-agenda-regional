@@ -539,7 +539,7 @@ export function LocaisView() {
         </div>
         <button
           onClick={handleOpenCreate}
-          className="px-5 py-2.5 bg-white text-brand-900 font-semibold rounded-lg text-sm hover:bg-brand-50 transition-colors shadow-sm whitespace-nowrap"
+          className="px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300 transition-colors shadow-sm whitespace-nowrap"
         >
           + Novo Local
         </button>
@@ -589,7 +589,7 @@ export function LocaisView() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
+              <thead className="bg-slate-800 text-slate-50 font-medium border-b border-slate-600">
                 <tr>
                   <th className="px-6 py-4">Nome</th>
                   <th className="px-6 py-4">Endereço</th>
@@ -598,7 +598,7 @@ export function LocaisView() {
                   <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 text-slate-700">
+              <tbody className="divide-y divide-slate-200 bg-white text-slate-900">
                 {locaisFiltrados.map((local) => (
                   <tr key={local.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4 font-medium text-slate-900">{local.nome}</td>
