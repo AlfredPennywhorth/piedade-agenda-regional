@@ -73,11 +73,11 @@ const pendingDarkCSS = `<style id="gate-a-contrast-pending">
 html,body{color-scheme:dark!important}
 body{background:#101827!important;color:#f1f5ff!important}
 main,section,article,aside,dialog,table,tbody,tr,form{color:inherit}
-[class*="bg-white"],[class*="bg-surface-container-lowest"],[class*="bg-surface-container-low"],[class*="bg-gray-50"],[class*="bg-slate-50"]{background-color:#1b293b!important;color:#f1f5ff!important}
-[class*="bg-surface-container"],[class*="bg-gray-100"],[class*="bg-slate-100"]{background-color:#26364a!important;color:#f1f5ff!important}
-[class*="text-on-surface"],[class*="text-on-background"],[class*="text-slate-900"],[class*="text-gray-900"],[class*="text-slate-800"],[class*="text-gray-800"]{color:#f3f7ff!important}
-[class*="text-on-surface-variant"],[class*="text-slate-600"],[class*="text-gray-600"],[class*="text-slate-500"],[class*="text-gray-500"]{color:#d3deed!important}
-[class*="border-outline"],[class*="border-slate-200"],[class*="border-gray-200"]{border-color:#71839c!important}
+[class~="bg-white"],[class~="bg-surface-container-lowest"],[class~="bg-surface-container-low"],[class~="bg-gray-50"],[class~="bg-slate-50"]{background-color:#1b293b!important;color:#f1f5ff!important}
+[class~="bg-surface-container"],[class~="bg-gray-100"],[class~="bg-slate-100"]{background-color:#26364a!important;color:#f1f5ff!important}
+[class~="text-on-surface"],[class~="text-on-background"],[class~="text-slate-900"],[class~="text-gray-900"],[class~="text-slate-800"],[class~="text-gray-800"]{color:#f3f7ff!important}
+[class~="text-on-surface-variant"],[class~="text-slate-600"],[class~="text-gray-600"],[class~="text-slate-500"],[class~="text-gray-500"]{color:#d3deed!important}
+[class~="border-outline"],[class~="border-slate-200"],[class~="border-gray-200"]{border-color:#71839c!important}
 input:not([type="checkbox"]):not([type="radio"]),select,textarea{background:#172538!important;color:#fff!important;border:1px solid #8193ac!important}
 input::placeholder,textarea::placeholder{color:#c1cede!important}
 button:disabled{opacity:.65}
