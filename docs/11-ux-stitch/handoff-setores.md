@@ -21,3 +21,7 @@
 O PO **aprovou os layouts originais de Setores em tema claro e escuro**, mantendo obrigatoriamente o **logotipo institucional anteriormente aprovado**, sem substituição ou redesenho. Referências: `prototipos/lote-1/setores/originais/claro/` e `originais/escuro/` (AGD-ADM-007, AGD-ADM-041 e AGD-ADM-042). As derivações `unificados-em-avaliacao/` não substituem as referências aprovadas.
 
 Este aceite é **apenas de layout**: não libera erros de rolagem, UUID nos detalhes, variante escura defeituosa com filtros duplicados, dados ilustrativos, responsividade ainda não testada, implementação React ou deploy. Manter Issue #371 e Gate A com essas ressalvas abertas, bem como validação funcional separada.
+
+## Confirmação adicional do PO — 24/10/2026
+
+O PO **reiterou aprovação dos layouts de Setores**, mantendo ressalvas anteriores sobre rolagem horizontal, UUID e variantes defeituosas, e solicitou visualização de versões escuras. **Distinção importante:** o repositório já contém quatro HTMLs originais em `prototipos/lote-1/setores/originais/escuro/`; portanto, não declarar que estão ausentes do repositório. Validar que são facilmente acessíveis no catálogo atualizado e que a experiência de comparação/tema escuro atenda ao esperado; caso contrário corrigir a apresentação. Preservar logotipo aprovado. Gate A e Issue #371 permanecem com pendências, sem autorização de implementação ou deploy.
