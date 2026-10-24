@@ -37,3 +37,11 @@ Prints de origem (4 imagens) e **5 HTML posteriores** enviados na conversa do pr
 **Pendente:** arquivar os cinco HTMLs originais e as capturas de referência em local versionado/imutável, e registrar as ligações de cada anexo com o respectivo commit/blob recuperável e seu hash. Os nomes acima **não significam** que os arquivos estejam presentes no repositório. Não afirmar Gate A concluído por este aceite.
 
 **Limites:** nenhuma implementação, alteração funcional, mudança de banco, CI de aplicação, deploy ou merge autorizados por este documento. O lote 1 continua com Gate A integral aberto.
+
+## Atualização do PO — 24/10/2026
+
+O PO **aprovou os layouts das cinco telas de Grupos de Trabalho** (`AGD-ADM-009` desktop e mobile, `AGD-ADM-045`, `AGD-ADM-046` e `AGD-ADM-047`), preservadas as restrições de usar dados reais, funcionalidades existentes e logotipo institucional aprovado.
+
+**Pendência visual expressa:** o catálogo apresenta somente uma versão dos cinco HTMLs de GT; **não estão disponíveis prévias escuras separadas**. O PO observou a mesma ausência nas telas de **Administrações** (`AGD-ADM-006`, `039`, `040`). Disponibilizar a visualização dos temas escuros para comparação, preferindo tokens compartilhados do design system em vez de duplicar implementação funcional; não inventar campos ou informações. Issue de acompanhamento específica criada no GitHub.
+
+O aceite de layout **não constitui aceite final de tema escuro**, responsividade/QA, operações reais, implementação React nem deploy. Os protótipos originais devem permanecer preservados; qualquer derivação para teste deve ficar identificada como prévia.
