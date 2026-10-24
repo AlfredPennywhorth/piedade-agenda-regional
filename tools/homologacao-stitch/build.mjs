@@ -68,10 +68,32 @@ body,[class~="bg-background"],[class~="bg-surface"]{background-color:#101827!imp
 input,select,textarea{background-color:#1c283a!important;color:#eef3fc!important;border-color:#62728b!important}
 input::placeholder,textarea::placeholder{color:#aebed2!important}
 </style>`;
-function darkPreview(html) {
+// Ajustes EXCLUSIVOS das prévias ainda reprovadas. Grupos aprovados nao recebem estas regras.
+const pendingDarkCSS = `<style id="gate-a-contrast-pending">
+html,body{color-scheme:dark!important}
+body{background:#101827!important;color:#f1f5ff!important}
+main,section,article,aside,dialog,table,tbody,tr,form{color:inherit}
+[class*="bg-white"],[class*="bg-surface-container-lowest"],[class*="bg-surface-container-low"],[class*="bg-gray-50"],[class*="bg-slate-50"]{background-color:#1b293b!important;color:#f1f5ff!important}
+[class*="bg-surface-container"],[class*="bg-gray-100"],[class*="bg-slate-100"]{background-color:#26364a!important;color:#f1f5ff!important}
+[class*="text-on-surface"],[class*="text-on-background"],[class*="text-slate-900"],[class*="text-gray-900"],[class*="text-slate-800"],[class*="text-gray-800"]{color:#f3f7ff!important}
+[class*="text-on-surface-variant"],[class*="text-slate-600"],[class*="text-gray-600"],[class*="text-slate-500"],[class*="text-gray-500"]{color:#d3deed!important}
+[class*="border-outline"],[class*="border-slate-200"],[class*="border-gray-200"]{border-color:#71839c!important}
+input:not([type="checkbox"]):not([type="radio"]),select,textarea{background:#172538!important;color:#fff!important;border:1px solid #8193ac!important}
+input::placeholder,textarea::placeholder{color:#c1cede!important}
+button:disabled{opacity:.65}
+a:not([class*="text-white"]){text-decoration-thickness:1px}
+table th{color:#f3f7ff!important}
+table td{color:#e4ebf8!important}
+</style>`;
+function needsContrastReview(group, filename) {
+  return group.folder.startsWith('locais-espacos/') ||
+    group.folder === 'casas-de-oracao' ||
+    (group.folder === 'grupos-trabalho' && filename === 'AGD-ADM-047-detalhes.html');
+}
+function darkPreview(html, needsReview = false) {
   // O marcador e proposital: evita transmitir a impressao de que o tema ja foi homologado.
   const notice = '<div role="note" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;background:#111827;color:white;padding:8px 12px;border:1px solid #64748b;border-radius:8px;font:12px system-ui;max-width:75vw">PRÉVIA ESCURA PARA AVALIAÇÃO · NÃO HOMOLOGADA</div>';
-  return html.replace(/<\/head>/i, darkPreviewCSS+'</head>').replace(/<\/body>/i,notice+'</body>');
+  return html.replace(/<\/head>/i, darkPreviewCSS+(needsReview ? pendingDarkCSS : '')+'</head>').replace(/<\/body>/i,notice+'</body>');
 }
 let total = 0;
 const panels = groups.map((group, index) => {
@@ -86,7 +108,7 @@ const panels = groups.map((group, index) => {
     const preview = !group.folder.startsWith('setores/');
     if (preview) {
       const darkName = filename.replace(/\.html$/i, '-previa-escura.html');
-      writeFileSync(join(target,darkName),darkPreview(readFileSync(src,'utf8')));
+      writeFileSync(join(target,darkName),darkPreview(readFileSync(src,'utf8'),needsContrastReview(group,filename)));
       total++;
     }
     const baseCard = '<a class="item" href="./referencias/'+group.folder+'/'+filename+'" target="_blank" rel="noopener noreferrer"><span>'+esc(label)+'</span><small>Original ↗</small></a>';
