@@ -44,3 +44,7 @@ O PO **aprovou os layouts das telas de Administrações**, com as **mesmas ressa
 - **Não transportar informações adicionais que não existem na base ou no contrato real**: descartar indicadores, datas, quantidades, status artificiais, filtros e campos fictícios do Stitch. Campos funcionais já documentados para Administração: Regional obrigatória, nome obrigatório, código opcional e ativo/inativo; confrontar outros elementos com a API e interface real antes de especificar implementação.
 - **Preservar o logotipo institucional aprovado** e identidade visual comum em ambas as temáticas.
 - Aceite estético **não** autoriza alterações no banco, implementação React, merge, deploy ou liberação da produção. Registrar correções como pendências do Gate A e solicitar nova validação mobile.
+
+## Homologação do tema escuro pelo PO — 24/10/2026
+
+**Aprovadas as versões escuras de Regionais e de Administrações quanto a cores e layout.** Permanecem as ressalvas anteriores relativas a dados reais, filtros e responsividade mobile; este aceite não autoriza implementação/deploy nem encerra Gate A integral.
