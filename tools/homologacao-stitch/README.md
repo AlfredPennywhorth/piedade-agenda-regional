@@ -28,3 +28,9 @@ Abrir a rota na Beta, clicar em cada uma das 35 referências, registrar aceite v
 ## Revisão Setores — 24/10/2026
 
 O catálogo separa agora 8 fontes originais Stitch (4 claras e 4 escuras) de 4 versões unificadas derivadas **reprovadas no confronto do PO**. Direção visual das fontes aprovada com condições em 15/10, mas Gate A permanece aberto. Não considerar a variante escura da edição com filtros duplicados uma referência final. Este ajuste reorganiza a navegação apenas; **não corrige os layouts nem declara aceite**. Ref.: Issue #371.
+
+## Prévia de tema escuro — Gate A (24/10/2026)
+
+O gerador do catálogo cria uma **cópia derivada somente no build** para cada HTML dos grupos Regionais, Administrações, GTs, Locais/Espaços e Casas de Oração, aplicando uma folha CSS de contraste escuro e inserindo selo visível **NÃO HOMOLOGADA**. O original arquivado permanece intocado, e cada card original recebe card distinto de prévia escura. Setores mantém seus arquivos originais escuros separados.
+
+**Importante:** a transformação é aproximação de CSS, não uma revisão integral do tema nem substitui a aplicação React, o design system ou aceite do PO. Conferir explicitamente cores não cobertas, contraste e legibilidade, campos e ações reais, logotipo, responsividade e navegação. Nunca fazer deploy de produção ou anunciar Gate A concluído com base apenas nessa prévia. O total de cards é dinâmico. Referências: Issues #376 e #378.
