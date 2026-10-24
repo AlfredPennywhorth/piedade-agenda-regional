@@ -26,3 +26,12 @@
 Os oito HTML foram apresentados no histórico desta conversa em 16/10/2026, após envio dos prints nativos. **Arquivamento imutável dos originais de Regionais/Administrações e hashes ainda precisa ser confirmado**: este handoff não afirma que os binários de protótipo estejam versionados nesta PR.
 
 **Gate:** direção visual aceita com condições; Gate A integral do lote 1 não encerrado; nenhuma implementação, deploy, merge ou release autorizados por este documento.
+
+## Decisão complementar do PO — 24/10/2026 — Regionais
+
+**Layouts de Regionais aprovados quanto à direção visual**, com duas ressalvas expressas e bloqueadoras do aceite final:
+
+1. **Informações extras nos protótipos:** remover ou não implementar campos, indicadores, contagens, filtros ou dados de negócio que não estejam respaldados no contrato e na base real. A implementação atual de `RegionaisView.tsx` expõe `id`, `nome`, `codigo`, `ativo` e metadados técnicos `createdAt`/`updatedAt`, mas os campos efetivos de cadastro são **nome obrigatório, código opcional e ativo/inativo**. Metadados internos não autorizam criar campos editáveis, métricas ou status artificiais. Todo conteúdo extra deve ser inventariado por tela (005, 037 e 038) e confrontado com backend antes da implementação.
+2. **Responsividade da listagem AGD-ADM-005 mobile:** **não aprovada**. Alinhar a composição à proposta aprovada de Setores em mobile: cartões legíveis sem truncar nomes, informações reais, ações acessíveis, sem rolagem horizontal, sem navegação inferior sobrepondo registros, zoom/teclado operáveis. Preservar a identidade institucional e o logotipo aprovado.
+
+A **aprovação do layout não abrange a responsividade mobile** nem a existência das informações adicionais. Somente após corrigir essas ressalvas e conferir as versões desktop/mobile, solicitar aceite final do PO. Não alterar os arquivos Stitch originais; produzir derivações identificadas, se necessário. A presente decisão **não autoriza React, migrações, mudanças na base, deploy nem produção**.
