@@ -85,13 +85,13 @@ const panels = groups.map((group, index) => {
     // Os originais de Setores ja possuem arquivos escuros proprios.
     const preview = !group.folder.startsWith('setores/');
     if (preview) {
-      const darkName = filename.replace(/\\.html$/i, '-previa-escura.html');
+      const darkName = filename.replace(/\.html$/i, '-previa-escura.html');
       writeFileSync(join(target,darkName),darkPreview(readFileSync(src,'utf8')));
       total++;
     }
     const baseCard = '<a class="item" href="./referencias/'+group.folder+'/'+filename+'" target="_blank" rel="noopener noreferrer"><span>'+esc(label)+'</span><small>Original ↗</small></a>';
     if (!preview) return baseCard;
-    const darkName = filename.replace(/\\.html$/i, '-previa-escura.html');
+    const darkName = filename.replace(/\.html$/i, '-previa-escura.html');
     return baseCard+'<a class="item" href="./referencias/'+group.folder+'/'+darkName+'" target="_blank" rel="noopener noreferrer"><span>'+esc(label)+' · Prévia escura NÃO homologada</span><small>Escuro ↗</small></a>';
   }).join('\n');
   return '<section id="grupo-'+index+'"><h2>'+esc(group.title)+'</h2><div class="items">'+cards+'</div></section>';
