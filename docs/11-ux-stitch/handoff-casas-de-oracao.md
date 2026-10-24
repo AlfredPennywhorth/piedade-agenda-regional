@@ -32,3 +32,7 @@
 ## Confirmação do PO — 24/10/2026
 
 O PO **ratificou a aprovação dos layouts de Casas de Oração**, com todas as ressalvas anteriores deste documento (incluindo cards mobile com nomes completos, campos reais, proibição de cruzes e fluxo de edição). **As versões escuras não estão disponíveis para homologação no catálogo**; preparar prévias escuras como variantes de avaliação, preservando originais, logotipo institucional e tokens compartilhados. Gate A final depende dessa comparação e dos demais ajustes. Sem autorização de implementação React ou deploy. Issue #378.
+
+## Avaliação do tema escuro pelo PO — 24/10/2026
+
+**Tema escuro de Casas de Oração não aprovado.** Contraste inadequado; adequar a paleta e legibilidade ao layout anteriormente aprovado, preservando todos os campos, ações, nomes extensos e logotipo institucional. Revalidar tema escuro desktop/mobile. Issue #384. Sem implementação/deploy.
