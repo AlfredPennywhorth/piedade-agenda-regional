@@ -1,6 +1,6 @@
 # Homologação visual Stitch — Beta existente
 
-Os **27 protótipos HTML** são copiados sem modificações para um catálogo acessível no Pages Beta, sem criar outro projeto Cloudflare.
+Os **35 referências HTML** são copiados sem modificações para um catálogo acessível no Pages Beta, sem criar outro projeto Cloudflare.
 
 ## Publicação
 
@@ -23,4 +23,8 @@ O catálogo fica em **`https://beta.piedade-agenda-regional.pages.dev/homologaca
 
 ## Homologação
 
-Abrir a rota na Beta, clicar em cada uma das 27 referências, registrar aceite visual por código. A direção visual aprovada **não equivale** ao Gate A global nem autoriza aplicação do HTML Stitch como React. Implementação real permanece em PRs independentes na `develop`, com testes Beta e liberação explícita para produção.
+Abrir a rota na Beta, clicar em cada uma das 35 referências, registrar aceite visual por código. A direção visual aprovada **não equivale** ao Gate A global nem autoriza aplicação do HTML Stitch como React. Implementação real permanece em PRs independentes na `develop`, com testes Beta e liberação explícita para produção.
+
+## Revisão Setores — 24/10/2026
+
+O catálogo separa agora 8 fontes originais Stitch (4 claras e 4 escuras) de 4 versões unificadas derivadas **reprovadas no confronto do PO**. Direção visual das fontes aprovada com condições em 15/10, mas Gate A permanece aberto. Não considerar a variante escura da edição com filtros duplicados uma referência final. Este ajuste reorganiza a navegação apenas; **não corrige os layouts nem declara aceite**. Ref.: Issue #371.
