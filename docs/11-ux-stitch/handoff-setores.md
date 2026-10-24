@@ -15,3 +15,7 @@
 **Pendências para Gate A final do sublote:** referência rastreável dos arquivos finais do Stitch, validação de layouts de cadastro/edição mobile, revisão de acessibilidade/contraste e confirmação do PO da versão final por código. Aceite desta direção visual não equivale ao Gate A do **lote 1 inteiro** (que inclui outras superfícies).
 
 **Implementação futura (PR independente):** tema com tokens compartilhados; versão/build reais no rodapé; nenhum código funcional nesta etapa. Smoke Beta com perfis autorizados/não autorizados, filtros em cascata, CRUD, estados, acessibilidade, larguras 360/390/430/768/1280/1440 e modo claro/escuro/automático.
+
+## Confirmação adicional do PO — 24/10/2026
+
+O PO **reiterou aprovação dos layouts de Setores**, mantendo ressalvas anteriores sobre rolagem horizontal, UUID e variantes defeituosas, e solicitou visualização de versões escuras. **Distinção importante:** o repositório já contém quatro HTMLs originais em `prototipos/lote-1/setores/originais/escuro/`; portanto, não declarar que estão ausentes do repositório. Validar que são facilmente acessíveis no catálogo atualizado e que a experiência de comparação/tema escuro atenda ao esperado; caso contrário corrigir a apresentação. Preservar logotipo aprovado. Gate A e Issue #371 permanecem com pendências, sem autorização de implementação ou deploy.
