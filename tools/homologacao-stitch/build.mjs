@@ -53,6 +53,26 @@ const groups = [
 if (!existsSync(source)) throw new Error('Referências Stitch não encontradas no repositório');
 mkdirSync(destination, { recursive: true });
 const esc = value => value.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+// Previa de contraste, nunca substitui a referencia original nem aprova o Gate A.
+// Nao modifica HTMLs fonte, marcas/logotipos ou estrutura; aplica somente cores por CSS.
+const darkPreviewCSS = `<style id="gate-a-dark-preview">
+html,html body{color-scheme:dark}
+body,[class~="bg-background"],[class~="bg-surface"]{background-color:#101827!important;color:#e9eef8!important}
+[class~="bg-white"],[class~="bg-surface-container-lowest"],[class~="bg-surface-container-low"]{background-color:#1c283a!important}
+[class~="bg-slate-50"],[class~="bg-gray-50"],[class~="bg-surface-container"],[class~="bg-surface-container-high"]{background-color:#263449!important}
+[class~="bg-slate-100"],[class~="bg-gray-100"],[class~="bg-surface-container-highest"]{background-color:#31435a!important}
+[class~="text-slate-900"],[class~="text-gray-900"],[class~="text-on-surface"],[class~="text-on-background"]{color:#eef3fc!important}
+[class~="text-slate-800"],[class~="text-gray-800"],[class~="text-slate-700"],[class~="text-on-surface-variant"]{color:#dae3f0!important}
+[class~="text-slate-600"],[class~="text-slate-500"],[class~="text-gray-600"],[class~="text-gray-500"]{color:#b3c4d9!important}
+[class~="border-slate-200"],[class~="border-gray-200"],[class~="border-outline-variant"]{border-color:#506077!important}
+input,select,textarea{background-color:#1c283a!important;color:#eef3fc!important;border-color:#62728b!important}
+input::placeholder,textarea::placeholder{color:#aebed2!important}
+</style>`;
+function darkPreview(html) {
+  // O marcador e proposital: evita transmitir a impressao de que o tema ja foi homologado.
+  const notice = '<div role="note" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;background:#111827;color:white;padding:8px 12px;border:1px solid #64748b;border-radius:8px;font:12px system-ui;max-width:75vw">PRÉVIA ESCURA PARA AVALIAÇÃO · NÃO HOMOLOGADA</div>';
+  return html.replace(/<\/head>/i, darkPreviewCSS+'</head>').replace(/<\/body>/i,notice+'</body>');
+}
 let total = 0;
 const panels = groups.map((group, index) => {
   const cards = group.files.map(([filename,label]) => {
@@ -62,7 +82,17 @@ const panels = groups.map((group, index) => {
     mkdirSync(target,{recursive:true});
     cpSync(src,join(target,filename));
     total++;
-    return '<a class="item" href="./referencias/'+group.folder+'/'+filename+'" target="_blank" rel="noopener noreferrer"><span>'+esc(label)+'</span><small>Abrir HTML ↗</small></a>';
+    // Os originais de Setores ja possuem arquivos escuros proprios.
+    const preview = !group.folder.startsWith('setores/');
+    if (preview) {
+      const darkName = filename.replace(/\\.html$/i, '-previa-escura.html');
+      writeFileSync(join(target,darkName),darkPreview(readFileSync(src,'utf8')));
+      total++;
+    }
+    const baseCard = '<a class="item" href="./referencias/'+group.folder+'/'+filename+'" target="_blank" rel="noopener noreferrer"><span>'+esc(label)+'</span><small>Original ↗</small></a>';
+    if (!preview) return baseCard;
+    const darkName = filename.replace(/\\.html$/i, '-previa-escura.html');
+    return baseCard+'<a class="item" href="./referencias/'+group.folder+'/'+darkName+'" target="_blank" rel="noopener noreferrer"><span>'+esc(label)+' · Prévia escura NÃO homologada</span><small>Escuro ↗</small></a>';
   }).join('\n');
   return '<section id="grupo-'+index+'"><h2>'+esc(group.title)+'</h2><div class="items">'+cards+'</div></section>';
 }).join('\n');
