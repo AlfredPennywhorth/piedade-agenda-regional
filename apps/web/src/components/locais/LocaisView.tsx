@@ -699,9 +699,9 @@ export function LocaisView() {
                       </option>
                     ))}
                   </select>
-                  {erroEscoposCadastro && <p role="alert" className="mt-2 text-sm text-red-700">{erroEscoposCadastro}</p>}
+                  {erroEscoposCadastro && <p role="alert" className="mt-2 text-sm text-red-300">{erroEscoposCadastro}</p>}
                   {!carregandoEscopos && !erroEscoposCadastro && escoposCadastro.length === 0 &&
-                    <p role="status" className="mt-2 text-sm text-amber-800">Nenhum escopo institucional disponível. Verifique se sua Casa de Oração e Setor de origem estão cadastrados.</p>}
+                    <p role="status" className="mt-2 text-sm text-amber-200">Nenhum escopo institucional disponível. Verifique se sua Casa de Oração e Setor de origem estão cadastrados.</p>}
                 </div>
               )}
               <div className="space-y-4 rounded-xl bg-[#1E293B] p-4 sm:p-5">
@@ -737,14 +737,14 @@ export function LocaisView() {
                       placeholder="00000-000"
                       aria-describedby="cep-feedback"
                     />
-                    <div id="cep-feedback" className={`text-xs mt-1 min-h-4 ${cepErro ? 'text-red-600' : 'text-slate-500'}`}>
+                    <div id="cep-feedback" className={`text-xs mt-1 min-h-4 ${cepErro ? 'text-red-300' : 'text-slate-200'}`}>
                       {consultandoCep ? 'Consultando CEP...' : cepMensagem}
                     </div>
                     {consultandoCep && (
                       <button
                         type="button"
                         onClick={cancelarConsultaCep}
-                        className="mt-1 text-xs font-medium text-brand-700 hover:underline"
+                        className="mt-1 text-xs font-medium text-blue-200 hover:text-white hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300"
                       >
                         Usar endereço manualmente
                       </button>
