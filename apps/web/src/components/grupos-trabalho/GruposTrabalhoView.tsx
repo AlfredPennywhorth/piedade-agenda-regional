@@ -282,13 +282,13 @@ export function GruposTrabalhoView() {
       </div>
 
       {/* Filtro */}
-      <div className="flex items-center space-x-2 mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
         <label htmlFor="filtro-escopo" className="text-sm font-medium text-slate-700">Filtrar por Escopo:</label>
         <select
           id="filtro-escopo"
           value={filtroEscopo}
           onChange={(e) => setFiltroEscopo(e.target.value as any)}
-          className="px-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
+          className="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-md text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-200"
         >
           <option value="todos">Todos</option>
           <option value="regional">Regional</option>
@@ -429,7 +429,23 @@ export function GruposTrabalhoView() {
             Nenhum grupo de trabalho encontrado.
           </div>
         ) : (
-          <div className="master-table-scroll">
+          <>
+            <div className="divide-y divide-slate-600 md:hidden" aria-label="Lista de Grupos de Trabalho">
+              {gruposFiltrados.map(g => (
+                <article key={g.id} className="p-4 space-y-3 bg-[#1E293B] text-[#F8FAFC]">
+                  <h3 className="font-semibold text-base break-words">{g.nome}</h3>
+                  <p className="text-sm text-slate-200 break-words">{getNomeEscopo(g)}</p>
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${g.ativo ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-200 text-slate-800'}`}>
+                    {g.ativo ? 'Ativo' : 'Inativo'}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <button type="button" onClick={() => verDetalhes(g.id)} className="min-h-11 px-4 py-2 rounded-lg bg-[#CBD5E1] text-[#0F172A] font-medium text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Detalhes</button>
+                    <button type="button" onClick={() => abrirFormEditar(g.id)} className="min-h-11 px-4 py-2 rounded-lg bg-[#2563EB] text-white font-medium text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Editar</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="hidden md:block master-table-scroll">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                 <tr>
@@ -477,7 +493,8 @@ export function GruposTrabalhoView() {
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </div>
 
