@@ -485,36 +485,36 @@ export function GruposTrabalhoView() {
       {grupoDetalhe && (
         <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50">
           <div 
-            className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200"
+            className="bg-[#0F172A] text-[#F8FAFC] rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-4 sm:p-5 space-y-4 shadow-xl border border-slate-600 break-words"
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-detalhes-titulo"
           >
-            <AjudaContextual /><span data-screen-code="AGD-ADM-047" className="block text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-047</span>
-            <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-              <h3 id="modal-detalhes-titulo" className="font-bold text-slate-800 text-base">Detalhes do Grupo de Trabalho</h3>
+            <AjudaContextual /><span data-screen-code="AGD-ADM-047" className="block text-right text-[10px] font-medium text-slate-300">Tela AGD-ADM-047</span>
+            <div className="flex justify-between items-center gap-3 border-b border-slate-600 pb-3">
+              <h3 id="modal-detalhes-titulo" className="font-bold text-[#F8FAFC] text-base">Detalhes do Grupo de Trabalho</h3>
               <button
                 onClick={() => setGrupoDetalhe(null)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-semibold"
+                className="text-slate-200 hover:text-white text-sm font-semibold"
               >
                 ✕
               </button>
             </div>
 
             {carregandoDetalheModal ? (
-              <div className="py-6 text-center text-slate-500 text-sm">Carregando detalhes...</div>
+              <div className="py-6 text-center text-slate-200 text-sm">Carregando detalhes...</div>
             ) : (
-              <div className="space-y-3 text-sm">
+              <div className="space-y-3 text-sm rounded-xl bg-[#1E293B] p-4">
                 <div>
-                  <span className="text-xs font-semibold text-slate-500 block">Nome:</span>
-                  <span className="font-semibold text-slate-800">{grupoDetalhe.nome}</span>
+                  <span className="text-xs font-semibold text-slate-300 block">Nome:</span>
+                  <span className="font-semibold text-[#F8FAFC]">{grupoDetalhe.nome}</span>
                 </div>
                 <div>
-                  <span className="text-xs font-semibold text-slate-500 block">Escopo:</span>
-                  <span className="text-slate-700">{getNomeEscopo(grupoDetalhe)}</span>
+                  <span className="text-xs font-semibold text-slate-300 block">Escopo:</span>
+                  <span className="text-[#F8FAFC]">{getNomeEscopo(grupoDetalhe)}</span>
                 </div>
                 <div>
-                  <span className="text-xs font-semibold text-slate-500 block">Status:</span>
+                  <span className="text-xs font-semibold text-slate-300 block">Status:</span>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                     grupoDetalhe.ativo ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
                   }`}>
@@ -523,17 +523,17 @@ export function GruposTrabalhoView() {
                 </div>
                 {grupoDetalhe.createdAt && (
                   <div>
-                    <span className="text-xs font-semibold text-slate-500 block">Data de Criação:</span>
-                    <span className="text-xs text-slate-600">{new Date(grupoDetalhe.createdAt).toLocaleString('pt-BR')}</span>
+                    <span className="text-xs font-semibold text-slate-300 block">Data de Criação:</span>
+                    <span className="text-xs text-slate-200">{new Date(grupoDetalhe.createdAt).toLocaleString('pt-BR')}</span>
                   </div>
                 )}
               </div>
             )}
 
-            <div className="text-right pt-3 border-t border-slate-100">
+            <div className="text-right pt-3 border-t border-slate-600">
               <button
                 onClick={() => setGrupoDetalhe(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors"
+                className="px-4 py-2 bg-[#CBD5E1] hover:bg-white text-[#0F172A] rounded-lg text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300"
               >
                 Fechar
               </button>
