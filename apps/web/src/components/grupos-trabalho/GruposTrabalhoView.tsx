@@ -282,13 +282,13 @@ export function GruposTrabalhoView() {
       </div>
 
       {/* Filtro */}
-      <div className="flex items-center space-x-2 mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-4">
         <label htmlFor="filtro-escopo" className="text-sm font-medium text-slate-700">Filtrar por Escopo:</label>
         <select
           id="filtro-escopo"
           value={filtroEscopo}
           onChange={(e) => setFiltroEscopo(e.target.value as any)}
-          className="px-3 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
+          className="w-full sm:w-auto min-w-0 px-3 py-2 border border-slate-300 rounded-md text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-200"
         >
           <option value="todos">Todos</option>
           <option value="regional">Regional</option>
@@ -314,26 +314,26 @@ export function GruposTrabalhoView() {
 
       {/* Form de Criação / Edição */}
       {modoForm && (
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-md space-y-4">
-          <AjudaContextual /><span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-045' : 'AGD-ADM-046'} className="block text-right text-[10px] font-medium tracking-wide text-slate-500">Tela {modoForm === 'criar' ? 'AGD-ADM-045' : 'AGD-ADM-046'}</span>
-          <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-            <h3 className="font-bold text-slate-800 text-base">
+        <div className="bg-[#0F172A] text-[#F8FAFC] p-4 sm:p-6 rounded-2xl border border-slate-600 shadow-md space-y-4 min-w-0">
+          <AjudaContextual /><span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-045' : 'AGD-ADM-046'} className="block text-right text-[10px] font-medium tracking-wide text-slate-300">Tela {modoForm === 'criar' ? 'AGD-ADM-045' : 'AGD-ADM-046'}</span>
+          <div className="flex justify-between items-center border-b border-slate-600 pb-3">
+            <h3 className="font-bold text-[#F8FAFC] text-base">
               {modoForm === 'criar' ? 'Cadastrar Novo Grupo' : 'Editar Grupo'}
             </h3>
             <button
               onClick={fecharForm}
-              className="text-slate-400 hover:text-slate-600 text-sm font-semibold"
+              className="text-slate-200 hover:text-white text-sm font-semibold"
             >
               Cancelar
             </button>
           </div>
 
           {carregandoDetalhes ? (
-            <div className="py-6 text-center text-slate-500 text-sm">Carregando dados do grupo...</div>
+            <div className="py-6 text-center text-slate-200 text-sm">Carregando dados do grupo...</div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4 rounded-xl bg-[#1E293B] p-4 sm:p-5">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="input-nome">
+                <label className="block text-sm font-semibold text-[#F8FAFC] mb-1" htmlFor="input-nome">
                   Nome do Grupo <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -342,18 +342,18 @@ export function GruposTrabalhoView() {
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   placeholder="Ex: Jovens, Casais"
-                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                  className={`w-full min-w-0 px-3 py-2 border rounded-lg bg-white text-[#0F172A] text-sm focus:outline-none focus:ring-2 ${
                     errosForm.nome ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-brand-200'
                   }`}
                   disabled={salvando}
                 />
                 {errosForm.nome && (
-                  <p className="text-xs text-red-600 mt-1">{errosForm.nome}</p>
+                  <p className="text-xs text-red-300 mt-1">{errosForm.nome}</p>
                 )}
               </div>
 
               <div>
-                <label htmlFor="select-regional" className="block text-xs font-semibold text-slate-700 mb-1">
+                <label htmlFor="select-regional" className="block text-sm font-semibold text-[#F8FAFC] mb-1">
                   Regional vinculada ao Grupo <span className="text-red-500">*</span>
                 </label>
                 <select
@@ -364,12 +364,12 @@ export function GruposTrabalhoView() {
                     setErrosForm(atual => ({ ...atual, escopo: '' }))
                   }}
                   disabled={salvando}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
+                  className="w-full min-w-0 px-3 py-2 border border-slate-300 rounded-lg bg-white text-[#0F172A] text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                 >
                   <option value="">Selecione...</option>
                   {regionais.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
                 </select>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-slate-200">
                   Grupos de Trabalho são exclusivamente Regionais. Os Setores participam por meio de seus representantes.
                 </p>
                 {avisoMigracaoEscopo && (
@@ -378,7 +378,7 @@ export function GruposTrabalhoView() {
                   </p>
                 )}
                 {errosForm.escopo && (
-                  <p className="text-xs text-red-600 mt-1">{errosForm.escopo}</p>
+                  <p className="text-xs text-red-300 mt-1">{errosForm.escopo}</p>
                 )}
               </div>
 
@@ -391,23 +391,23 @@ export function GruposTrabalhoView() {
                   className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                   disabled={salvando}
                 />
-                <label htmlFor="input-ativo" className="text-sm text-slate-700 font-medium">
+                <label htmlFor="input-ativo" className="text-sm text-[#F8FAFC] font-medium">
                   Grupo Ativo
                 </label>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex flex-wrap justify-end gap-2 pt-3 border-t border-slate-600">
                 <button
                   type="button"
                   onClick={fecharForm}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors"
+                  className="min-h-11 px-4 py-2 bg-[#CBD5E1] hover:bg-white text-[#0F172A] rounded-lg text-sm font-medium transition-colors"
                   disabled={salvando}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-medium transition-colors shadow-sm disabled:opacity-50"
+                  className="min-h-11 px-4 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
                   disabled={salvando}
                 >
                   {salvando ? 'Salvando...' : modoForm === 'criar' ? 'Salvar Grupo' : 'Atualizar Grupo'}
@@ -429,7 +429,23 @@ export function GruposTrabalhoView() {
             Nenhum grupo de trabalho encontrado.
           </div>
         ) : (
-          <div className="master-table-scroll">
+          <>
+            <div className="divide-y divide-slate-600 md:hidden" aria-label="Lista de Grupos de Trabalho">
+              {gruposFiltrados.map(g => (
+                <article key={g.id} className="p-4 space-y-3 bg-[#1E293B] text-[#F8FAFC]">
+                  <h3 className="font-semibold text-base break-words">{g.nome}</h3>
+                  <p className="text-sm text-slate-200 break-words">{getNomeEscopo(g)}</p>
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${g.ativo ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-200 text-slate-800'}`}>
+                    {g.ativo ? 'Ativo' : 'Inativo'}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <button type="button" onClick={() => verDetalhes(g.id)} className="min-h-11 px-4 py-2 rounded-lg bg-[#CBD5E1] text-[#0F172A] font-medium text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Detalhes</button>
+                    <button type="button" onClick={() => abrirFormEditar(g.id)} className="min-h-11 px-4 py-2 rounded-lg bg-[#2563EB] text-white font-medium text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Editar</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="hidden md:block master-table-scroll">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                 <tr>
@@ -477,7 +493,8 @@ export function GruposTrabalhoView() {
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </div>
 
