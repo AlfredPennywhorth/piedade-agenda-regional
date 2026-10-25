@@ -967,19 +967,33 @@ export function LocaisView() {
                 {espacos.length === 0 ? (
                   <p className="p-4 text-sm text-slate-500">Nenhum espaço cadastrado para este Local.</p>
                 ) : (
-                  <table className="w-full text-sm">
-                    <thead className="bg-slate-50"><tr><th className="text-left px-4 py-3">Espaço</th><th className="text-left px-4 py-3">Capacidade</th><th className="text-left px-4 py-3">Status</th><th className="px-4 py-3"></th></tr></thead>
-                    <tbody className="divide-y">
+                  <>
+                    <div className="divide-y md:hidden" aria-label="Lista de espaços">
                       {espacos.map(espaco => (
-                        <tr key={espaco.id}>
-                          <td className="px-4 py-3">{espaco.nome}</td>
-                          <td className="px-4 py-3">{espaco.capacidade ?? '—'}</td>
-                          <td className="px-4 py-3">{espaco.ativo ? 'Ativo' : 'Inativo'}</td>
-                          <td className="px-4 py-3 text-right"><button onClick={() => editarEspaco(espaco)} className="text-brand-700 font-medium">Editar</button></td>
-                        </tr>
+                        <div key={espaco.id} className="space-y-3 p-4 text-sm">
+                          <p className="font-semibold text-slate-900 break-words">{espaco.nome}</p>
+                          <div className="flex flex-wrap gap-x-5 gap-y-2 text-slate-700">
+                            <p>Capacidade: <span className="font-medium">{espaco.capacidade ?? '—'}</span></p>
+                            <p>Status: <span className="font-medium">{espaco.ativo ? 'Ativo' : 'Inativo'}</span></p>
+                          </div>
+                          <button type="button" onClick={() => editarEspaco(espaco)} className="min-h-11 rounded-lg px-3 py-2 font-medium text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">Editar</button>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                    <table className="hidden w-full text-sm md:table">
+                      <thead className="bg-slate-50"><tr><th className="text-left px-4 py-3">Espaço</th><th className="text-left px-4 py-3">Capacidade</th><th className="text-left px-4 py-3">Status</th><th className="px-4 py-3"></th></tr></thead>
+                      <tbody className="divide-y">
+                        {espacos.map(espaco => (
+                          <tr key={espaco.id}>
+                            <td className="px-4 py-3 break-words">{espaco.nome}</td>
+                            <td className="px-4 py-3">{espaco.capacidade ?? '—'}</td>
+                            <td className="px-4 py-3">{espaco.ativo ? 'Ativo' : 'Inativo'}</td>
+                            <td className="px-4 py-3 text-right"><button type="button" onClick={() => editarEspaco(espaco)} className="text-brand-700 font-medium">Editar</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </>
                 )}
               </div>
             </div>
