@@ -46,12 +46,13 @@ export function GruposTrabalhoView() {
   // Estado do modal/modo de formulário (null = fechado, 'criar' = novo, 'editar' = editando)
   const [modoForm, setModoForm] = useState<'criar' | 'editar' | null>(null)
   const formularioRef = useRef<HTMLDivElement>(null)
+  const [solicitacaoEdicao, setSolicitacaoEdicao] = useState(0)
 
   useEffect(() => {
     if (modoForm === 'editar') {
       formularioRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
-  }, [modoForm])
+  }, [modoForm, solicitacaoEdicao])
   const [grupoEditandoId, setGrupoEditandoId] = useState<string | null>(null)
   const [carregandoDetalhes, setCarregandoDetalhes] = useState<boolean>(false)
 
@@ -105,6 +106,7 @@ export function GruposTrabalhoView() {
   }
 
   const abrirFormEditar = async (id: string) => {
+    setSolicitacaoEdicao(atual => atual + 1)
     setModoForm('editar')
     setGrupoEditandoId(id)
     setCarregandoDetalhes(true)
