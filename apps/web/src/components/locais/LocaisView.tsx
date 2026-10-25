@@ -930,45 +930,45 @@ export function LocaisView() {
 
       {espacosOpen && localEspacos && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div role="dialog" aria-modal="true" aria-labelledby="modal-espacos-title" className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-            <AjudaContextual /><span data-screen-code="AGD-ADM-058" className="block shrink-0 px-6 pt-3 pb-1 text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-058</span>
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          <div role="dialog" aria-modal="true" aria-labelledby="modal-espacos-title" className="bg-[#0F172A] text-[#F8FAFC] rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <AjudaContextual /><span data-screen-code="AGD-ADM-058" className="block shrink-0 px-6 pt-3 pb-1 text-right text-[10px] font-medium text-slate-300">Tela AGD-ADM-058</span>
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-600 flex justify-between items-center bg-[#1E293B]">
               <div>
-                <h3 id="modal-espacos-title" className="text-lg font-semibold text-slate-900">Espaços do Local</h3>
-                <p className="text-sm text-slate-500">{localEspacos.nome}</p>
+                <h3 id="modal-espacos-title" className="text-lg font-semibold text-[#F8FAFC]">Espaços do Local</h3>
+                <p className="text-sm text-slate-300 break-words">{localEspacos.nome}</p>
               </div>
-              <button onClick={fecharEspacos} className="text-slate-400 hover:text-slate-600">✕</button>
+              <button onClick={fecharEspacos} className="text-slate-200 hover:text-white">✕</button>
             </div>
-            <div className="p-6 overflow-y-auto space-y-6">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-6">
               {espacoErro && <div role="alert" className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{espacoErro}</div>}
-              <form onSubmit={salvarEspaco} className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 border rounded-xl bg-slate-50">
+              <form onSubmit={salvarEspaco} className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 sm:p-5 border border-slate-600 rounded-xl bg-[#1E293B]">
                 <div>
-                  <label htmlFor="espacoNome" className="block text-sm font-medium text-slate-700 mb-1">Nome do Espaço *</label>
-                  <input id="espacoNome" value={espacoForm.nome} onChange={e => setEspacoForm({ ...espacoForm, nome: e.target.value })} className="w-full p-2.5 border rounded-lg text-sm" placeholder="Ex: Salão de Reunião" />
+                  <label htmlFor="espacoNome" className="block text-sm font-medium text-[#F8FAFC] mb-1">Nome do Espaço *</label>
+                  <input id="espacoNome" value={espacoForm.nome} onChange={e => setEspacoForm({ ...espacoForm, nome: e.target.value })} className="w-full min-w-0 p-2.5 border border-slate-300 bg-white text-[#0F172A] rounded-lg text-sm" placeholder="Ex: Salão de Reunião" />
                 </div>
                 <div>
-                  <label htmlFor="espacoCapacidade" className="block text-sm font-medium text-slate-700 mb-1">Capacidade</label>
-                  <input id="espacoCapacidade" type="number" min="1" value={espacoForm.capacidade} onChange={e => setEspacoForm({ ...espacoForm, capacidade: e.target.value })} className="w-full p-2.5 border rounded-lg text-sm" />
+                  <label htmlFor="espacoCapacidade" className="block text-sm font-medium text-[#F8FAFC] mb-1">Capacidade</label>
+                  <input id="espacoCapacidade" type="number" min="1" value={espacoForm.capacidade} onChange={e => setEspacoForm({ ...espacoForm, capacidade: e.target.value })} className="w-full min-w-0 p-2.5 border border-slate-300 bg-white text-[#0F172A] rounded-lg text-sm" />
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="espacoDescricao" className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
-                  <input id="espacoDescricao" value={espacoForm.descricao} onChange={e => setEspacoForm({ ...espacoForm, descricao: e.target.value })} className="w-full p-2.5 border rounded-lg text-sm" />
+                  <label htmlFor="espacoDescricao" className="block text-sm font-medium text-[#F8FAFC] mb-1">Descrição</label>
+                  <input id="espacoDescricao" value={espacoForm.descricao} onChange={e => setEspacoForm({ ...espacoForm, descricao: e.target.value })} className="w-full min-w-0 p-2.5 border border-slate-300 bg-white text-[#0F172A] rounded-lg text-sm" />
                 </div>
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={espacoForm.ativo} onChange={e => setEspacoForm({ ...espacoForm, ativo: e.target.checked })} />
                   Espaço ativo
                 </label>
-                <div className="flex justify-end gap-2">
-                  {espacoEditandoId && <button type="button" onClick={() => { setEspacoEditandoId(null); setEspacoForm({ nome: '', descricao: '', capacidade: '', ativo: true }) }} className="px-3 py-2 text-sm">Cancelar edição</button>}
-                  <button type="submit" disabled={salvandoEspaco} className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm disabled:opacity-50">{salvandoEspaco ? 'Salvando...' : espacoEditandoId ? 'Atualizar Espaço' : '+ Adicionar Espaço'}</button>
+                <div className="flex flex-wrap justify-end gap-2 sm:col-span-2">
+                  {espacoEditandoId && <button type="button" onClick={() => { setEspacoEditandoId(null); setEspacoForm({ nome: '', descricao: '', capacidade: '', ativo: true }) }} className="px-3 py-2 bg-[#CBD5E1] text-[#0F172A] hover:bg-white rounded-lg text-sm font-medium">Cancelar edição</button>}
+                  <button type="submit" disabled={salvandoEspaco} className="px-4 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-lg text-sm font-medium disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300">{salvandoEspaco ? 'Salvando...' : espacoEditandoId ? 'Atualizar Espaço' : '+ Adicionar Espaço'}</button>
                 </div>
               </form>
-              <div className="border rounded-xl overflow-hidden">
+              <div className="border border-slate-600 rounded-xl overflow-hidden bg-white text-[#0F172A]">
                 {espacos.length === 0 ? (
                   <p className="p-4 text-sm text-slate-500">Nenhum espaço cadastrado para este Local.</p>
                 ) : (
                   <>
-                    <div className="divide-y md:hidden" aria-label="Lista de espaços">
+                    <div className="divide-y divide-slate-200 md:hidden" aria-label="Lista de espaços">
                       {espacos.map(espaco => (
                         <div key={espaco.id} className="space-y-3 p-4 text-sm">
                           <p className="font-semibold text-slate-900 break-words">{espaco.nome}</p>
@@ -980,7 +980,7 @@ export function LocaisView() {
                         </div>
                       ))}
                     </div>
-                    <table className="hidden w-full text-sm md:table">
+                    <table className="hidden w-full text-sm text-[#0F172A] md:table">
                       <thead className="bg-slate-50"><tr><th className="text-left px-4 py-3">Espaço</th><th className="text-left px-4 py-3">Capacidade</th><th className="text-left px-4 py-3">Status</th><th className="px-4 py-3"></th></tr></thead>
                       <tbody className="divide-y">
                         {espacos.map(espaco => (
@@ -988,7 +988,7 @@ export function LocaisView() {
                             <td className="px-4 py-3 break-words">{espaco.nome}</td>
                             <td className="px-4 py-3">{espaco.capacidade ?? '—'}</td>
                             <td className="px-4 py-3">{espaco.ativo ? 'Ativo' : 'Inativo'}</td>
-                            <td className="px-4 py-3 text-right"><button type="button" onClick={() => editarEspaco(espaco)} className="text-brand-700 font-medium">Editar</button></td>
+                            <td className="px-4 py-3 text-right"><button type="button" onClick={() => editarEspaco(espaco)} className="text-blue-700 font-medium hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">Editar</button></td>
                           </tr>
                         ))}
                       </tbody>
