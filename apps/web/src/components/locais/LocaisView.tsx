@@ -1008,45 +1008,45 @@ export function LocaisView() {
             role="dialog" 
             aria-modal="true" 
             aria-labelledby="modal-detail-title"
-            className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95"
+            className="bg-[#0F172A] text-[#F8FAFC] rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95"
           >
-            <AjudaContextual /><span data-screen-code="AGD-ADM-057" className="block shrink-0 px-6 pt-3 pb-1 text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-057</span>
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 id="modal-detail-title" className="text-lg font-semibold text-slate-900">
+            <AjudaContextual /><span data-screen-code="AGD-ADM-057" className="block shrink-0 px-6 pt-3 pb-1 text-right text-[10px] font-medium text-slate-300">Tela AGD-ADM-057</span>
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-600 flex justify-between items-center bg-[#1E293B]">
+              <h3 id="modal-detail-title" className="text-lg font-semibold text-[#F8FAFC]">
                 Detalhes do Local
               </h3>
               <button
                 onClick={() => setDetailOpen(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
+                className="text-slate-200 hover:text-white transition-colors"
               >
                 ✕
               </button>
             </div>
             
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 break-words">
               <div>
-                <p className="text-sm text-slate-500 mb-1">Nome</p>
-                <p className="font-medium text-slate-900">{selectedLocal.nome}</p>
+                <p className="text-sm text-slate-300 mb-1">Nome</p>
+                <p className="font-medium text-[#F8FAFC]">{selectedLocal.nome}</p>
               </div>
               
               <div>
-                <p className="text-sm text-slate-500 mb-1">Endereço Completo</p>
-                <p className="text-slate-900">
+                <p className="text-sm text-slate-300 mb-1">Endereço Completo</p>
+                <p className="text-[#F8FAFC]">
                   {selectedLocal.endereco}, {selectedLocal.numero}
                   {selectedLocal.complemento && ` - ${selectedLocal.complemento}`}
                 </p>
-                <p className="text-slate-900">
+                <p className="text-[#F8FAFC]">
                   {selectedLocal.bairro && `${selectedLocal.bairro} - `}
                   {selectedLocal.cidade} / {selectedLocal.uf}
                 </p>
-                {selectedLocal.cep && <p className="text-slate-900">CEP: {selectedLocal.cep}</p>}
-                {selectedLocal.referencia && <p className="text-slate-500 text-sm italic mt-1">Ref: {selectedLocal.referencia}</p>}
+                {selectedLocal.cep && <p className="text-[#F8FAFC]">CEP: {selectedLocal.cep}</p>}
+                {selectedLocal.referencia && <p className="text-slate-300 text-sm italic mt-1">Ref: {selectedLocal.referencia}</p>}
               </div>
 
               {(selectedLocal.latitude || selectedLocal.longitude) && (
                 <div>
-                  <p className="text-sm text-slate-500 mb-1">Coordenadas</p>
-                  <p className="text-slate-900 font-mono text-sm">
+                  <p className="text-sm text-slate-300 mb-1">Coordenadas</p>
+                  <p className="text-[#F8FAFC] font-mono text-sm">
                     {selectedLocal.latitude}, {selectedLocal.longitude}
                   </p>
                 </div>
@@ -1054,15 +1054,15 @@ export function LocaisView() {
 
               {(selectedLocal.urlMaps || selectedLocal.urlWaze) && (
                 <div className="pt-2 flex flex-col gap-2">
-                  <p className="text-sm text-slate-500">Navegação</p>
-                  <div className="flex gap-3">
+                  <p className="text-sm text-slate-300">Navegação</p>
+                  <div className="flex flex-wrap gap-3">
                     {selectedLocal.urlMaps && (
-                      <a href={selectedLocal.urlMaps} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline text-sm font-medium">
+                      <a href={selectedLocal.urlMaps} target="_blank" rel="noreferrer" className="text-blue-200 hover:text-white hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300 text-sm font-medium">
                         Ver no Google Maps
                       </a>
                     )}
                     {selectedLocal.urlWaze && (
-                      <a href={selectedLocal.urlWaze} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline text-sm font-medium">
+                      <a href={selectedLocal.urlWaze} target="_blank" rel="noreferrer" className="text-blue-200 hover:text-white hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300 text-sm font-medium">
                         Ver no Waze
                       </a>
                     )}
@@ -1077,10 +1077,10 @@ export function LocaisView() {
               </div>
             </div>
             
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+            <div className="px-4 sm:px-6 py-4 border-t border-slate-600 bg-[#1E293B] flex justify-end">
               <button
                 onClick={() => setDetailOpen(false)}
-                className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-200 rounded-lg transition-colors text-sm"
+                className="px-5 py-2.5 bg-[#CBD5E1] text-[#0F172A] font-medium hover:bg-white rounded-lg transition-colors text-sm"
               >
                 Fechar
               </button>
