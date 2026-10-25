@@ -35,12 +35,12 @@ describe('S01 — GruposTrabalhoView (Gestão de Grupos de Trabalho)', () => {
     render(<GruposTrabalhoView />)
 
     expect(screen.getByText('Gestão de Grupos de Trabalho')).toBeInTheDocument()
-    expect(await screen.findByText('Jovens - Regional')).toBeInTheDocument()
-    expect(screen.getByText('Casais - Setor')).toBeInTheDocument()
-    expect(screen.getByText('Regional: Regional Sul')).toBeInTheDocument()
-    expect(screen.getByText('Setor: Setor A')).toBeInTheDocument()
-    expect(screen.getByText('Ativo')).toBeInTheDocument()
-    expect(screen.getByText('Inativo')).toBeInTheDocument()
+    expect((await screen.findAllByText('Jovens - Regional')).length).toBe(2)
+    expect(screen.getAllByText('Casais - Setor')).toHaveLength(2)
+    expect(screen.getAllByText('Regional: Regional Sul')).toHaveLength(2)
+    expect(screen.getAllByText('Setor: Setor A')).toHaveLength(2)
+    expect(screen.getAllByText('Ativo')).toHaveLength(2)
+    expect(screen.getAllByText('Inativo')).toHaveLength(2)
   })
 
   it('2. Vazio: deve exibir estado vazio quando a lista estiver vazia', async () => {
@@ -64,7 +64,8 @@ describe('S01 — GruposTrabalhoView (Gestão de Grupos de Trabalho)', () => {
 
     render(<GruposTrabalhoView />)
 
-    const btnDetalhes = await screen.findByText('Detalhes')
+    const listaMobile = await screen.findByLabelText('Lista de Grupos de Trabalho')
+    const btnDetalhes = within(listaMobile).getByRole('button', { name: 'Detalhes' })
     fireEvent.click(btnDetalhes)
 
     const dialog = await screen.findByRole('dialog')
