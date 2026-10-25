@@ -440,15 +440,20 @@ describe('LocaisView', () => {
     fireEvent.click(within(linhaB!).getByRole('button', { name: 'Espaços' }))
 
     dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
-    expect(await within(dialog).findByText('Sala B')).toBeInTheDocument()
+    expect(await within(dialog.querySelector('table')!).findByText('Sala B')).toBeInTheDocument()
+    const listaMobile = dialog.querySelector('[aria-label="Lista de espaços"]')
+    expect(listaMobile).not.toBeNull()
+    expect(within(listaMobile as HTMLElement).getByText('Sala B')).toBeInTheDocument()
+    expect(within(listaMobile as HTMLElement).getByRole('button', { name: 'Editar' })).toBeInTheDocument()
+    expect(within(dialog.querySelector('table')!).getByRole('button', { name: 'Editar' })).toBeInTheDocument()
 
     await act(async () => {
       resolverLocalA?.([{ id: 'esp-a', localId: '1', nome: 'Sala A', ativo: true }])
       await respostaLocalA
     })
 
-    expect(within(dialog).getByText('Sala B')).toBeInTheDocument()
-    expect(within(dialog).queryByText('Sala A')).not.toBeInTheDocument()
+    expect(within(dialog.querySelector('table')!).getByText('Sala B')).toBeInTheDocument()
+    expect(within(dialog.querySelector('table')!).queryByText('Sala A')).not.toBeInTheDocument()
   })
 
   it('deve ignorar refresh pós-save de um Local depois que outro Local foi aberto', async () => {
@@ -516,15 +521,15 @@ describe('LocaisView', () => {
     fireEvent.click(within(linhaB!).getByRole('button', { name: 'Espaços' }))
 
     dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
-    expect(await within(dialog).findByText('Sala B')).toBeInTheDocument()
+    expect(await within(dialog.querySelector('table')!).findByText('Sala B')).toBeInTheDocument()
 
     await act(async () => {
       resolverRefreshA?.([{ id: 'esp-a', localId: localAId, nome: 'Sala A Atualizada', ativo: true }])
       await refreshA
     })
 
-    expect(within(dialog).getByText('Sala B')).toBeInTheDocument()
-    expect(within(dialog).queryByText('Sala A Atualizada')).not.toBeInTheDocument()
+    expect(within(dialog.querySelector('table')!).getByText('Sala B')).toBeInTheDocument()
+    expect(within(dialog.querySelector('table')!).queryByText('Sala A Atualizada')).not.toBeInTheDocument()
   })
 
   it('deve atualizar o mesmo Local reaberto enquanto o save ainda estava pendente', async () => {
@@ -560,7 +565,7 @@ describe('LocaisView', () => {
     fireEvent.click(within(linha!).getByRole('button', { name: 'Espaços' }))
 
     let dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
-    expect(await within(dialog).findByText('Sala Antiga')).toBeInTheDocument()
+    expect(await within(dialog.querySelector('table')!).findByText('Sala Antiga')).toBeInTheDocument()
 
     fireEvent.change(within(dialog).getByLabelText(/nome do espaço/i), {
       target: { value: 'Sala Nova' },
@@ -579,8 +584,8 @@ describe('LocaisView', () => {
     fireEvent.click(within(linha!).getByRole('button', { name: 'Espaços' }))
     dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
 
-    expect(await within(dialog).findByText('Sala Antiga')).toBeInTheDocument()
-    expect(within(dialog).queryByText('Sala Nova')).not.toBeInTheDocument()
+    expect(await within(dialog.querySelector('table')!).findByText('Sala Antiga')).toBeInTheDocument()
+    expect(within(dialog.querySelector('table')!).queryByText('Sala Nova')).not.toBeInTheDocument()
 
     const botaoSaveReaberto = within(dialog).getByRole('button', { name: /salvando/i })
     expect(botaoSaveReaberto).toBeDisabled()
@@ -593,7 +598,7 @@ describe('LocaisView', () => {
     })
 
     await waitFor(() => {
-      expect(within(dialog).getByText('Sala Nova')).toBeInTheDocument()
+      expect(within(dialog.querySelector('table')!).getByText('Sala Nova')).toBeInTheDocument()
       expect(within(dialog).getByRole('button', { name: /adicionar espaço/i })).not.toBeDisabled()
     })
     expect(apiClient.postWithAuth).toHaveBeenCalledTimes(1)
