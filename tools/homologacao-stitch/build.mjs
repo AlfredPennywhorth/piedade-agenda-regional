@@ -227,6 +227,21 @@ function needsRegionaisPoContrast(groupFolder, filename) {
   return groupFolder === 'regionais-administracoes' &&
     /^(AGD-ADM-005-desktop|AGD-ADM-039-cadastro|AGD-ADM-040-edicao)\.html$/.test(filename);
 }
+// Últimas ressalvas PO: 006 status Ativo; 013 desktop linhas da tabela.
+const finalPoCSS = `<style id="gate-a-po-final-006-013">
+/* 006: badge verde-claro deve conservar texto verde escuro. */
+html body span[class~="bg-[#ecfdf5]"][class~="text-[#065f46]"]{background-color:#ecfdf5!important;color:#065f46!important}
+html body span[class~="bg-[#ecfdf5]"][class~="text-[#065f46]"] span{background-color:#10b981!important}
+/* 013: superfície realmente escura na tabela, sem texto cinza sobre fundo claro. */
+html body table tbody tr,html body table tbody td{background-color:#1e293b!important}
+html body table tbody td[class~="text-slate-600"],
+html body table tbody td[class~="text-slate-900"]{color:#f1f5f9!important}
+html body table tbody tr:hover,html body table tbody tr:hover td{background-color:#334155!important}
+</style>`;
+function needsFinalPoCSS(groupFolder, filename){
+  return groupFolder === 'regionais-administracoes' && filename === 'AGD-ADM-006-desktop.html' ||
+    groupFolder.startsWith('locais-espacos/') && filename === 'AGD-ADM-013-listagem-desktop.html';
+}
 // Correspondencia visual com a referencia Setores escura (somente GT, so na previa).
 // Acoes primarias e Editar: azul; Detalhes: neutro. Estados hover preservados.
 const gtButtonsCSS = `<style id="gate-a-gt-button-pattern">
@@ -242,7 +257,7 @@ button:disabled{opacity:.65}
 function darkPreview(html, needsReview = false, groupFolder = '', filename = '') {
   // O marcador e proposital: evita transmitir a impressao de que o tema ja foi homologado.
   const notice = '<div role="note" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;background:#111827;color:white;padding:8px 12px;border:1px solid #64748b;border-radius:8px;font:12px system-ui;max-width:75vw">PRÉVIA ESCURA PARA AVALIAÇÃO · NÃO HOMOLOGADA</div>';
-  return html.replace(/<\/head>/i, darkPreviewCSS+(needsReview ? pendingDarkCSS : '')+(groupFolder === 'grupos-trabalho' ? gtButtonsCSS : '')+(needsReview && (groupFolder.startsWith('locais-espacos/') || filename === 'AGD-ADM-047-detalhes.html') ? reviewByScreenCSS : '')+(needsReview ? approvedGrayContrastCSS : '')+(needsPoLote1Contrast(groupFolder,filename) ? administrationGtContrastCSS : '')+(filename === 'AGD-ADM-047-detalhes.html' && groupFolder === 'grupos-trabalho' ? gtDetailsNoGrayCSS : '')+(needsLocalPoContrast(groupFolder,filename) ? localPoContrastCSS : '')+(needsRegionaisPoContrast(groupFolder,filename) ? regionaisPoCSS : '')+'</head>').replace(/<\/body>/i,notice+'</body>');
+  return html.replace(/<\/head>/i, darkPreviewCSS+(needsReview ? pendingDarkCSS : '')+(groupFolder === 'grupos-trabalho' ? gtButtonsCSS : '')+(needsReview && (groupFolder.startsWith('locais-espacos/') || filename === 'AGD-ADM-047-detalhes.html') ? reviewByScreenCSS : '')+(needsReview ? approvedGrayContrastCSS : '')+(needsPoLote1Contrast(groupFolder,filename) ? administrationGtContrastCSS : '')+(filename === 'AGD-ADM-047-detalhes.html' && groupFolder === 'grupos-trabalho' ? gtDetailsNoGrayCSS : '')+(needsLocalPoContrast(groupFolder,filename) ? localPoContrastCSS : '')+(needsRegionaisPoContrast(groupFolder,filename) ? regionaisPoCSS : '')+(needsFinalPoCSS(groupFolder,filename) ? finalPoCSS : '')+'</head>').replace(/<\/body>/i,notice+'</body>');
 }
 let total = 0;
 const panels = groups.map((group, index) => {
