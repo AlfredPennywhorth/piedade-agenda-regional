@@ -123,6 +123,110 @@ function needsContrastReview(group, filename) {
     group.folder === 'casas-de-oracao' ||
     (group.folder === 'grupos-trabalho' && filename === 'AGD-ADM-047-detalhes.html');
 }
+// Correções de legibilidade solicitadas pelo PO em 26/10: Administrações 006/039/040
+// e GTs 009/045/046/047. Exclusivas das prévias geradas, sem tocar nos originais.
+const administrationGtContrastCSS = `<style id="gate-a-po-lote1-contrast">
+/* Superfícies escuras e textos auxiliares legíveis também em mobile. */
+html body [class~="text-outline"],html body [class~="text-outline-variant"],
+html body [class~="text-secondary"],html body [class~="text-on-surface-variant"],
+html body [class~="text-slate-500"],html body [class~="text-slate-600"],
+html body [class~="text-gray-500"],html body [class~="text-gray-600"]{color:#cbd5e1!important}
+html body [class~="text-slate-400"],html body [class~="text-gray-400"],
+html body [class~="text-blue-900"],html body [class~="text-blue-950"],
+html body [class~="text-on-surface-variant"],html body [class~="text-tertiary"],
+html body [class~="text-outline-variant"]{color:#cbd5e1!important}
+html body [class*="text-[#0"],html body [class*="text-[#1"]{color:#cbd5e1!important}
+html body [class*="opacity-40"],html body [class*="opacity-50"]{opacity:1!important}
+html body [class~="text-xs"],html body [class~="text-sm"]{text-shadow:none}
+html body a:not([class~="text-white"]){color:#bfdbfe!important}
+html body [class*="text-blue-"],html body [class*="text-primary"]{color:#bfdbfe!important}
+html body [class*="hover:text-blue-"]:hover{color:#eff6ff!important}
+/* Preservar primeiro plano escuro sobre badges verdes e ações secundárias claras. */
+html body [class~="bg-tertiary-fixed"][class~="text-tertiary"],
+html body [class~="bg-tertiary-fixed"] [class~="text-tertiary"]{color:#14532d!important}
+html body a[class~="bg-secondary-container"][class~="text-on-secondary-fixed"],
+html body a[class~="bg-secondary-container"][class~="text-on-secondary-fixed"]:hover,
+html body a[class~="bg-secondary-container"][class~="text-on-secondary-fixed"]:focus-visible{background-color:#d5e0f8!important;color:#172554!important}
+html body [class~="text-primary"],html body [class~="text-primary-container"],
+html body [class~="text-blue-700"],html body [class~="text-blue-800"],
+html body [class~="text-blue-900"]{color:#bfdbfe!important}
+html body [class~="bg-primary-fixed"],html body [class~="bg-primary-fixed-dim"]{background:#233b5c!important;color:#eaf3ff!important}
+html body [class~="bg-surface-container-highest"],html body [class~="bg-gray-300"],
+html body [class~="bg-slate-300"],html body [class~="bg-gray-200"],
+html body [class~="bg-slate-200"]{background:#334155!important;color:#f8fafc!important}
+/* Não deixar células ou cards clarearem no hover mantendo texto claro. */
+html body tr:hover,html body tr:hover td,html body [class*="hover:bg-white"]:hover,
+html body [class*="hover:bg-slate-50"]:hover,html body [class*="hover:bg-gray-50"]:hover,
+html body [class*="hover:bg-surface"]:hover{background-color:#334155!important;color:#f8fafc!important}
+html body tr:hover :is(td,span,p,a,button){color:inherit}
+html body tr:hover [class~="text-primary"],html body tr:hover a{color:#bfdbfe!important}
+/* Cabeçalhos, campos e códigos: evitar azul escuro sobre cinza escuro. */
+html body th{color:#e2e8f0!important}
+html body input,html body select,html body textarea{color:#f8fafc!important;caret-color:#f8fafc!important}
+html body input::placeholder,html body textarea::placeholder{color:#cbd5e1!important;opacity:1}
+html body button:focus-visible,html body a:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}
+</style>`;
+const gtDetailsNoGrayCSS = `<style id="gate-a-gt-details-no-gray">
+/* AGD-ADM-047: substituir caixa cinza clara por painel escuro com separadores. */
+html body [class~="bg-surface-container-highest"],html body [class~="bg-slate-300"],
+html body [class~="bg-gray-300"],html body [class~="bg-gray-200"],
+html body [class~="bg-slate-200"]{background-color:#26364a!important;color:#f8fafc!important}
+html body [class~="bg-surface-container-highest"] :is(span,p,dt,dd,strong),
+html body [class~="bg-slate-300"] :is(span,p,dt,dd,strong),
+html body [class~="bg-gray-300"] :is(span,p,dt,dd,strong){color:#f8fafc!important}
+</style>`;
+function needsPoLote1Contrast(groupFolder, filename) {
+  return (groupFolder === 'regionais-administracoes' && /^AGD-ADM-(006|039|040)-/.test(filename)) ||
+    (groupFolder === 'grupos-trabalho' && /^AGD-ADM-(009|045|046|047)-/.test(filename)) ||
+    (groupFolder === 'casas-de-oracao' && /^AGD-ADM-(008|043|044)-/.test(filename));
+}
+// Correções PO — Locais/Espaços: somente 013 desktop, 055 e 057.
+// Preservar 013 mobile, 056 e 058 visualmente aprovadas.
+const localPoContrastCSS = `<style id="gate-a-po-locais-contrast">
+html body [class~="text-on-surface-variant"],html body [class~="text-outline"],
+html body [class~="text-outline-variant"],html body [class~="text-secondary"],
+html body [class~="text-slate-500"],html body [class~="text-slate-600"],
+html body [class~="text-gray-500"],html body [class~="text-gray-600"]{color:#cbd5e1!important}
+html body [class~="text-primary"],html body [class~="text-primary-container"],
+html body [class~="text-blue-700"],html body [class~="text-blue-800"],
+html body a:not([class~="text-white"]):not([class~="bg-blue-50"]):not([class~="bg-amber-50"]){color:#bfdbfe!important}
+/* Ações em superfícies claras mantêm texto escuro em estados normal, hover e foco. */
+html body a[class~="bg-blue-50"],html body a[class~="bg-blue-50"]:hover,
+html body a[class~="bg-blue-50"]:focus-visible{background-color:#dbeafe!important;color:#1e3a8a!important}
+html body a[class~="bg-amber-50"],html body a[class~="bg-amber-50"]:hover,
+html body a[class~="bg-amber-50"]:focus-visible{background-color:#fef3c7!important;color:#78350f!important}
+html body [class~="bg-surface-container-highest"],html body [class~="bg-slate-300"],
+html body [class~="bg-gray-300"]{background:#26364a!important;color:#f8fafc!important}
+html body [class~="bg-surface-container-highest"] :is(h1,h2,h3,h4,p,span,label,small,strong),
+html body [class~="bg-slate-300"] :is(h1,h2,h3,h4,p,span,label,small,strong),
+html body [class~="bg-gray-300"] :is(h1,h2,h3,h4,p,span,label,small,strong){color:#f8fafc!important}
+html body tr:hover,html body tr:hover td{background:#334155!important;color:#f8fafc!important}
+html body input::placeholder,html body textarea::placeholder{color:#cbd5e1!important;opacity:1}
+</style>`;
+function needsLocalPoContrast(groupFolder, filename) {
+  return groupFolder.startsWith('locais-espacos/') &&
+    /^(AGD-ADM-013-listagem-desktop|AGD-ADM-055-novo-local|AGD-ADM-057-detalhes-local)\.html$/.test(filename);
+}
+// Regionais 005 desktop e Administrações 039/040: revisão final de legibilidade PO.
+// O problema da 039 é visual (fontes muito fracas), não resolução da imagem gerada.
+const regionaisPoCSS = `<style id="gate-a-po-regionais">
+html body [class~="text-primary"],html body [class~="text-primary-container"],
+html body [class~="text-blue-800"],html body [class~="text-blue-900"],
+html body [class~="text-secondary"],html body [class~="text-outline"],
+html body [class~="text-outline-variant"],html body [class~="text-on-surface-variant"],
+html body [class~="text-slate-500"],html body [class~="text-gray-500"]{color:#cbd5e1!important}
+html body [class~="text-primary"],html body [class~="text-primary-container"],
+html body [class~="text-blue-800"],html body [class~="text-blue-900"]{color:#bfdbfe!important}
+html body [class~="opacity-40"],html body [class~="opacity-50"]{opacity:1!important}
+html body [class~="bg-surface-container-highest"],html body [class~="bg-gray-300"],
+html body [class~="bg-slate-300"]{background:#26364a!important;color:#f8fafc!important}
+html body tr:hover,html body tr:hover td{background:#334155!important;color:#f8fafc!important}
+html body input::placeholder{color:#cbd5e1!important;opacity:1}
+</style>`;
+function needsRegionaisPoContrast(groupFolder, filename) {
+  return groupFolder === 'regionais-administracoes' &&
+    /^(AGD-ADM-005-desktop|AGD-ADM-039-cadastro|AGD-ADM-040-edicao)\.html$/.test(filename);
+}
 // Correspondencia visual com a referencia Setores escura (somente GT, so na previa).
 // Acoes primarias e Editar: azul; Detalhes: neutro. Estados hover preservados.
 const gtButtonsCSS = `<style id="gate-a-gt-button-pattern">
@@ -138,7 +242,7 @@ button:disabled{opacity:.65}
 function darkPreview(html, needsReview = false, groupFolder = '', filename = '') {
   // O marcador e proposital: evita transmitir a impressao de que o tema ja foi homologado.
   const notice = '<div role="note" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;background:#111827;color:white;padding:8px 12px;border:1px solid #64748b;border-radius:8px;font:12px system-ui;max-width:75vw">PRÉVIA ESCURA PARA AVALIAÇÃO · NÃO HOMOLOGADA</div>';
-  return html.replace(/<\/head>/i, darkPreviewCSS+(needsReview ? pendingDarkCSS : '')+(groupFolder === 'grupos-trabalho' ? gtButtonsCSS : '')+(needsReview && (groupFolder.startsWith('locais-espacos/') || filename === 'AGD-ADM-047-detalhes.html') ? reviewByScreenCSS : '')+(needsReview ? approvedGrayContrastCSS : '')+'</head>').replace(/<\/body>/i,notice+'</body>');
+  return html.replace(/<\/head>/i, darkPreviewCSS+(needsReview ? pendingDarkCSS : '')+(groupFolder === 'grupos-trabalho' ? gtButtonsCSS : '')+(needsReview && (groupFolder.startsWith('locais-espacos/') || filename === 'AGD-ADM-047-detalhes.html') ? reviewByScreenCSS : '')+(needsReview ? approvedGrayContrastCSS : '')+(needsPoLote1Contrast(groupFolder,filename) ? administrationGtContrastCSS : '')+(filename === 'AGD-ADM-047-detalhes.html' && groupFolder === 'grupos-trabalho' ? gtDetailsNoGrayCSS : '')+(needsLocalPoContrast(groupFolder,filename) ? localPoContrastCSS : '')+(needsRegionaisPoContrast(groupFolder,filename) ? regionaisPoCSS : '')+'</head>').replace(/<\/body>/i,notice+'</body>');
 }
 let total = 0;
 const panels = groups.map((group, index) => {
