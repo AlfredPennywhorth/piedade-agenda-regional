@@ -141,6 +141,12 @@ html body [class~="text-xs"],html body [class~="text-sm"]{text-shadow:none}
 html body a:not([class~="text-white"]){color:#bfdbfe!important}
 html body [class*="text-blue-"],html body [class*="text-primary"]{color:#bfdbfe!important}
 html body [class*="hover:text-blue-"]:hover{color:#eff6ff!important}
+/* Preservar primeiro plano escuro sobre badges verdes e ações secundárias claras. */
+html body [class~="bg-tertiary-fixed"][class~="text-tertiary"],
+html body [class~="bg-tertiary-fixed"] [class~="text-tertiary"]{color:#14532d!important}
+html body a[class~="bg-secondary-container"][class~="text-on-secondary-fixed"],
+html body a[class~="bg-secondary-container"][class~="text-on-secondary-fixed"]:hover,
+html body a[class~="bg-secondary-container"][class~="text-on-secondary-fixed"]:focus-visible{background-color:#d5e0f8!important;color:#172554!important}
 html body [class~="text-primary"],html body [class~="text-primary-container"],
 html body [class~="text-blue-700"],html body [class~="text-blue-800"],
 html body [class~="text-blue-900"]{color:#bfdbfe!important}
