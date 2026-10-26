@@ -423,12 +423,12 @@ export function CasasView() {
               </article>
             ))}
             <nav aria-label="Paginação das Casas de Oração" className="flex items-center justify-between gap-2 pt-2">
-              <button type="button" disabled={paginaAtualMobile <= 1} onClick={() => setPaginaMobile(Math.max(1, paginaAtualMobile - 1))} className="min-h-11 px-3 py-2 rounded-lg bg-slate-100 text-sm font-semibold disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600">Anterior</button>
-              <span className="text-xs text-slate-600 text-center" aria-live="polite">Página {paginaAtualMobile} de {totalPaginasMobile}</span>
-              <button type="button" disabled={paginaAtualMobile >= totalPaginasMobile} onClick={() => setPaginaMobile(Math.min(totalPaginasMobile, paginaAtualMobile + 1))} className="min-h-11 px-3 py-2 rounded-lg bg-slate-100 text-sm font-semibold disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600">Próxima</button>
+              <button type="button" disabled={paginaAtualMobile <= 1} onClick={() => setPaginaMobile(Math.max(1, paginaAtualMobile - 1))} className="min-h-11 px-3 py-2 rounded-lg bg-[#CBD5E1] text-[#0F172A] text-sm font-semibold disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600">Anterior</button>
+              <span className="text-xs text-slate-200 text-center" aria-live="polite">Página {paginaAtualMobile} de {totalPaginasMobile}</span>
+              <button type="button" disabled={paginaAtualMobile >= totalPaginasMobile} onClick={() => setPaginaMobile(Math.min(totalPaginasMobile, paginaAtualMobile + 1))} className="min-h-11 px-3 py-2 rounded-lg bg-[#CBD5E1] text-[#0F172A] text-sm font-semibold disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600">Próxima</button>
             </nav>
           </div>
-          <div className="casas-desktop-table hidden md:block master-table-scroll">
+          <div className="casas-desktop-table hidden md:block master-table-scroll [&_thead_th]:!bg-[#0F172A] [&_th:first-child]:!bg-[#0F172A] [&_td:first-child]:!bg-[#1E293B] [&_tr:hover_td:first-child]:!bg-[#334155] [&_th:first-child]:!shadow-[1px_0_0_#475569] [&_td:first-child]:!shadow-[1px_0_0_#475569]">
             <table className="w-full text-left text-sm">
               <thead className="bg-[#0F172A] text-[#F8FAFC] border-b border-slate-600">
                 <tr>
@@ -457,7 +457,7 @@ export function CasasView() {
                           Ativo
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-200">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-800">
                           Inativo
                         </span>
                       )}
