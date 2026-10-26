@@ -31,6 +31,7 @@ export function CasasView() {
   const [modoForm, setModoForm] = useState<'criar' | 'editar' | null>(null)
   const [casaEditandoId, setCasaEditandoId] = useState<string | null>(null)
   const [carregandoDetalhes, setCarregandoDetalhes] = useState<boolean>(false)
+  const [solicitacaoEdicao, setSolicitacaoEdicao] = useState(0)
 
   // Estado do detalhe visualizado em modal
   const [casaDetalhe, setCasaDetalhe] = useState<Casa | null>(null)
@@ -79,6 +80,7 @@ export function CasasView() {
 
   const abrirFormEditar = async (id: string) => {
     setRestaurarCardId(id)
+    setSolicitacaoEdicao(atual => atual + 1)
     setModoForm('editar')
     setCasaEditandoId(id)
     setCarregandoDetalhes(true)
@@ -104,7 +106,7 @@ export function CasasView() {
     if (modoForm === 'editar' && !carregandoDetalhes) {
       document.getElementById('casas-formulario')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
     }
-  }, [modoForm, carregandoDetalhes])
+  }, [modoForm, carregandoDetalhes, solicitacaoEdicao])
 
   const verDetalhes = async (id: string) => {
     setCarregandoDetalheModal(true)
@@ -393,7 +395,7 @@ export function CasasView() {
       )}
 
       {/* Lista de Casas de Oração */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-[#1E293B] text-[#F8FAFC] rounded-xl border border-slate-600 shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-slate-500 text-sm">
             Carregando casas de oração...
@@ -421,14 +423,14 @@ export function CasasView() {
               </article>
             ))}
             <nav aria-label="Paginação das Casas de Oração" className="flex items-center justify-between gap-2 pt-2">
-              <button type="button" disabled={paginaAtualMobile <= 1} onClick={() => setPaginaMobile(Math.max(1, paginaAtualMobile - 1))} className="min-h-11 px-3 py-2 rounded-lg bg-slate-100 text-sm font-semibold disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600">Anterior</button>
-              <span className="text-xs text-slate-600 text-center" aria-live="polite">Página {paginaAtualMobile} de {totalPaginasMobile}</span>
-              <button type="button" disabled={paginaAtualMobile >= totalPaginasMobile} onClick={() => setPaginaMobile(Math.min(totalPaginasMobile, paginaAtualMobile + 1))} className="min-h-11 px-3 py-2 rounded-lg bg-slate-100 text-sm font-semibold disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600">Próxima</button>
+              <button type="button" disabled={paginaAtualMobile <= 1} onClick={() => setPaginaMobile(Math.max(1, paginaAtualMobile - 1))} className="min-h-11 px-3 py-2 rounded-lg bg-[#CBD5E1] text-[#0F172A] text-sm font-semibold disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600">Anterior</button>
+              <span className="text-xs text-slate-200 text-center" aria-live="polite">Página {paginaAtualMobile} de {totalPaginasMobile}</span>
+              <button type="button" disabled={paginaAtualMobile >= totalPaginasMobile} onClick={() => setPaginaMobile(Math.min(totalPaginasMobile, paginaAtualMobile + 1))} className="min-h-11 px-3 py-2 rounded-lg bg-[#CBD5E1] text-[#0F172A] text-sm font-semibold disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600">Próxima</button>
             </nav>
           </div>
-          <div className="casas-desktop-table hidden md:block master-table-scroll">
+          <div className="casas-desktop-table hidden md:block master-table-scroll [&_thead_th]:!bg-[#0F172A] [&_th:first-child]:!bg-[#0F172A] [&_td:first-child]:!bg-[#1E293B] [&_tr:hover_td:first-child]:!bg-[#334155] [&_th:first-child]:!shadow-[1px_0_0_#475569] [&_td:first-child]:!shadow-[1px_0_0_#475569]">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+              <thead className="bg-[#0F172A] text-[#F8FAFC] border-b border-slate-600">
                 <tr>
                   <th className="p-3">Nome</th>
                   <th className="p-3">Setor</th>
@@ -437,16 +439,16 @@ export function CasasView() {
                   <th className="p-3 text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-600">
                 {casasFiltradas.map((casa) => (
-                  <tr key={casa.id} className="hover:bg-slate-50">
-                    <td className="p-3 font-semibold text-slate-800">
+                  <tr key={casa.id} className="hover:bg-slate-700/60">
+                    <td className="p-3 font-semibold text-[#F8FAFC]">
                       {casa.nome}
                     </td>
-                    <td className="p-3 text-xs text-slate-600 font-medium">
+                    <td className="p-3 text-xs text-slate-200 font-medium">
                       {getSetorNome(casa.setorId)}
                     </td>
-                    <td className="p-3 text-xs text-slate-600 font-mono">
+                    <td className="p-3 text-xs text-slate-200 font-mono">
                       {casa.codigo || '-'}
                     </td>
                     <td className="p-3">
@@ -455,7 +457,7 @@ export function CasasView() {
                           Ativo
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-800">
                           Inativo
                         </span>
                       )}
@@ -463,13 +465,13 @@ export function CasasView() {
                     <td className="p-3 text-right space-x-2 whitespace-nowrap">
                       <button
                         onClick={() => verDetalhes(casa.id)}
-                        className="text-xs text-slate-600 hover:text-slate-900 font-medium px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded transition-colors"
+                        className="min-h-11 text-sm text-[#0F172A] font-medium px-3 py-2 bg-[#CBD5E1] hover:bg-white rounded-lg transition-colors"
                       >
                         Detalhes
                       </button>
                       <button
                         onClick={() => abrirFormEditar(casa.id)}
-                        className="text-xs text-brand-600 hover:text-brand-800 font-medium px-2 py-1 bg-brand-50 hover:bg-brand-100 rounded transition-colors"
+                        className="min-h-11 text-sm text-white font-medium px-3 py-2 bg-[#2563EB] hover:bg-blue-700 rounded-lg transition-colors"
                       >
                         Editar
                       </button>
