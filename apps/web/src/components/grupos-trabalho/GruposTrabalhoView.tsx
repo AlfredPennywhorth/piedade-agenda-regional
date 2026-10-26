@@ -1,5 +1,5 @@
 import { AjudaContextual } from '../ajuda/AjudaContextual'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { CreateGrupoTrabalhoSchema, UpdateGrupoTrabalhoSchema } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 
@@ -45,6 +45,14 @@ export function GruposTrabalhoView() {
 
   // Estado do modal/modo de formulário (null = fechado, 'criar' = novo, 'editar' = editando)
   const [modoForm, setModoForm] = useState<'criar' | 'editar' | null>(null)
+  const formularioRef = useRef<HTMLDivElement>(null)
+  const [solicitacaoEdicao, setSolicitacaoEdicao] = useState(0)
+
+  useEffect(() => {
+    if (modoForm === 'editar') {
+      formularioRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [modoForm, solicitacaoEdicao])
   const [grupoEditandoId, setGrupoEditandoId] = useState<string | null>(null)
   const [carregandoDetalhes, setCarregandoDetalhes] = useState<boolean>(false)
 
@@ -98,6 +106,7 @@ export function GruposTrabalhoView() {
   }
 
   const abrirFormEditar = async (id: string) => {
+    setSolicitacaoEdicao(atual => atual + 1)
     setModoForm('editar')
     setGrupoEditandoId(id)
     setCarregandoDetalhes(true)
@@ -314,7 +323,7 @@ export function GruposTrabalhoView() {
 
       {/* Form de Criação / Edição */}
       {modoForm && (
-        <div className="bg-[#0F172A] text-[#F8FAFC] p-4 sm:p-6 rounded-2xl border border-slate-600 shadow-md space-y-4 min-w-0">
+        <div ref={formularioRef} className="scroll-mt-20 bg-[#0F172A] text-[#F8FAFC] p-4 sm:p-6 rounded-2xl border border-slate-600 shadow-md space-y-4 min-w-0">
           <AjudaContextual /><span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-045' : 'AGD-ADM-046'} className="block text-right text-[10px] font-medium tracking-wide text-slate-300">Tela {modoForm === 'criar' ? 'AGD-ADM-045' : 'AGD-ADM-046'}</span>
           <div className="flex justify-between items-center border-b border-slate-600 pb-3">
             <h3 className="font-bold text-[#F8FAFC] text-base">
