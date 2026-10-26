@@ -131,6 +131,16 @@ html body [class~="text-outline"],html body [class~="text-outline-variant"],
 html body [class~="text-secondary"],html body [class~="text-on-surface-variant"],
 html body [class~="text-slate-500"],html body [class~="text-slate-600"],
 html body [class~="text-gray-500"],html body [class~="text-gray-600"]{color:#cbd5e1!important}
+html body [class~="text-slate-400"],html body [class~="text-gray-400"],
+html body [class~="text-blue-900"],html body [class~="text-blue-950"],
+html body [class~="text-on-surface-variant"],html body [class~="text-tertiary"],
+html body [class~="text-outline-variant"]{color:#cbd5e1!important}
+html body [class*="text-[#0"],html body [class*="text-[#1"]{color:#cbd5e1!important}
+html body [class*="opacity-40"],html body [class*="opacity-50"]{opacity:1!important}
+html body [class~="text-xs"],html body [class~="text-sm"]{text-shadow:none}
+html body a:not([class~="text-white"]){color:#bfdbfe!important}
+html body [class*="text-blue-"],html body [class*="text-primary"]{color:#bfdbfe!important}
+html body [class*="hover:text-blue-"]:hover{color:#eff6ff!important}
 html body [class~="text-primary"],html body [class~="text-primary-container"],
 html body [class~="text-blue-700"],html body [class~="text-blue-800"],
 html body [class~="text-blue-900"]{color:#bfdbfe!important}
@@ -161,7 +171,8 @@ html body [class~="bg-gray-300"] :is(span,p,dt,dd,strong){color:#f8fafc!importan
 </style>`;
 function needsPoLote1Contrast(group, filename) {
   return (group.folder === 'regionais-administracoes' && /^AGD-ADM-(006|039|040)-/.test(filename)) ||
-    (group.folder === 'grupos-trabalho' && /^AGD-ADM-(009|045|046|047)-/.test(filename));
+    (group.folder === 'grupos-trabalho' && /^AGD-ADM-(009|045|046|047)-/.test(filename)) ||
+    (group.folder === 'casas-de-oracao' && /^AGD-ADM-(008|043|044)-/.test(filename));
 }
 // Correspondencia visual com a referencia Setores escura (somente GT, so na previa).
 // Acoes primarias e Editar: azul; Detalhes: neutro. Estados hover preservados.
