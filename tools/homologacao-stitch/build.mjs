@@ -169,10 +169,10 @@ html body [class~="bg-surface-container-highest"] :is(span,p,dt,dd,strong),
 html body [class~="bg-slate-300"] :is(span,p,dt,dd,strong),
 html body [class~="bg-gray-300"] :is(span,p,dt,dd,strong){color:#f8fafc!important}
 </style>`;
-function needsPoLote1Contrast(group, filename) {
-  return (group.folder === 'regionais-administracoes' && /^AGD-ADM-(006|039|040)-/.test(filename)) ||
-    (group.folder === 'grupos-trabalho' && /^AGD-ADM-(009|045|046|047)-/.test(filename)) ||
-    (group.folder === 'casas-de-oracao' && /^AGD-ADM-(008|043|044)-/.test(filename));
+function needsPoLote1Contrast(groupFolder, filename) {
+  return (groupFolder === 'regionais-administracoes' && /^AGD-ADM-(006|039|040)-/.test(filename)) ||
+    (groupFolder === 'grupos-trabalho' && /^AGD-ADM-(009|045|046|047)-/.test(filename)) ||
+    (groupFolder === 'casas-de-oracao' && /^AGD-ADM-(008|043|044)-/.test(filename));
 }
 // Correções PO — Locais/Espaços: somente 013 desktop, 055 e 057.
 // Preservar 013 mobile, 056 e 058 visualmente aprovadas.
@@ -192,8 +192,8 @@ html body [class~="bg-gray-300"] :is(h1,h2,h3,h4,p,span,label,small,strong){colo
 html body tr:hover,html body tr:hover td{background:#334155!important;color:#f8fafc!important}
 html body input::placeholder,html body textarea::placeholder{color:#cbd5e1!important;opacity:1}
 </style>`;
-function needsLocalPoContrast(group, filename) {
-  return group.folder.startsWith('locais-espacos/') &&
+function needsLocalPoContrast(groupFolder, filename) {
+  return groupFolder.startsWith('locais-espacos/') &&
     /^(AGD-ADM-013-listagem-desktop|AGD-ADM-055-novo-local|AGD-ADM-057-detalhes-local)\.html$/.test(filename);
 }
 // Regionais 005 desktop e Administrações 039/040: revisão final de legibilidade PO.
@@ -212,8 +212,8 @@ html body [class~="bg-slate-300"]{background:#26364a!important;color:#f8fafc!imp
 html body tr:hover,html body tr:hover td{background:#334155!important;color:#f8fafc!important}
 html body input::placeholder{color:#cbd5e1!important;opacity:1}
 </style>`;
-function needsRegionaisPoContrast(group, filename) {
-  return group.folder === 'regionais-administracoes' &&
+function needsRegionaisPoContrast(groupFolder, filename) {
+  return groupFolder === 'regionais-administracoes' &&
     /^(AGD-ADM-005-desktop|AGD-ADM-039-cadastro|AGD-ADM-040-edicao)\.html$/.test(filename);
 }
 // Correspondencia visual com a referencia Setores escura (somente GT, so na previa).
