@@ -248,7 +248,7 @@ export function CasasView() {
 
       {/* Bar de Filtros (Cliente) */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0 w-full sm:w-auto">
           <label htmlFor="select-filtro-setor" className="text-xs font-semibold text-slate-700">
             Filtrar por Setor:
           </label>
@@ -256,7 +256,7 @@ export function CasasView() {
             id="select-filtro-setor"
             value={filtroSetorId}
             onChange={(e) => { setFiltroSetorId(e.target.value); setPaginaMobile(1) }}
-            className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-brand-200"
+            className="w-full sm:w-auto min-w-0 px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-200"
           >
             <option value="">Todos os Setores</option>
             {setores.map((s) => (
@@ -273,7 +273,7 @@ export function CasasView() {
 
       {/* Form de Criação / Edição */}
       {modoForm && (
-        <div id="casas-formulario" className="bg-white p-5 rounded-xl border border-slate-200 shadow-md space-y-4">
+        <div id="casas-formulario" className="scroll-mt-20 bg-white p-5 rounded-xl border border-slate-200 shadow-md space-y-4">
           <AjudaContextual /><span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-043' : 'AGD-ADM-044'} className="block text-right text-[10px] font-medium tracking-wide text-slate-500">Tela {modoForm === 'criar' ? 'AGD-ADM-043' : 'AGD-ADM-044'}</span>
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <h3 className="font-bold text-slate-800 text-base">
@@ -407,23 +407,23 @@ export function CasasView() {
         ) : (
 
           <>
-          <div className="casas-mobile-cards md:hidden p-3 space-y-3" data-testid="casas-lista-mobile">
+          <div className="casas-mobile-cards md:hidden p-3 space-y-3 min-w-0" data-testid="casas-lista-mobile">
             {casasPaginaMobile.map((casa) => (
-              <article key={casa.id} id={`casa-card-${casa.id}`} className="rounded-lg border border-slate-200 bg-white p-3 space-y-2 min-w-0">
+              <article key={casa.id} id={`casa-card-${casa.id}`} className="rounded-xl border border-slate-200 bg-white p-4 space-y-3 min-w-0">
                 <h3 className="font-semibold text-slate-800 whitespace-normal break-words [overflow-wrap:anywhere]">{casa.nome}</h3>
                 <div className="text-xs text-slate-600 break-words"><strong>Setor:</strong> {getSetorNome(casa.setorId)}</div>
                 <div className="text-xs text-slate-600 break-words"><strong>Código:</strong> {casa.codigo || '-'}</div>
                 <div className="text-xs text-slate-600"><strong>Status:</strong> {casa.ativo ? 'Ativo' : 'Inativo'}</div>
                 <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-                  <button type="button" onClick={() => verDetalhes(casa.id)} className="flex-1 min-w-0 px-3 py-2 text-xs font-medium rounded bg-slate-100 text-slate-700">Detalhes</button>
-                  <button type="button" onClick={() => { void abrirFormEditar(casa.id) }} className="flex-1 min-w-0 px-3 py-2 text-xs font-medium rounded bg-brand-50 text-brand-700">Editar</button>
+                  <button type="button" onClick={() => verDetalhes(casa.id)} className="flex-1 min-w-0 min-h-11 px-3 py-2 text-sm font-semibold rounded-lg bg-slate-100 text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600">Detalhes</button>
+                  <button type="button" onClick={() => { void abrirFormEditar(casa.id) }} className="flex-1 min-w-0 min-h-11 px-3 py-2 text-sm font-semibold rounded-lg bg-brand-50 text-brand-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700">Editar</button>
                 </div>
               </article>
             ))}
             <nav aria-label="Paginação das Casas de Oração" className="flex items-center justify-between gap-2 pt-2">
-              <button type="button" disabled={paginaAtualMobile <= 1} onClick={() => setPaginaMobile(Math.max(1, paginaAtualMobile - 1))} className="px-3 py-2 rounded bg-slate-100 text-xs font-semibold disabled:opacity-40">Anterior</button>
+              <button type="button" disabled={paginaAtualMobile <= 1} onClick={() => setPaginaMobile(Math.max(1, paginaAtualMobile - 1))} className="min-h-11 px-3 py-2 rounded-lg bg-slate-100 text-sm font-semibold disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600">Anterior</button>
               <span className="text-xs text-slate-600 text-center" aria-live="polite">Página {paginaAtualMobile} de {totalPaginasMobile}</span>
-              <button type="button" disabled={paginaAtualMobile >= totalPaginasMobile} onClick={() => setPaginaMobile(Math.min(totalPaginasMobile, paginaAtualMobile + 1))} className="px-3 py-2 rounded bg-slate-100 text-xs font-semibold disabled:opacity-40">Próxima</button>
+              <button type="button" disabled={paginaAtualMobile >= totalPaginasMobile} onClick={() => setPaginaMobile(Math.min(totalPaginasMobile, paginaAtualMobile + 1))} className="min-h-11 px-3 py-2 rounded-lg bg-slate-100 text-sm font-semibold disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600">Próxima</button>
             </nav>
           </div>
           <div className="casas-desktop-table hidden md:block master-table-scroll">
