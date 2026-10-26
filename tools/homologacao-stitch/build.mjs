@@ -174,6 +174,28 @@ function needsPoLote1Contrast(group, filename) {
     (group.folder === 'grupos-trabalho' && /^AGD-ADM-(009|045|046|047)-/.test(filename)) ||
     (group.folder === 'casas-de-oracao' && /^AGD-ADM-(008|043|044)-/.test(filename));
 }
+// Correções PO — Locais/Espaços: somente 013 desktop, 055 e 057.
+// Preservar 013 mobile, 056 e 058 visualmente aprovadas.
+const localPoContrastCSS = `<style id="gate-a-po-locais-contrast">
+html body [class~="text-on-surface-variant"],html body [class~="text-outline"],
+html body [class~="text-outline-variant"],html body [class~="text-secondary"],
+html body [class~="text-slate-500"],html body [class~="text-slate-600"],
+html body [class~="text-gray-500"],html body [class~="text-gray-600"]{color:#cbd5e1!important}
+html body [class~="text-primary"],html body [class~="text-primary-container"],
+html body [class~="text-blue-700"],html body [class~="text-blue-800"],
+html body a:not([class~="text-white"]){color:#bfdbfe!important}
+html body [class~="bg-surface-container-highest"],html body [class~="bg-slate-300"],
+html body [class~="bg-gray-300"]{background:#26364a!important;color:#f8fafc!important}
+html body [class~="bg-surface-container-highest"] :is(h1,h2,h3,h4,p,span,label,small,strong),
+html body [class~="bg-slate-300"] :is(h1,h2,h3,h4,p,span,label,small,strong),
+html body [class~="bg-gray-300"] :is(h1,h2,h3,h4,p,span,label,small,strong){color:#f8fafc!important}
+html body tr:hover,html body tr:hover td{background:#334155!important;color:#f8fafc!important}
+html body input::placeholder,html body textarea::placeholder{color:#cbd5e1!important;opacity:1}
+</style>`;
+function needsLocalPoContrast(group, filename) {
+  return group.folder.startsWith('locais-espacos/') &&
+    /^(AGD-ADM-013-listagem-desktop|AGD-ADM-055-novo-local|AGD-ADM-057-detalhes-local)\.html$/.test(filename);
+}
 // Correspondencia visual com a referencia Setores escura (somente GT, so na previa).
 // Acoes primarias e Editar: azul; Detalhes: neutro. Estados hover preservados.
 const gtButtonsCSS = `<style id="gate-a-gt-button-pattern">
@@ -189,7 +211,7 @@ button:disabled{opacity:.65}
 function darkPreview(html, needsReview = false, groupFolder = '', filename = '') {
   // O marcador e proposital: evita transmitir a impressao de que o tema ja foi homologado.
   const notice = '<div role="note" style="position:fixed;bottom:12px;left:12px;z-index:2147483647;background:#111827;color:white;padding:8px 12px;border:1px solid #64748b;border-radius:8px;font:12px system-ui;max-width:75vw">PRÉVIA ESCURA PARA AVALIAÇÃO · NÃO HOMOLOGADA</div>';
-  return html.replace(/<\/head>/i, darkPreviewCSS+(needsReview ? pendingDarkCSS : '')+(groupFolder === 'grupos-trabalho' ? gtButtonsCSS : '')+(needsReview && (groupFolder.startsWith('locais-espacos/') || filename === 'AGD-ADM-047-detalhes.html') ? reviewByScreenCSS : '')+(needsReview ? approvedGrayContrastCSS : '')+(needsPoLote1Contrast(groupFolder,filename) ? administrationGtContrastCSS : '')+(filename === 'AGD-ADM-047-detalhes.html' && groupFolder === 'grupos-trabalho' ? gtDetailsNoGrayCSS : '')+'</head>').replace(/<\/body>/i,notice+'</body>');
+  return html.replace(/<\/head>/i, darkPreviewCSS+(needsReview ? pendingDarkCSS : '')+(groupFolder === 'grupos-trabalho' ? gtButtonsCSS : '')+(needsReview && (groupFolder.startsWith('locais-espacos/') || filename === 'AGD-ADM-047-detalhes.html') ? reviewByScreenCSS : '')+(needsReview ? approvedGrayContrastCSS : '')+(needsPoLote1Contrast(groupFolder,filename) ? administrationGtContrastCSS : '')+(filename === 'AGD-ADM-047-detalhes.html' && groupFolder === 'grupos-trabalho' ? gtDetailsNoGrayCSS : '')+(needsLocalPoContrast(groupFolder,filename) ? localPoContrastCSS : '')+'</head>').replace(/<\/body>/i,notice+'</body>');
 }
 let total = 0;
 const panels = groups.map((group, index) => {
