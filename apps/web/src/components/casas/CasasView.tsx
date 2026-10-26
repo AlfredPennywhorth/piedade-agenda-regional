@@ -247,9 +247,9 @@ export function CasasView() {
       )}
 
       {/* Bar de Filtros (Cliente) */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between flex-wrap gap-3">
+      <div className="bg-[#1E293B] text-[#F8FAFC] p-4 rounded-xl border border-slate-600 shadow-sm flex items-center justify-between flex-wrap gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0 w-full sm:w-auto">
-          <label htmlFor="select-filtro-setor" className="text-xs font-semibold text-slate-700">
+          <label htmlFor="select-filtro-setor" className="text-sm font-semibold text-[#F8FAFC]">
             Filtrar por Setor:
           </label>
           <select
@@ -266,40 +266,40 @@ export function CasasView() {
             ))}
           </select>
         </div>
-        <div className="text-xs text-slate-500 font-medium">
+        <div className="text-xs text-slate-200 font-medium">
           Encontradas {casasFiltradas.length} de {casas.length} casas de oração
         </div>
       </div>
 
       {/* Form de Criação / Edição */}
       {modoForm && (
-        <div id="casas-formulario" className="scroll-mt-20 bg-white p-5 rounded-xl border border-slate-200 shadow-md space-y-4">
-          <AjudaContextual /><span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-043' : 'AGD-ADM-044'} className="block text-right text-[10px] font-medium tracking-wide text-slate-500">Tela {modoForm === 'criar' ? 'AGD-ADM-043' : 'AGD-ADM-044'}</span>
-          <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-            <h3 className="font-bold text-slate-800 text-base">
+        <div id="casas-formulario" className="scroll-mt-20 bg-[#0F172A] text-[#F8FAFC] p-4 sm:p-5 rounded-2xl border border-slate-600 shadow-md space-y-4">
+          <AjudaContextual /><span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-043' : 'AGD-ADM-044'} className="block text-right text-[10px] font-medium tracking-wide text-slate-300">Tela {modoForm === 'criar' ? 'AGD-ADM-043' : 'AGD-ADM-044'}</span>
+          <div className="flex justify-between items-center border-b border-slate-600 pb-2">
+            <h3 className="font-bold text-[#F8FAFC] text-base">
               {modoForm === 'criar' ? 'Cadastrar Nova Casa de Oração' : 'Editar Casa de Oração'}
             </h3>
             <button
               onClick={fecharForm}
-              className="text-slate-400 hover:text-slate-600 text-sm font-semibold"
+              className="text-slate-200 hover:text-white text-sm font-semibold"
             >
               Cancelar
             </button>
           </div>
 
           {carregandoDetalhes ? (
-            <div className="py-6 text-center text-slate-500 text-sm">Carregando dados da casa de oração...</div>
+            <div className="py-6 text-center text-slate-200 text-sm">Carregando dados da casa de oração...</div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4 rounded-xl bg-[#1E293B] p-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="input-setor">
+                <label className="block text-sm font-semibold text-[#F8FAFC] mb-1" htmlFor="input-setor">
                   Setor <span className="text-red-500">*</span>
                 </label>
                 <select
                   id="input-setor"
                   value={setorId}
                   onChange={(e) => setSetorId(e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                  className={`w-full min-w-0 px-3 py-2 border rounded-lg bg-white text-[#0F172A] text-sm focus:outline-none focus:ring-2 ${
                     errosForm.setorId ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-brand-200'
                   }`}
                   disabled={salvando}
@@ -317,7 +317,7 @@ export function CasasView() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="input-nome">
+                <label className="block text-sm font-semibold text-[#F8FAFC] mb-1" htmlFor="input-nome">
                   Nome da Casa de Oração <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -326,7 +326,7 @@ export function CasasView() {
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   placeholder="Ex: Central de Osasco"
-                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                  className={`w-full min-w-0 px-3 py-2 border rounded-lg bg-white text-[#0F172A] text-sm focus:outline-none focus:ring-2 ${
                     errosForm.nome ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-brand-200'
                   }`}
                   disabled={salvando}
@@ -337,7 +337,7 @@ export function CasasView() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="input-codigo">
+                <label className="block text-sm font-semibold text-[#F8FAFC] mb-1" htmlFor="input-codigo">
                   Código (Opcional)
                 </label>
                 <input
@@ -346,7 +346,7 @@ export function CasasView() {
                   value={codigo}
                   onChange={(e) => setCodigo(e.target.value)}
                   placeholder="Ex: C-OSC-01"
-                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                  className={`w-full min-w-0 px-3 py-2 border rounded-lg bg-white text-[#0F172A] text-sm focus:outline-none focus:ring-2 ${
                     errosForm.codigo ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-brand-200'
                   }`}
                   disabled={salvando}
@@ -365,23 +365,23 @@ export function CasasView() {
                   className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                   disabled={salvando}
                 />
-                <label htmlFor="input-ativo" className="text-sm text-slate-700 font-medium">
+                <label htmlFor="input-ativo" className="text-sm text-[#F8FAFC] font-medium">
                   Casa de Oração Ativa
                 </label>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex flex-wrap justify-end gap-2 pt-3 border-t border-slate-600">
                 <button
                   type="button"
                   onClick={fecharForm}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors"
+                  className="min-h-11 px-4 py-2 bg-[#CBD5E1] hover:bg-white text-[#0F172A] rounded-lg text-sm font-medium transition-colors"
                   disabled={salvando}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-medium transition-colors shadow-sm disabled:opacity-50"
+                  className="min-h-11 px-4 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
                   disabled={salvando}
                 >
                   {salvando ? 'Salvando...' : modoForm === 'criar' ? 'Salvar Casa de Oração' : 'Atualizar Casa de Oração'}
@@ -409,14 +409,14 @@ export function CasasView() {
           <>
           <div className="casas-mobile-cards md:hidden p-3 space-y-3 min-w-0" data-testid="casas-lista-mobile">
             {casasPaginaMobile.map((casa) => (
-              <article key={casa.id} id={`casa-card-${casa.id}`} className="rounded-xl border border-slate-200 bg-white p-4 space-y-3 min-w-0">
-                <h3 className="font-semibold text-slate-800 whitespace-normal break-words [overflow-wrap:anywhere]">{casa.nome}</h3>
-                <div className="text-xs text-slate-600 break-words"><strong>Setor:</strong> {getSetorNome(casa.setorId)}</div>
-                <div className="text-xs text-slate-600 break-words"><strong>Código:</strong> {casa.codigo || '-'}</div>
-                <div className="text-xs text-slate-600"><strong>Status:</strong> {casa.ativo ? 'Ativo' : 'Inativo'}</div>
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-                  <button type="button" onClick={() => verDetalhes(casa.id)} className="flex-1 min-w-0 min-h-11 px-3 py-2 text-sm font-semibold rounded-lg bg-slate-100 text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600">Detalhes</button>
-                  <button type="button" onClick={() => { void abrirFormEditar(casa.id) }} className="flex-1 min-w-0 min-h-11 px-3 py-2 text-sm font-semibold rounded-lg bg-brand-50 text-brand-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700">Editar</button>
+              <article key={casa.id} id={`casa-card-${casa.id}`} className="rounded-xl border border-slate-600 bg-[#1E293B] text-[#F8FAFC] p-4 space-y-3 min-w-0">
+                <h3 className="font-semibold text-[#F8FAFC] whitespace-normal break-words [overflow-wrap:anywhere]">{casa.nome}</h3>
+                <div className="text-sm text-slate-200 break-words"><strong>Setor:</strong> {getSetorNome(casa.setorId)}</div>
+                <div className="text-sm text-slate-200 break-words"><strong>Código:</strong> {casa.codigo || '-'}</div>
+                <div className="text-sm text-slate-200"><strong>Status:</strong> {casa.ativo ? 'Ativo' : 'Inativo'}</div>
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-600">
+                  <button type="button" onClick={() => verDetalhes(casa.id)} className="flex-1 min-w-0 min-h-11 px-3 py-2 text-sm font-semibold rounded-lg bg-[#CBD5E1] text-[#0F172A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600">Detalhes</button>
+                  <button type="button" onClick={() => { void abrirFormEditar(casa.id) }} className="flex-1 min-w-0 min-h-11 px-3 py-2 text-sm font-semibold rounded-lg bg-[#2563EB] text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700">Editar</button>
                 </div>
               </article>
             ))}
@@ -486,35 +486,35 @@ export function CasasView() {
       {/* Modal de Detalhes da Casa de Oração */}
       {casaDetalhe && (
         <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-              <h3 className="font-bold text-slate-800 text-base">Detalhes da Casa de Oração</h3><AjudaContextual />
+          <div className="bg-[#0F172A] text-[#F8FAFC] rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-4 sm:p-5 space-y-4 shadow-xl border border-slate-600 break-words">
+            <div className="flex justify-between items-center border-b border-slate-600 pb-2">
+              <h3 className="font-bold text-[#F8FAFC] text-base">Detalhes da Casa de Oração</h3><AjudaContextual />
               <button
                 onClick={() => setCasaDetalhe(null)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-semibold"
+                className="text-slate-200 hover:text-white text-sm font-semibold"
               >
                 ✕
               </button>
             </div>
 
             {carregandoDetalheModal ? (
-              <div className="py-6 text-center text-slate-500 text-sm">Carregando detalhes...</div>
+              <div className="py-6 text-center text-slate-200 text-sm">Carregando detalhes...</div>
             ) : (
-              <div className="space-y-3 text-sm">
+              <div className="space-y-3 text-sm rounded-xl bg-[#1E293B] p-4">
                 <div>
-                  <span className="text-xs font-semibold text-slate-500 block">Nome:</span>
-                  <span className="font-semibold text-slate-800">{casaDetalhe.nome}</span>
+                  <span className="text-xs font-semibold text-slate-300 block">Nome:</span>
+                  <span className="font-semibold text-[#F8FAFC]">{casaDetalhe.nome}</span>
                 </div>
                 <div>
-                  <span className="text-xs font-semibold text-slate-500 block">Setor:</span>
-                  <span className="text-slate-700 font-medium">{getSetorNome(casaDetalhe.setorId)}</span>
+                  <span className="text-xs font-semibold text-slate-300 block">Setor:</span>
+                  <span className="text-[#F8FAFC] font-medium">{getSetorNome(casaDetalhe.setorId)}</span>
                 </div>
                 <div>
-                  <span className="text-xs font-semibold text-slate-500 block">Código:</span>
-                  <span className="font-mono text-slate-700">{casaDetalhe.codigo || 'Não informado'}</span>
+                  <span className="text-xs font-semibold text-slate-300 block">Código:</span>
+                  <span className="font-mono text-[#F8FAFC] break-all">{casaDetalhe.codigo || 'Não informado'}</span>
                 </div>
                 <div>
-                  <span className="text-xs font-semibold text-slate-500 block">Status:</span>
+                  <span className="text-xs font-semibold text-slate-300 block">Status:</span>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                     casaDetalhe.ativo ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
                   }`}>
@@ -523,17 +523,17 @@ export function CasasView() {
                 </div>
                 {casaDetalhe.createdAt && (
                   <div>
-                    <span className="text-xs font-semibold text-slate-500 block">Data de Criação:</span>
-                    <span className="text-xs text-slate-600">{new Date(casaDetalhe.createdAt).toLocaleString('pt-BR')}</span>
+                    <span className="text-xs font-semibold text-slate-300 block">Data de Criação:</span>
+                    <span className="text-sm text-slate-200">{new Date(casaDetalhe.createdAt).toLocaleString('pt-BR')}</span>
                   </div>
                 )}
               </div>
             )}
 
-            <div className="text-right pt-3 border-t border-slate-100">
+            <div className="text-right pt-3 border-t border-slate-600">
               <button
                 onClick={() => setCasaDetalhe(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors"
+                className="min-h-11 px-4 py-2 bg-[#CBD5E1] hover:bg-slate-100 text-[#0F172A] rounded-lg text-sm font-medium transition-colors"
               >
                 Fechar
               </button>
