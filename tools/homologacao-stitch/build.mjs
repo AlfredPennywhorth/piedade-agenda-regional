@@ -183,7 +183,12 @@ html body [class~="text-slate-500"],html body [class~="text-slate-600"],
 html body [class~="text-gray-500"],html body [class~="text-gray-600"]{color:#cbd5e1!important}
 html body [class~="text-primary"],html body [class~="text-primary-container"],
 html body [class~="text-blue-700"],html body [class~="text-blue-800"],
-html body a:not([class~="text-white"]){color:#bfdbfe!important}
+html body a:not([class~="text-white"]):not([class~="bg-blue-50"]):not([class~="bg-amber-50"]){color:#bfdbfe!important}
+/* Ações em superfícies claras mantêm texto escuro em estados normal, hover e foco. */
+html body a[class~="bg-blue-50"],html body a[class~="bg-blue-50"]:hover,
+html body a[class~="bg-blue-50"]:focus-visible{background-color:#dbeafe!important;color:#1e3a8a!important}
+html body a[class~="bg-amber-50"],html body a[class~="bg-amber-50"]:hover,
+html body a[class~="bg-amber-50"]:focus-visible{background-color:#fef3c7!important;color:#78350f!important}
 html body [class~="bg-surface-container-highest"],html body [class~="bg-slate-300"],
 html body [class~="bg-gray-300"]{background:#26364a!important;color:#f8fafc!important}
 html body [class~="bg-surface-container-highest"] :is(h1,h2,h3,h4,p,span,label,small,strong),
