@@ -428,58 +428,21 @@ export function CasasView() {
               <button type="button" disabled={paginaAtualMobile >= totalPaginasMobile} onClick={() => setPaginaMobile(Math.min(totalPaginasMobile, paginaAtualMobile + 1))} className="min-h-11 px-3 py-2 rounded-lg bg-[#CBD5E1] text-[#0F172A] text-sm font-semibold disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600">Próxima</button>
             </nav>
           </div>
-          <div className="casas-desktop-table hidden md:block master-table-scroll [&_thead_th]:!bg-[#0F172A] [&_th:first-child]:!bg-[#0F172A] [&_td:first-child]:!bg-[#1E293B] [&_tr:hover_td:first-child]:!bg-[#334155] [&_th:first-child]:!shadow-[1px_0_0_#475569] [&_td:first-child]:!shadow-[1px_0_0_#475569]">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-[#0F172A] text-[#F8FAFC] border-b border-slate-600">
-                <tr>
-                  <th className="p-3">Nome</th>
-                  <th className="p-3">Setor</th>
-                  <th className="p-3">Código</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-600">
-                {casasFiltradas.map((casa) => (
-                  <tr key={casa.id} className="hover:bg-slate-700/60">
-                    <td className="p-3 font-semibold text-[#F8FAFC]">
-                      {casa.nome}
-                    </td>
-                    <td className="p-3 text-xs text-slate-200 font-medium">
-                      {getSetorNome(casa.setorId)}
-                    </td>
-                    <td className="p-3 text-xs text-slate-200 font-mono">
-                      {casa.codigo || '-'}
-                    </td>
-                    <td className="p-3">
-                      {casa.ativo ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
-                          Ativo
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-800">
-                          Inativo
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3 text-right space-x-2 whitespace-nowrap">
-                      <button
-                        onClick={() => verDetalhes(casa.id)}
-                        className="min-h-11 text-sm text-[#0F172A] font-medium px-3 py-2 bg-[#CBD5E1] hover:bg-white rounded-lg transition-colors"
-                      >
-                        Detalhes
-                      </button>
-                      <button
-                        onClick={() => abrirFormEditar(casa.id)}
-                        className="min-h-11 text-sm text-white font-medium px-3 py-2 bg-[#2563EB] hover:bg-blue-700 rounded-lg transition-colors"
-                      >
-                        Editar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="casas-desktop-table hidden md:grid md:grid-cols-2 xl:grid-cols-3 gap-3 p-4 min-w-0" data-testid="casas-lista-desktop">
+            {casasFiltradas.map((casa) => (
+              <article key={casa.id} className="min-w-0 rounded-xl border border-slate-600 bg-[#1E293B] p-4 space-y-3">
+                <h3 className="text-base font-semibold text-[#F8FAFC] whitespace-normal break-words [overflow-wrap:anywhere]">{casa.nome}</h3>
+                <dl className="space-y-2 text-sm">
+                  <div className="min-w-0"><dt className="inline font-semibold text-slate-300">Setor: </dt><dd className="inline text-slate-100 break-words [overflow-wrap:anywhere]">{getSetorNome(casa.setorId)}</dd></div>
+                  <div className="min-w-0"><dt className="inline font-semibold text-slate-300">Código: </dt><dd className="inline font-mono text-slate-100 break-all">{casa.codigo || '-'}</dd></div>
+                  <div><dt className="inline font-semibold text-slate-300">Status: </dt><dd className="inline"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${casa.ativo ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-800'}`}>{casa.ativo ? 'Ativo' : 'Inativo'}</span></dd></div>
+                </dl>
+                <div className="flex flex-wrap gap-2 pt-3 border-t border-slate-600">
+                  <button type="button" onClick={() => verDetalhes(casa.id)} className="flex-1 min-w-0 min-h-11 px-3 py-2 rounded-lg bg-[#CBD5E1] text-[#0F172A] text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Detalhes</button>
+                  <button type="button" onClick={() => { void abrirFormEditar(casa.id) }} className="flex-1 min-w-0 min-h-11 px-3 py-2 rounded-lg bg-[#2563EB] text-white text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Editar</button>
+                </div>
+              </article>
+            ))}
           </div>
           </>
         )}
