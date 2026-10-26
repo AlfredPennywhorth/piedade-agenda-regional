@@ -486,7 +486,7 @@ export function CasasView() {
       {/* Modal de Detalhes da Casa de Oração */}
       {casaDetalhe && (
         <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200">
+          <div className="bg-[#0F172A] text-[#F8FAFC] rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-4 sm:p-5 space-y-4 shadow-xl border border-slate-600 break-words">
             <div className="flex justify-between items-center border-b border-slate-600 pb-2">
               <h3 className="font-bold text-[#F8FAFC] text-base">Detalhes da Casa de Oração</h3><AjudaContextual />
               <button
@@ -500,21 +500,21 @@ export function CasasView() {
             {carregandoDetalheModal ? (
               <div className="py-6 text-center text-slate-200 text-sm">Carregando detalhes...</div>
             ) : (
-              <div className="space-y-3 text-sm">
+              <div className="space-y-3 text-sm rounded-xl bg-[#1E293B] p-4">
                 <div>
-                  <span className="text-xs font-semibold text-slate-500 block">Nome:</span>
-                  <span className="font-semibold text-slate-800">{casaDetalhe.nome}</span>
+                  <span className="text-xs font-semibold text-slate-300 block">Nome:</span>
+                  <span className="font-semibold text-[#F8FAFC]">{casaDetalhe.nome}</span>
                 </div>
                 <div>
-                  <span className="text-xs font-semibold text-slate-500 block">Setor:</span>
-                  <span className="text-slate-700 font-medium">{getSetorNome(casaDetalhe.setorId)}</span>
+                  <span className="text-xs font-semibold text-slate-300 block">Setor:</span>
+                  <span className="text-[#F8FAFC] font-medium">{getSetorNome(casaDetalhe.setorId)}</span>
                 </div>
                 <div>
-                  <span className="text-xs font-semibold text-slate-500 block">Código:</span>
-                  <span className="font-mono text-slate-700">{casaDetalhe.codigo || 'Não informado'}</span>
+                  <span className="text-xs font-semibold text-slate-300 block">Código:</span>
+                  <span className="font-mono text-[#F8FAFC] break-all">{casaDetalhe.codigo || 'Não informado'}</span>
                 </div>
                 <div>
-                  <span className="text-xs font-semibold text-slate-500 block">Status:</span>
+                  <span className="text-xs font-semibold text-slate-300 block">Status:</span>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                     casaDetalhe.ativo ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
                   }`}>
@@ -523,17 +523,17 @@ export function CasasView() {
                 </div>
                 {casaDetalhe.createdAt && (
                   <div>
-                    <span className="text-xs font-semibold text-slate-500 block">Data de Criação:</span>
+                    <span className="text-xs font-semibold text-slate-300 block">Data de Criação:</span>
                     <span className="text-sm text-slate-200">{new Date(casaDetalhe.createdAt).toLocaleString('pt-BR')}</span>
                   </div>
                 )}
               </div>
             )}
 
-            <div className="text-right pt-3 border-t border-slate-100">
+            <div className="text-right pt-3 border-t border-slate-600">
               <button
                 onClick={() => setCasaDetalhe(null)}
-                className="min-h-11 px-4 py-2 bg-[#CBD5E1] hover:bg-white text-[#0F172A] rounded-lg text-sm font-medium transition-colors"
+                className="min-h-11 px-4 py-2 bg-[#CBD5E1] hover:bg-slate-100 text-[#0F172A] rounded-lg text-sm font-medium transition-colors"
               >
                 Fechar
               </button>
