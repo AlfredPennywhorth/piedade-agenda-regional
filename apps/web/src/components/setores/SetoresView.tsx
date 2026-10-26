@@ -234,11 +234,11 @@ export function SetoresView() {
 
   const getAdministracaoNome = (admId: string) => {
     const adm = administracoes.find((a) => a.id === admId)
-    return adm ? adm.nome : admId
+    return adm ? adm.nome : 'Administração não encontrada'
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 space-y-6 max-w-6xl min-w-0 mx-auto">
       {/* Cabeçalho */}
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
@@ -472,58 +472,21 @@ export function SetoresView() {
                 : 'Nenhum setor cadastrado até o momento.'}
           </div>
         ) : (
-          <div className="master-table-scroll">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                <tr>
-                  <th className="p-3">Nome</th>
-                  <th className="p-3">Administração</th>
-                  <th className="p-3">Código</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {setoresFiltrados.map((setor) => (
-                  <tr key={setor.id} className="hover:bg-slate-50">
-                    <td className="p-3 font-semibold text-slate-800">
-                      {setor.nome}
-                    </td>
-                    <td className="p-3 text-xs text-slate-600 font-medium">
-                      {getAdministracaoNome(setor.administracaoId)}
-                    </td>
-                    <td className="p-3 text-xs text-slate-600 font-mono">
-                      {setor.codigo || '-'}
-                    </td>
-                    <td className="p-3">
-                      {setor.ativo ? (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
-                          Ativo
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
-                          Inativo
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-3 text-right space-x-2 whitespace-nowrap">
-                      <button
-                        onClick={() => verDetalhes(setor.id)}
-                        className="text-xs text-slate-600 hover:text-slate-900 font-medium px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded transition-colors"
-                      >
-                        Detalhes
-                      </button>
-                      <button
-                        onClick={() => abrirFormEditar(setor.id)}
-                        className="text-xs text-brand-600 hover:text-brand-800 font-medium px-2 py-1 bg-brand-50 hover:bg-brand-100 rounded transition-colors"
-                      >
-                        Editar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 p-4 min-w-0" data-testid="setores-lista">
+            {setoresFiltrados.map((setor) => (
+              <article key={setor.id} className="min-w-0 rounded-xl bg-[#1E293B] border border-slate-600 p-4 space-y-3">
+                <h3 className="text-base font-semibold text-[#F8FAFC] break-words [overflow-wrap:anywhere]">{setor.nome}</h3>
+                <dl className="space-y-2 text-sm">
+                  <div><dt className="inline text-slate-300 font-semibold">Administração: </dt><dd className="inline text-slate-100 break-words [overflow-wrap:anywhere]">{getAdministracaoNome(setor.administracaoId)}</dd></div>
+                  <div><dt className="inline text-slate-300 font-semibold">Código: </dt><dd className="inline font-mono text-slate-100 break-all">{setor.codigo || 'Não informado'}</dd></div>
+                  <div><dt className="inline text-slate-300 font-semibold">Status: </dt><dd className="inline"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${setor.ativo ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-800'}`}>{setor.ativo ? 'Ativo' : 'Inativo'}</span></dd></div>
+                </dl>
+                <div className="flex gap-2 pt-3 border-t border-slate-600">
+                  <button type="button" onClick={() => verDetalhes(setor.id)} className="flex-1 min-w-0 min-h-11 rounded-lg px-3 py-2 bg-[#CBD5E1] text-[#0F172A] font-semibold text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Detalhes</button>
+                  <button type="button" onClick={() => { void abrirFormEditar(setor.id) }} className="flex-1 min-w-0 min-h-11 rounded-lg px-3 py-2 bg-[#2563EB] text-white font-semibold text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Editar</button>
+                </div>
+              </article>
+            ))}
           </div>
         )}
       </div>
