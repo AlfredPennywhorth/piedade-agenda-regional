@@ -51,11 +51,10 @@ O membro convocado normalmente pode responder pelo painel **Sua Participação**
 1. Abra o cartão do compromisso em **Minha Agenda** ou **Calendário**.
 2. Localize **Sua Participação**.
 3. Selecione **✓ Vou participar**.
-4. Se o evento solicitar período de participação, escolha pelo menos uma opção disponível entre **Manhã**, **Tarde** e **Noite**.
-5. Quando exibido, selecione **Confirmar Participação** e aguarde a gravação.
-6. Verifique a indicação **Confirmado**.
+4. **Na maioria das confirmações, não há seleção de período:** aguarde a gravação da resposta e confira o status **Confirmado**.
+5. **Somente se o evento tiver mais de um período habilitado**, será exibida uma etapa adicional de participação. Nesse caso, marque pelo menos uma das opções efetivamente apresentadas (**Manhã**, **Tarde** e/ou **Noite**) e selecione **Confirmar Participação**.
 
-Os períodos são opções condicionais: nem toda convocação solicita essa informação.
+**Importante:** a seleção de Manhã/Tarde/Noite **não é um filtro nem um campo fixo na Agenda ou no Calendário**. Ela aparece dentro dos detalhes do evento, durante a resposta **Vou participar**, apenas quando a configuração do evento possui dois ou três períodos habilitados. Não procure essas opções quando elas não forem exibidas.
 
 ### 4.2. Informar que não poderá participar
 
@@ -105,7 +104,7 @@ A criação e a edição de eventos são operações distintas da consulta da ag
 | Evento não aparece no dia esperado | Confira o mês, a data, o fuso operacional e a publicação/vinculação do evento |
 | A aba Eventos ou Convocações não aparece | Seu perfil pode não possuir `podeGerirAgenda`; isso não impede a consulta de Minha Agenda |
 | Convocação não oferece botão de resposta | O evento pode já ter começado, ser pessoal ou não conter destinatário RSVP vinculado |
-| Resposta exige período | Marque pelo menos um período disponível antes de confirmar |
+| Não encontro Manhã/Tarde/Noite | Isso é esperado em eventos com zero ou um período habilitado; a seleção só aparece após **Vou participar** em eventos com dois ou três períodos |
 | Não consigo confirmar ausência | Preencha a justificativa obrigatória |
 | Apareceu **Reconfirmar** | Revise a alteração do evento e envie uma nova resposta |
 | Aviso de conflito continua aparecendo | Consulte os detalhes; priorização não implica eliminação completa dos conflitos |
