@@ -1,6 +1,6 @@
 # Manual de Uso — Locais, Espaços e Estrutura Territorial
 
-> **Rascunho para validação do PO — 20/10/2026 (Etapa M2.4).** Descreve telas e ações identificadas nos componentes da `main`. Confirmar build publicado, perfis autorizados e capturas reais antes de distribuir como manual definitivo. Este documento não modifica cadastros existentes.
+> **Rascunho atualizado em 27/10/2026 para validação do PO (Etapa M2.4).** Descreve telas e ações identificadas nos componentes da `main`. Confirmar build publicado, perfis autorizados e capturas reais antes de distribuir como manual definitivo. Este documento não modifica cadastros existentes.
 
 ## 1. Para que servem esses cadastros
 
@@ -95,6 +95,11 @@ Na tela **Gestão Territorial — Administrações**, utilize **Filtrar por Regi
 Na tela **Gestão Territorial — Setores**, filtre primeiro por **Regional** e então por **Administração**. Ao trocar a Regional, o filtro de Administração é limpo para evitar associação incorreta.
 
 Se autorizado como Master ou administrador de sistema Regional, em **+ Novo Setor** selecione a Regional e uma Administração **pertencente a ela**, depois informe os demais campos. Para registros existentes, use **Detalhes** ou **Editar**. O vínculo administrativo é obrigatório para um Setor válido.
+
+**Interface Beta (Gate B):** a listagem de Setores apresenta cartões responsivos em vez de uma tabela horizontal. Cada cartão mostra Nome, Administração, Código, Status e os botões **Detalhes** e **Editar**. No celular, não é necessário arrastar horizontalmente para alcançar as ações. Em **Detalhes**, confira o nome da Administração; o identificador técnico não deve ser exibido.
+
+**Editar no celular (correção pendente de publicação, PR #407):** ao tocar **Editar**, o sistema deverá deslocar a página automaticamente até o formulário **AGD-ADM-042**, localizado acima da listagem. Confira os dados do Setor antes de atualizar. Enquanto a correção não tiver sido publicada e homologada, o usuário poderá precisar deslizar até o formulário manualmente. Para criar, utilize **+ Novo Setor** (AGD-ADM-041), sem confundir cadastro novo com edição.
+
 
 ### 5.4. Casas de Oração
 
