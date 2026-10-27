@@ -2,6 +2,32 @@
 
 > Rascunho operacional para validação antes da publicação; não presume versão/build atualmente implantados em produção. Os nomes de botões e permissões podem variar por perfil. Este documento não substitui orientação institucional.
 
+## Índice do manual por jornada (rascunhos para validação)
+
+Esta página é a **porta de entrada** dos capítulos operacionais. Os capítulos abaixo são documentação em revisão, não comprovam que a interface de `main` já corresponda à Beta; confirme sempre o perfil autorizado e a versão efetivamente publicada.
+
+| Jornada | Capítulo de referência |
+|---|---|
+| Primeiro acesso, ativação, login e Meu Cadastro | [Acesso e cadastro](manual-uso-acesso-cadastro.md) |
+| Usuário Comum: compromissos, Calendário e RSVP | [Minha Agenda e Calendário](manual-uso-minha-agenda-calendario.md) |
+| Gestor de Agenda: eventos, séries e convocações | [Eventos, Convocações e Séries](manual-uso-gestao-eventos-convocacoes-series.md) |
+| Administração: Regional, Administração, Setor, Casa, Local e Espaço | [Locais, Espaços e Estrutura Territorial](manual-uso-locais-espacos-territorio.md) |
+| Administração: GTs, membros, funções e vínculos | [GTs, Membros, Funções e Vínculos](manual-uso-gt-membros-funcoes-vinculos.md) |
+| Contas, permissões, revogação e segurança | [Contas, Acessos, Permissões e Segurança](manual-uso-contas-acessos-permissoes-seguranca.md) |
+| Operador de Portaria: recepção e presenças | [Portaria, Recepção e Presenças](manual-uso-portaria-recepcao-presencas.md) |
+| Gestor de Relatórios e Auditor: indicadores e consulta autorizada | [Relatórios, Indicadores e Auditoria](manual-uso-relatorios-indicadores-auditoria.md) |
+
+### Controle de publicação e aceite (#170)
+
+- **Estado editorial:** rascunho; nenhuma captura Stitch deve ser divulgada como se fosse tela da aplicação.
+- **Referência de implantação:** registrar URL, ambiente (`main` ou `beta`), versão/build e data de conferência antes da liberação definitiva, sem presumir igualdade entre ambientes.
+- **Validação por perfil:** revisar os passos com o perfil real autorizado, garantindo que o servidor também permita a operação descrita.
+- **Validação visual:** usar somente capturas reais e anonimizadas da versão homologada, em desktop/mobile quando necessário; não expor PIN, telefone, carteirinha ou dados pessoais.
+- **Aprovação do PO:** conferir trilhas, nomes atuais dos botões, mensagens, casos de erro, links e data da revisão antes de distribuir o manual.
+- **Manutenção:** toda alteração posterior de interface, perfil ou fluxo deve revisar o respectivo capítulo e o número da versão documentada.
+
+---
+
 ## Acesso e primeiros passos
 
 1. Acesse https://piedade-agenda-regional.pages.dev/.
