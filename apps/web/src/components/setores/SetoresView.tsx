@@ -35,7 +35,9 @@ export function SetoresView() {
 
   useEffect(() => {
     if (modoForm === 'editar' && setorEditandoId) {
-      formSetorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      if (typeof formSetorRef.current?.scrollIntoView === 'function') {
+        formSetorRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
     }
   }, [modoForm, setorEditandoId])
 
