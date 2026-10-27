@@ -1,5 +1,5 @@
 import { AjudaContextual } from '../ajuda/AjudaContextual'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { CreateSetorSchema, UpdateSetorSchema } from '@piedade/shared'
 import { fetchWithAuth, postWithAuth, patchWithAuth, ApiError } from '../../api/apiClient'
 import type { Administracao } from '../administracoes/AdministracoesView'
@@ -31,6 +31,15 @@ export function SetoresView() {
   const [modoForm, setModoForm] = useState<'criar' | 'editar' | null>(null)
   const [setorEditandoId, setSetorEditandoId] = useState<string | null>(null)
   const [carregandoDetalhes, setCarregandoDetalhes] = useState<boolean>(false)
+  const formSetorRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (modoForm === 'editar' && setorEditandoId) {
+      if (typeof formSetorRef.current?.scrollIntoView === 'function') {
+        formSetorRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }
+  }, [modoForm, setorEditandoId])
 
   // Estado do detalhe visualizado em modal
   const [setorDetalhe, setSetorDetalhe] = useState<Setor | null>(null)
@@ -318,7 +327,7 @@ export function SetoresView() {
 
       {/* Form de Criação / Edição */}
       {modoForm && (
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-md space-y-4">
+        <div ref={formSetorRef} className="bg-white p-5 rounded-xl border border-slate-200 shadow-md space-y-4 scroll-mt-6">
           <AjudaContextual /><span data-screen-code={modoForm === 'criar' ? 'AGD-ADM-041' : 'AGD-ADM-042'} className="block text-right text-[10px] font-medium tracking-wide text-slate-500">Tela {modoForm === 'criar' ? 'AGD-ADM-041' : 'AGD-ADM-042'}</span>
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <h3 className="font-bold text-slate-800 text-base">
