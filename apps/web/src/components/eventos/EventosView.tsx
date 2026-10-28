@@ -892,6 +892,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         return
       }
 
+      envioEventoEmAndamento.current = true
       setSalvando(true)
 
       // Ensure that for PATCH, fields that are not relevant (like localId for ONLINE) are explicitly null
