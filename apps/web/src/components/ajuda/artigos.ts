@@ -13,6 +13,36 @@ export interface ArtigoAjuda {
 }
 
 export const artigosAjuda: ArtigoAjuda[] = [
+  {
+    id: 'pontos-atendimento',
+    titulo: 'Pontos de Atendimento — cadastro e Casas vinculadas',
+    codigos: ['AGD-ADM-045'],
+    capacidade: 'podeAdministrarEstrutura',
+    passos: [
+      'Acesse Mais → Administração → Pontos de Atendimento e informe Nome, Código e Setor.',
+      'Use Salvar para cadastrar; selecione Editar para alterar um Ponto existente.',
+      'Na lista, vincule somente Casas de Oração pertencentes ao mesmo Setor e confira a atualização.',
+    ],
+    cuidados: [
+      'Pontos inativos não aceitam novos vínculos de Casas. A alteração não apaga o histórico.',
+      'O Ponto é um agrupamento territorial, não um novo Local físico.',
+    ],
+  },
+  {
+    id: 'tipos-reuniao',
+    titulo: 'Tipos de Reunião — catálogo institucional',
+    codigos: ['AGD-ADM-046'],
+    capacidade: 'podeAdministrarEstrutura',
+    passos: [
+      'Acesse Mais → Administração → Tipos de Reunião.',
+      'Informe Nome e Código institucional sem espaços; use Salvar para criar.',
+      'Use Editar para atualizar os dados e Ativar/Inativar para controlar novas escolhas.',
+    ],
+    cuidados: [
+      'Códigos devem ser únicos; manter o histórico ao inativar tipos já utilizados.',
+      'A criação e edição do catálogo dependem da autorização do servidor.',
+    ],
+  },
   ...artigosComplementares,
   {
     id: 'inicio',
