@@ -28,6 +28,9 @@ CREATE INDEX idx_casas_ponto_atendimento ON casas(ponto_atendimento_id);
 -- Eventos antigos permanecem validos; titulo historico nao e alterado.
 ALTER TABLE eventos ADD COLUMN ponto_atendimento_id TEXT REFERENCES pontos_atendimento(id);
 ALTER TABLE eventos ADD COLUMN tipo_reuniao_id TEXT REFERENCES tipos_reuniao(id);
+-- Mesmo identificador indica alternativas institucionais, nunca inferidas por horario/titulo.
+ALTER TABLE eventos ADD COLUMN grupo_equivalencia_id TEXT;
+CREATE INDEX idx_eventos_grupo_equivalencia ON eventos(grupo_equivalencia_id);
 CREATE INDEX idx_eventos_ponto_atendimento ON eventos(ponto_atendimento_id,inicio_em);
 CREATE INDEX idx_eventos_tipo_reuniao ON eventos(tipo_reuniao_id,inicio_em);
 
