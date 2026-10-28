@@ -62,6 +62,7 @@ interface SerieResponse {
   setorId: string | null
   pontoAtendimentoId?: string | null
   tipoReuniaoId?: string | null
+  grupoEquivalenciaId?: string | null
   casaId: string | null
   grupoTrabalhoId: string | null
   observacoes: string | null
@@ -516,6 +517,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       casaId: '',
       grupoTrabalhoId: '',
       pontoAtendimentoId: null,
+      grupoEquivalenciaId: null,
       localId: (externo || (!(tipo === 'casa' || externo) && !!locais.find(local => local.id === prev.localId)?.proprietarioMembroId)) ? '' : prev.localId,
       espacoId: (externo || (!(tipo === 'casa' || externo) && !!locais.find(local => local.id === prev.localId)?.proprietarioMembroId)) ? '' : prev.espacoId,
     }))
@@ -570,6 +572,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       grupoTrabalhoId: '',
       pontoAtendimentoId: null,
       tipoReuniaoId: null,
+      grupoEquivalenciaId: null,
       observacoes: '',
       ativo: true,
     })
@@ -768,6 +771,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         setorId: item.setorId || '',
         pontoAtendimentoId: item.pontoAtendimentoId ?? null,
         tipoReuniaoId: item.tipoReuniaoId ?? null,
+        grupoEquivalenciaId: item.grupoEquivalenciaId ?? null,
         casaId: item.casaId || '',
         grupoTrabalhoId: item.grupoTrabalhoId || '',
         observacoes: item.observacoes || '',
@@ -871,6 +875,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       grupoTrabalhoId: formData.grupoTrabalhoId || null,
       pontoAtendimentoId: tipoEscopo === 'setor' ? formData.pontoAtendimentoId || null : null,
       tipoReuniaoId: formData.pessoal ? null : formData.tipoReuniaoId || null,
+      grupoEquivalenciaId: tipoEscopo === 'setor' && formData.pontoAtendimentoId && formData.tipoReuniaoId ? formData.grupoEquivalenciaId || null : null,
       observacoes: formData.observacoes || null,
       inicioEm: parseDatetimeLocal(formData.inicioEm as string),
       fimEm: parseDatetimeLocal(formData.fimEm as string),
@@ -1648,7 +1653,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                               <select
                                 id="setorId"
                                 value={formData.setorId || ''}
-                                onChange={e => setFormData({ ...formData, setorId: e.target.value, pontoAtendimentoId: null })}
+                                onChange={e => setFormData({ ...formData, setorId: e.target.value, pontoAtendimentoId: null, grupoEquivalenciaId: null })}
                                 className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                               >
                                 <option value="">Selecione...</option>
@@ -1659,10 +1664,19 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                           {tipoEscopo === 'setor' && formData.setorId && (
                             <div className="mt-3">
                               <label htmlFor="pontoAtendimentoId" className="mb-1 block text-xs font-medium text-slate-700">Ponto de Atendimento</label>
-                              <select id="pontoAtendimentoId" value={formData.pontoAtendimentoId || ''} onChange={e => setFormData({ ...formData, pontoAtendimentoId: e.target.value || null })} className="w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-sm">
+                              <select id="pontoAtendimentoId" value={formData.pontoAtendimentoId || ''} onChange={e => setFormData({ ...formData, pontoAtendimentoId: e.target.value || null, grupoEquivalenciaId: null })} className="w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-sm">
                                 <option value="">Reunião de todo o Setor (sem Ponto)</option>
                                 {pontosAtendimento.filter(p => p.setorId === formData.setorId && (p.ativo || p.id === formData.pontoAtendimentoId)).map(p => <option key={p.id} value={p.id}>{p.nome}{p.ativo ? '' : ' (inativo)'}</option>)}
                               </select>
+                            </div>
+                          )}
+                          {tipoEscopo === 'setor' && formData.pontoAtendimentoId && formData.tipoReuniaoId && (
+                            <div className="mt-3 space-y-2">
+                              <label htmlFor="grupoEquivalenciaId" className="block text-xs font-medium text-slate-700">Grupo de reuniões alternativas (opcional)</label>
+                              <input id="grupoEquivalenciaId" value={formData.grupoEquivalenciaId || ''} onChange={e => setFormData({ ...formData, grupoEquivalenciaId: e.target.value.trim() || null })} placeholder="UUID compartilhado entre reuniões" className="w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-sm" />
+                              <button type="button" onClick={() => setFormData(prev => ({ ...prev, grupoEquivalenciaId: crypto.randomUUID() }))} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium">Criar novo grupo</button>
+                              <p className="text-xs text-slate-600">Use o mesmo identificador em reuniões equivalentes de Pontos diferentes do mesmo Setor e Tipo.</p>
+                              {errosForm.grupoEquivalenciaId && <p role="alert" className="text-xs text-red-700">{errosForm.grupoEquivalenciaId}</p>}
                             </div>
                           )}
                           {tipoEscopo === 'casa' && (
