@@ -438,6 +438,13 @@ convocacoesRouter.post('/:id/publicar', async c => {
     eq(membros.ativo, true),
     inArray(vinculosFuncionais.funcaoId, funcaoIds),
   ]
+  // PA restringe o público às Casas vinculadas, inclusive para vínculos funcionais de Setor.
+  // Sem PA, preserva integralmente o comportamento territorial existente.
+  if (evento.pontoAtendimentoId) {
+    const casasDoPonto = db.select({ id: casas.id }).from(casas)
+      .where(and(eq(casas.pontoAtendimentoId, evento.pontoAtendimentoId), eq(casas.ativo, true)))
+    conditions.push(inArray(membros.casaId, casasDoPonto))
+  }
   const vinculoDco = and(eq(funcoes.codigo, 'DCO'), eq(vinculosFuncionais.casaId, membros.casaId))
   if (evento.casaId) {
     const casasAtivas = db.select({ id: casas.id }).from(casas).where(eq(casas.ativo, true))
@@ -631,6 +638,10 @@ convocacoesRouter.post('/:id/sincronizar-dco', async c => {
   const convocouDco = await db.select({ id: convocacaoFuncoes.id }).from(convocacaoFuncoes)
     .where(and(eq(convocacaoFuncoes.convocacaoId, id), eq(convocacaoFuncoes.funcaoId, dco.id))).get()
   if (!convocouDco) return c.json({ error: 'Convocação não contém a função canônica DCO' }, 409)
+  // A reconciliação legada ainda não conhece PA: bloquear evita convocar Casas de outros Pontos.
+  if (evento.pontoAtendimentoId) {
+    return c.json({ error: 'Sincronização DCO por Ponto de Atendimento indisponível até adaptação do reconciliador', code: 'SINCRONIZACAO_PA_PENDENTE' }, 409)
+  }
   const nowIso = new Date().toISOString()
   if (evento.fimEm <= nowIso) return c.json({ error: 'Convocação encerrada não pode ser sincronizada' }, 409)
   const antes = await db.select({ total: sql<number>`count(*)` }).from(convocacaoDestinatarios)
