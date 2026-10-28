@@ -16,7 +16,7 @@ export const artigosAjuda: ArtigoAjuda[] = [
   {
     id: 'pontos-atendimento',
     titulo: 'Pontos de Atendimento — cadastro e Casas vinculadas',
-    codigos: ['AGD-ADM-045'],
+    codigos: ['AGD-ADM-060'],
     capacidade: 'podeAdministrarEstrutura',
     passos: [
       'Acesse Mais → Administração → Pontos de Atendimento e informe Nome, Código e Setor.',
@@ -31,7 +31,7 @@ export const artigosAjuda: ArtigoAjuda[] = [
   {
     id: 'tipos-reuniao',
     titulo: 'Tipos de Reunião — catálogo institucional',
-    codigos: ['AGD-ADM-046'],
+    codigos: ['AGD-ADM-061'],
     capacidade: 'podeAdministrarEstrutura',
     passos: [
       'Acesse Mais → Administração → Tipos de Reunião.',
