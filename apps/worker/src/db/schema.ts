@@ -61,8 +61,26 @@ export const setores = sqliteTable('setores', {
   ...timestamps,
 })
 
+export const pontosAtendimento = sqliteTable('pontos_atendimento', {
+  id: text('id').primaryKey(),
+  setorId: text('setor_id').notNull().references(() => setores.id),
+  nome: text('nome').notNull(),
+  codigo: text('codigo'),
+  ativo: ativoDefault,
+  ...timestamps,
+})
+
+export const tiposReuniao = sqliteTable('tipos_reuniao', {
+  id: text('id').primaryKey(),
+  nome: text('nome').notNull(),
+  codigo: text('codigo').notNull().unique(),
+  ativo: ativoDefault,
+  ...timestamps,
+})
+
 export const casas = sqliteTable('casas', {
   id: text('id').primaryKey(),
+  pontoAtendimentoId: text('ponto_atendimento_id').references(() => pontosAtendimento.id),
   setorId: text('setor_id')
     .notNull()
     .references(() => setores.id), // Permite atualização (Update)
@@ -532,6 +550,8 @@ export const seriesRecorrencia = sqliteTable(
   {
     id: text('id').primaryKey(),
     titulo: text('titulo').notNull(),
+    tipoReuniaoId: text('tipo_reuniao_id').references(() => tiposReuniao.id),
+    pontoAtendimentoId: text('ponto_atendimento_id').references(() => pontosAtendimento.id),
     descricao: text('descricao'),
     pauta: text('pauta'),
     modalidade: text('modalidade').notNull(),
