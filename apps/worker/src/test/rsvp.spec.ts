@@ -366,6 +366,48 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     expect(res.status).toBe(404)
   })
 
+  it('PA-02: escolha unica entre alternativas, troca apos recusa e independencia de outros grupos', async () => {
+    const setor = 'set-1'
+    const pontoA = crypto.randomUUID()
+    const pontoB = crypto.randomUUID()
+    const tipoId = crypto.randomUUID()
+    const grupoId = crypto.randomUUID()
+    const outroGrupoId = crypto.randomUUID()
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(pontoA, setor, 'PA RSVP A')
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(pontoB, setor, 'PA RSVP B')
+    sqlite.prepare('INSERT INTO tipos_reuniao (id, nome, codigo) VALUES (?, ?, ?)').run(tipoId, 'Atendimento RSVP', 'ATD-RSVP-PA02')
+    const eventos = [
+      ['ev-pa-rsvp-a', pontoA, grupoId],
+      ['ev-pa-rsvp-b', pontoB, grupoId],
+      ['ev-pa-rsvp-outro', pontoB, outroGrupoId],
+    ] as const
+    for (const [id, ponto, grupo] of eventos) {
+      sqlite.prepare(`INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, setor_id, ponto_atendimento_id, tipo_reuniao_id, grupo_equivalencia_id, ativo)
+        VALUES (?, ?, 'ONLINE', '2030-08-01T10:00:00Z', '2030-08-01T11:00:00Z', ?, ?, ?, ?, 1)`)
+        .run(id, id, setor, ponto, tipoId, grupo)
+      sqlite.prepare("INSERT INTO convocacoes (id, evento_id, status, ativo) VALUES (?, ?, 'PUBLICADA', 1)")
+        .run(`conv-${id}`, id)
+      sqlite.prepare("INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES (?, ?, ?)")
+        .run(`dest-${id}`, `conv-${id}`, membroId)
+    }
+    const responder = (id: string, resposta: string) => req(`/api/v1/minha-agenda/rsvp/dest-${id}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta }),
+    })
+    expect((await responder('ev-pa-rsvp-a', 'PARTICIPAREI')).status).toBe(200)
+    const segunda = await responder('ev-pa-rsvp-b', 'PARTICIPAREI')
+    expect(segunda.status).toBe(409)
+    expect((await segunda.json() as { code: string }).code).toBe('RSVP_ALTERNATIVA_JA_CONFIRMADA')
+    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM rsvp WHERE convocacao_destinatario_id = ?")
+      .get('dest-ev-pa-rsvp-b')).toMatchObject({ n: 0 })
+    expect((await responder('ev-pa-rsvp-outro', 'PARTICIPAREI')).status).toBe(200)
+    expect((await responder('ev-pa-rsvp-a', 'NAO_PARTICIPAREI')).status).toBe(200)
+    expect((await responder('ev-pa-rsvp-b', 'PARTICIPAREI')).status).toBe(200)
+    expect((await responder('ev-pa-rsvp-a', 'PARTICIPAREI')).status).toBe(409)
+  })
+
   it('30. falha no batch não deixa atualização parcial (Rollback no executeAtomic)', async () => {
     const destId = destIdPeriodos
     await req(`/api/v1/minha-agenda/rsvp/${destId}`, {
