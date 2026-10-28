@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, inArray } from 'drizzle-orm'
-import { z } from 'zod'
+import { z } from '@piedade/shared'
 import { pontosAtendimento, tiposReuniao, casas, setores } from '../db/schema'
 import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo } from '../security/permissoes'
