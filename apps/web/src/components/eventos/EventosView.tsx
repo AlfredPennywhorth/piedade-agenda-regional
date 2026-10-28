@@ -95,6 +95,8 @@ export interface Evento {
   regionalId: string | null
   administracaoId: string | null
   setorId: string | null
+  pontoAtendimentoId?: string | null
+  tipoReuniaoId?: string | null
   casaId: string | null
   grupoTrabalhoId: string | null
   filtroRegionalId?: string | null
@@ -147,6 +149,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   const [eventoEditandoSerieId, setEventoEditandoSerieId] = useState<string | null>(null)
   const [carregandoDetalhes, setCarregandoDetalhes] = useState<boolean>(false)
   const [salvando, setSalvando] = useState<boolean>(false)
+  const envioEventoEmAndamento = useRef(false)
   const [escolhaSerieAberto, setEscolhaSerieAberto] = useState<Evento | null>(null)
   const [confirmacaoThisAberto, setConfirmacaoThisAberto] = useState<EventoUpdateInput | null>(null)
   const [confirmacaoFutureAberto, setConfirmacaoFutureAberto] = useState<SerieCreateInput | null>(null)
@@ -846,7 +849,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (salvando) return
+    if (envioEventoEmAndamento.current) return
     setErrosForm({})
     
     const payload = {
@@ -929,7 +932,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       }
 
       fecharFormularioEvento()
-      carregarDados()
+      await carregarDados()
     } catch (err: any) {
       if (err instanceof ApiError && err.body?.error) {
         setErro(typeof err.body.error === 'string' ? err.body.error : 'Dados inválidos')
@@ -937,6 +940,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         setErro(err.message || 'Erro ao salvar evento.')
       }
     } finally {
+      envioEventoEmAndamento.current = false
       setSalvando(false)
     }
   }
