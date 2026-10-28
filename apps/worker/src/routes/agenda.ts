@@ -71,6 +71,8 @@ type RegistroAgenda = {
     inicioEm: string
     fimEm: string
     agendaRevisao: string
+    grupoEquivalenciaId: string | null
+    pontoAtendimentoId: string | null
   }
   convocacao: any
   local: any
@@ -110,6 +112,14 @@ function montarMapaConflitos(records: RegistroAgenda[]) {
       if (inicioSeguinte > fimAtual + JANELA_TRANSICAO_MS) break
 
       if (ativos[i].evento.id === ativos[j].evento.id) continue
+      // Reuniões de um mesmo grupo institucional em Pontos distintos são alternativas,
+      // não compromissos cumulativos. Sem grupo explícito, mantêm os conflitos normais.
+      const atual = ativos[i].evento
+      const seguinte = ativos[j].evento
+      if (atual.grupoEquivalenciaId &&
+        atual.grupoEquivalenciaId === seguinte.grupoEquivalenciaId &&
+        atual.pontoAtendimentoId && seguinte.pontoAtendimentoId &&
+        atual.pontoAtendimentoId !== seguinte.pontoAtendimentoId) continue
       const tipo = tipoConflito(ativos[i], ativos[j])
       if (!tipo) continue
 
