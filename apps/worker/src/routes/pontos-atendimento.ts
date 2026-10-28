@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, eq, inArray } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import { pontosAtendimento, tiposReuniao, casas, setores } from '../db/schema'
 import { authMiddleware } from '../middleware/auth'
