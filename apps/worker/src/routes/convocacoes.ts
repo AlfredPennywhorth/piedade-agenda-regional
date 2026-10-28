@@ -638,10 +638,6 @@ convocacoesRouter.post('/:id/sincronizar-dco', async c => {
   const convocouDco = await db.select({ id: convocacaoFuncoes.id }).from(convocacaoFuncoes)
     .where(and(eq(convocacaoFuncoes.convocacaoId, id), eq(convocacaoFuncoes.funcaoId, dco.id))).get()
   if (!convocouDco) return c.json({ error: 'Convocação não contém a função canônica DCO' }, 409)
-  // A reconciliação legada ainda não conhece PA: bloquear evita convocar Casas de outros Pontos.
-  if (evento.pontoAtendimentoId) {
-    return c.json({ error: 'Sincronização DCO por Ponto de Atendimento indisponível até adaptação do reconciliador', code: 'SINCRONIZACAO_PA_PENDENTE' }, 409)
-  }
   const nowIso = new Date().toISOString()
   if (evento.fimEm <= nowIso) return c.json({ error: 'Convocação encerrada não pode ser sincronizada' }, 409)
   const antes = await db.select({ total: sql<number>`count(*)` }).from(convocacaoDestinatarios)
@@ -662,6 +658,7 @@ convocacoesRouter.post('/:id/sincronizar-dco', async c => {
               AND ${eventos.regionalId} IS ${evento.regionalId ?? null}
               AND ${eventos.administracaoId} IS ${evento.administracaoId ?? null}
               AND ${eventos.setorId} IS ${evento.setorId ?? null}
+              AND ${eventos.pontoAtendimentoId} IS ${evento.pontoAtendimentoId ?? null}
               AND ${eventos.casaId} IS ${evento.casaId ?? null}
               AND ${eventos.grupoTrabalhoId} IS ${evento.grupoTrabalhoId ?? null})
             AND EXISTS (SELECT 1 FROM ${convocacaoFuncoes}
