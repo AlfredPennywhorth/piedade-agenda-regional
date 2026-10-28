@@ -87,7 +87,7 @@ pontosAtendimentoRouter.patch('/:id/casas/:casaId', async c => {
 tiposReuniaoRouter.get('/', async c => {
   const db = c.get('db')
   const data = await db.select().from(tiposReuniao).all()
-  return c.json(data.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
+  return c.json(data.sort((a: typeof tiposReuniao.$inferSelect, b: typeof tiposReuniao.$inferSelect) => a.nome.localeCompare(b.nome, 'pt-BR')))
 })
 
 tiposReuniaoRouter.post('/', async c => {
