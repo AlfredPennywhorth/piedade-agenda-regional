@@ -98,6 +98,7 @@ export interface Evento {
   setorId: string | null
   pontoAtendimentoId?: string | null
   tipoReuniaoId?: string | null
+  grupoEquivalenciaId?: string | null
   casaId: string | null
   grupoTrabalhoId: string | null
   filtroRegionalId?: string | null
