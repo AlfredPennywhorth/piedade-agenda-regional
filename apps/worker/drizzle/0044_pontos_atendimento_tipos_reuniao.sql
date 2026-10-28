@@ -62,3 +62,45 @@ WHEN NEW.ponto_atendimento_id IS NOT NULL AND (
  NOT EXISTS (SELECT 1 FROM pontos_atendimento p WHERE p.id=NEW.ponto_atendimento_id AND p.setor_id=NEW.setor_id)
 )
 BEGIN SELECT RAISE(ABORT,'EVENTO_PONTO_SETOR_DIVERGENTE'); END;
+
+-- Evita concorrencia entre confirmacoes de alternativas do mesmo grupo.
+-- A validacao ocorre no SQLite, dentro da propria escrita RSVP.
+CREATE TRIGGER trg_rsvp_alternativa_insert BEFORE INSERT ON rsvp
+WHEN NEW.resposta = 'PARTICIPAREI'
+AND EXISTS (
+ SELECT 1 FROM convocacao_destinatarios cd
+ JOIN convocacoes c ON c.id = cd.convocacao_id
+ JOIN eventos e ON e.id = c.evento_id
+ JOIN convocacao_destinatarios outro_cd ON outro_cd.membro_id = cd.membro_id AND outro_cd.id <> cd.id
+ JOIN convocacoes outro_c ON outro_c.id = outro_cd.convocacao_id AND outro_c.status = 'PUBLICADA' AND outro_c.ativo = 1
+ JOIN eventos outro_e ON outro_e.id = outro_c.evento_id AND outro_e.id <> e.id
+ JOIN rsvp outro_r ON outro_r.convocacao_destinatario_id = outro_cd.id AND outro_r.resposta = 'PARTICIPAREI'
+ WHERE cd.id = NEW.convocacao_destinatario_id
+ AND e.grupo_equivalencia_id IS NOT NULL
+ AND e.grupo_equivalencia_id = outro_e.grupo_equivalencia_id
+ AND e.tipo_reuniao_id = outro_e.tipo_reuniao_id
+ AND e.setor_id = outro_e.setor_id
+ AND e.ponto_atendimento_id IS NOT NULL AND outro_e.ponto_atendimento_id IS NOT NULL
+ AND e.ponto_atendimento_id <> outro_e.ponto_atendimento_id
+)
+BEGIN SELECT RAISE(ABORT,'RSVP_ALTERNATIVA_JA_CONFIRMADA'); END;
+
+CREATE TRIGGER trg_rsvp_alternativa_update BEFORE UPDATE OF resposta ON rsvp
+WHEN NEW.resposta = 'PARTICIPAREI'
+AND EXISTS (
+ SELECT 1 FROM convocacao_destinatarios cd
+ JOIN convocacoes c ON c.id = cd.convocacao_id
+ JOIN eventos e ON e.id = c.evento_id
+ JOIN convocacao_destinatarios outro_cd ON outro_cd.membro_id = cd.membro_id AND outro_cd.id <> cd.id
+ JOIN convocacoes outro_c ON outro_c.id = outro_cd.convocacao_id AND outro_c.status = 'PUBLICADA' AND outro_c.ativo = 1
+ JOIN eventos outro_e ON outro_e.id = outro_c.evento_id AND outro_e.id <> e.id
+ JOIN rsvp outro_r ON outro_r.convocacao_destinatario_id = outro_cd.id AND outro_r.resposta = 'PARTICIPAREI'
+ WHERE cd.id = NEW.convocacao_destinatario_id
+ AND e.grupo_equivalencia_id IS NOT NULL
+ AND e.grupo_equivalencia_id = outro_e.grupo_equivalencia_id
+ AND e.tipo_reuniao_id = outro_e.tipo_reuniao_id
+ AND e.setor_id = outro_e.setor_id
+ AND e.ponto_atendimento_id IS NOT NULL AND outro_e.ponto_atendimento_id IS NOT NULL
+ AND e.ponto_atendimento_id <> outro_e.ponto_atendimento_id
+)
+BEGIN SELECT RAISE(ABORT,'RSVP_ALTERNATIVA_JA_CONFIRMADA'); END;
