@@ -550,8 +550,6 @@ export const seriesRecorrencia = sqliteTable(
   {
     id: text('id').primaryKey(),
     titulo: text('titulo').notNull(),
-    tipoReuniaoId: text('tipo_reuniao_id').references(() => tiposReuniao.id),
-    pontoAtendimentoId: text('ponto_atendimento_id').references(() => pontosAtendimento.id),
     descricao: text('descricao'),
     pauta: text('pauta'),
     modalidade: text('modalidade').notNull(),
@@ -606,6 +604,8 @@ export const eventos = sqliteTable(
     pessoal: integer('pessoal', { mode: 'boolean' }).notNull().default(false),
     criadorMembroId: text('criador_membro_id').references(() => membros.id),
     titulo: text('titulo').notNull(),
+    tipoReuniaoId: text('tipo_reuniao_id').references(() => tiposReuniao.id),
+    pontoAtendimentoId: text('ponto_atendimento_id').references(() => pontosAtendimento.id),
     descricao: text('descricao'),
     pauta: text('pauta'),
     modalidade: text('modalidade').notNull(), // PRESENCIAL, ONLINE, HIBRIDO
