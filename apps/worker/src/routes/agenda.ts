@@ -73,6 +73,8 @@ type RegistroAgenda = {
     agendaRevisao: string
     grupoEquivalenciaId: string | null
     pontoAtendimentoId: string | null
+    tipoReuniaoId: string | null
+    setorId: string | null
   }
   convocacao: any
   local: any
@@ -119,7 +121,9 @@ function montarMapaConflitos(records: RegistroAgenda[]) {
       if (atual.grupoEquivalenciaId &&
         atual.grupoEquivalenciaId === seguinte.grupoEquivalenciaId &&
         atual.pontoAtendimentoId && seguinte.pontoAtendimentoId &&
-        atual.pontoAtendimentoId !== seguinte.pontoAtendimentoId) continue
+        atual.pontoAtendimentoId !== seguinte.pontoAtendimentoId &&
+        atual.tipoReuniaoId && atual.tipoReuniaoId === seguinte.tipoReuniaoId &&
+        atual.setorId && atual.setorId === seguinte.setorId) continue
       const tipo = tipoConflito(ativos[i], ativos[j])
       if (!tipo) continue
 
