@@ -394,7 +394,7 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     const responder = (id: string, resposta: string) => req(`/api/v1/minha-agenda/rsvp/dest-${id}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resposta }),
+      body: JSON.stringify({ resposta, ...(resposta === 'NAO_PARTICIPAREI' ? { justificativa: 'Escolhi outra reunião alternativa' } : {}) }),
     })
     expect((await responder('ev-pa-rsvp-a', 'PARTICIPAREI')).status).toBe(200)
     const segunda = await responder('ev-pa-rsvp-b', 'PARTICIPAREI')
