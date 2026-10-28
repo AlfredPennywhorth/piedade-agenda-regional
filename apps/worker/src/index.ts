@@ -24,6 +24,7 @@ import { regionaisRouter } from './routes/regionais'
 import { administracoesRouter } from './routes/administracoes'
 import { setoresRouter } from './routes/setores'
 import { casasRouter } from './routes/casas'
+import { pontosAtendimentoRouter, tiposReuniaoRouter } from './routes/pontos-atendimento'
 import { gruposTrabalhoRouter } from './routes/grupos_trabalho'
 import { membrosRouter } from './routes/membros'
 import { funcoesRouter } from './routes/funcoes'
@@ -152,6 +153,8 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.route('/api/v1/setores', setoresRouter)
   app.route('/api/v1/casas', casasRouter)
   app.route('/api/v1/grupos-trabalho', gruposTrabalhoRouter)
+  app.route('/api/v1/pontos-atendimento', pontosAtendimentoRouter)
+  app.route('/api/v1/tipos-reuniao', tiposReuniaoRouter)
 
   // ============================================================
   // Rotas da API (S02)
