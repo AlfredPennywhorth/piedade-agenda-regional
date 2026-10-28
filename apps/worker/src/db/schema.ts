@@ -606,6 +606,7 @@ export const eventos = sqliteTable(
     titulo: text('titulo').notNull(),
     tipoReuniaoId: text('tipo_reuniao_id').references(() => tiposReuniao.id),
     pontoAtendimentoId: text('ponto_atendimento_id').references(() => pontosAtendimento.id),
+    grupoEquivalenciaId: text('grupo_equivalencia_id'),
     descricao: text('descricao'),
     pauta: text('pauta'),
     modalidade: text('modalidade').notNull(), // PRESENCIAL, ONLINE, HIBRIDO
