@@ -112,7 +112,7 @@ export interface Evento {
   recorrenciaExcecao?: boolean
 }
 
-export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEventoCriado?: (eventoId: string) => void; onEventoPessoalCriado?: () => void }) {
+export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisualizarGruposAlternativos = false }: { onEventoCriado?: (eventoId: string) => void; onEventoPessoalCriado?: () => void; podeVisualizarGruposAlternativos?: boolean }) {
   const [eventos, setEventos] = useState<Evento[]>([])
   
   const [filtros, setFiltros] = useState<{ master: boolean; filtrarEscopo?: boolean; pessoas: { id: string; nome: string }[] }>({ master: false, pessoas: [] })
@@ -876,16 +876,21 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       grupoTrabalhoId: formData.grupoTrabalhoId || null,
       pontoAtendimentoId: tipoEscopo === 'setor' ? formData.pontoAtendimentoId || null : null,
       tipoReuniaoId: formData.pessoal ? null : formData.tipoReuniaoId || null,
-      grupoEquivalenciaId: tipoEscopo === 'setor' && formData.pontoAtendimentoId && formData.tipoReuniaoId ? formData.grupoEquivalenciaId || null : null,
+      grupoEquivalenciaId: podeVisualizarGruposAlternativos && tipoEscopo === 'setor' && formData.pontoAtendimentoId && formData.tipoReuniaoId ? formData.grupoEquivalenciaId || null : null,
       observacoes: formData.observacoes || null,
       inicioEm: parseDatetimeLocal(formData.inicioEm as string),
       fimEm: parseDatetimeLocal(formData.fimEm as string),
     }
 
+    // O campo oculto não pode apagar um agrupamento existente em eventos editados.
+    const payloadValidacao = podeVisualizarGruposAlternativos
+      ? payload
+      : Object.fromEntries(Object.entries(payload).filter(([campo]) => campo !== 'grupoEquivalenciaId'))
+
     try {
       const parsed = eventoEditandoId 
-        ? EventoUpdate.safeParse(payload) 
-        : EventoCreate.safeParse(payload)
+        ? EventoUpdate.safeParse(payloadValidacao) 
+        : EventoCreate.safeParse(payloadValidacao)
 
       if (!parsed.success) {
         const errors: any = {}
@@ -1671,7 +1676,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                               </select>
                             </div>
                           )}
-                          {tipoEscopo === 'setor' && formData.pontoAtendimentoId && formData.tipoReuniaoId && (
+                          {podeVisualizarGruposAlternativos && tipoEscopo === 'setor' && formData.pontoAtendimentoId && formData.tipoReuniaoId && (
                             <div className="mt-3 space-y-2">
                               <label htmlFor="grupoEquivalenciaId" className="block text-xs font-medium text-slate-700">Grupo de reuniões alternativas (opcional)</label>
                               <input id="grupoEquivalenciaId" value={formData.grupoEquivalenciaId || ''} onChange={e => setFormData({ ...formData, grupoEquivalenciaId: e.target.value.trim() || null })} placeholder="UUID compartilhado entre reuniões" className="w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-sm" />
