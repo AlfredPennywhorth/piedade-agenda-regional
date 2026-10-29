@@ -985,6 +985,7 @@ export interface CapacidadesMembro {
   podeAdministrarAcessos: boolean
   podeGerenciarSessoes: boolean
   podeAdministrarRegionais: boolean
+  podeAutorizarExcecaoIntersetorial: boolean
   podeAdministrarEstrutura: boolean
   podeAdministrarPessoas: boolean
   podeAdministrarFuncoes: boolean
@@ -1004,6 +1005,7 @@ export async function obterCapacidadesMembro(
       podeAdministrarAcessos: false,
       podeGerenciarSessoes: false,
       podeAdministrarRegionais: false,
+      podeAutorizarExcecaoIntersetorial: false,
       podeAdministrarEstrutura: false,
       podeAdministrarPessoas: false,
       podeAdministrarFuncoes: false,
