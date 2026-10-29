@@ -8,6 +8,7 @@ import { authMiddleware } from '../middleware/auth'
 import { eMasterSistema, podeGerenciarAgendaNoEscopo, regionaisAdministradas } from '../security/permissoes'
 import { podeGerenciarEvento } from '../security/eventos'
 import { criarAuditQuery, executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
+import { validarClassificacaoEvento } from '../services/validacao-classificacao-evento'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
 export const seriesRecorrenciaRouter = new Hono<any>()
@@ -584,6 +585,8 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
 
       const mergedEvent = { ...existingEvent, ...parsed.changes }
       EventoCreate.parse(mergedEvent) // Valida regras S04
+      const erroClassificacao = await validarClassificacaoEvento(db, mergedEvent, existingEvent)
+      if (erroClassificacao) return c.json(erroClassificacao, 400)
       const alteracaoMaterial = houveAlteracaoMaterialOcorrencia(existingEvent, mergedEvent)
       const agendaAviso = alteracaoMaterial
         ? await criarAvisoAlteracaoOcorrencia(db, existingEvent, mergedEvent)
