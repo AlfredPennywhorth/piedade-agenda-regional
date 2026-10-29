@@ -102,7 +102,7 @@ describe('QA-AUTH-01 — matriz de capacidades por perfil técnico', () => {
         podeGerenciarSessoes: false,
         podeAdministrarRegionais: false,
         podeAutorizarExcecaoIntersetorial: false,
-        podeVisualizarGruposAlternativos: false,
+        podeVisualizarGruposAlternativos: true,
         podeAdministrarEstrutura: false,
         podeAdministrarPessoas: false,
         podeAdministrarFuncoes: false,
