@@ -265,6 +265,17 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose, returnFocusRef }
             </div>
           )}
         </div>
+        <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-slate-600">As funções são salvas ao adicionar ou remover. Ao concluir, você retorna à gestão da convocação para revisar e publicar o rascunho.</p>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading || salvando}
+            className="w-full shrink-0 rounded-lg bg-brand-900 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-50 sm:w-auto"
+          >
+            Concluir e continuar
+          </button>
+        </div>
       </div>
     </div>
   )
