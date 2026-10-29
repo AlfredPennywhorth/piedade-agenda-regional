@@ -882,6 +882,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
       fimEm: parseDatetimeLocal(formData.fimEm as string),
     }
 
+    // O campo oculto não pode apagar um agrupamento existente em eventos editados.
+    if (!podeVisualizarGruposAlternativos) delete payload.grupoEquivalenciaId
+
     try {
       const parsed = eventoEditandoId 
         ? EventoUpdate.safeParse(payload) 
