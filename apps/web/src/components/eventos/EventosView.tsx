@@ -11,6 +11,9 @@ import type { Regional } from '../regionais/RegionaisView'
 import type { GrupoTrabalho } from '../grupos-trabalho/GruposTrabalhoView'
 import type { Membro } from '../membros/MembrosView'
 
+interface PontoAtendimentoOpcao { id: string; nome: string; setorId: string; ativo: boolean }
+interface TipoReuniaoOpcao { id: string; nome: string; ativo: boolean }
+
 interface ParticipanteExterno {
   eventoId: string
   membroId: string
@@ -57,6 +60,9 @@ interface SerieResponse {
   regionalId: string | null
   administracaoId: string | null
   setorId: string | null
+  pontoAtendimentoId?: string | null
+  tipoReuniaoId?: string | null
+  grupoEquivalenciaId?: string | null
   casaId: string | null
   grupoTrabalhoId: string | null
   observacoes: string | null
@@ -90,6 +96,9 @@ export interface Evento {
   regionalId: string | null
   administracaoId: string | null
   setorId: string | null
+  pontoAtendimentoId?: string | null
+  tipoReuniaoId?: string | null
+  grupoEquivalenciaId?: string | null
   casaId: string | null
   grupoTrabalhoId: string | null
   filtroRegionalId?: string | null
@@ -127,6 +136,8 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   const [administracoes, setAdministracoes] = useState<Administracao[]>([])
   const [setores, setSetores] = useState<Setor[]>([])
   const [casas, setCasas] = useState<Casa[]>([])
+  const [pontosAtendimento, setPontosAtendimento] = useState<PontoAtendimentoOpcao[]>([])
+  const [tiposReuniao, setTiposReuniao] = useState<TipoReuniaoOpcao[]>([])
   const [gruposTrabalho, setGruposTrabalho] = useState<GrupoTrabalho[]>([])
 
   const [loading, setLoading] = useState<boolean>(true)
@@ -140,6 +151,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
   const [eventoEditandoSerieId, setEventoEditandoSerieId] = useState<string | null>(null)
   const [carregandoDetalhes, setCarregandoDetalhes] = useState<boolean>(false)
   const [salvando, setSalvando] = useState<boolean>(false)
+  const envioEventoEmAndamento = useRef(false)
   const [escolhaSerieAberto, setEscolhaSerieAberto] = useState<Evento | null>(null)
   const [confirmacaoThisAberto, setConfirmacaoThisAberto] = useState<EventoUpdateInput | null>(null)
   const [confirmacaoFutureAberto, setConfirmacaoFutureAberto] = useState<SerieCreateInput | null>(null)
@@ -187,6 +199,8 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
     setorId: '',
     casaId: '',
     grupoTrabalhoId: '',
+    pontoAtendimentoId: null,
+    tipoReuniaoId: null,
     observacoes: '',
     ativo: true,
   })
@@ -327,6 +341,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       setSetores(setoresData || [])
       setCasas(casasData || [])
       setGruposTrabalho(gruposData || [])
+      void Promise.all([fetchWithAuth<PontoAtendimentoOpcao[]>('/pontos-atendimento'), fetchWithAuth<TipoReuniaoOpcao[]>('/tipos-reuniao')])
+        .then(([pontos, tipos]) => { setPontosAtendimento(pontos); setTiposReuniao(tipos) })
+        .catch(() => { setPontosAtendimento([]); setTiposReuniao([]) })
     } catch (err: any) {
       if (seq === pessoaConsultaSeq.current) setErro(err.message || 'Erro ao carregar os dados.')
     } finally {
@@ -500,6 +517,8 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       setorId: '',
       casaId: '',
       grupoTrabalhoId: '',
+      pontoAtendimentoId: null,
+      grupoEquivalenciaId: null,
       localId: (externo || (!(tipo === 'casa' || externo) && !!locais.find(local => local.id === prev.localId)?.proprietarioMembroId)) ? '' : prev.localId,
       espacoId: (externo || (!(tipo === 'casa' || externo) && !!locais.find(local => local.id === prev.localId)?.proprietarioMembroId)) ? '' : prev.espacoId,
     }))
@@ -552,6 +571,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       setorId: '',
       casaId: '',
       grupoTrabalhoId: '',
+      pontoAtendimentoId: null,
+      tipoReuniaoId: null,
+      grupoEquivalenciaId: null,
       observacoes: '',
       ativo: true,
     })
@@ -748,6 +770,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         regionalId: item.regionalId || '',
         administracaoId: item.administracaoId || '',
         setorId: item.setorId || '',
+        pontoAtendimentoId: item.pontoAtendimentoId ?? null,
+        tipoReuniaoId: item.tipoReuniaoId ?? null,
+        grupoEquivalenciaId: item.grupoEquivalenciaId ?? null,
         casaId: item.casaId || '',
         grupoTrabalhoId: item.grupoTrabalhoId || '',
         observacoes: item.observacoes || '',
@@ -829,6 +854,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (envioEventoEmAndamento.current) return
     setErrosForm({})
     
     const payload = {
@@ -848,6 +874,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       setorId: formData.setorId || null,
       casaId: formData.casaId || null,
       grupoTrabalhoId: formData.grupoTrabalhoId || null,
+      pontoAtendimentoId: tipoEscopo === 'setor' ? formData.pontoAtendimentoId || null : null,
+      tipoReuniaoId: formData.pessoal ? null : formData.tipoReuniaoId || null,
+      grupoEquivalenciaId: tipoEscopo === 'setor' && formData.pontoAtendimentoId && formData.tipoReuniaoId ? formData.grupoEquivalenciaId || null : null,
       observacoes: formData.observacoes || null,
       inicioEm: parseDatetimeLocal(formData.inicioEm as string),
       fimEm: parseDatetimeLocal(formData.fimEm as string),
@@ -869,6 +898,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         return
       }
 
+      envioEventoEmAndamento.current = true
       setSalvando(true)
 
       // Ensure that for PATCH, fields that are not relevant (like localId for ONLINE) are explicitly null
@@ -909,7 +939,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
       }
 
       fecharFormularioEvento()
-      carregarDados()
+      await carregarDados()
     } catch (err: any) {
       if (err instanceof ApiError && err.body?.error) {
         setErro(typeof err.body.error === 'string' ? err.body.error : 'Dados inválidos')
@@ -917,6 +947,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
         setErro(err.message || 'Erro ao salvar evento.')
       }
     } finally {
+      envioEventoEmAndamento.current = false
       setSalvando(false)
     }
   }
@@ -1520,6 +1551,12 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                 </div>
               ) : (
                 <>
+                  {!formData.pessoal && <label className="block text-sm font-medium text-slate-700">Tipo de Reunião
+                    <select value={formData.tipoReuniaoId || ''} onChange={e => setFormData({ ...formData, tipoReuniaoId: e.target.value || null })} className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5">
+                      <option value="">Sem tipo padronizado</option>
+                      {tiposReuniao.filter(t => t.ativo || t.id === formData.tipoReuniaoId).map(t => <option key={t.id} value={t.id}>{t.nome}{t.ativo ? '' : ' (inativo)'}</option>)}
+                    </select>
+                  </label>}
                   <div className="space-y-4">
                     <div>
                       <label htmlFor="titulo" className="block text-sm font-medium text-slate-700 mb-1">Título *</label>
@@ -1617,13 +1654,31 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado }: { onEvent
                               <select
                                 id="setorId"
                                 value={formData.setorId || ''}
-                                onChange={e => setFormData({ ...formData, setorId: e.target.value })}
+                                onChange={e => setFormData({ ...formData, setorId: e.target.value, pontoAtendimentoId: null, grupoEquivalenciaId: null })}
                                 className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                               >
                                 <option value="">Selecione...</option>
                                 {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
                               </select>
                             </>
+                          )}
+                          {tipoEscopo === 'setor' && formData.setorId && (
+                            <div className="mt-3">
+                              <label htmlFor="pontoAtendimentoId" className="mb-1 block text-xs font-medium text-slate-700">Ponto de Atendimento</label>
+                              <select id="pontoAtendimentoId" value={formData.pontoAtendimentoId || ''} onChange={e => setFormData({ ...formData, pontoAtendimentoId: e.target.value || null, grupoEquivalenciaId: null })} className="w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-sm">
+                                <option value="">Reunião de todo o Setor (sem Ponto)</option>
+                                {pontosAtendimento.filter(p => p.setorId === formData.setorId && (p.ativo || p.id === formData.pontoAtendimentoId)).map(p => <option key={p.id} value={p.id}>{p.nome}{p.ativo ? '' : ' (inativo)'}</option>)}
+                              </select>
+                            </div>
+                          )}
+                          {tipoEscopo === 'setor' && formData.pontoAtendimentoId && formData.tipoReuniaoId && (
+                            <div className="mt-3 space-y-2">
+                              <label htmlFor="grupoEquivalenciaId" className="block text-xs font-medium text-slate-700">Grupo de reuniões alternativas (opcional)</label>
+                              <input id="grupoEquivalenciaId" value={formData.grupoEquivalenciaId || ''} onChange={e => setFormData({ ...formData, grupoEquivalenciaId: e.target.value.trim() || null })} placeholder="UUID compartilhado entre reuniões" className="w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-sm" />
+                              <button type="button" onClick={() => setFormData(prev => ({ ...prev, grupoEquivalenciaId: crypto.randomUUID() }))} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium">Criar novo grupo</button>
+                              <p className="text-xs text-slate-600">Use o mesmo identificador em reuniões equivalentes de Pontos diferentes do mesmo Setor e Tipo.</p>
+                              {errosForm.grupoEquivalenciaId && <p role="alert" className="text-xs text-red-700">{errosForm.grupoEquivalenciaId}</p>}
+                            </div>
                           )}
                           {tipoEscopo === 'casa' && (
                             <div className="space-y-2">

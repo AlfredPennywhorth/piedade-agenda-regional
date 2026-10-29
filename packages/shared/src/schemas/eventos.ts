@@ -49,6 +49,9 @@ export const baseEvento = {
   regionalId: z.string().uuid('Regional ID inválido').nullable().optional(),
   administracaoId: z.string().uuid('Administração ID inválida').nullable().optional(),
   setorId: z.string().uuid('Setor ID inválido').nullable().optional(),
+  pontoAtendimentoId: z.string().uuid('Ponto de Atendimento inválido').nullable().optional(),
+  tipoReuniaoId: z.string().uuid('Tipo de Reunião inválido').nullable().optional(),
+  grupoEquivalenciaId: z.string().uuid('Grupo de equivalência inválido').nullable().optional(),
   casaId: z.string().uuid('Casa ID inválida').nullable().optional(),
   grupoTrabalhoId: z.string().uuid('GT ID inválido').nullable().optional(),
 
@@ -65,6 +68,15 @@ const eventoSuperRefine = (data: any, ctx: z.RefinementCtx) => {
   const abrangencia = data.abrangencia ?? 'TERRITORIAL'
   const externo = abrangencia === 'NACIONAL' || abrangencia === 'INTERNACIONAL'
 
+  if (data.pontoAtendimentoId && (externo || data.pessoal || !data.setorId || data.casaId || data.regionalId || data.administracaoId || data.grupoTrabalhoId)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Ponto de Atendimento exige evento territorial institucional com escopo Setor', path: ['pontoAtendimentoId'] })
+  }
+  if (data.grupoEquivalenciaId && (!data.pontoAtendimentoId || !data.tipoReuniaoId || data.pessoal || externo)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Alternativas exigem Ponto e Tipo de Reunião institucionais', path: ['grupoEquivalenciaId'] })
+  }
+  if (data.tipoReuniaoId && data.pessoal) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Tipos padronizados são para eventos institucionais', path: ['tipoReuniaoId'] })
+  }
   if (data.pessoal && !externo && !data.casaId) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Evento Próprio territorial exige escopo Casa de Oração', path: ['pessoal'] })
   }

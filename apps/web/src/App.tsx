@@ -12,6 +12,8 @@ import { RegionaisView } from './components/regionais/RegionaisView'
 import { AdministracoesView } from './components/administracoes/AdministracoesView'
 import { SetoresView } from './components/setores/SetoresView'
 import { CasasView } from './components/casas/CasasView'
+import { PontosAtendimentoView } from './components/pontos-atendimento/PontosAtendimentoView'
+import { TiposReuniaoView } from './components/tipos-reuniao/TiposReuniaoView'
 import { GruposTrabalhoView } from './components/grupos-trabalho/GruposTrabalhoView'
 import { MembrosView } from './components/membros/MembrosView'
 import { FuncoesView } from './components/funcoes/FuncoesView'
@@ -45,7 +47,7 @@ function App() {
     ? decodeURIComponent(window.location.pathname.slice(3))
     : paramsPublicos.get('op')
 
-  const [currentTab, setCurrentTab] = useState<'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes' | 'acessos'>('agenda')
+  const [currentTab, setCurrentTab] = useState<'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'pontos-atendimento' | 'tipos-reuniao' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes' | 'acessos'>('agenda')
   const [fluxoEventoId, setFluxoEventoId] = useState<string | null>(null)
   const [capacidades, setCapacidades] = useState<CapacidadesFrontend>({})
   const [nomeUsuario, setNomeUsuario] = useState('')
@@ -115,7 +117,7 @@ function App() {
     if (tab === 'relatorios') return capacidades.podeVisualizarRelatorios === true
     if (tab === 'auditoria') return capacidades.podeVisualizarAuditoria === true
     if (tab === 'acessos') return capacidades.podeAdministrarAcessos === true
-    if (['regionais', 'administracoes', 'setores', 'casas', 'grupos-trabalho'].includes(tab)) {
+    if (['regionais', 'administracoes', 'setores', 'pontos-atendimento', 'tipos-reuniao', 'casas', 'grupos-trabalho'].includes(tab)) {
       return capacidades.podeAdministrarEstrutura === true
     }
     if (['membros', 'vinculos-funcionais'].includes(tab)) {
@@ -239,6 +241,8 @@ function App() {
       )}
       {currentTab === 'administracoes' && capacidades.podeAdministrarEstrutura === true && <AdministracoesView />}
       {currentTab === 'setores' && capacidades.podeAdministrarEstrutura === true && <SetoresView />}
+      {currentTab === 'pontos-atendimento' && capacidades.podeAdministrarEstrutura === true && <PontosAtendimentoView />}
+      {currentTab === 'tipos-reuniao' && capacidades.podeAdministrarEstrutura === true && <TiposReuniaoView />}
       {currentTab === 'casas' && capacidades.podeAdministrarEstrutura === true && <CasasView />}
       {currentTab === 'grupos-trabalho' && capacidades.podeAdministrarEstrutura === true && <GruposTrabalhoView />}
       {currentTab === 'membros' && capacidades.podeAdministrarPessoas === true && <MembrosView />}

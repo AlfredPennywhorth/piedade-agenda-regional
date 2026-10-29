@@ -1,0 +1,115 @@
+import { Hono } from 'hono'
+import { eq, inArray } from 'drizzle-orm'
+import { z } from '@piedade/shared'
+import { pontosAtendimento, tiposReuniao, casas, setores } from '../db/schema'
+import { authMiddleware } from '../middleware/auth'
+import { eMasterSistema, obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo } from '../security/permissoes'
+
+export const pontosAtendimentoRouter = new Hono<any>()
+export const tiposReuniaoRouter = new Hono<any>()
+pontosAtendimentoRouter.use('*', authMiddleware)
+tiposReuniaoRouter.use('*', authMiddleware)
+
+const pontoInput = z.object({
+  nome: z.string().trim().min(2).max(255),
+  setorId: z.string().uuid(),
+  codigo: z.string().trim().max(60).nullable().optional(),
+})
+const tipoInput = z.object({
+  nome: z.string().trim().min(2).max(255),
+  codigo: z.string().trim().min(2).max(60).regex(/^[A-Z0-9_-]+$/),
+})
+const corpoAtivo = z.object({ ativo: z.boolean() })
+
+pontosAtendimentoRouter.get('/', async c => {
+  const db = c.get('db')
+  const visible = await obterEscoposTerritoriaisVisiveis(db, c.get('contextoPermissoes'))
+  const setorId = c.req.query('setorId')
+  if (setorId && !visible.tudo && !visible.setoresIds.has(setorId)) return c.json([], 200)
+  const ids = setorId ? [setorId] : [...visible.setoresIds]
+  if (!visible.tudo && ids.length === 0) return c.json([])
+  // Limite de binds D1. Evita IN massivo.
+  const result: Array<typeof pontosAtendimento.$inferSelect> = []
+  if (visible.tudo && !setorId) result.push(...await db.select().from(pontosAtendimento).all())
+  else for (let i = 0; i < ids.length; i += 80) {
+    result.push(...await db.select().from(pontosAtendimento).where(inArray(pontosAtendimento.setorId, ids.slice(i, i + 80))).all())
+  }
+  return c.json(result.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR') || a.id.localeCompare(b.id)))
+})
+
+pontosAtendimentoRouter.post('/', async c => {
+  const parsed = pontoInput.safeParse(await c.req.json())
+  if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
+  const db = c.get('db')
+  const { nome, setorId, codigo } = parsed.data
+  if (!(await podeAdministrarEscopo(db, c.get('contextoPermissoes'), 'SETOR', setorId))) return c.json({ error: 'Acesso negado' }, 403)
+  const setor = await db.select({ id: setores.id }).from(setores).where(eq(setores.id, setorId)).get()
+  if (!setor) return c.json({ error: 'Setor inexistente' }, 400)
+  const id = crypto.randomUUID()
+  try {
+    await db.insert(pontosAtendimento).values({ id, setorId, nome, codigo: codigo ?? null })
+  } catch {
+    return c.json({ error: 'Ponto duplicado ou inválido' }, 409)
+  }
+  return c.json(await db.select().from(pontosAtendimento).where(eq(pontosAtendimento.id, id)).get(), 201)
+})
+
+pontosAtendimentoRouter.patch('/:id', async c => {
+  const db = c.get('db')
+  const existing = await db.select().from(pontosAtendimento).where(eq(pontosAtendimento.id, c.req.param('id'))).get()
+  if (!existing) return c.json({ error: 'Ponto não encontrado' }, 404)
+  const parsed = pontoInput.partial().extend({ ativo: z.boolean().optional() }).safeParse(await c.req.json())
+  if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
+  const setorFinal = parsed.data.setorId ?? existing.setorId
+  if (!(await podeAdministrarEscopo(db, c.get('contextoPermissoes'), 'SETOR', existing.setorId)) ||
+      !(await podeAdministrarEscopo(db, c.get('contextoPermissoes'), 'SETOR', setorFinal))) return c.json({ error: 'Acesso negado' }, 403)
+  try {
+    await db.update(pontosAtendimento).set({ ...parsed.data, updatedAt: new Date().toISOString() }).where(eq(pontosAtendimento.id, existing.id))
+  } catch {
+    return c.json({ error: 'Alteração incompatível com Casas vinculadas ou nome duplicado' }, 409)
+  }
+  return c.json(await db.select().from(pontosAtendimento).where(eq(pontosAtendimento.id, existing.id)).get())
+})
+
+// Vincula a Casa sem alterar seu setor. Restrição entre setores também existe no D1.
+pontosAtendimentoRouter.patch('/:id/casas/:casaId', async c => {
+  const db = c.get('db')
+  const ponto = await db.select().from(pontosAtendimento).where(eq(pontosAtendimento.id, c.req.param('id'))).get()
+  const casa = await db.select().from(casas).where(eq(casas.id, c.req.param('casaId'))).get()
+  if (!ponto || !casa) return c.json({ error: 'Ponto ou Casa não encontrado' }, 404)
+  if (ponto.setorId !== casa.setorId) return c.json({ error: 'Casa pertence a outro Setor' }, 400)
+  if (!(await podeAdministrarEscopo(db, c.get('contextoPermissoes'), 'SETOR', ponto.setorId))) return c.json({ error: 'Acesso negado' }, 403)
+  if (!ponto.ativo) return c.json({ error: 'Ponto inativo' }, 409)
+  await db.update(casas).set({ pontoAtendimentoId: ponto.id, updatedAt: new Date().toISOString() }).where(eq(casas.id, casa.id))
+  return c.json({ ok: true })
+})
+
+tiposReuniaoRouter.get('/', async c => {
+  const db = c.get('db')
+  const data = await db.select().from(tiposReuniao).all()
+  return c.json(data.sort((a: typeof tiposReuniao.$inferSelect, b: typeof tiposReuniao.$inferSelect) => a.nome.localeCompare(b.nome, 'pt-BR')))
+})
+
+tiposReuniaoRouter.post('/', async c => {
+  if (!eMasterSistema(c.get('contextoPermissoes'))) return c.json({ error: 'Acesso negado' }, 403)
+  const parsed = tipoInput.safeParse(await c.req.json())
+  if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
+  const db = c.get('db')
+  const id = crypto.randomUUID()
+  try { await db.insert(tiposReuniao).values({ id, ...parsed.data }) }
+  catch { return c.json({ error: 'Tipo duplicado' }, 409) }
+  return c.json(await db.select().from(tiposReuniao).where(eq(tiposReuniao.id, id)).get(), 201)
+})
+
+tiposReuniaoRouter.patch('/:id', async c => {
+  if (!eMasterSistema(c.get('contextoPermissoes'))) return c.json({ error: 'Acesso negado' }, 403)
+  const parsed = tipoInput.partial().merge(corpoAtivo.partial()).safeParse(await c.req.json())
+  if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
+  const db = c.get('db')
+  const id = c.req.param('id')
+  const existing = await db.select().from(tiposReuniao).where(eq(tiposReuniao.id, id)).get()
+  if (!existing) return c.json({ error: 'Tipo não encontrado' }, 404)
+  try { await db.update(tiposReuniao).set({ ...parsed.data, updatedAt: new Date().toISOString() }).where(eq(tiposReuniao.id, id)) }
+  catch { return c.json({ error: 'Tipo duplicado ou inválido' }, 409) }
+  return c.json(await db.select().from(tiposReuniao).where(eq(tiposReuniao.id, id)).get())
+})

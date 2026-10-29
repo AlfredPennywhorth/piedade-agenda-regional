@@ -242,7 +242,16 @@ convocacoesRouter.patch('/:id', async c => {
           .update(convocacoes)
           .set({
             status:
-              sql`CASE WHEN ${convocacoes.updatedAt} = ${nowIso} THEN ${convocacoes.status} ELSE 'ABORT_OCC' END` as any,
+              sql`CASE WHEN ${convocacoes.updatedAt} = ${nowIso}
+                 AND EXISTS (SELECT 1 FROM ${eventos}
+                   WHERE ${eventos.id} = ${convocacao.eventoId}
+                     AND ${eventos.pontoAtendimentoId} IS ${evento.pontoAtendimentoId ?? null}
+                     AND ${eventos.setorId} IS ${evento.setorId ?? null}
+                     AND ${eventos.casaId} IS ${evento.casaId ?? null}
+                     AND ${eventos.administracaoId} IS ${evento.administracaoId ?? null}
+                     AND ${eventos.regionalId} IS ${evento.regionalId ?? null}
+                     AND ${eventos.grupoTrabalhoId} IS ${evento.grupoTrabalhoId ?? null})
+                THEN ${convocacoes.status} ELSE 'ABORT_OCC' END` as any,
           })
           .where(eq(convocacoes.id, id)),
       ])
@@ -438,6 +447,13 @@ convocacoesRouter.post('/:id/publicar', async c => {
     eq(membros.ativo, true),
     inArray(vinculosFuncionais.funcaoId, funcaoIds),
   ]
+  // PA restringe o público às Casas vinculadas, inclusive para vínculos funcionais de Setor.
+  // Sem PA, preserva integralmente o comportamento territorial existente.
+  if (evento.pontoAtendimentoId) {
+    const casasDoPonto = db.select({ id: casas.id }).from(casas)
+      .where(and(eq(casas.pontoAtendimentoId, evento.pontoAtendimentoId), eq(casas.ativo, true)))
+    conditions.push(inArray(membros.casaId, casasDoPonto))
+  }
   const vinculoDco = and(eq(funcoes.codigo, 'DCO'), eq(vinculosFuncionais.casaId, membros.casaId))
   if (evento.casaId) {
     const casasAtivas = db.select({ id: casas.id }).from(casas).where(eq(casas.ativo, true))
@@ -588,7 +604,11 @@ convocacoesRouter.post('/:id/publicar', async c => {
           .update(convocacoes)
           .set({
             status:
-              sql`CASE WHEN ${convocacoes.updatedAt} = ${nowIso} THEN ${convocacoes.status} ELSE 'ABORT_OCC' END` as any,
+              sql`CASE WHEN ${convocacoes.updatedAt} = ${nowIso}
+              AND EXISTS (SELECT 1 FROM ${eventos} WHERE ${eventos.id} = ${convocacoes.eventoId}
+                AND ${eventos.pontoAtendimentoId} IS ${evento.pontoAtendimentoId ?? null}
+                AND ${eventos.setorId} IS ${evento.setorId ?? null})
+              THEN ${convocacoes.status} ELSE 'ABORT_OCC' END` as any,
           })
           .where(eq(convocacoes.id, id))
       )
@@ -651,6 +671,7 @@ convocacoesRouter.post('/:id/sincronizar-dco', async c => {
               AND ${eventos.regionalId} IS ${evento.regionalId ?? null}
               AND ${eventos.administracaoId} IS ${evento.administracaoId ?? null}
               AND ${eventos.setorId} IS ${evento.setorId ?? null}
+              AND ${eventos.pontoAtendimentoId} IS ${evento.pontoAtendimentoId ?? null}
               AND ${eventos.casaId} IS ${evento.casaId ?? null}
               AND ${eventos.grupoTrabalhoId} IS ${evento.grupoTrabalhoId ?? null})
             AND EXISTS (SELECT 1 FROM ${convocacaoFuncoes}

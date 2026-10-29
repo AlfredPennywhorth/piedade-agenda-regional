@@ -731,6 +731,58 @@ describe('S07 - Minha Agenda', () => {
     expect(itemDepois.rsvp.reconfirmacaoPendente).toBe(false)
   })
 
+  it('PA-03: alternativas de Pontos distintos não conflitam, mas assuntos diferentes sim', async () => {
+    const paA = crypto.randomUUID()
+    const paB = crypto.randomUUID()
+    const tipo = crypto.randomUUID()
+    const grupo = crypto.randomUUID()
+    const outroGrupo = crypto.randomUUID()
+    const salaA = 'ev-pa-agenda-a'
+    const salaB = 'ev-pa-agenda-b'
+    const distinto = 'ev-pa-agenda-distinto'
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)')
+      .run(paA, 'set-1', 'Ponto Agenda A')
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)')
+      .run(paB, 'set-1', 'Ponto Agenda B')
+    sqlite.prepare('INSERT INTO tipos_reuniao (id, nome, codigo) VALUES (?, ?, ?)')
+      .run(tipo, 'Tipo Agenda PA', 'TIPO-AGENDA-PA03')
+    for (const [id, ponto, grupoId] of [
+      [salaA, paA, grupo],
+      [salaB, paB, grupo],
+      [distinto, paB, outroGrupo],
+    ]) {
+      sqlite.prepare(`INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, setor_id, ponto_atendimento_id, tipo_reuniao_id, grupo_equivalencia_id, ativo)
+        VALUES (?, ?, 'ONLINE', '2032-03-02T10:00:00Z', '2032-03-02T11:00:00Z', 'set-1', ?, ?, ?, 1)`)
+        .run(id, id, ponto, tipo, grupoId)
+      sqlite.prepare("INSERT INTO convocacoes (id, evento_id, status, ativo) VALUES (?, ?, 'PUBLICADA', 1)")
+        .run(`conv-${id}`, id)
+      sqlite.prepare('INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES (?, ?, ?)')
+        .run(`dest-${id}`, `conv-${id}`, membroId)
+    }
+    const carregarAgenda = async () => {
+      const res = await req('/api/v1/minha-agenda', {
+        headers: { Authorization: `Bearer ${sessionToken}` },
+      })
+      expect(res.status).toBe(200)
+      return await res.json() as Array<{ evento: { id: string }; conflito: { eventos: Array<{ eventoId: string }> } | null }>
+    }
+    const agenda = await carregarAgenda()
+    const a = agenda.find(item => item.evento.id === salaA)!
+    const b = agenda.find(item => item.evento.id === salaB)!
+    expect(a.conflito?.eventos.some(item => item.eventoId === salaB)).toBeFalsy()
+    expect(b.conflito?.eventos.some(item => item.eventoId === salaA)).toBeFalsy()
+    expect(a.conflito?.eventos.some(item => item.eventoId === distinto)).toBe(true)
+    expect(b.conflito?.eventos.some(item => item.eventoId === distinto)).toBe(true)
+
+    sqlite.prepare(`INSERT INTO rsvp (id, convocacao_destinatario_id, resposta, respondido_em, atualizado_em)
+      VALUES (?, ?, 'NAO_PARTICIPAREI', '2030-01-01T00:00:00Z', '2030-01-01T00:00:00Z')`)
+      .run('rsvp-pa-agenda-distinto', `dest-${distinto}`)
+    const aposRecusa = await carregarAgenda()
+    expect(aposRecusa.find(item => item.evento.id === salaA)?.conflito).toBeNull()
+    expect(aposRecusa.find(item => item.evento.id === salaB)?.conflito).toBeNull()
+  })
+
   it('EXT-05 Evento Próprio externo entra na agenda e conflita com compromisso local', async () => {
     sqlite.exec(`
       INSERT INTO eventos (

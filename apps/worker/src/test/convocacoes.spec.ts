@@ -7,6 +7,7 @@ import {
   regionais,
   administracoes,
   setores,
+  pontosAtendimento,
   casas,
   gruposTrabalho,
   membros,
@@ -565,6 +566,59 @@ describe('S06 - Convocações', () => {
       .toMatchObject({ setor_id: outroSetorId })
   })
 
+  it('PA-01: publicação e sincronização DCO não alcançam Casas de outro Ponto do mesmo Setor', async () => {
+    const ctx = await setupBaseData()
+    const pontoA = crypto.randomUUID()
+    const pontoB = crypto.randomUUID()
+    await db.insert(pontosAtendimento).values([
+      { id: pontoA, nome: 'Ponto A', setorId: ctx.setId },
+      { id: pontoB, nome: 'Ponto B', setorId: ctx.setId },
+    ])
+    await db.update(casas).set({ pontoAtendimentoId: pontoA }).where(eq(casas.id, ctx.casId))
+    await db.update(casas).set({ pontoAtendimentoId: pontoB }).where(eq(casas.id, ctx.cas2Id))
+    const dco = await db.select().from(funcoes).where(eq(funcoes.codigo, 'DCO')).get()
+    const criarDco = async (casaId: string, nome: string) => {
+      const id = crypto.randomUUID()
+      await db.insert(membros).values({ id, nome, casaId, ativo: true })
+      await db.insert(vinculosFuncionais).values({
+        id: crypto.randomUUID(), membroId: id, funcaoId: dco!.id, casaId, ativo: true,
+      })
+      return id
+    }
+    const dentro = await criarDco(ctx.casId, 'DCO Ponto A')
+    const fora = await criarDco(ctx.cas2Id, 'DCO Ponto B')
+    const eventoId = crypto.randomUUID()
+    await db.insert(eventos).values({
+      id: eventoId, titulo: 'Reunião no Ponto A', modalidade: 'ONLINE',
+      inicioEm: '2030-03-01T10:00:00.000Z', fimEm: '2030-03-01T11:00:00.000Z',
+      setorId: ctx.setId, pontoAtendimentoId: pontoA, ativo: true,
+    })
+    const criar = await app.request('/api/v1/convocacoes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId }),
+    })
+    expect(criar.status).toBe(201)
+    const { id } = await criar.json()
+    expect((await app.request(`/api/v1/convocacoes/${id}/funcoes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ funcaoId: dco!.id }),
+    })).status).toBe(201)
+    expect((await app.request(`/api/v1/convocacoes/${id}/publicar`, { method: 'POST' })).status).toBe(200)
+    const listaInicial = await (await app.request(`/api/v1/convocacoes/${id}/destinatarios`)).json() as Array<{ membroId: string }>
+    expect(listaInicial.some(item => item.membroId === dentro)).toBe(true)
+    expect(listaInicial.some(item => item.membroId === fora)).toBe(false)
+
+    const dentroNovo = await criarDco(ctx.casId, 'DCO Ponto A posterior')
+    const foraNovo = await criarDco(ctx.cas2Id, 'DCO Ponto B posterior')
+    for (let i = 0; i < 2; i++) {
+      expect((await app.request(`/api/v1/convocacoes/${id}/sincronizar-dco`, { method: 'POST' })).status).toBe(200)
+    }
+    const listaFinal = await (await app.request(`/api/v1/convocacoes/${id}/destinatarios`)).json() as Array<{ membroId: string }>
+    expect(listaFinal.filter(item => item.membroId === dentroNovo)).toHaveLength(1)
+    expect(listaFinal.some(item => item.membroId === foraNovo)).toBe(false)
+    expect(listaFinal.some(item => item.membroId === fora)).toBe(false)
+  })
+
   it('15bc. Recusa sincronização de convocação DCO encerrada sem auditoria', async () => {
     const ctx = await setupBaseData()
     const dco = await db.select().from(funcoes).where(eq(funcoes.codigo, 'DCO')).get()
@@ -967,6 +1021,48 @@ describe('S06 - Convocações', () => {
       )
       .get(conv.id) as any
     expect(countEvidencias.c).toBe(0)
+  })
+
+  it('PA-05: aborta publicacao se o Ponto mudar apos selecionar destinatarios', async () => {
+    const ctx = await setupBaseData()
+    const paA = crypto.randomUUID()
+    const paB = crypto.randomUUID()
+    await db.insert(pontosAtendimento).values([
+      { id: paA, nome: 'PA concorrencia A', setorId: ctx.setId },
+      { id: paB, nome: 'PA concorrencia B', setorId: ctx.setId },
+    ])
+    await db.update(eventos).set({ pontoAtendimentoId: paA }).where(eq(eventos.id, ctx.evSetorId))
+    const criado = await app.request('/api/v1/convocacoes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId: ctx.evSetorId }),
+    })
+    expect(criado.status).toBe(201)
+    const { id } = await criado.json()
+    expect((await app.request(`/api/v1/convocacoes/${id}/funcoes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ funcaoId: ctx.f1Id }),
+    })).status).toBe(201)
+    const originalTransaction = db.transaction.bind(db)
+    let interceptado = false
+    db.transaction = (...args: any[]) => {
+      if (!interceptado) {
+        interceptado = true
+        sqlite.prepare('UPDATE eventos SET ponto_atendimento_id = ? WHERE id = ?')
+          .run(paB, ctx.evSetorId)
+      }
+      return originalTransaction(...args)
+    }
+    try {
+      const resposta = await app.request(`/api/v1/convocacoes/${id}/publicar`, { method: 'POST' })
+      expect(resposta.status).toBe(409)
+      expect(interceptado).toBe(true)
+    } finally {
+      db.transaction = originalTransaction
+    }
+    expect(sqlite.prepare('SELECT status FROM convocacoes WHERE id = ?').get(id))
+      .toMatchObject({ status: 'RASCUNHO' })
+    expect(sqlite.prepare('SELECT COUNT(*) AS total FROM convocacao_destinatarios WHERE convocacao_id = ?')
+      .get(id)).toMatchObject({ total: 0 })
   })
 
   it('29. publicação autenticada registra o ator da sessão e ignora header forjado', async () => {

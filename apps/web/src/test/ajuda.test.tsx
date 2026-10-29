@@ -56,7 +56,7 @@ describe('Central de Ajuda', () => {
     const codigos = artigosAjuda.flatMap(a => a.codigos)
     expect(new Set(codigos).size).toBe(codigos.length)
     const oficiais = [
-      ...Array.from({ length: 59 }, (_, i) => `AGD-ADM-${String(i + 1).padStart(3, '0')}`),
+      ...Array.from({ length: 61 }, (_, i) => `AGD-ADM-${String(i + 1).padStart(3, '0')}`),
       ...Array.from({ length: 6 }, (_, i) => `AGD-MOB-${String(i + 1).padStart(3, '0')}`),
       ...Array.from({ length: 6 }, (_, i) => `AGD-SHR-${String(i + 1).padStart(3, '0')}`),
     ]
