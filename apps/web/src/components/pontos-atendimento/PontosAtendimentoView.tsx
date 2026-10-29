@@ -15,6 +15,7 @@ export function PontosAtendimentoView() {
   const [editando, setEditando] = useState<Ponto | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [transferindo, setTransferindo] = useState<string | null>(null)
+  const [excecaoCasa, setExcecaoCasa] = useState<Record<string, string>>({})
   const [erro, setErro] = useState('')
   const [aviso, setAviso] = useState('')
   const [carregando, setCarregando] = useState(true)
@@ -67,6 +68,26 @@ export function PontosAtendimentoView() {
       setAviso('Casa vinculada ao Ponto de Atendimento.')
     } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao vincular Casa') }
   }
+  // Exceções intersetoriais são autorizadas exclusivamente pela API Master,
+  // exigem justificativa e não alteram o Setor institucional da Casa.
+  const autorizarExcecao = async (ponto: Ponto) => {
+    const casaId = excecaoCasa[ponto.id]
+    const casa = casas.find(c => c.id === casaId)
+    if (!casa || !ponto.ativo || casa.pontoAtendimentoId || casa.setorId === ponto.setorId) return
+    const motivo = window.prompt('Justificativa para atendimento excepcional de ' + casa.nome + ' no Ponto ' + ponto.nome + ' (mínimo 5 caracteres):')
+    if (!motivo || motivo.trim().length < 5) return
+    const origem = setores.find(s => s.id === casa.setorId)?.nome || 'Setor de origem'
+    const destino = setores.find(s => s.id === ponto.setorId)?.nome || 'Setor do Ponto'
+    if (!window.confirm('Autorização excepcional (somente Master): ' + casa.nome + ' permanece no Setor ' + origem + ' e será atendida em ' + ponto.nome + ' (' + destino + '). Confirmar?')) return
+    setSalvando(true); setErro(''); setAviso('')
+    try {
+      await postWithAuth('/pontos-atendimento/excecoes-intersetoriais', { casaId, pontoAtendimentoId: ponto.id, motivo: motivo.trim() })
+      setExcecaoCasa(prev => ({ ...prev, [ponto.id]: '' }))
+      await carregar()
+      setAviso('Exceção intersetorial autorizada. A Casa permanece no Setor original. Revise convocações futuras já publicadas.')
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao autorizar exceção. Apenas o Master pode executar esta operação.') }
+    finally { setSalvando(false) }
+  }
   const desvincular = async (ponto: Ponto, casa: Casa) => {
     const motivo = window.prompt('Motivo da desvinculação de ' + casa.nome + ' (mínimo 5 caracteres):')
     if (!motivo || motivo.trim().length < 5) return
@@ -110,6 +131,7 @@ export function PontosAtendimentoView() {
     <div className="space-y-3">{pontos.filter(p => !filtro || p.setorId === filtro).map(p => {
       const vinculadas = casas.filter(c => c.pontoAtendimentoId === p.id)
       const disponiveis = casas.filter(c => c.setorId === p.setorId && !c.pontoAtendimentoId).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+      const excecoesDisponiveis = casas.filter(c => c.setorId !== p.setorId && !c.pontoAtendimentoId).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
       const ocupadasEmOutroPonto = casas.filter(c => c.setorId === p.setorId && c.pontoAtendimentoId && c.pontoAtendimentoId !== p.id)
       return <article key={p.id} className="space-y-3 rounded-xl border bg-white p-4">
         <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><h3 className="break-words font-semibold">{p.nome}</h3><p className="text-sm text-slate-600">Código: {p.codigo || '—'} · {setores.find(s => s.id === p.setorId)?.nome || 'Setor'} · {p.ativo ? 'Ativo' : 'Inativo'}</p></div><div className="flex gap-2"><button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => selecionar(p)}>Editar</button><button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => void alterarStatus(p)}>{p.ativo ? 'Inativar' : 'Ativar'}</button></div></div>
@@ -124,6 +146,17 @@ export function PontosAtendimentoView() {
         </div>)}
         {p.ativo && <p className="text-sm text-slate-600">Casas disponíveis para vínculo: {disponiveis.length}. Já vinculadas a outros Pontos: {ocupadasEmOutroPonto.length}. Casas já vinculadas a este Ponto aparecem acima e não podem ser selecionadas novamente.</p>}
         {p.ativo && <label className="block text-sm font-medium">Vincular Casa de Oração<select defaultValue="" key={p.id + '-' + vinculadas.length} onChange={e => void vincular(p, e.target.value)} className="mt-1 w-full rounded-lg border p-3"><option value="">{disponiveis.length ? 'Selecione uma Casa sem vínculo' : 'Nenhuma Casa disponível neste Setor'}</option>{disponiveis.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></label>}
+        {p.ativo && <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p className="text-sm font-semibold">Exceção intersetorial — somente Master</p>
+          <p className="text-xs text-slate-700">A Casa mantém seu Setor de origem e passa a ser atendida neste Ponto. Use apenas com autorização institucional e justificativa. Se a Casa já estiver vinculada a outro Ponto, desvincule-a primeiro.</p>
+          <label className="block text-sm font-medium">Casa de outro Setor sem vínculo
+            <select value={excecaoCasa[p.id] || ''} onChange={e => setExcecaoCasa(prev => ({ ...prev, [p.id]: e.target.value }))} className="mt-1 w-full rounded-lg border bg-white p-3">
+              <option value="">Selecione uma Casa de outro Setor</option>
+              {excecoesDisponiveis.map(c => <option key={c.id} value={c.id}>{c.nome} — {setores.find(s => s.id === c.setorId)?.nome || 'Setor não identificado'}</option>)}
+            </select>
+          </label>
+          <button type="button" disabled={salvando || !excecaoCasa[p.id]} onClick={() => void autorizarExcecao(p)} className="rounded-lg bg-brand-900 px-3 py-2 text-sm text-white disabled:opacity-40">Autorizar vínculo excepcional</button>
+        </div>}
       </article>
     })}</div>
   </section>
