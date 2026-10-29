@@ -1035,8 +1035,14 @@ describe('S06 - Convocações', () => {
     // Conceder administrador regional somente neste cenário de teste.
     const conta = sqlite.prepare('SELECT conta_acesso_id AS id FROM acessos_conta WHERE perfil_codigo=? AND escopo_id=? ORDER BY rowid DESC LIMIT 1')
       .get('GESTOR_AGENDA', ctx.setId) as { id: string }
-    sqlite.prepare("INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, 'ADMINISTRADOR_SISTEMA', 'REGIONAL', ?)")
-      .run(crypto.randomUUID(), conta.id, ctx.regId)
+    // Administrador regional exige ciência formal do PMO; usar MASTER no teste
+    // de sucesso e validar a negativa do GESTOR_AGENDA antes de concedê-lo.
+    const semPermissao = await app.request(`/api/v1/pontos-atendimento/${paA}/casas/${ctx.casId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    })
+    expect(semPermissao.status).toBe(403)
+    sqlite.prepare("INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, 'MASTER_SISTEMA', 'GLOBAL', NULL)")
+      .run(crypto.randomUUID(), conta.id)
     const vincular = (id: string, casaId: string) => app.request(
       `/api/v1/pontos-atendimento/${id}/casas/${casaId}`,
       { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' },
