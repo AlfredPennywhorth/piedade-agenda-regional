@@ -67,6 +67,18 @@ export function PontosAtendimentoView() {
       setAviso('Casa vinculada ao Ponto de Atendimento.')
     } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao vincular Casa') }
   }
+  const desvincular = async (ponto: Ponto, casa: Casa) => {
+    const motivo = window.prompt('Motivo da desvinculação de ' + casa.nome + ' (mínimo 5 caracteres):')
+    if (!motivo || motivo.trim().length < 5) return
+    if (!window.confirm('Desvincular ' + casa.nome + ' de ' + ponto.nome + '? Novas convocações não incluirão esta Casa até que seja vinculada novamente.')) return
+    setSalvando(true); setErro(''); setAviso('')
+    try {
+      await postWithAuth('/pontos-atendimento/' + ponto.id + '/casas/' + casa.id + '/desvincular', { motivo: motivo.trim() })
+      await carregar()
+      setAviso('Casa desvinculada. Revise as convocações futuras já publicadas.')
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao desvincular Casa') }
+    finally { setSalvando(false) }
+  }
   const transferir = async (ponto: Ponto, casa: Casa) => {
     const destino = pontos.find(p => p.id === transferindo?.slice(casa.id.length + 1))
     if (!destino || !casa.pontoAtendimentoId) return
@@ -108,7 +120,7 @@ export function PontosAtendimentoView() {
             <option value="">Transferir para...</option>
             {pontos.filter(dest => dest.ativo && dest.setorId === p.setorId && dest.id !== p.id).map(dest => <option key={dest.id} value={dest.id}>{dest.nome}</option>)}
           </select>
-          <button type="button" disabled={salvando || !transferindo?.startsWith(c.id + ':')} onClick={() => void transferir(p, c)} className="rounded border px-3 py-2 disabled:opacity-40">Confirmar</button>
+          <button type="button" disabled={salvando || !transferindo?.startsWith(c.id + ':')} onClick={() => void transferir(p, c)} className="rounded border px-3 py-2 disabled:opacity-40">Confirmar</button><button type="button" disabled={salvando} onClick={() => void desvincular(p, c)} className="rounded border px-3 py-2 disabled:opacity-40">Desvincular</button>
         </div>)}
         {p.ativo && <p className="text-sm text-slate-600">Casas disponíveis para vínculo: {disponiveis.length}. Já vinculadas a outros Pontos: {ocupadasEmOutroPonto.length}. Casas já vinculadas a este Ponto aparecem acima e não podem ser selecionadas novamente.</p>}
         {p.ativo && <label className="block text-sm font-medium">Vincular Casa de Oração<select defaultValue="" key={p.id + '-' + vinculadas.length} onChange={e => void vincular(p, e.target.value)} className="mt-1 w-full rounded-lg border p-3"><option value="">{disponiveis.length ? 'Selecione uma Casa sem vínculo' : 'Nenhuma Casa disponível neste Setor'}</option>{disponiveis.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></label>}
