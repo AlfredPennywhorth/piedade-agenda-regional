@@ -439,6 +439,11 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
       .run(paB, 'ev-pa04-a')).toThrow(/EVENTO_PONTO_COM_CONVOCACAO_PUBLICADA/)
     expect(sqlite.prepare('SELECT ponto_atendimento_id AS ponto FROM eventos WHERE id=?')
       .get('ev-pa04-a')).toMatchObject({ ponto: paA })
+    sqlite.prepare('INSERT INTO setores (id, administracao_id, nome) VALUES (?, ?, ?)')
+      .run('set-pa04-transfer', 'adm-1', 'Setor PA-04 transferido')
+    expect(() => sqlite.prepare('UPDATE pontos_atendimento SET setor_id=? WHERE id=?')
+      .run('set-pa04-transfer', paB)).toThrow(/PONTO_COM_CASAS_VINCULADAS/)
+
   })
 
   it('30. falha no batch não deixa atualização parcial (Rollback no executeAtomic)', async () => {
