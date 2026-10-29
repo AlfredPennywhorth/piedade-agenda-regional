@@ -46,8 +46,8 @@ export function queriesSincronizacaoDcoAtual(
           SELECT 1 FROM ${casas}
           JOIN ${setores} ON ${setores.id} = ${casas.setorId}
           WHERE ${casas.id} = ${vinculosFuncionais.casaId}
-            AND ${casas.setorId} = ${eventos.setorId}
-            AND (${eventos.pontoAtendimentoId} IS NULL OR ${casas.pontoAtendimentoId} = ${eventos.pontoAtendimentoId})
+            AND ((${eventos.pontoAtendimentoId} IS NULL AND ${casas.setorId} = ${eventos.setorId})
+              OR (${eventos.pontoAtendimentoId} IS NOT NULL AND ${casas.pontoAtendimentoId} = ${eventos.pontoAtendimentoId}))
             AND ${casas.ativo} = 1 AND ${setores.ativo} = 1
         ))`,
         sql`(${eventos.administracaoId} IS NOT NULL AND EXISTS (
