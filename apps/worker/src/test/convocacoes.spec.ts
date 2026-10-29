@@ -1023,6 +1023,38 @@ describe('S06 - Convocações', () => {
     expect(countEvidencias.c).toBe(0)
   })
 
+  it('PA-06: vinculo exclusivo, transferencia auditada e protecoes territoriais', async () => {
+    const ctx = await setupBaseData()
+    const paA = crypto.randomUUID()
+    const paB = crypto.randomUUID()
+    await db.insert(pontosAtendimento).values([
+      { id: paA, nome: 'Ponto A transferencias', setorId: ctx.setId },
+      { id: paB, nome: 'Ponto B transferencias', setorId: ctx.setId },
+    ])
+    const vincular = (id: string, casaId: string) => app.request(
+      `/api/v1/pontos-atendimento/${id}/casas/${casaId}`,
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+    )
+    const transferir = (id: string, casaId: string, origemPontoId: string, motivo: string) => app.request(
+      `/api/v1/pontos-atendimento/${id}/casas/${casaId}/transferir`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ origemPontoId, motivo }) },
+    )
+    expect((await vincular(paA, ctx.casId)).status).toBe(200)
+    expect((await vincular(paB, ctx.casId)).status).toBe(409)
+    expect((await transferir(paB, ctx.casId, paA, 'Redistribuicao territorial')).status).toBe(200)
+    expect(sqlite.prepare('SELECT ponto_atendimento_id AS pa FROM casas WHERE id=?')
+      .get(ctx.casId)).toMatchObject({ pa: paB })
+    expect((await transferir(paA, ctx.casId, paA, 'Origem desatualizada')).status).toBe(409)
+    expect((await transferir(paA, ctx.casId, paB, 'x')).status).toBe(400)
+    const outroSetor = crypto.randomUUID()
+    await db.insert(setores).values({ id: outroSetor, nome: 'Outro setor PA-06', administracaoId: (await db.select().from(administracoes).where(eq(administracoes.id, (await db.select().from(setores).where(eq(setores.id, ctx.setId)).get()).administracaoId)).get()).id })
+    const paExterno = crypto.randomUUID()
+    await db.insert(pontosAtendimento).values({ id: paExterno, nome: 'Ponto outro setor', setorId: outroSetor })
+    expect((await transferir(paExterno, ctx.casId, paB, 'Transferencia proibida')).status).toBe(400)
+    expect(sqlite.prepare("SELECT COUNT(*) AS total FROM auditoria_logs WHERE recurso_id=? AND acao='CASA_TRANSFERIDA_PONTO'")
+      .get(ctx.casId)).toMatchObject({ total: 1 })
+  })
+
   it('PA-05: aborta publicacao se o Ponto mudar apos selecionar destinatarios', async () => {
     const ctx = await setupBaseData()
     const paA = crypto.randomUUID()
