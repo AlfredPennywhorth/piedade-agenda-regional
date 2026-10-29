@@ -1098,6 +1098,7 @@ export async function obterCapacidadesMembro(
     podeAdministrarAcessos,
     podeGerenciarSessoes,
     podeAdministrarRegionais,
+    podeAutorizarExcecaoIntersetorial: master,
     podeAdministrarEstrutura,
     podeAdministrarPessoas,
     podeAdministrarFuncoes,
