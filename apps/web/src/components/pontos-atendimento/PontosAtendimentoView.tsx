@@ -29,7 +29,12 @@ export function PontosAtendimentoView({ podeAutorizarExcecaoIntersetorial = fals
         fetchWithAuth<Setor[]>('/setores'),
         fetchWithAuth<Casa[]>('/casas'),
       ])
-      setPontos(lista); setSetores(setoresLista); setCasas(casasLista); setErro('')
+      setPontos(lista); setSetores(setoresLista); setCasas(casasLista)
+      setCasaPendente(prev => Object.fromEntries(Object.entries(prev).filter(([pontoId, casaId]) => {
+        const ponto = lista.find(p => p.id === pontoId)
+        return ponto && casasLista.some(c => c.id === casaId && c.setorId === ponto.setorId && !c.pontoAtendimentoId)
+      })))
+      setErro('')
     } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível carregar os Pontos') }
     finally { setCarregando(false) }
   }
@@ -61,7 +66,7 @@ export function PontosAtendimentoView({ podeAutorizarExcecaoIntersetorial = fals
     } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao atualizar situação') }
   }
   const vincular = async (ponto: Ponto, casaId: string) => {
-    if (!casaId) return
+    if (!casaId || !casas.some(c => c.id === casaId && c.setorId === ponto.setorId && !c.pontoAtendimentoId)) return
     setSalvando(true); setErro(''); setAviso('')
     try {
       await patchWithAuth('/pontos-atendimento/' + ponto.id + '/casas/' + casaId, {})
@@ -148,7 +153,7 @@ export function PontosAtendimentoView({ podeAutorizarExcecaoIntersetorial = fals
           <button type="button" disabled={salvando || !transferindo?.startsWith(c.id + ':')} onClick={() => void transferir(p, c)} className="rounded border px-3 py-2 disabled:opacity-40">Confirmar</button><button type="button" disabled={salvando} onClick={() => void desvincular(p, c)} className="rounded border px-3 py-2 disabled:opacity-40">Desvincular</button>
         </div>)}
         {p.ativo && <p className="text-sm text-slate-600">Casas disponíveis para vínculo: {disponiveis.length}. Já vinculadas a outros Pontos: {ocupadasEmOutroPonto.length}. Casas já vinculadas a este Ponto aparecem acima e não podem ser selecionadas novamente.</p>}
-        {p.ativo && <label className="block text-sm font-medium">Vincular Casa de Oração<select value={casaPendente[p.id] || ''} onChange={e => setCasaPendente(prev => ({ ...prev, [p.id]: e.target.value }))} className="mt-1 w-full rounded-lg border p-3"><option value="">{disponiveis.length ? 'Selecione uma Casa sem vínculo' : 'Nenhuma Casa disponível neste Setor'}</option>{disponiveis.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}</select><span className="mt-2 block text-xs font-normal text-slate-600">Após selecionar, confirme o vínculo abaixo. A escolha não grava automaticamente.</span><span className="mt-2 flex flex-wrap gap-2"><button type="button" disabled={salvando || !casaPendente[p.id]} onClick={() => void vincular(p, casaPendente[p.id])} className="rounded-lg bg-brand-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">Confirmar vínculo</button><button type="button" disabled={salvando || !casaPendente[p.id]} onClick={() => setCasaPendente(prev => ({ ...prev, [p.id]: '' }))} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40">Cancelar</button></span></label>}
+        {p.ativo && <label className="block text-sm font-medium">Vincular Casa de Oração<select value={casaPendente[p.id] || ''} onChange={e => setCasaPendente(prev => ({ ...prev, [p.id]: e.target.value }))} className="mt-1 w-full rounded-lg border p-3"><option value="">{disponiveis.length ? 'Selecione uma Casa sem vínculo' : 'Nenhuma Casa disponível neste Setor'}</option>{disponiveis.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}</select><span className="mt-2 block text-xs font-normal text-slate-600">Após selecionar, confirme o vínculo abaixo. A escolha não grava automaticamente.</span><span className="mt-2 flex flex-wrap gap-2"><button type="button" disabled={salvando || !disponiveis.some(c => c.id === casaPendente[p.id])} onClick={() => void vincular(p, casaPendente[p.id])} className="rounded-lg bg-brand-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">Confirmar vínculo</button><button type="button" disabled={salvando || !casaPendente[p.id]} onClick={() => setCasaPendente(prev => ({ ...prev, [p.id]: '' }))} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40">Cancelar</button></span></label>}
         {p.ativo && podeAutorizarExcecaoIntersetorial && <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
           <p className="text-sm font-semibold">Exceção intersetorial — somente Master</p>
           <p className="text-xs text-slate-700">A Casa mantém seu Setor de origem e passa a ser atendida neste Ponto. Use apenas com autorização institucional e justificativa. Se a Casa já estiver vinculada a outro Ponto, desvincule-a primeiro.</p>
