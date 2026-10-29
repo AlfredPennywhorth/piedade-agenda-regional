@@ -466,8 +466,14 @@ convocacoesRouter.post('/:id/publicar', async c => {
     const casasDoSetor = db.select({ id: casas.id }).from(casas)
       .innerJoin(setores, eq(setores.id, casas.setorId))
       .where(and(eq(casas.setorId, evento.setorId), eq(casas.ativo, true), eq(setores.ativo, true)))
+    const casasElegiveisDco = evento.pontoAtendimentoId
+      ? db.select({ id: casas.id }).from(casas)
+          .innerJoin(setores, eq(setores.id, casas.setorId))
+          .where(and(eq(casas.pontoAtendimentoId, evento.pontoAtendimentoId),
+            eq(casas.ativo, true), eq(setores.ativo, true)))
+      : casasDoSetor
     conditions.push(or(eq(vinculosFuncionais.setorId, evento.setorId),
-      and(vinculoDco, inArray(vinculosFuncionais.casaId, casasDoSetor)))!)
+      and(vinculoDco, inArray(vinculosFuncionais.casaId, casasElegiveisDco)))!)
   } else if (evento.administracaoId) {
     const casasDaAdministracao = db.select({ id: casas.id }).from(casas)
       .innerJoin(setores, eq(setores.id, casas.setorId))
