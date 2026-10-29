@@ -986,6 +986,7 @@ export interface CapacidadesMembro {
   podeGerenciarSessoes: boolean
   podeAdministrarRegionais: boolean
   podeAutorizarExcecaoIntersetorial: boolean
+  podeVisualizarGruposAlternativos: boolean
   podeAdministrarEstrutura: boolean
   podeAdministrarPessoas: boolean
   podeAdministrarFuncoes: boolean
@@ -1006,6 +1007,7 @@ export async function obterCapacidadesMembro(
       podeGerenciarSessoes: false,
       podeAdministrarRegionais: false,
       podeAutorizarExcecaoIntersetorial: false,
+      podeVisualizarGruposAlternativos: false,
       podeAdministrarEstrutura: false,
       podeAdministrarPessoas: false,
       podeAdministrarFuncoes: false,
@@ -1101,6 +1103,7 @@ export async function obterCapacidadesMembro(
     podeGerenciarSessoes,
     podeAdministrarRegionais,
     podeAutorizarExcecaoIntersetorial: master,
+    podeVisualizarGruposAlternativos: master || administraAlgumaRegional || perfisTecnicos.has('GESTOR_AGENDA') || podeVisualizarAuditoria,
     podeAdministrarEstrutura,
     podeAdministrarPessoas,
     podeAdministrarFuncoes,
