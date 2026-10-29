@@ -883,12 +883,14 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
     }
 
     // O campo oculto não pode apagar um agrupamento existente em eventos editados.
-    if (!podeVisualizarGruposAlternativos) delete payload.grupoEquivalenciaId
+    const payloadValidacao = podeVisualizarGruposAlternativos
+      ? payload
+      : Object.fromEntries(Object.entries(payload).filter(([campo]) => campo !== 'grupoEquivalenciaId'))
 
     try {
       const parsed = eventoEditandoId 
-        ? EventoUpdate.safeParse(payload) 
-        : EventoCreate.safeParse(payload)
+        ? EventoUpdate.safeParse(payloadValidacao) 
+        : EventoCreate.safeParse(payloadValidacao)
 
       if (!parsed.success) {
         const errors: any = {}
