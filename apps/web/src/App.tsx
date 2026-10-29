@@ -212,6 +212,7 @@ function App() {
       {currentTab === 'agenda' && <AgendaView />}
       {currentTab === 'eventos' && capacidades.podeGerirAgenda === true && (
         <EventosView
+          podeVisualizarGruposAlternativos={capacidades.podeVisualizarGruposAlternativos === true}
           onEventoPessoalCriado={() => {
             setFluxoEventoId(null)
             setCurrentTab('agenda')
