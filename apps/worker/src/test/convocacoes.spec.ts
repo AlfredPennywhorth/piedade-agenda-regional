@@ -1102,8 +1102,16 @@ describe('S06 - Convocações', () => {
     expect(sqlite.prepare('SELECT setor_id AS setor, ponto_atendimento_id AS ponto FROM casas WHERE id=?')
       .get(ctx.cas2Id)).toMatchObject({ setor: outroSetor, ponto: pontoCentro })
     expect((await request()).status).toBe(409)
+    const desvinculo = await app.request(`/api/v1/pontos-atendimento/${pontoCentro}/casas/${ctx.cas2Id}/desvincular`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo: 'Reorganizacao de atendimento' }),
+    })
+    expect(desvinculo.status).toBe(200)
+    expect((await request()).status).toBe(201)
+    expect(sqlite.prepare('SELECT ponto_atendimento_id AS ponto FROM casas WHERE id=?')
+      .get(ctx.cas2Id)).toMatchObject({ ponto: pontoCentro })
     expect(sqlite.prepare("SELECT COUNT(*) AS total FROM auditoria_logs WHERE recurso_id=? AND acao='CASA_PONTO_EXCECAO_INTERSETORIAL'")
-      .get(ctx.cas2Id)).toMatchObject({ total: 1 })
+      .get(ctx.cas2Id)).toMatchObject({ total: 2 })
   })
 
   it('PA-05: aborta publicacao se o Ponto mudar apos selecionar destinatarios', async () => {
