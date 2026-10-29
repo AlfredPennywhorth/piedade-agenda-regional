@@ -12,6 +12,7 @@ export interface CapacidadesFrontend {
   podeGerenciarSessoes?: boolean
   podeAdministrarRegionais?: boolean
   podeAutorizarExcecaoIntersetorial?: boolean
+  podeVisualizarGruposAlternativos?: boolean
   podeAdministrarEstrutura?: boolean
   podeAdministrarPessoas?: boolean
   podeAdministrarFuncoes?: boolean
