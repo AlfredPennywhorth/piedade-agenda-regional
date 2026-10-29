@@ -81,11 +81,13 @@ export function PontosAtendimentoView() {
     {carregando && <p role="status">Carregando...</p>}
     <div className="space-y-3">{pontos.filter(p => !filtro || p.setorId === filtro).map(p => {
       const vinculadas = casas.filter(c => c.pontoAtendimentoId === p.id)
-      const disponiveis = casas.filter(c => c.setorId === p.setorId && c.pontoAtendimentoId !== p.id)
+      const disponiveis = casas.filter(c => c.setorId === p.setorId && !c.pontoAtendimentoId).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+      const ocupadasEmOutroPonto = casas.filter(c => c.setorId === p.setorId && c.pontoAtendimentoId && c.pontoAtendimentoId !== p.id)
       return <article key={p.id} className="space-y-3 rounded-xl border bg-white p-4">
         <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><h3 className="break-words font-semibold">{p.nome}</h3><p className="text-sm text-slate-600">Código: {p.codigo || '—'} · {setores.find(s => s.id === p.setorId)?.nome || 'Setor'} · {p.ativo ? 'Ativo' : 'Inativo'}</p></div><div className="flex gap-2"><button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => selecionar(p)}>Editar</button><button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => void alterarStatus(p)}>{p.ativo ? 'Inativar' : 'Ativar'}</button></div></div>
         <p className="text-sm">Casas vinculadas ({vinculadas.length}): {vinculadas.map(c => c.nome).join(', ') || 'Nenhuma'}</p>
-        {p.ativo && <label className="block text-sm font-medium">Vincular Casa de Oração<select defaultValue="" key={p.id + '-' + vinculadas.length} onChange={e => void vincular(p, e.target.value)} className="mt-1 w-full rounded-lg border p-3"><option value="">Selecione uma Casa do Setor</option>{disponiveis.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></label>}
+        {p.ativo && <p className="text-sm text-slate-600">Casas disponíveis para vínculo: {disponiveis.length}. Já vinculadas a outros Pontos: {ocupadasEmOutroPonto.length}. Casas já vinculadas a este Ponto aparecem acima e não podem ser selecionadas novamente.</p>}
+        {p.ativo && <label className="block text-sm font-medium">Vincular Casa de Oração<select defaultValue="" key={p.id + '-' + vinculadas.length} onChange={e => void vincular(p, e.target.value)} className="mt-1 w-full rounded-lg border p-3"><option value="">{disponiveis.length ? 'Selecione uma Casa sem vínculo' : 'Nenhuma Casa disponível neste Setor'}</option>{disponiveis.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></label>}
       </article>
     })}</div>
   </section>
