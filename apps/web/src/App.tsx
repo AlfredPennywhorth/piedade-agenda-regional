@@ -241,7 +241,7 @@ function App() {
       )}
       {currentTab === 'administracoes' && capacidades.podeAdministrarEstrutura === true && <AdministracoesView />}
       {currentTab === 'setores' && capacidades.podeAdministrarEstrutura === true && <SetoresView />}
-      {currentTab === 'pontos-atendimento' && capacidades.podeAdministrarEstrutura === true && <PontosAtendimentoView />}
+      {currentTab === 'pontos-atendimento' && capacidades.podeAdministrarEstrutura === true && <PontosAtendimentoView podeAutorizarExcecaoIntersetorial={capacidades.podeAutorizarExcecaoIntersetorial === true} />}
       {currentTab === 'tipos-reuniao' && capacidades.podeAdministrarEstrutura === true && <TiposReuniaoView />}
       {currentTab === 'casas' && capacidades.podeAdministrarEstrutura === true && <CasasView />}
       {currentTab === 'grupos-trabalho' && capacidades.podeAdministrarEstrutura === true && <GruposTrabalhoView />}
