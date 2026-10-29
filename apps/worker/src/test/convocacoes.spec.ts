@@ -1023,6 +1023,48 @@ describe('S06 - Convocações', () => {
     expect(countEvidencias.c).toBe(0)
   })
 
+  it('PA-05: aborta publicacao se o Ponto mudar apos selecionar destinatarios', async () => {
+    const ctx = await setupBaseData()
+    const paA = crypto.randomUUID()
+    const paB = crypto.randomUUID()
+    await db.insert(pontosAtendimento).values([
+      { id: paA, nome: 'PA concorrencia A', setorId: ctx.setId },
+      { id: paB, nome: 'PA concorrencia B', setorId: ctx.setId },
+    ])
+    await db.update(eventos).set({ pontoAtendimentoId: paA }).where(eq(eventos.id, ctx.evSetorId))
+    const criado = await app.request('/api/v1/convocacoes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId: ctx.evSetorId }),
+    })
+    expect(criado.status).toBe(201)
+    const { id } = await criado.json()
+    expect((await app.request(`/api/v1/convocacoes/${id}/funcoes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ funcaoId: ctx.f1Id }),
+    })).status).toBe(201)
+    const originalTransaction = db.transaction.bind(db)
+    let interceptado = false
+    db.transaction = (...args: any[]) => {
+      if (!interceptado) {
+        interceptado = true
+        sqlite.prepare('UPDATE eventos SET ponto_atendimento_id = ? WHERE id = ?')
+          .run(paB, ctx.evSetorId)
+      }
+      return originalTransaction(...args)
+    }
+    try {
+      const resposta = await app.request(`/api/v1/convocacoes/${id}/publicar`, { method: 'POST' })
+      expect(resposta.status).toBe(409)
+      expect(interceptado).toBe(true)
+    } finally {
+      db.transaction = originalTransaction
+    }
+    expect(sqlite.prepare('SELECT status FROM convocacoes WHERE id = ?').get(id))
+      .toMatchObject({ status: 'RASCUNHO' })
+    expect(sqlite.prepare('SELECT COUNT(*) AS total FROM convocacao_destinatarios WHERE convocacao_id = ?')
+      .get(id)).toMatchObject({ total: 0 })
+  })
+
   it('29. publicação autenticada registra o ator da sessão e ignora header forjado', async () => {
     const ctx = await setupBaseData()
     const convRes = await app.request('/api/v1/convocacoes', {
