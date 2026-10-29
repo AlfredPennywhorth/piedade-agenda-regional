@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
-import { and, eq, inArray, isNull } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { z } from '@piedade/shared'
 import { pontosAtendimento, tiposReuniao, casas, setores } from '../db/schema'
 import { authMiddleware } from '../middleware/auth'
+import { executarOperacaoComAudit } from '../services/auditoria'
 import { eMasterSistema, obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo } from '../security/permissoes'
 
 export const pontosAtendimentoRouter = new Hono<any>()
@@ -88,6 +89,44 @@ pontosAtendimentoRouter.patch('/:id/casas/:casaId', async c => {
     .returning({ id: casas.id }).get()
   if (!vinculada) return c.json({ error: 'Casa já vinculada a um Ponto de Atendimento. Remanejamentos exigem procedimento específico.', code: 'CASA_PONTO_JA_VINCULADO' }, 409)
   return c.json({ ok: true })
+})
+
+// Transferência explícita: vinculação continua exclusiva; o histórico dos convites não é reescrito.
+pontosAtendimentoRouter.post('/:id/casas/:casaId/transferir', async c => {
+  const db = c.get('db')
+  const destino = await db.select().from(pontosAtendimento).where(eq(pontosAtendimento.id, c.req.param('id'))).get()
+  const casa = await db.select().from(casas).where(eq(casas.id, c.req.param('casaId'))).get()
+  if (!destino || !casa) return c.json({ error: 'Ponto ou Casa não encontrado' }, 404)
+  const parsed = z.object({ origemPontoId: z.string().uuid(), motivo: z.string().trim().min(5).max(500) }).safeParse(await c.req.json())
+  if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
+  const origem = await db.select().from(pontosAtendimento).where(eq(pontosAtendimento.id, parsed.data.origemPontoId)).get()
+  if (!origem || casa.pontoAtendimentoId !== origem.id) return c.json({ error: 'Vínculo de origem foi alterado. Recarregue a tela.', code: 'VINCULO_ALTERADO' }, 409)
+  if (origem.id === destino.id) return c.json({ error: 'A Casa já pertence a este Ponto' }, 409)
+  if (origem.setorId !== destino.setorId || destino.setorId !== casa.setorId) return c.json({ error: 'Transferência permitida apenas dentro do mesmo Setor' }, 400)
+  if (!destino.ativo) return c.json({ error: 'Ponto de destino inativo' }, 409)
+  if (!(await podeAdministrarEscopo(db, c.get('contextoPermissoes'), 'SETOR', casa.setorId))) return c.json({ error: 'Acesso negado' }, 403)
+  try {
+    await executarOperacaoComAudit(db, qdb => [
+      // A FK inválida no ramo de erro aborta todo o batch, inclusive a auditoria.
+      // Não substitui um vínculo que tenha sido modificado durante esta requisição.
+      qdb.update(casas).set({
+        pontoAtendimentoId: sql`CASE WHEN ${casas.pontoAtendimentoId} = ${origem.id}
+          THEN ${destino.id} ELSE 'VINCULO_CONCORRENTE_INVALIDO' END` as any,
+        updatedAt: new Date().toISOString(),
+      }).where(eq(casas.id, casa.id)),
+    ], {
+      acao: 'CASA_TRANSFERIDA_PONTO',
+      atorMembroId: c.get('membroId') || null,
+      recursoTipo: 'CASA',
+      recursoId: casa.id,
+      escopoTipo: 'SETOR',
+      escopoId: casa.setorId,
+      contexto: { origemPontoId: origem.id, destinoPontoId: destino.id, motivo: parsed.data.motivo },
+    })
+  } catch {
+    return c.json({ error: 'Vínculo alterado simultaneamente ou transferência não permitida', code: 'VINCULO_ALTERADO' }, 409)
+  }
+  return c.json({ ok: true, origemPontoId: origem.id, destinoPontoId: destino.id })
 })
 
 tiposReuniaoRouter.get('/', async c => {
