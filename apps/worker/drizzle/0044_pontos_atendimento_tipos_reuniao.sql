@@ -47,7 +47,10 @@ WHEN NEW.ponto_atendimento_id IS NOT NULL AND NOT EXISTS (
 BEGIN SELECT RAISE(ABORT,'CASA_PONTO_SETOR_DIVERGENTE'); END;
 
 CREATE TRIGGER trg_pontos_setor_update BEFORE UPDATE OF setor_id ON pontos_atendimento
-WHEN NEW.setor_id<>OLD.setor_id AND EXISTS(SELECT 1 FROM casas WHERE ponto_atendimento_id=OLD.id)
+WHEN NEW.setor_id<>OLD.setor_id AND (
+ EXISTS(SELECT 1 FROM casas WHERE ponto_atendimento_id=OLD.id)
+ OR EXISTS(SELECT 1 FROM eventos WHERE ponto_atendimento_id=OLD.id)
+)
 BEGIN SELECT RAISE(ABORT,'PONTO_COM_CASAS_VINCULADAS'); END;
 
 CREATE TRIGGER trg_eventos_ponto_setor_insert BEFORE INSERT ON eventos
@@ -104,3 +107,36 @@ AND EXISTS (
  AND e.ponto_atendimento_id <> outro_e.ponto_atendimento_id
 )
 BEGIN SELECT RAISE(ABORT,'RSVP_ALTERNATIVA_JA_CONFIRMADA'); END;
+
+-- Bloqueio no próprio banco: destinatários publicados não podem mudar de Ponto.
+CREATE TRIGGER trg_eventos_ponto_publicado_update
+BEFORE UPDATE OF ponto_atendimento_id ON eventos
+WHEN NEW.ponto_atendimento_id IS NOT OLD.ponto_atendimento_id
+AND EXISTS (SELECT 1 FROM convocacoes c
+  WHERE c.evento_id=OLD.id AND c.status='PUBLICADA')
+BEGIN SELECT RAISE(ABORT,'EVENTO_PONTO_COM_CONVOCACAO_PUBLICADA'); END;
+
+-- A reclassificação não pode transformar confirmações existentes em alternativas conflitantes.
+CREATE TRIGGER trg_eventos_equivalencia_confirmada_update
+BEFORE UPDATE OF grupo_equivalencia_id,tipo_reuniao_id,ponto_atendimento_id,setor_id ON eventos
+WHEN NEW.grupo_equivalencia_id IS NOT NULL
+AND NEW.ponto_atendimento_id IS NOT NULL
+AND NEW.tipo_reuniao_id IS NOT NULL
+AND EXISTS (
+ SELECT 1 FROM convocacoes c
+ JOIN convocacao_destinatarios cd ON cd.convocacao_id=c.id
+ JOIN rsvp r ON r.convocacao_destinatario_id=cd.id AND r.resposta='PARTICIPAREI'
+ JOIN convocacao_destinatarios outro_cd ON outro_cd.membro_id=cd.membro_id
+ JOIN convocacoes outro_c ON outro_c.id=outro_cd.convocacao_id
+  AND outro_c.status='PUBLICADA' AND outro_c.ativo=1
+ JOIN eventos outro_e ON outro_e.id=outro_c.evento_id AND outro_e.id<>OLD.id
+ JOIN rsvp outro_r ON outro_r.convocacao_destinatario_id=outro_cd.id
+  AND outro_r.resposta='PARTICIPAREI'
+ WHERE c.evento_id=OLD.id AND c.status='PUBLICADA' AND c.ativo=1
+ AND outro_e.grupo_equivalencia_id=NEW.grupo_equivalencia_id
+ AND outro_e.tipo_reuniao_id=NEW.tipo_reuniao_id
+ AND outro_e.setor_id=NEW.setor_id
+ AND outro_e.ponto_atendimento_id IS NOT NULL
+ AND outro_e.ponto_atendimento_id<>NEW.ponto_atendimento_id
+)
+BEGIN SELECT RAISE(ABORT,'EVENTO_EQUIVALENCIA_COM_RSVP_DUPLO'); END;
