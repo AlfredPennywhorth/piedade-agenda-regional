@@ -46,6 +46,9 @@ pontosAtendimentoRouter.post('/excecoes-intersetoriais', async c => {
       qdb.insert(casasPontosExcecoes).values({
         casaId, pontoAtendimentoId, motivo,
         autorizadoPorMembroId: c.get('membroId') || null,
+      }).onConflictDoUpdate({
+        target: casasPontosExcecoes.casaId,
+        set: { pontoAtendimentoId, motivo, autorizadoPorMembroId: c.get('membroId') || null },
       }),
       qdb.update(casas).set({
         pontoAtendimentoId: sql`CASE WHEN ${casas.pontoAtendimentoId} IS NULL
