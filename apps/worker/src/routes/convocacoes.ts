@@ -604,7 +604,11 @@ convocacoesRouter.post('/:id/publicar', async c => {
           .update(convocacoes)
           .set({
             status:
-              sql`CASE WHEN ${convocacoes.updatedAt} = ${nowIso} THEN ${convocacoes.status} ELSE 'ABORT_OCC' END` as any,
+              sql`CASE WHEN ${convocacoes.updatedAt} = ${nowIso}
+              AND EXISTS (SELECT 1 FROM ${eventos} WHERE ${eventos.id} = ${convocacoes.eventoId}
+                AND ${eventos.pontoAtendimentoId} IS ${evento.pontoAtendimentoId ?? null}
+                AND ${eventos.setorId} IS ${evento.setorId ?? null})
+              THEN ${convocacoes.status} ELSE 'ABORT_OCC' END` as any,
           })
           .where(eq(convocacoes.id, id))
       )
