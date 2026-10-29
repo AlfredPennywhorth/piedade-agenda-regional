@@ -408,6 +408,39 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     expect((await responder('ev-pa-rsvp-a', 'PARTICIPAREI')).status).toBe(409)
   })
 
+  it('PA-04: bloqueia reclassificacao com duas confirmacoes e troca de Ponto publicado', async () => {
+    const paA = crypto.randomUUID()
+    const paB = crypto.randomUUID()
+    const tipo = crypto.randomUUID()
+    const grupo = crypto.randomUUID()
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(paA, 'set-1', 'Ponto PA-04 A')
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(paB, 'set-1', 'Ponto PA-04 B')
+    sqlite.prepare('INSERT INTO tipos_reuniao (id, nome, codigo) VALUES (?, ?, ?)').run(tipo, 'Tipo PA-04', 'PA-04')
+    for (const [id, ponto, grupoId] of [
+      ['ev-pa04-a', paA, grupo],
+      ['ev-pa04-b', paB, crypto.randomUUID()],
+    ]) {
+      sqlite.prepare(`INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, setor_id, ponto_atendimento_id, tipo_reuniao_id, grupo_equivalencia_id, ativo)
+        VALUES (?, ?, 'ONLINE', '2031-01-02T10:00:00Z', '2031-01-02T11:00:00Z', 'set-1', ?, ?, ?, 1)`)
+        .run(id, id, ponto, tipo, grupoId)
+      sqlite.prepare("INSERT INTO convocacoes (id, evento_id, status, ativo) VALUES (?, ?, 'PUBLICADA', 1)")
+        .run(`conv-${id}`, id)
+      sqlite.prepare('INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES (?, ?, ?)')
+        .run(`dest-${id}`, `conv-${id}`, membroId)
+      sqlite.prepare(`INSERT INTO rsvp
+        (id, convocacao_destinatario_id, resposta, respondido_em, atualizado_em)
+        VALUES (?, ?, 'PARTICIPAREI', '2030-01-01T00:00:00Z', '2030-01-01T00:00:00Z')`)
+        .run(`rsvp-${id}`, `dest-${id}`)
+    }
+    expect(() => sqlite.prepare('UPDATE eventos SET grupo_equivalencia_id=? WHERE id=?')
+      .run(grupo, 'ev-pa04-b')).toThrow(/EVENTO_EQUIVALENCIA_COM_RSVP_DUPLO/)
+    expect(() => sqlite.prepare('UPDATE eventos SET ponto_atendimento_id=? WHERE id=?')
+      .run(paB, 'ev-pa04-a')).toThrow(/EVENTO_PONTO_COM_CONVOCACAO_PUBLICADA/)
+    expect(sqlite.prepare('SELECT ponto_atendimento_id AS ponto FROM eventos WHERE id=?')
+      .get('ev-pa04-a')).toMatchObject({ ponto: paA })
+  })
+
   it('30. falha no batch não deixa atualização parcial (Rollback no executeAtomic)', async () => {
     const destId = destIdPeriodos
     await req(`/api/v1/minha-agenda/rsvp/${destId}`, {
