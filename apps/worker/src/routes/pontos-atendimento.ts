@@ -91,6 +91,38 @@ pontosAtendimentoRouter.patch('/:id/casas/:casaId', async c => {
   return c.json({ ok: true })
 })
 
+// Desvinculação autorizada para reorganização territorial, inclusive futura mudança de Setor.
+pontosAtendimentoRouter.post('/:id/casas/:casaId/desvincular', async c => {
+  const db = c.get('db')
+  const ponto = await db.select().from(pontosAtendimento).where(eq(pontosAtendimento.id, c.req.param('id'))).get()
+  const casa = await db.select().from(casas).where(eq(casas.id, c.req.param('casaId'))).get()
+  if (!ponto || !casa) return c.json({ error: 'Ponto ou Casa não encontrado' }, 404)
+  if (!(await podeAdministrarEscopo(db, c.get('contextoPermissoes'), 'SETOR', casa.setorId))) return c.json({ error: 'Acesso negado' }, 403)
+  if (casa.pontoAtendimentoId !== ponto.id) return c.json({ error: 'Vínculo de origem alterado', code: 'VINCULO_ALTERADO' }, 409)
+  const parsed = z.object({ motivo: z.string().trim().min(5).max(500) }).safeParse(await c.req.json())
+  if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
+  try {
+    await executarOperacaoComAudit(db, qdb => [
+      qdb.update(casas).set({
+        pontoAtendimentoId: sql`CASE WHEN ${casas.pontoAtendimentoId} = ${ponto.id}
+          THEN NULL ELSE 'VINCULO_CONCORRENTE_INVALIDO' END` as any,
+        updatedAt: new Date().toISOString(),
+      }).where(eq(casas.id, casa.id)),
+    ], {
+      acao: 'CASA_DESVINCULADA_PONTO',
+      atorMembroId: c.get('membroId') || null,
+      recursoTipo: 'CASA',
+      recursoId: casa.id,
+      escopoTipo: 'SETOR',
+      escopoId: casa.setorId,
+      contexto: { origemPontoId: ponto.id, motivo: parsed.data.motivo },
+    })
+  } catch {
+    return c.json({ error: 'Vínculo alterado simultaneamente', code: 'VINCULO_ALTERADO' }, 409)
+  }
+  return c.json({ ok: true })
+})
+
 // Transferência explícita: vinculação continua exclusiva; o histórico dos convites não é reescrito.
 pontosAtendimentoRouter.post('/:id/casas/:casaId/transferir', async c => {
   const db = c.get('db')
