@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { z } from '@piedade/shared'
-import { pontosAtendimento, tiposReuniao, casas, setores } from '../db/schema'
+import { pontosAtendimento, tiposReuniao, casas, setores, casasPontosExcecoes } from '../db/schema'
 import { authMiddleware } from '../middleware/auth'
 import { executarOperacaoComAudit } from '../services/auditoria'
 import { eMasterSistema, obterEscoposTerritoriaisVisiveis, podeAdministrarEscopo } from '../security/permissoes'
@@ -21,6 +21,49 @@ const tipoInput = z.object({
   codigo: z.string().trim().min(2).max(60).regex(/^[A-Z0-9_-]+$/),
 })
 const corpoAtivo = z.object({ ativo: z.boolean() })
+
+// Exceção intersetorial somente pelo Master; não altera o Setor institucional.
+pontosAtendimentoRouter.post('/excecoes-intersetoriais', async c => {
+  if (!eMasterSistema(c.get('contextoPermissoes'))) return c.json({ error: 'Apenas Master pode autorizar exceções', code: 'FORBIDDEN' }, 403)
+  const parsed = z.object({
+    casaId: z.string().uuid(),
+    pontoAtendimentoId: z.string().uuid(),
+    motivo: z.string().trim().min(5).max(500),
+  }).safeParse(await c.req.json())
+  if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400)
+  const { casaId, pontoAtendimentoId, motivo } = parsed.data
+  const db = c.get('db')
+  const [casa, ponto] = await Promise.all([
+    db.select().from(casas).where(eq(casas.id, casaId)).get(),
+    db.select().from(pontosAtendimento).where(eq(pontosAtendimento.id, pontoAtendimentoId)).get(),
+  ])
+  if (!casa || !ponto) return c.json({ error: 'Casa ou Ponto inexistente' }, 404)
+  if (!casa.ativo || !ponto.ativo) return c.json({ error: 'Casa ou Ponto inativo' }, 409)
+  if (casa.setorId === ponto.setorId) return c.json({ error: 'Use a vinculação normal para Casas do mesmo Setor' }, 400)
+  if (casa.pontoAtendimentoId) return c.json({ error: 'Casa já vinculada: desvincule antes de autorizar exceção', code: 'CASA_PONTO_JA_VINCULADO' }, 409)
+  try {
+    await executarOperacaoComAudit(db, qdb => [
+      qdb.insert(casasPontosExcecoes).values({
+        casaId, pontoAtendimentoId, motivo,
+        autorizadoPorMembroId: c.get('membroId') || null,
+      }),
+      qdb.update(casas).set({
+        pontoAtendimentoId: sql`CASE WHEN ${casas.pontoAtendimentoId} IS NULL
+          THEN ${pontoAtendimentoId} ELSE 'VINCULO_CONCORRENTE_INVALIDO' END` as any,
+        updatedAt: new Date().toISOString(),
+      }).where(eq(casas.id, casaId)),
+    ], {
+      acao: 'CASA_PONTO_EXCECAO_INTERSETORIAL',
+      atorMembroId: c.get('membroId') || null,
+      recursoTipo: 'CASA', recursoId: casaId,
+      escopoTipo: 'SETOR', escopoId: casa.setorId,
+      contexto: { setorOrigemId: casa.setorId, setorDestinoId: ponto.setorId, pontoAtendimentoId, motivo },
+    })
+  } catch {
+    return c.json({ error: 'Autorização concorrente, vínculo existente ou restrição de integridade', code: 'EXCECAO_NAO_APLICADA' }, 409)
+  }
+  return c.json({ ok: true, casaId, pontoAtendimentoId }, 201)
+})
 
 pontosAtendimentoRouter.get('/', async c => {
   const db = c.get('db')
