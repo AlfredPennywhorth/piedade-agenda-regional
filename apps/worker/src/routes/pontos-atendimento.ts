@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { z } from '@piedade/shared'
 import { pontosAtendimento, tiposReuniao, casas, setores } from '../db/schema'
 import { authMiddleware } from '../middleware/auth'
@@ -80,7 +80,13 @@ pontosAtendimentoRouter.patch('/:id/casas/:casaId', async c => {
   if (ponto.setorId !== casa.setorId) return c.json({ error: 'Casa pertence a outro Setor' }, 400)
   if (!(await podeAdministrarEscopo(db, c.get('contextoPermissoes'), 'SETOR', ponto.setorId))) return c.json({ error: 'Acesso negado' }, 403)
   if (!ponto.ativo) return c.json({ error: 'Ponto inativo' }, 409)
-  await db.update(casas).set({ pontoAtendimentoId: ponto.id, updatedAt: new Date().toISOString() }).where(eq(casas.id, casa.id))
+  // Compare-and-set atômico: a Casa só pode ser vinculada se ainda não possuir Ponto.
+  // Evita que duas requisições concorrentes transfiram silenciosamente o vínculo.
+  const vinculada = await db.update(casas)
+    .set({ pontoAtendimentoId: ponto.id, updatedAt: new Date().toISOString() })
+    .where(and(eq(casas.id, casa.id), isNull(casas.pontoAtendimentoId)))
+    .returning({ id: casas.id }).get()
+  if (!vinculada) return c.json({ error: 'Casa já vinculada a um Ponto de Atendimento. Remanejamentos exigem procedimento específico.', code: 'CASA_PONTO_JA_VINCULADO' }, 409)
   return c.json({ ok: true })
 })
 
