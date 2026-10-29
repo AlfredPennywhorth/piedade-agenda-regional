@@ -70,6 +70,14 @@ export const pontosAtendimento = sqliteTable('pontos_atendimento', {
   ...timestamps,
 })
 
+export const casasPontosExcecoes = sqliteTable('casas_pontos_excecoes', {
+  casaId: text('casa_id').primaryKey().references(() => casas.id),
+  pontoAtendimentoId: text('ponto_atendimento_id').notNull().references(() => pontosAtendimento.id),
+  motivo: text('motivo').notNull(),
+  autorizadoPorMembroId: text('autorizado_por_membro_id').references(() => membros.id),
+  criadoEm: text('criado_em').notNull().default(sql`CURRENT_TIMESTAMP`),
+})
+
 export const tiposReuniao = sqliteTable('tipos_reuniao', {
   id: text('id').primaryKey(),
   nome: text('nome').notNull(),
