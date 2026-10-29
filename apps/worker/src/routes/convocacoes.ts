@@ -242,7 +242,16 @@ convocacoesRouter.patch('/:id', async c => {
           .update(convocacoes)
           .set({
             status:
-              sql`CASE WHEN ${convocacoes.updatedAt} = ${nowIso} THEN ${convocacoes.status} ELSE 'ABORT_OCC' END` as any,
+              sql`CASE WHEN ${convocacoes.updatedAt} = ${nowIso}
+                 AND EXISTS (SELECT 1 FROM ${eventos}
+                   WHERE ${eventos.id} = ${convocacao.eventoId}
+                     AND ${eventos.pontoAtendimentoId} IS ${evento.pontoAtendimentoId ?? null}
+                     AND ${eventos.setorId} IS ${evento.setorId ?? null}
+                     AND ${eventos.casaId} IS ${evento.casaId ?? null}
+                     AND ${eventos.administracaoId} IS ${evento.administracaoId ?? null}
+                     AND ${eventos.regionalId} IS ${evento.regionalId ?? null}
+                     AND ${eventos.grupoTrabalhoId} IS ${evento.grupoTrabalhoId ?? null})
+                THEN ${convocacoes.status} ELSE 'ABORT_OCC' END` as any,
           })
           .where(eq(convocacoes.id, id)),
       ])
