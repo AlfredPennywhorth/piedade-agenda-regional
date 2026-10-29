@@ -1080,6 +1080,32 @@ describe('S06 - Convocações', () => {
       .get(ctx.casId)).toMatchObject({ total: 1 })
   })
 
+  it('PA-07: Master autoriza Casa de outro Setor sem modificar Setor institucional', async () => {
+    const ctx = await setupBaseData()
+    const outroSetor = crypto.randomUUID()
+    await db.insert(setores).values({ id: outroSetor, nome: 'Setor excepcional',
+      administracaoId: (await db.select().from(setores).where(eq(setores.id, ctx.setId)).get()).administracaoId })
+    const pontoCentro = crypto.randomUUID()
+    await db.insert(pontosAtendimento).values({ id: pontoCentro, setorId: ctx.setId, nome: 'Ponto de destino excepcional' })
+    await db.update(casas).set({ setorId: outroSetor }).where(eq(casas.id, ctx.cas2Id))
+    const url = '/api/v1/pontos-atendimento/excecoes-intersetoriais'
+    const request = () => app.request(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ casaId: ctx.cas2Id, pontoAtendimentoId: pontoCentro, motivo: 'Atendimento excepcional autorizado' }) })
+    expect((await request()).status).toBe(403)
+    const conta = sqlite.prepare('SELECT conta_acesso_id AS id FROM acessos_conta WHERE perfil_codigo=? AND escopo_id=? ORDER BY rowid DESC LIMIT 1')
+      .get('GESTOR_AGENDA', ctx.setId) as { id: string }
+    sqlite.prepare("INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, 'MASTER_SISTEMA', 'GLOBAL', NULL)")
+      .run(crypto.randomUUID(), conta.id)
+    sqlite.prepare('UPDATE sessoes SET conta_acesso_id=? WHERE token_hash=?')
+      .run(conta.id, await hashToken(tokenSessaoAtual))
+    expect((await request()).status).toBe(201)
+    expect(sqlite.prepare('SELECT setor_id AS setor, ponto_atendimento_id AS ponto FROM casas WHERE id=?')
+      .get(ctx.cas2Id)).toMatchObject({ setor: outroSetor, ponto: pontoCentro })
+    expect((await request()).status).toBe(409)
+    expect(sqlite.prepare("SELECT COUNT(*) AS total FROM auditoria_logs WHERE recurso_id=? AND acao='CASA_PONTO_EXCECAO_INTERSETORIAL'")
+      .get(ctx.cas2Id)).toMatchObject({ total: 1 })
+  })
+
   it('PA-05: aborta publicacao se o Ponto mudar apos selecionar destinatarios', async () => {
     const ctx = await setupBaseData()
     const paA = crypto.randomUUID()
