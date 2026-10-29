@@ -1031,6 +1031,12 @@ describe('S06 - Convocações', () => {
       { id: paA, nome: 'Ponto A transferencias', setorId: ctx.setId },
       { id: paB, nome: 'Ponto B transferencias', setorId: ctx.setId },
     ])
+    // A configuração de base usa GESTOR_AGENDA, sem permissão para administrar estrutura.
+    // Conceder administrador regional somente neste cenário de teste.
+    const conta = sqlite.prepare('SELECT conta_acesso_id AS id FROM acessos_conta WHERE perfil_codigo=? AND escopo_id=? ORDER BY rowid DESC LIMIT 1')
+      .get('GESTOR_AGENDA', ctx.setId) as { id: string }
+    sqlite.prepare("INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, 'ADMINISTRADOR_SISTEMA', 'REGIONAL', ?)")
+      .run(crypto.randomUUID(), conta.id, ctx.regId)
     const vincular = (id: string, casaId: string) => app.request(
       `/api/v1/pontos-atendimento/${id}/casas/${casaId}`,
       { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' },
@@ -1044,6 +1050,16 @@ describe('S06 - Convocações', () => {
     expect((await transferir(paB, ctx.casId, paA, 'Redistribuicao territorial')).status).toBe(200)
     expect(sqlite.prepare('SELECT ponto_atendimento_id AS pa FROM casas WHERE id=?')
       .get(ctx.casId)).toMatchObject({ pa: paB })
+    const desvincular = await app.request(`/api/v1/pontos-atendimento/${paB}/casas/${ctx.casId}/desvincular`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo: 'Redistribuicao para outro Setor' }),
+    })
+    expect(desvincular.status).toBe(200)
+    expect(sqlite.prepare('SELECT ponto_atendimento_id AS pa FROM casas WHERE id=?')
+      .get(ctx.casId)).toMatchObject({ pa: null })
+    expect((await vincular(paA, ctx.casId)).status).toBe(200)
+    expect(sqlite.prepare("SELECT COUNT(*) AS total FROM auditoria_logs WHERE recurso_id=? AND acao='CASA_DESVINCULADA_PONTO'")
+      .get(ctx.casId)).toMatchObject({ total: 1 })
     expect((await transferir(paA, ctx.casId, paA, 'Origem desatualizada')).status).toBe(409)
     expect((await transferir(paA, ctx.casId, paB, 'x')).status).toBe(400)
     const outroSetor = crypto.randomUUID()
