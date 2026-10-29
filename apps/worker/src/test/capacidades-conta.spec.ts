@@ -40,6 +40,7 @@ describe('ACC-11 — capacidades consolidadas da conta', () => {
       podeGerenciarSessoes: false,
       podeAdministrarRegionais: false,
       podeAutorizarExcecaoIntersetorial: false,
+      podeVisualizarGruposAlternativos: false,
       podeAdministrarEstrutura: false,
       podeAdministrarPessoas: false,
       podeAdministrarFuncoes: false,
