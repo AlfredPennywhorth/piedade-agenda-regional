@@ -14,6 +14,7 @@ export function PontosAtendimentoView() {
   const [form, setForm] = useState(vazio)
   const [editando, setEditando] = useState<Ponto | null>(null)
   const [salvando, setSalvando] = useState(false)
+  const [transferindo, setTransferindo] = useState<string | null>(null)
   const [erro, setErro] = useState('')
   const [aviso, setAviso] = useState('')
   const [carregando, setCarregando] = useState(true)
@@ -66,6 +67,33 @@ export function PontosAtendimentoView() {
       setAviso('Casa vinculada ao Ponto de Atendimento.')
     } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao vincular Casa') }
   }
+  const desvincular = async (ponto: Ponto, casa: Casa) => {
+    const motivo = window.prompt('Motivo da desvinculação de ' + casa.nome + ' (mínimo 5 caracteres):')
+    if (!motivo || motivo.trim().length < 5) return
+    if (!window.confirm('Desvincular ' + casa.nome + ' de ' + ponto.nome + '? Novas convocações não incluirão esta Casa até que seja vinculada novamente.')) return
+    setSalvando(true); setErro(''); setAviso('')
+    try {
+      await postWithAuth('/pontos-atendimento/' + ponto.id + '/casas/' + casa.id + '/desvincular', { motivo: motivo.trim() })
+      await carregar()
+      setAviso('Casa desvinculada. Revise as convocações futuras já publicadas.')
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao desvincular Casa') }
+    finally { setSalvando(false) }
+  }
+  const transferir = async (ponto: Ponto, casa: Casa) => {
+    const destino = pontos.find(p => p.id === transferindo?.slice(casa.id.length + 1))
+    if (!destino || !casa.pontoAtendimentoId) return
+    const motivo = window.prompt('Motivo da transferência de ' + casa.nome + ' para ' + destino.nome + ' (mínimo 5 caracteres):')
+    if (!motivo || motivo.trim().length < 5) return
+    if (!window.confirm('Confirmar transferência de ' + casa.nome + ' de ' + ponto.nome + ' para ' + destino.nome + '? Convocações já publicadas não serão alteradas.')) return
+    setSalvando(true); setErro(''); setAviso('')
+    try {
+      await postWithAuth('/pontos-atendimento/' + destino.id + '/casas/' + casa.id + '/transferir', { origemPontoId: ponto.id, motivo: motivo.trim() })
+      setTransferindo(null)
+      await carregar()
+      setAviso('Casa transferida. Verifique as convocações futuras já publicadas.')
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Falha ao transferir Casa') }
+    finally { setSalvando(false) }
+  }
   return <section className="space-y-4 p-4 sm:p-6">
     <header className="rounded-xl bg-brand-900 p-4 text-white"><h2 className="text-xl font-bold">Pontos de Atendimento</h2><p className="text-sm text-brand-100">Organização das Casas de Oração por Setor</p></header>
     {erro && <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-800">{erro}</p>}
@@ -81,11 +109,21 @@ export function PontosAtendimentoView() {
     {carregando && <p role="status">Carregando...</p>}
     <div className="space-y-3">{pontos.filter(p => !filtro || p.setorId === filtro).map(p => {
       const vinculadas = casas.filter(c => c.pontoAtendimentoId === p.id)
-      const disponiveis = casas.filter(c => c.setorId === p.setorId && c.pontoAtendimentoId !== p.id)
+      const disponiveis = casas.filter(c => c.setorId === p.setorId && !c.pontoAtendimentoId).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+      const ocupadasEmOutroPonto = casas.filter(c => c.setorId === p.setorId && c.pontoAtendimentoId && c.pontoAtendimentoId !== p.id)
       return <article key={p.id} className="space-y-3 rounded-xl border bg-white p-4">
         <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><h3 className="break-words font-semibold">{p.nome}</h3><p className="text-sm text-slate-600">Código: {p.codigo || '—'} · {setores.find(s => s.id === p.setorId)?.nome || 'Setor'} · {p.ativo ? 'Ativo' : 'Inativo'}</p></div><div className="flex gap-2"><button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => selecionar(p)}>Editar</button><button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => void alterarStatus(p)}>{p.ativo ? 'Inativar' : 'Ativar'}</button></div></div>
-        <p className="text-sm">Casas vinculadas ({vinculadas.length}): {vinculadas.map(c => c.nome).join(', ') || 'Nenhuma'}</p>
-        {p.ativo && <label className="block text-sm font-medium">Vincular Casa de Oração<select defaultValue="" key={p.id + '-' + vinculadas.length} onChange={e => void vincular(p, e.target.value)} className="mt-1 w-full rounded-lg border p-3"><option value="">Selecione uma Casa do Setor</option>{disponiveis.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></label>}
+        <p className="text-sm">Casas vinculadas ({vinculadas.length}): {vinculadas.length ? '' : 'Nenhuma'}</p>
+        {vinculadas.map(c => <div key={c.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-2 text-sm">
+          <span className="min-w-0 flex-1 break-words">{c.nome}</span>
+          <select aria-label={'Ponto de destino para ' + c.nome} value={transferindo === c.id ? '' : transferindo?.startsWith(c.id + ':') ? transferindo.slice(c.id.length + 1) : ''} onChange={e => setTransferindo(e.target.value ? c.id + ':' + e.target.value : null)} className="max-w-full rounded border p-2">
+            <option value="">Transferir para...</option>
+            {pontos.filter(dest => dest.ativo && dest.setorId === p.setorId && dest.id !== p.id).map(dest => <option key={dest.id} value={dest.id}>{dest.nome}</option>)}
+          </select>
+          <button type="button" disabled={salvando || !transferindo?.startsWith(c.id + ':')} onClick={() => void transferir(p, c)} className="rounded border px-3 py-2 disabled:opacity-40">Confirmar</button><button type="button" disabled={salvando} onClick={() => void desvincular(p, c)} className="rounded border px-3 py-2 disabled:opacity-40">Desvincular</button>
+        </div>)}
+        {p.ativo && <p className="text-sm text-slate-600">Casas disponíveis para vínculo: {disponiveis.length}. Já vinculadas a outros Pontos: {ocupadasEmOutroPonto.length}. Casas já vinculadas a este Ponto aparecem acima e não podem ser selecionadas novamente.</p>}
+        {p.ativo && <label className="block text-sm font-medium">Vincular Casa de Oração<select defaultValue="" key={p.id + '-' + vinculadas.length} onChange={e => void vincular(p, e.target.value)} className="mt-1 w-full rounded-lg border p-3"><option value="">{disponiveis.length ? 'Selecione uma Casa sem vínculo' : 'Nenhuma Casa disponível neste Setor'}</option>{disponiveis.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></label>}
       </article>
     })}</div>
   </section>

@@ -1023,6 +1023,63 @@ describe('S06 - Convocações', () => {
     expect(countEvidencias.c).toBe(0)
   })
 
+  it('PA-06: vinculo exclusivo, transferencia auditada e protecoes territoriais', async () => {
+    const ctx = await setupBaseData()
+    const paA = crypto.randomUUID()
+    const paB = crypto.randomUUID()
+    await db.insert(pontosAtendimento).values([
+      { id: paA, nome: 'Ponto A transferencias', setorId: ctx.setId },
+      { id: paB, nome: 'Ponto B transferencias', setorId: ctx.setId },
+    ])
+    // A configuração de base usa GESTOR_AGENDA, sem permissão para administrar estrutura.
+    // Conceder administrador regional somente neste cenário de teste.
+    const conta = sqlite.prepare('SELECT conta_acesso_id AS id FROM acessos_conta WHERE perfil_codigo=? AND escopo_id=? ORDER BY rowid DESC LIMIT 1')
+      .get('GESTOR_AGENDA', ctx.setId) as { id: string }
+    // Administrador regional exige ciência formal do PMO; usar MASTER no teste
+    // de sucesso e validar a negativa do GESTOR_AGENDA antes de concedê-lo.
+    const semPermissao = await app.request(`/api/v1/pontos-atendimento/${paA}/casas/${ctx.casId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    })
+    expect(semPermissao.status).toBe(403)
+    sqlite.prepare("INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, 'MASTER_SISTEMA', 'GLOBAL', NULL)")
+      .run(crypto.randomUUID(), conta.id)
+    // Vincular a sessão de teste à conta que recebeu o perfil Master.
+    sqlite.prepare('UPDATE sessoes SET conta_acesso_id=? WHERE token_hash=?')
+      .run(conta.id, await hashToken(tokenSessaoAtual))
+    const vincular = (id: string, casaId: string) => app.request(
+      `/api/v1/pontos-atendimento/${id}/casas/${casaId}`,
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+    )
+    const transferir = (id: string, casaId: string, origemPontoId: string, motivo: string) => app.request(
+      `/api/v1/pontos-atendimento/${id}/casas/${casaId}/transferir`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ origemPontoId, motivo }) },
+    )
+    expect((await vincular(paA, ctx.casId)).status).toBe(200)
+    expect((await vincular(paB, ctx.casId)).status).toBe(409)
+    expect((await transferir(paB, ctx.casId, paA, 'Redistribuicao territorial')).status).toBe(200)
+    expect(sqlite.prepare('SELECT ponto_atendimento_id AS pa FROM casas WHERE id=?')
+      .get(ctx.casId)).toMatchObject({ pa: paB })
+    const desvincular = await app.request(`/api/v1/pontos-atendimento/${paB}/casas/${ctx.casId}/desvincular`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo: 'Redistribuicao para outro Setor' }),
+    })
+    expect(desvincular.status).toBe(200)
+    expect(sqlite.prepare('SELECT ponto_atendimento_id AS pa FROM casas WHERE id=?')
+      .get(ctx.casId)).toMatchObject({ pa: null })
+    expect((await vincular(paA, ctx.casId)).status).toBe(200)
+    expect(sqlite.prepare("SELECT COUNT(*) AS total FROM auditoria_logs WHERE recurso_id=? AND acao='CASA_DESVINCULADA_PONTO'")
+      .get(ctx.casId)).toMatchObject({ total: 1 })
+    expect((await transferir(paB, ctx.casId, paB, 'Origem desatualizada')).status).toBe(409)
+    expect((await transferir(paB, ctx.casId, paA, 'x')).status).toBe(400)
+    const outroSetor = crypto.randomUUID()
+    await db.insert(setores).values({ id: outroSetor, nome: 'Outro setor PA-06', administracaoId: (await db.select().from(administracoes).where(eq(administracoes.id, (await db.select().from(setores).where(eq(setores.id, ctx.setId)).get()).administracaoId)).get()).id })
+    const paExterno = crypto.randomUUID()
+    await db.insert(pontosAtendimento).values({ id: paExterno, nome: 'Ponto outro setor', setorId: outroSetor })
+    expect((await transferir(paExterno, ctx.casId, paA, 'Transferencia proibida')).status).toBe(400)
+    expect(sqlite.prepare("SELECT COUNT(*) AS total FROM auditoria_logs WHERE recurso_id=? AND acao='CASA_TRANSFERIDA_PONTO'")
+      .get(ctx.casId)).toMatchObject({ total: 1 })
+  })
+
   it('PA-05: aborta publicacao se o Ponto mudar apos selecionar destinatarios', async () => {
     const ctx = await setupBaseData()
     const paA = crypto.randomUUID()
