@@ -116,9 +116,56 @@
   }
 }
 
-/* Casas de Oração: dispositivos móveis em paisagem não devem ativar a tabela desktop.
-   A largura sozinha ultrapassa md em vários telefones girados. */
+/* Casas de OraÃ§Ã£o: dispositivos mÃ³veis em paisagem nÃ£o devem ativar a tabela desktop.
+   A largura sozinha ultrapassa md em vÃ¡rios telefones girados. */
 @media (orientation: landscape) and (max-height: 500px) and (max-width: 1024px) {
   .casas-mobile-cards { display: block !important; }
   .casas-desktop-table { display: none !important; }
+}
+
+/* The same territorial records and actions remain accessible at every width. */
+@layer components {
+  .territorial-table {
+    background: white;
+  }
+  .territorial-table td {
+    vertical-align: top;
+    overflow-wrap: anywhere;
+  }
+  @media (max-width: 767px) {
+    .territorial-table,
+    .territorial-table tbody {
+      display: block;
+      background: transparent;
+    }
+    .territorial-table tr {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      margin-bottom: 1rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.75rem;
+      background: white;
+      padding: 0.25rem;
+    }
+    .territorial-table td {
+      display: block;
+      min-width: 0;
+      padding: 0.5rem 0.75rem;
+    }
+    .territorial-table td[data-label]::before {
+      content: attr(data-label);
+      display: block;
+      font-family: Inter, system-ui, sans-serif;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 0.25rem;
+    }
+    .territorial-table td:last-child > div {
+      justify-content: stretch;
+    }
+    .territorial-table td:last-child button {
+      flex: 1;
+    }
+  }
 }
