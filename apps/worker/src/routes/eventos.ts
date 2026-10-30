@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
 import { eq, and, or, sql, inArray } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal, membros, casas, setores, administracoes, gruposTrabalho, eventosParticipantesExternos, pontosAtendimento, tiposReuniao } from '../db/schema'
+import { eventos, convocacoes, convocacaoFuncoes, locais, espacosLocal, membros, casas, setores, administracoes, gruposTrabalho, eventosParticipantesExternos } from '../db/schema'
 import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, executarOperacaoComAudits, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
 import { podeGerenciarAgendaNoEscopo, podeGerenciarAgendaExterna, podeCriarAgendaExterna, obterRegionalGestaoAgendaExterna, eMasterSistema, eGestorRelatoriosAutorizadoParaEvento } from '../security/permissoes'
+import { validarClassificacaoEvento } from '../services/validacao-classificacao-evento'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
 import { carregarEscoposOperacionaisLegados, condicaoEventosVisiveis, condicaoEventosGerenciaveis, podeLerEvento, podeGerenciarEvento } from '../security/eventos'
@@ -196,25 +197,6 @@ function houveAlteracaoMaterial(anterior: any, atual: any) {
   )
 }
 
-async function validarClassificacaoEvento(db: any, data: {
-  pontoAtendimentoId?: string | null
-  tipoReuniaoId?: string | null
-  setorId?: string | null
-}, anterior?: { pontoAtendimentoId: string | null; tipoReuniaoId: string | null }) {
-  if (data.pontoAtendimentoId) {
-    const ponto = await db.select().from(pontosAtendimento).where(eq(pontosAtendimento.id, data.pontoAtendimentoId)).get()
-    if (!ponto || ponto.setorId !== data.setorId || (!ponto.ativo && anterior?.pontoAtendimentoId !== ponto.id)) {
-      return { error: 'Ponto inexistente, inativo ou de outro Setor', code: 'PONTO_ATENDIMENTO_INVALIDO' }
-    }
-  }
-  if (data.tipoReuniaoId) {
-    const tipo = await db.select().from(tiposReuniao).where(eq(tiposReuniao.id, data.tipoReuniaoId)).get()
-    if (!tipo || (!tipo.ativo && anterior?.tipoReuniaoId !== tipo.id)) {
-      return { error: 'Tipo de Reunião inexistente ou inativo', code: 'TIPO_REUNIAO_INVALIDO' }
-    }
-  }
-  return null
-}
 
 eventosRouter.use('*', authMiddleware)
 
