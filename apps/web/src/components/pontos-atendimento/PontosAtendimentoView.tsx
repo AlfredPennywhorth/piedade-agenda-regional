@@ -11,6 +11,8 @@ export function PontosAtendimentoView({ podeAutorizarExcecaoIntersetorial = fals
   const [setores, setSetores] = useState<Setor[]>([])
   const [casas, setCasas] = useState<Casa[]>([])
   const [filtro, setFiltro] = useState('')
+  const [filtroPonto, setFiltroPonto] = useState('')
+  const [buscaCasa, setBuscaCasa] = useState('')
   const [form, setForm] = useState(vazio)
   const [editando, setEditando] = useState<Ponto | null>(null)
   const [salvando, setSalvando] = useState(false)
@@ -134,23 +136,36 @@ export function PontosAtendimentoView({ podeAutorizarExcecaoIntersetorial = fals
       <label className="block text-sm font-medium">Setor<select required value={form.setorId} onChange={e => setForm(f => ({ ...f, setorId: e.target.value }))} className="mt-1 w-full rounded-lg border p-3"><option value="">Selecione</option>{setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}</select></label>
       <div className="flex flex-wrap gap-2"><button disabled={salvando} className="rounded-lg bg-brand-900 px-4 py-2 font-semibold text-white disabled:opacity-50">{salvando ? 'Salvando...' : 'Salvar'}</button>{editando && <button type="button" className="rounded-lg border px-4 py-2" onClick={() => { setEditando(null); setForm(vazio) }}>Cancelar edição</button>}</div>
     </form>
-    <label className="block text-sm font-medium">Filtrar por Setor<select value={filtro} onChange={e => setFiltro(e.target.value)} className="mt-1 w-full rounded-lg border bg-white p-3"><option value="">Todos os Setores</option>{setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}</select></label>
+    <label className="block text-sm font-medium">Filtrar por Setor<select value={filtro} onChange={e => { setFiltro(e.target.value); setFiltroPonto('') }} className="mt-1 w-full rounded-lg border bg-white p-3"><option value="">Todos os Setores</option>{setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}</select></label>
+    <div className="grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-2">
+      <label className="block min-w-0 text-sm font-medium">Filtrar por Ponto de Atendimento
+        <select value={filtroPonto} onChange={e => setFiltroPonto(e.target.value)} className="mt-1 w-full min-w-0 rounded-lg border bg-white p-3">
+          <option value="">Todos os Pontos de Atendimento</option>
+          {pontos.filter(p => !filtro || p.setorId === filtro).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+        </select>
+      </label>
+      <label className="block min-w-0 text-sm font-medium">Buscar Casa de Oração
+        <input type="search" value={buscaCasa} onChange={e => setBuscaCasa(e.target.value)} placeholder="Digite o nome da Casa" className="mt-1 w-full min-w-0 rounded-lg border p-3" />
+      </label>
+      {(filtro || filtroPonto || buscaCasa) && <button type="button" className="w-fit rounded-lg border px-3 py-2 text-sm sm:col-span-2" onClick={() => { setFiltro(''); setFiltroPonto(''); setBuscaCasa('') }}>Limpar filtros</button>}
+    </div>
     {carregando && <p role="status">Carregando...</p>}
-    <div className="space-y-3">{pontos.filter(p => !filtro || p.setorId === filtro).map(p => {
-      const vinculadas = casas.filter(c => c.pontoAtendimentoId === p.id)
+    <div className="space-y-3">{pontos.filter(p => (!filtro || p.setorId === filtro) && (!filtroPonto || p.id === filtroPonto) && (!buscaCasa.trim() || casas.some(c => c.pontoAtendimentoId === p.id && c.nome.toLocaleLowerCase('pt-BR').includes(buscaCasa.trim().toLocaleLowerCase('pt-BR'))))).map(p => {
+      const vinculadas = casas.filter(c => c.pontoAtendimentoId === p.id && (!buscaCasa.trim() || c.nome.toLocaleLowerCase('pt-BR').includes(buscaCasa.trim().toLocaleLowerCase('pt-BR')))).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
       const disponiveis = casas.filter(c => c.setorId === p.setorId && !c.pontoAtendimentoId).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
       const excecoesDisponiveis = casas.filter(c => c.ativo && c.setorId !== p.setorId && !c.pontoAtendimentoId).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
       const ocupadasEmOutroPonto = casas.filter(c => c.setorId === p.setorId && c.pontoAtendimentoId && c.pontoAtendimentoId !== p.id)
       return <article key={p.id} className="space-y-3 rounded-xl border bg-white p-4">
         <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><h3 className="break-words font-semibold">{p.nome}</h3><p className="text-sm text-slate-600">Código: {p.codigo || '—'} · {setores.find(s => s.id === p.setorId)?.nome || 'Setor'} · {p.ativo ? 'Ativo' : 'Inativo'}</p></div><div className="flex gap-2"><button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => selecionar(p)}>Editar</button><button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => void alterarStatus(p)}>{p.ativo ? 'Inativar' : 'Ativar'}</button></div></div>
         <p className="text-sm">Casas vinculadas ({vinculadas.length}): {vinculadas.length ? '' : 'Nenhuma'}</p>
-        {vinculadas.map(c => <div key={c.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-2 text-sm">
-          <span className="min-w-0 flex-1 break-words">{c.nome}</span>
-          <select aria-label={'Ponto de destino para ' + c.nome} value={transferindo === c.id ? '' : transferindo?.startsWith(c.id + ':') ? transferindo.slice(c.id.length + 1) : ''} onChange={e => setTransferindo(e.target.value ? c.id + ':' + e.target.value : null)} className="max-w-full rounded border p-2">
+        {vinculadas.map(c => <div key={c.id} className="min-w-0 space-y-3 rounded-lg border p-3 text-sm">
+          <p className="w-full whitespace-normal break-words font-semibold leading-relaxed">{c.nome}</p>
+          <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <select aria-label={'Ponto de destino para ' + c.nome} value={transferindo === c.id ? '' : transferindo?.startsWith(c.id + ':') ? transferindo.slice(c.id.length + 1) : ''} onChange={e => setTransferindo(e.target.value ? c.id + ':' + e.target.value : null)} className="w-full min-w-0 rounded border p-3">
             <option value="">Transferir para...</option>
             {pontos.filter(dest => dest.ativo && dest.setorId === p.setorId && dest.id !== p.id).map(dest => <option key={dest.id} value={dest.id}>{dest.nome}</option>)}
           </select>
-          <button type="button" disabled={salvando || !transferindo?.startsWith(c.id + ':')} onClick={() => void transferir(p, c)} className="rounded border px-3 py-2 disabled:opacity-40">Confirmar</button><button type="button" disabled={salvando} onClick={() => void desvincular(p, c)} className="rounded border px-3 py-2 disabled:opacity-40">Desvincular</button>
+          <button type="button" disabled={salvando || !transferindo?.startsWith(c.id + ':')} onClick={() => void transferir(p, c)} className="rounded border px-3 py-2 disabled:opacity-40">Confirmar</button></div><button type="button" disabled={salvando} onClick={() => void desvincular(p, c)} className="rounded border border-red-200 px-3 py-2 text-red-700 disabled:opacity-40">Desvincular</button>
         </div>)}
         {p.ativo && <p className="text-sm text-slate-600">Casas disponíveis para vínculo: {disponiveis.length}. Já vinculadas a outros Pontos: {ocupadasEmOutroPonto.length}. Casas já vinculadas a este Ponto aparecem acima e não podem ser selecionadas novamente.</p>}
         {p.ativo && <label className="block text-sm font-medium">Vincular Casa de Oração<select value={casaPendente[p.id] || ''} onChange={e => setCasaPendente(prev => ({ ...prev, [p.id]: e.target.value }))} className="mt-1 w-full rounded-lg border p-3"><option value="">{disponiveis.length ? 'Selecione uma Casa sem vínculo' : 'Nenhuma Casa disponível neste Setor'}</option>{disponiveis.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}</select><span className="mt-2 block text-xs font-normal text-slate-600">Após selecionar, confirme o vínculo abaixo. A escolha não grava automaticamente.</span><span className="mt-2 flex flex-wrap gap-2"><button type="button" disabled={salvando || !disponiveis.some(c => c.id === casaPendente[p.id])} onClick={() => void vincular(p, casaPendente[p.id])} className="rounded-lg bg-brand-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">Confirmar vínculo</button><button type="button" disabled={salvando || !casaPendente[p.id]} onClick={() => setCasaPendente(prev => ({ ...prev, [p.id]: '' }))} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40">Cancelar</button></span></label>}
