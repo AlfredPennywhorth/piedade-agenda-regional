@@ -35,3 +35,16 @@ Durante revisão, comparar:
 - instruções de agentes × estes gates.
 
 O preflight automatiza verificações objetivas de base/SHA/impacto e blockers P0. A resolução de threads deve permanecer sob a proteção nativa da branch. Segurança, aderência funcional e smoke continuam exigindo revisão humana.
+
+## Exceção transitória de release seletivo — PR #430 (30/10/2026)
+
+A regra canônica continua sendo `develop → main`. Diante da divergência das branches e da aprovação exclusiva da UX de Pontos de Atendimento na PR #429, o preflight permite **somente a PR #430**, com base `main` e head `release/pr429-pontos-filtros-main-20261030`, identificados pelo evento autenticado do GitHub Actions.
+
+A exceção exige diff limitado **exatamente** aos três arquivos a seguir:
+- `apps/web/src/components/pontos-atendimento/PontosAtendimentoView.tsx` — alteração funcional homologada, frontend apenas;
+- `scripts/preflight.mjs` — gate de uso único, vinculado à PR #430;
+- `docs/00-governanca/preflight-cross-audit.md` — justificativa e rastreabilidade.
+
+A exceção não vale para outras PRs, branches, merges diretos ou execuções manuais; qualquer arquivo adicional reprova o preflight. Permanece obrigatória a CI no HEAD, revisão do delta, verificação de P0 e de threads, autorização expressa do PMO para merge e deploy, além de smoke pós-deploy. Não altera Worker, D1 ou as demais regras de produção.
+
+Após esta promoção, avaliar em PR separada um mecanismo geral e auditável de releases seletivos; **não ampliar a exceção temporária**.
