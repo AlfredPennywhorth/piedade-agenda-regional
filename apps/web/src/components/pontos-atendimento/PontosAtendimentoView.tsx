@@ -32,6 +32,7 @@ export function PontosAtendimentoView({ podeAutorizarExcecaoIntersetorial = fals
         fetchWithAuth<Casa[]>('/casas'),
       ])
       setPontos(lista); setSetores(setoresLista); setCasas(casasLista)
+      setFiltroPonto(anterior => anterior && !lista.some(p => p.id === anterior && (!filtro || p.setorId === filtro)) ? '' : anterior)
       setCasaPendente(prev => Object.fromEntries(Object.entries(prev).filter(([pontoId, casaId]) => {
         const ponto = lista.find(p => p.id === pontoId)
         return ponto && casasLista.some(c => c.id === casaId && c.setorId === ponto.setorId && !c.pontoAtendimentoId)
@@ -151,13 +152,14 @@ export function PontosAtendimentoView({ podeAutorizarExcecaoIntersetorial = fals
     </div>
     {carregando && <p role="status">Carregando...</p>}
     <div className="space-y-3">{pontos.filter(p => (!filtro || p.setorId === filtro) && (!filtroPonto || p.id === filtroPonto) && (!buscaCasa.trim() || casas.some(c => c.pontoAtendimentoId === p.id && c.nome.toLocaleLowerCase('pt-BR').includes(buscaCasa.trim().toLocaleLowerCase('pt-BR'))))).map(p => {
+      const totalVinculadas = casas.filter(c => c.pontoAtendimentoId === p.id).length
       const vinculadas = casas.filter(c => c.pontoAtendimentoId === p.id && (!buscaCasa.trim() || c.nome.toLocaleLowerCase('pt-BR').includes(buscaCasa.trim().toLocaleLowerCase('pt-BR')))).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
       const disponiveis = casas.filter(c => c.setorId === p.setorId && !c.pontoAtendimentoId).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
       const excecoesDisponiveis = casas.filter(c => c.ativo && c.setorId !== p.setorId && !c.pontoAtendimentoId).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
       const ocupadasEmOutroPonto = casas.filter(c => c.setorId === p.setorId && c.pontoAtendimentoId && c.pontoAtendimentoId !== p.id)
       return <article key={p.id} className="space-y-3 rounded-xl border bg-white p-4">
         <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><h3 className="break-words font-semibold">{p.nome}</h3><p className="text-sm text-slate-600">Código: {p.codigo || '—'} · {setores.find(s => s.id === p.setorId)?.nome || 'Setor'} · {p.ativo ? 'Ativo' : 'Inativo'}</p></div><div className="flex gap-2"><button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => selecionar(p)}>Editar</button><button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={() => void alterarStatus(p)}>{p.ativo ? 'Inativar' : 'Ativar'}</button></div></div>
-        <p className="text-sm">Casas vinculadas ({vinculadas.length}): {vinculadas.length ? '' : 'Nenhuma'}</p>
+        <p className="text-sm">Casas vinculadas ({totalVinculadas}): {totalVinculadas ? '' : 'Nenhuma'}</p>
         {vinculadas.map(c => <div key={c.id} className="min-w-0 space-y-3 rounded-lg border p-3 text-sm">
           <p className="w-full whitespace-normal break-words font-semibold leading-relaxed">{c.nome}</p>
           <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
