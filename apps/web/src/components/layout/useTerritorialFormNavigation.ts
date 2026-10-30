@@ -3,7 +3,8 @@ import { useEffect, useRef } from 'react'
 export function useTerritorialFormNavigation(
   aberto: boolean,
   carregandoDetalhes: boolean,
-  carregandoLista: boolean
+  carregandoLista: boolean,
+  fallbackId: string
 ) {
   const formRef = useRef<HTMLDivElement>(null)
   const origem = useRef<string | null>(null)
@@ -18,11 +19,13 @@ export function useTerritorialFormNavigation(
 
   useEffect(() => {
     if (aberto || carregandoLista || !restaurar.current) return
-    const alvo = origem.current ? document.getElementById(origem.current) : null
+    const alvo =
+      (origem.current ? document.getElementById(origem.current) : null) ??
+      document.getElementById(fallbackId)
     alvo?.focus({ preventScroll: true })
     alvo?.scrollIntoView?.({ block: 'nearest', behavior: 'instant' })
     restaurar.current = false
-  }, [aberto, carregandoLista])
+  }, [aberto, carregandoLista, fallbackId])
 
   return {
     formRef,

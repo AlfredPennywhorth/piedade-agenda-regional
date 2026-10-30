@@ -39,7 +39,8 @@ export function RegionaisView({ podeEditar = true }: { podeEditar?: boolean }) {
   const { formRef, guardarOrigem, retornar } = useTerritorialFormNavigation(
     modoForm !== null,
     carregandoDetalhes,
-    loading
+    loading,
+    'novo-regionais'
   )
 
   const carregarRegionais = async () => {

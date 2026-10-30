@@ -46,7 +46,8 @@ export function AdministracoesView() {
   const { formRef, guardarOrigem, retornar } = useTerritorialFormNavigation(
     modoForm !== null,
     carregandoDetalhes,
-    loading
+    loading,
+    'novo-administracoes'
   )
 
   const carregarDados = async () => {

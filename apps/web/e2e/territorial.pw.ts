@@ -209,3 +209,39 @@ test('Regionais em consulta não oferece criação ou edição', async ({ page }
   await expect(page.getByRole('button', { name: 'Editar', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '+ Nova Regional', exact: true })).toHaveCount(0)
 })
+
+test('Administração movida para outra Regional preserva filtro e retorna foco a Nova Administração', async ({
+  page,
+}) => {
+  const outraRegional = '33333333-3333-4333-8333-333333333333'
+  const adm = { id: admId, regionalId, nome: 'Administração teste', codigo: null, ativo: true }
+  await page.route('**/api/v1/**', async route => {
+    const path = new URL(route.request().url()).pathname.replace('/api/v1', '')
+    if (route.request().method() === 'PATCH') Object.assign(adm, route.request().postDataJSON())
+    await route.fulfill({
+      json:
+        path === '/regionais'
+          ? [
+              { id: regionalId, nome: 'Regional A', codigo: null, ativo: true },
+              { id: outraRegional, nome: 'Regional B', codigo: null, ativo: true },
+            ]
+          : path === '/administracoes'
+            ? [adm]
+            : adm,
+    })
+  })
+  await page.goto('/e2e/territorial.html?tela=administracoes')
+  await page.getByLabel('Filtrar por Regional:').selectOption(regionalId)
+  await page.getByRole('button', { name: 'Editar', exact: true }).click()
+  await expect(page.locator('#input-regional')).toHaveValue(regionalId)
+  await page.locator('#input-regional').selectOption(outraRegional)
+  await page.getByRole('button', { name: 'Atualizar Administração', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('atualizada com sucesso')
+  await expect(page.getByLabel('Filtrar por Regional:')).toHaveValue(regionalId)
+  await expect(
+    page.getByText('Nenhuma administração encontrada para a regional selecionada.')
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: '+ Nova Administração', exact: true })
+  ).toBeFocused()
+})
