@@ -59,3 +59,15 @@ Para cada código 007/041/042, verificar (1) versão/variante escolhida, (2) lay
 ### Próximo gate
 
 Registrar checklist visual das telas `AGD-ADM-007`, `AGD-ADM-041` e `AGD-ADM-042` no Beta com resultados e evidências; abrir PR **de implementação React separada** apenas para divergências demonstradas (não refazer cards/UUID já corrigidos). Não tocar produção nem alterar dados de teste do usuário sem autorização.
+
+## Aceite final do PO — 30/10/2026
+
+O PO confirmou expressamente: **“as telas 007, 041 e 042 estão aprovadas”**.
+
+- **AGD-ADM-007 — Listagem de Setores:** aprovada.
+- **AGD-ADM-041 — Cadastro de Setor:** aprovada.
+- **AGD-ADM-042 — Edição de Setor:** aprovada.
+
+**Decisão:** Gate A do sublote Setores aprovado; utilizar layouts originais claros/escuros anteriormente validados, com logotipo institucional preservado. A implementação React atual já contém cards responsivos, filtros em cascata e nome da Administração no modal. Não criar nova PR de redesenho destas telas sem novo defeito comprovado. As dívidas transversais ou de outros módulos continuam independentes.
+
+**Governança:** aceite visual não é autorização de merge, deploy ou alteração no D1. Beta e produção só são alterados no fluxo de liberação estabelecido.
