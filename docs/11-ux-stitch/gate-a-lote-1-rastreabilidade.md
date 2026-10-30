@@ -34,3 +34,11 @@ Exemplos inventados de informações cadastráveis pelo usuário não bloqueiam 
 2. Conferir matriz de códigos `AGD-ADM-005/006/007/008/009/013` e suas subtelas aprovadas; não inferir aceite funcional.
 3. Verificar lacunas de subestados mobile/desktop a partir dos componentes reais; solicitar PO apenas se houver novo comportamento ou alteração visual material.
 4. Encerrar Gate A **somente após** rastreabilidade e cobertura; autorização de implementação React/Tailwind será decisão independente do PO.
+
+## Checklist consolidado de aceite (22/10/2026)
+
+Consultar a [Matriz de fechamento do Gate A — Lote 1](matriz-fechamento-gate-a-lote-1-2026-10-22.md) para códigos, variantes, ressalvas e critérios de evidência por tela. A matriz não altera os aceites condicionados anteriores nem encerra o Gate A.
+
+## Atualização de evidências — Casas e menu Mais (22/10/2026)
+
+Os seis HTMLs de Casas de Oração (quatro protótipos principais e duas variantes comparativas) **já constam na `develop`**. O documento de origem da pasta contém pendências históricas de arquivamento que não representam o estado atual do GitHub. A escolha das versões B de cadastro e edição foi registrada pelo PO em 19/10. Há uma divergência a resolver sobre paginação na referência mobile versus o escopo funcional atual. Consultar [auditoria preliminar de Casas e Mais](auditoria-gate-a-casas-mais-2026-10-22.md) antes de concluir o Gate A.

@@ -53,6 +53,9 @@ jobs:
           VITE_BUILD_SHA: ${{ github.sha }}
         run: pnpm --filter @piedade/web build
 
+      - name: Include Stitch homologation references (Beta only)
+        run: node tools/homologacao-stitch/build.mjs
+
       - name: Deploy Pages Beta preview
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}

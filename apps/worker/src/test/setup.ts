@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 
 const escopoConfirmacoesSql = readFileSync(decodeURIComponent(new URL('../../drizzle/0047_escopo_confirmacoes_rsvp.sql', import.meta.url).pathname)).toString('utf8')
+const excecaoIntersetorialSql = readFileSync(decodeURIComponent(new URL('../../drizzle/0049_pa_excecao_intersetorial.sql', import.meta.url).pathname)).toString('utf8')
+const pontosAtendimentoSql = readFileSync(decodeURIComponent(new URL('../../drizzle/0044_pontos_atendimento_tipos_reuniao.sql', import.meta.url).pathname)).toString('utf8')
 const portariaIntegridadeSql = readFileSync(decodeURIComponent(new URL('../../drizzle/0046_portaria_escopo_integridade.sql', import.meta.url).pathname)).toString('utf8')
 
 export function setupDb(sqlite: any) {
@@ -988,6 +990,8 @@ export function setupDb(sqlite: any) {
 
   `
   sqlite.exec(setupSql)
+  sqlite.exec(pontosAtendimentoSql)
+  sqlite.exec(excecaoIntersetorialSql)
   sqlite.exec(portariaIntegridadeSql)
   sqlite.exec(escopoConfirmacoesSql)
 }

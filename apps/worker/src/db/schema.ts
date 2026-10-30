@@ -61,8 +61,34 @@ export const setores = sqliteTable('setores', {
   ...timestamps,
 })
 
+export const pontosAtendimento = sqliteTable('pontos_atendimento', {
+  id: text('id').primaryKey(),
+  setorId: text('setor_id').notNull().references(() => setores.id),
+  nome: text('nome').notNull(),
+  codigo: text('codigo'),
+  ativo: ativoDefault,
+  ...timestamps,
+})
+
+export const casasPontosExcecoes = sqliteTable('casas_pontos_excecoes', {
+  casaId: text('casa_id').primaryKey().references(() => casas.id),
+  pontoAtendimentoId: text('ponto_atendimento_id').notNull().references(() => pontosAtendimento.id),
+  motivo: text('motivo').notNull(),
+  autorizadoPorMembroId: text('autorizado_por_membro_id').references(() => membros.id),
+  criadoEm: text('criado_em').notNull().default(sql`CURRENT_TIMESTAMP`),
+})
+
+export const tiposReuniao = sqliteTable('tipos_reuniao', {
+  id: text('id').primaryKey(),
+  nome: text('nome').notNull(),
+  codigo: text('codigo').notNull().unique(),
+  ativo: ativoDefault,
+  ...timestamps,
+})
+
 export const casas = sqliteTable('casas', {
   id: text('id').primaryKey(),
+  pontoAtendimentoId: text('ponto_atendimento_id').references(() => pontosAtendimento.id),
   setorId: text('setor_id')
     .notNull()
     .references(() => setores.id), // Permite atualização (Update)
@@ -586,6 +612,9 @@ export const eventos = sqliteTable(
     pessoal: integer('pessoal', { mode: 'boolean' }).notNull().default(false),
     criadorMembroId: text('criador_membro_id').references(() => membros.id),
     titulo: text('titulo').notNull(),
+    tipoReuniaoId: text('tipo_reuniao_id').references(() => tiposReuniao.id),
+    pontoAtendimentoId: text('ponto_atendimento_id').references(() => pontosAtendimento.id),
+    grupoEquivalenciaId: text('grupo_equivalencia_id'),
     descricao: text('descricao'),
     pauta: text('pauta'),
     modalidade: text('modalidade').notNull(), // PRESENCIAL, ONLINE, HIBRIDO

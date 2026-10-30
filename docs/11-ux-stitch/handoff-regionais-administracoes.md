@@ -26,3 +26,25 @@
 Os oito HTML foram apresentados no histórico desta conversa em 16/10/2026, após envio dos prints nativos. **Arquivamento imutável dos originais de Regionais/Administrações e hashes ainda precisa ser confirmado**: este handoff não afirma que os binários de protótipo estejam versionados nesta PR.
 
 **Gate:** direção visual aceita com condições; Gate A integral do lote 1 não encerrado; nenhuma implementação, deploy, merge ou release autorizados por este documento.
+
+## Decisão complementar do PO — 24/10/2026 — Regionais
+
+**Layouts de Regionais aprovados quanto à direção visual**, com duas ressalvas expressas e bloqueadoras do aceite final:
+
+1. **Informações extras nos protótipos:** remover ou não implementar campos, indicadores, contagens, filtros ou dados de negócio que não estejam respaldados no contrato e na base real. A implementação atual de `RegionaisView.tsx` expõe `id`, `nome`, `codigo`, `ativo` e metadados técnicos `createdAt`/`updatedAt`, mas os campos efetivos de cadastro são **nome obrigatório, código opcional e ativo/inativo**. Metadados internos não autorizam criar campos editáveis, métricas ou status artificiais. Todo conteúdo extra deve ser inventariado por tela (005, 037 e 038) e confrontado com backend antes da implementação.
+2. **Responsividade da listagem AGD-ADM-005 mobile:** **não aprovada**. Alinhar a composição à proposta aprovada de Setores em mobile: cartões legíveis sem truncar nomes, informações reais, ações acessíveis, sem rolagem horizontal, sem navegação inferior sobrepondo registros, zoom/teclado operáveis. Preservar a identidade institucional e o logotipo aprovado.
+
+A **aprovação do layout não abrange a responsividade mobile** nem a existência das informações adicionais. Somente após corrigir essas ressalvas e conferir as versões desktop/mobile, solicitar aceite final do PO. Não alterar os arquivos Stitch originais; produzir derivações identificadas, se necessário. A presente decisão **não autoriza React, migrações, mudanças na base, deploy nem produção**.
+
+## Decisão complementar do PO — 24/10/2026 — Administrações
+
+O PO **aprovou os layouts das telas de Administrações**, com as **mesmas ressalvas já registradas para Regionais**:
+
+- **AGD-ADM-006** (listagem desktop/mobile), **AGD-ADM-039** (cadastro) e **AGD-ADM-040** (edição): direção visual aprovada, porém **responsividade mobile ainda não aprovada**. Ajustar a experiência mobile ao padrão visual previamente aceito para Setores (cards legíveis sem truncamento de nomes, ações reais acessíveis, sem rolagem horizontal, navegação que não encubra o último registro).
+- **Não transportar informações adicionais que não existem na base ou no contrato real**: descartar indicadores, datas, quantidades, status artificiais, filtros e campos fictícios do Stitch. Campos funcionais já documentados para Administração: Regional obrigatória, nome obrigatório, código opcional e ativo/inativo; confrontar outros elementos com a API e interface real antes de especificar implementação.
+- **Preservar o logotipo institucional aprovado** e identidade visual comum em ambas as temáticas.
+- Aceite estético **não** autoriza alterações no banco, implementação React, merge, deploy ou liberação da produção. Registrar correções como pendências do Gate A e solicitar nova validação mobile.
+
+## Homologação do tema escuro pelo PO — 24/10/2026
+
+**Aprovadas as versões escuras de Regionais e de Administrações quanto a cores e layout.** Permanecem as ressalvas anteriores relativas a dados reais, filtros e responsividade mobile; este aceite não autoriza implementação/deploy nem encerra Gate A integral.

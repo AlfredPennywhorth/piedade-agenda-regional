@@ -39,6 +39,8 @@ describe('ACC-11 — capacidades consolidadas da conta', () => {
       podeAdministrarAcessos: false,
       podeGerenciarSessoes: false,
       podeAdministrarRegionais: false,
+      podeAutorizarExcecaoIntersetorial: false,
+      podeVisualizarGruposAlternativos: false,
       podeAdministrarEstrutura: false,
       podeAdministrarPessoas: false,
       podeAdministrarFuncoes: false,
@@ -139,6 +141,7 @@ describe('ACC-11 — capacidades consolidadas da conta', () => {
     expect(capacidades.podeAdministrarAcessos).toBe(true)
     expect(capacidades.podeGerenciarSessoes).toBe(false)
     expect(capacidades.podeAdministrarRegionais).toBe(false)
+    expect(capacidades.podeAutorizarExcecaoIntersetorial).toBe(false)
     expect(capacidades.podeAdministrarEstrutura).toBe(true)
     expect(capacidades.podeAdministrarPessoas).toBe(true)
     expect(capacidades.podeAdministrarFuncoes).toBe(false)
@@ -156,6 +159,7 @@ describe('ACC-11 — capacidades consolidadas da conta', () => {
     expect(capacidades.podeAdministrarAcessos).toBe(true)
     expect(capacidades.podeGerenciarSessoes).toBe(true)
     expect(capacidades.podeAdministrarRegionais).toBe(true)
+    expect(capacidades.podeAutorizarExcecaoIntersetorial).toBe(true)
     expect(capacidades.podeAdministrarEstrutura).toBe(true)
     expect(capacidades.podeAdministrarPessoas).toBe(true)
     expect(capacidades.podeAdministrarFuncoes).toBe(true)

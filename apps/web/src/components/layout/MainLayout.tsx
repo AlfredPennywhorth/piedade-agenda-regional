@@ -11,6 +11,8 @@ export interface CapacidadesFrontend {
   podeAdministrarAcessos?: boolean
   podeGerenciarSessoes?: boolean
   podeAdministrarRegionais?: boolean
+  podeAutorizarExcecaoIntersetorial?: boolean
+  podeVisualizarGruposAlternativos?: boolean
   podeAdministrarEstrutura?: boolean
   podeAdministrarPessoas?: boolean
   podeAdministrarFuncoes?: boolean
@@ -30,6 +32,8 @@ export const SCREEN_CODES = {
   regionais: 'AGD-ADM-005',
   administracoes: 'AGD-ADM-006',
   setores: 'AGD-ADM-007',
+  'pontos-atendimento': 'AGD-ADM-060',
+  'tipos-reuniao': 'AGD-ADM-061',
   casas: 'AGD-ADM-008',
   'grupos-trabalho': 'AGD-ADM-009',
   membros: 'AGD-ADM-010',
@@ -42,8 +46,8 @@ export const SCREEN_CODES = {
 
 interface MainLayoutProps {
   children: ReactNode
-  currentTab: 'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes' | 'acessos'
-  onTabChange: (tab: 'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes' | 'acessos') => void
+  currentTab: 'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'pontos-atendimento' | 'tipos-reuniao' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes' | 'acessos'
+  onTabChange: (tab: 'agenda' | 'eventos' | 'series' | 'calendario' | 'avisos' | 'cadastro' | 'portaria' | 'relatorios' | 'auditoria' | 'regionais' | 'administracoes' | 'setores' | 'pontos-atendimento' | 'tipos-reuniao' | 'casas' | 'grupos-trabalho' | 'membros' | 'funcoes' | 'vinculos-funcionais' | 'locais' | 'convocacoes' | 'acessos') => void
   capacidades?: CapacidadesFrontend
   nomeUsuario?: string
   onLogout?: () => void | Promise<void>
@@ -237,7 +241,9 @@ export function MainLayout({ children, currentTab, onTabChange, capacidades, nom
                     {mostrarEstrutura && <button type="button" onClick={() => navegar('regionais')} className="rounded-lg bg-slate-50 p-3 text-left">Regionais</button>}
                     {mostrarEstrutura && <button type="button" onClick={() => navegar('administracoes')} className="rounded-lg bg-slate-50 p-3 text-left">Administrações</button>}
                     {mostrarEstrutura && <button type="button" onClick={() => navegar('setores')} className="rounded-lg bg-slate-50 p-3 text-left">Setores</button>}
-                    {mostrarEstrutura && <button type="button" onClick={() => navegar('casas')} className="rounded-lg bg-slate-50 p-3 text-left">Casas</button>}
+                    {mostrarEstrutura && <button type="button" onClick={() => navegar('pontos-atendimento')} className="rounded-lg bg-slate-50 p-3 text-left">Pontos de Atendimento</button>}
+                    {mostrarEstrutura && <button type="button" onClick={() => navegar('tipos-reuniao')} className="rounded-lg bg-slate-50 p-3 text-left">Tipos de Reunião</button>}
+                    {mostrarEstrutura && <button type="button" onClick={() => navegar('casas')} className="rounded-lg bg-slate-50 p-3 text-left">Casas de Oração</button>}
                     {mostrarEstrutura && <button type="button" onClick={() => navegar('grupos-trabalho')} className="rounded-lg bg-slate-50 p-3 text-left">Grupos de Trabalho</button>}
                     {mostrarGestaoAgenda && <button type="button" onClick={() => navegar('locais')} className="rounded-lg bg-slate-50 p-3 text-left">Locais</button>}
                   </div>

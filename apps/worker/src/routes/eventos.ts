@@ -5,6 +5,7 @@ import { EventoCreate, EventoUpdate } from '@piedade/shared'
 import { executarOperacaoComAudit, executarOperacaoComAudits, extrairEscopoDoEvento, AuditLogData } from '../services/auditoria'
 import { authMiddleware } from '../middleware/auth'
 import { podeGerenciarAgendaNoEscopo, podeGerenciarAgendaExterna, podeCriarAgendaExterna, obterRegionalGestaoAgendaExterna, eMasterSistema, eGestorRelatoriosAutorizadoParaEvento } from '../security/permissoes'
+import { validarClassificacaoEvento } from '../services/validacao-classificacao-evento'
 import { espacoAtivoPertenceAoLocal, espacoPertenceAoLocal } from '../services/espacos-local'
 
 import { carregarEscoposOperacionaisLegados, condicaoEventosVisiveis, condicaoEventosGerenciaveis, podeLerEvento, podeGerenciarEvento } from '../security/eventos'
@@ -196,6 +197,7 @@ function houveAlteracaoMaterial(anterior: any, atual: any) {
   )
 }
 
+
 eventosRouter.use('*', authMiddleware)
 
 // Metadados de filtro não concedem acesso a eventos fora da autorização.
@@ -256,6 +258,8 @@ eventosRouter.post('/', async (c) => {
   try {
     const body = await c.req.json()
     const parsed = EventoCreate.parse(body)
+    const erroClassificacao = await validarClassificacaoEvento(db, parsed)
+    if (erroClassificacao) return c.json(erroClassificacao, 400)
     
     if (!(await espacoAtivoPertenceAoLocal(db, parsed.localId, parsed.espacoId))) {
       if (await espacoPertenceAoLocal(db, parsed.localId, parsed.espacoId)) {
@@ -514,6 +518,8 @@ eventosRouter.patch('/:id', async (c) => {
         ? { ...merged, regionalId: null, administracaoId: null, setorId: null, casaId: null, grupoTrabalhoId: null }
         : merged
     )
+    const erroClassificacao = await validarClassificacaoEvento(db, merged, existing)
+    if (erroClassificacao) return c.json(erroClassificacao, 400)
     const espacoFoiAlterado = parsed.espacoId !== undefined && parsed.espacoId !== existing.espacoId
     const espacoValido = espacoFoiAlterado
       ? await espacoAtivoPertenceAoLocal(db, merged.localId, merged.espacoId)

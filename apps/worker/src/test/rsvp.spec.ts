@@ -366,6 +366,86 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     expect(res.status).toBe(404)
   })
 
+  it('PA-02: escolha unica entre alternativas, troca apos recusa e independencia de outros grupos', async () => {
+    const setor = 'set-1'
+    const pontoA = crypto.randomUUID()
+    const pontoB = crypto.randomUUID()
+    const tipoId = crypto.randomUUID()
+    const grupoId = crypto.randomUUID()
+    const outroGrupoId = crypto.randomUUID()
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(pontoA, setor, 'PA RSVP A')
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(pontoB, setor, 'PA RSVP B')
+    sqlite.prepare('INSERT INTO tipos_reuniao (id, nome, codigo) VALUES (?, ?, ?)').run(tipoId, 'Atendimento RSVP', 'ATD-RSVP-PA02')
+    const eventos = [
+      ['ev-pa-rsvp-a', pontoA, grupoId],
+      ['ev-pa-rsvp-b', pontoB, grupoId],
+      ['ev-pa-rsvp-outro', pontoB, outroGrupoId],
+    ] as const
+    for (const [id, ponto, grupo] of eventos) {
+      sqlite.prepare(`INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, setor_id, ponto_atendimento_id, tipo_reuniao_id, grupo_equivalencia_id, ativo)
+        VALUES (?, ?, 'ONLINE', '2030-08-01T10:00:00Z', '2030-08-01T11:00:00Z', ?, ?, ?, ?, 1)`)
+        .run(id, id, setor, ponto, tipoId, grupo)
+      sqlite.prepare("INSERT INTO convocacoes (id, evento_id, status, ativo) VALUES (?, ?, 'PUBLICADA', 1)")
+        .run(`conv-${id}`, id)
+      sqlite.prepare("INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES (?, ?, ?)")
+        .run(`dest-${id}`, `conv-${id}`, membroId)
+    }
+    const responder = (id: string, resposta: string) => req(`/api/v1/minha-agenda/rsvp/dest-${id}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta, ...(resposta === 'NAO_PARTICIPAREI' ? { justificativa: 'Escolhi outra reunião alternativa' } : {}) }),
+    })
+    expect((await responder('ev-pa-rsvp-a', 'PARTICIPAREI')).status).toBe(200)
+    const segunda = await responder('ev-pa-rsvp-b', 'PARTICIPAREI')
+    expect(segunda.status).toBe(409)
+    expect((await segunda.json() as { code: string }).code).toBe('RSVP_ALTERNATIVA_JA_CONFIRMADA')
+    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM rsvp WHERE convocacao_destinatario_id = ?")
+      .get('dest-ev-pa-rsvp-b')).toMatchObject({ n: 0 })
+    expect((await responder('ev-pa-rsvp-outro', 'PARTICIPAREI')).status).toBe(200)
+    expect((await responder('ev-pa-rsvp-a', 'NAO_PARTICIPAREI')).status).toBe(200)
+    expect((await responder('ev-pa-rsvp-b', 'PARTICIPAREI')).status).toBe(200)
+    expect((await responder('ev-pa-rsvp-a', 'PARTICIPAREI')).status).toBe(409)
+  })
+
+  it('PA-04: bloqueia reclassificacao com duas confirmacoes e troca de Ponto publicado', async () => {
+    const paA = crypto.randomUUID()
+    const paB = crypto.randomUUID()
+    const tipo = crypto.randomUUID()
+    const grupo = crypto.randomUUID()
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(paA, 'set-1', 'Ponto PA-04 A')
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(paB, 'set-1', 'Ponto PA-04 B')
+    sqlite.prepare('INSERT INTO tipos_reuniao (id, nome, codigo) VALUES (?, ?, ?)').run(tipo, 'Tipo PA-04', 'PA-04')
+    for (const [id, ponto, grupoId] of [
+      ['ev-pa04-a', paA, grupo],
+      ['ev-pa04-b', paB, crypto.randomUUID()],
+    ]) {
+      sqlite.prepare(`INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, setor_id, ponto_atendimento_id, tipo_reuniao_id, grupo_equivalencia_id, ativo)
+        VALUES (?, ?, 'ONLINE', '2031-01-02T10:00:00Z', '2031-01-02T11:00:00Z', 'set-1', ?, ?, ?, 1)`)
+        .run(id, id, ponto, tipo, grupoId)
+      sqlite.prepare("INSERT INTO convocacoes (id, evento_id, status, ativo) VALUES (?, ?, 'PUBLICADA', 1)")
+        .run(`conv-${id}`, id)
+      sqlite.prepare('INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES (?, ?, ?)')
+        .run(`dest-${id}`, `conv-${id}`, membroId)
+      sqlite.prepare(`INSERT INTO rsvp
+        (id, convocacao_destinatario_id, resposta, respondido_em, atualizado_em)
+        VALUES (?, ?, 'PARTICIPAREI', '2030-01-01T00:00:00Z', '2030-01-01T00:00:00Z')`)
+        .run(`rsvp-${id}`, `dest-${id}`)
+    }
+    expect(() => sqlite.prepare('UPDATE eventos SET grupo_equivalencia_id=? WHERE id=?')
+      .run(grupo, 'ev-pa04-b')).toThrow(/EVENTO_EQUIVALENCIA_COM_RSVP_DUPLO/)
+    expect(() => sqlite.prepare('UPDATE eventos SET ponto_atendimento_id=? WHERE id=?')
+      .run(paB, 'ev-pa04-a')).toThrow(/EVENTO_PONTO_COM_CONVOCACAO_PUBLICADA/)
+    expect(sqlite.prepare('SELECT ponto_atendimento_id AS ponto FROM eventos WHERE id=?')
+      .get('ev-pa04-a')).toMatchObject({ ponto: paA })
+    sqlite.prepare('INSERT INTO setores (id, administracao_id, nome) VALUES (?, ?, ?)')
+      .run('set-pa04-transfer', 'adm-1', 'Setor PA-04 transferido')
+    expect(() => sqlite.prepare('UPDATE pontos_atendimento SET setor_id=? WHERE id=?')
+      .run('set-pa04-transfer', paB)).toThrow(/PONTO_COM_CASAS_VINCULADAS/)
+
+  })
+
   it('30. falha no batch não deixa atualização parcial (Rollback no executeAtomic)', async () => {
     const destId = destIdPeriodos
     await req(`/api/v1/minha-agenda/rsvp/${destId}`, {

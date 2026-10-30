@@ -201,6 +201,9 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
     return c.json(updated, 200)
 
   } catch (err: any) {
+    if (String(err?.message).includes('RSVP_ALTERNATIVA_JA_CONFIRMADA')) {
+      return c.json({ error: 'Você já confirmou participação em outra reunião alternativa deste grupo. Recuse a anterior antes de escolher esta.', code: 'RSVP_ALTERNATIVA_JA_CONFIRMADA' }, 409)
+    }
     if (String(err?.message).includes('EVENTO_COM_RSVP_CONFIRMADO_NAO_PODE_MUDAR_ESCOPO')) {
       return c.json({ error: 'Confirmação indisponível após mudança de escopo do evento', code: 'EVENTO_COM_RSVP_CONFIRMADO_NAO_PODE_MUDAR_ESCOPO' }, 409)
     }

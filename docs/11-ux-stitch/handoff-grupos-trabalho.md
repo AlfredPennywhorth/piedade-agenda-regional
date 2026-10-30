@@ -37,3 +37,7 @@ Prints de origem (4 imagens) e **5 HTML posteriores** enviados na conversa do pr
 **Pendente:** arquivar os cinco HTMLs originais e as capturas de referência em local versionado/imutável, e registrar as ligações de cada anexo com o respectivo commit/blob recuperável e seu hash. Os nomes acima **não significam** que os arquivos estejam presentes no repositório. Não afirmar Gate A concluído por este aceite.
 
 **Limites:** nenhuma implementação, alteração funcional, mudança de banco, CI de aplicação, deploy ou merge autorizados por este documento. O lote 1 continua com Gate A integral aberto.
+
+## Homologação do tema escuro pelo PO — 24/10/2026
+
+**Versões escuras de GTs aprovadas, com exceção da tela de Detalhes AGD-ADM-047**, cujas cores divergem da identidade visual aprovada. Corrigir a paleta de Detalhes e submeter novamente; preservar o layout e o logotipo aprovados. Issue #382. Sem liberação de implementação ou produção.

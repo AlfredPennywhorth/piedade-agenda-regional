@@ -38,10 +38,26 @@ describe('LocaisView', () => {
     expect(screen.getByText('Gestão de Locais')).toBeInTheDocument()
     
     await waitFor(() => {
-      expect(screen.getByText('Templo Central')).toBeInTheDocument()
-      expect(screen.getByText('Rua A, 100')).toBeInTheDocument()
-      expect(screen.getByText('São Paulo - SP')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Templo Central')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Rua A, 100')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('São Paulo - SP')).toBeInTheDocument()
     })
+  })
+
+  it('deve exibir cartões mobile com as três ações sem perder dados', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValueOnce(mockLocais)
+    render(<LocaisView />)
+    const cards = await screen.findAllByRole('article')
+    expect(cards).toHaveLength(1)
+    const card = within(cards[0])
+    expect(card.getByText('Templo Central')).toBeInTheDocument()
+    expect(card.getByText('Rua A, 100')).toBeInTheDocument()
+    expect(card.getByText('São Paulo - SP')).toBeInTheDocument()
+    expect(card.getByText('Ativo')).toBeInTheDocument()
+    expect(card.getByRole('button', { name: 'Ver' })).toBeInTheDocument()
+    expect(card.getByRole('button', { name: 'Espaços' })).toBeInTheDocument()
+    expect(card.getByRole('button', { name: 'Editar' })).toBeInTheDocument()
+    expect(within(screen.getByRole('table')).getByText('Templo Central')).toBeInTheDocument()
   })
 
   it('deve exibir empty state quando não houver locais', async () => {
@@ -74,20 +90,20 @@ describe('LocaisView', () => {
     render(<LocaisView />)
 
     await waitFor(() => {
-      expect(screen.getByText('Templo Central')).toBeInTheDocument()
-      expect(screen.getByText('Salão Regional')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Templo Central')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Salão Regional')).toBeInTheDocument()
     })
 
     const filtro = screen.getByLabelText('Pesquisar locais')
     fireEvent.change(filtro, { target: { value: '13000' } })
 
-    expect(screen.queryByText('Templo Central')).not.toBeInTheDocument()
-    expect(screen.getByText('Salão Regional')).toBeInTheDocument()
+    expect(within(screen.getByRole('table')).queryByText('Templo Central')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('table')).getByText('Salão Regional')).toBeInTheDocument()
 
     fireEvent.change(filtro, { target: { value: '13000000' } })
 
-    expect(screen.queryByText('Templo Central')).not.toBeInTheDocument()
-    expect(screen.getByText('Salão Regional')).toBeInTheDocument()
+    expect(within(screen.getByRole('table')).queryByText('Templo Central')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('table')).getByText('Salão Regional')).toBeInTheDocument()
 
     fireEvent.change(filtro, { target: { value: 'inexistente' } })
     expect(screen.getByText('Nenhum local encontrado para a pesquisa informada.')).toBeInTheDocument()
@@ -106,10 +122,10 @@ describe('LocaisView', () => {
     render(<LocaisView />)
 
     await waitFor(() => {
-      expect(screen.getByText('Templo Central')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Templo Central')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /ver/i }))
+    fireEvent.click(within(screen.getByRole('table')).getByRole('button', { name: 'Ver' }))
 
     await waitFor(() => {
       const dialog = screen.getByRole('dialog', { name: /detalhes do local/i })
@@ -352,10 +368,10 @@ describe('LocaisView', () => {
     render(<LocaisView />)
 
     await waitFor(() => {
-      expect(screen.getByText('Templo Central')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Templo Central')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /editar/i }))
+    fireEvent.click(within(screen.getByRole('table')).getByRole('button', { name: 'Editar' }))
 
     await waitFor(() => {
       const dialog = screen.getByRole('dialog', { name: /editar local/i })
@@ -408,31 +424,36 @@ describe('LocaisView', () => {
 
     render(<LocaisView />)
     await waitFor(() => {
-      expect(screen.getByText('Templo Central')).toBeInTheDocument()
-      expect(screen.getByText('Anexo Regional')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Templo Central')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Anexo Regional')).toBeInTheDocument()
     })
 
-    const linhaA = screen.getByText('Templo Central').closest('tr')
+    const linhaA = within(screen.getByRole('table')).getByText('Templo Central').closest('tr')
     expect(linhaA).not.toBeNull()
     fireEvent.click(within(linhaA!).getByRole('button', { name: 'Espaços' }))
 
     let dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
     fireEvent.click(within(dialog).getByText('✕'))
 
-    const linhaB = screen.getByText('Anexo Regional').closest('tr')
+    const linhaB = within(screen.getByRole('table')).getByText('Anexo Regional').closest('tr')
     expect(linhaB).not.toBeNull()
     fireEvent.click(within(linhaB!).getByRole('button', { name: 'Espaços' }))
 
     dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
-    expect(await within(dialog).findByText('Sala B')).toBeInTheDocument()
+    expect(await within(dialog.querySelector('table')!).findByText('Sala B')).toBeInTheDocument()
+    const listaMobile = dialog.querySelector('[aria-label="Lista de espaços"]')
+    expect(listaMobile).not.toBeNull()
+    expect(within(listaMobile as HTMLElement).getByText('Sala B')).toBeInTheDocument()
+    expect(within(listaMobile as HTMLElement).getByRole('button', { name: 'Editar' })).toBeInTheDocument()
+    expect(within(dialog.querySelector('table')!).getByRole('button', { name: 'Editar' })).toBeInTheDocument()
 
     await act(async () => {
       resolverLocalA?.([{ id: 'esp-a', localId: '1', nome: 'Sala A', ativo: true }])
       await respostaLocalA
     })
 
-    expect(within(dialog).getByText('Sala B')).toBeInTheDocument()
-    expect(within(dialog).queryByText('Sala A')).not.toBeInTheDocument()
+    expect(within(dialog.querySelector('table')!).getByText('Sala B')).toBeInTheDocument()
+    expect(within(dialog.querySelector('table')!).queryByText('Sala A')).not.toBeInTheDocument()
   })
 
   it('deve ignorar refresh pós-save de um Local depois que outro Local foi aberto', async () => {
@@ -473,11 +494,11 @@ describe('LocaisView', () => {
 
     render(<LocaisView />)
     await waitFor(() => {
-      expect(screen.getByText('Templo Central')).toBeInTheDocument()
-      expect(screen.getByText('Anexo Regional')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Templo Central')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('Anexo Regional')).toBeInTheDocument()
     })
 
-    const linhaA = screen.getByText('Templo Central').closest('tr')
+    const linhaA = within(screen.getByRole('table')).getByText('Templo Central').closest('tr')
     expect(linhaA).not.toBeNull()
     fireEvent.click(within(linhaA!).getByRole('button', { name: 'Espaços' }))
 
@@ -495,20 +516,20 @@ describe('LocaisView', () => {
 
     fireEvent.click(within(dialog).getByText('✕'))
 
-    const linhaB = screen.getByText('Anexo Regional').closest('tr')
+    const linhaB = within(screen.getByRole('table')).getByText('Anexo Regional').closest('tr')
     expect(linhaB).not.toBeNull()
     fireEvent.click(within(linhaB!).getByRole('button', { name: 'Espaços' }))
 
     dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
-    expect(await within(dialog).findByText('Sala B')).toBeInTheDocument()
+    expect(await within(dialog.querySelector('table')!).findByText('Sala B')).toBeInTheDocument()
 
     await act(async () => {
       resolverRefreshA?.([{ id: 'esp-a', localId: localAId, nome: 'Sala A Atualizada', ativo: true }])
       await refreshA
     })
 
-    expect(within(dialog).getByText('Sala B')).toBeInTheDocument()
-    expect(within(dialog).queryByText('Sala A Atualizada')).not.toBeInTheDocument()
+    expect(within(dialog.querySelector('table')!).getByText('Sala B')).toBeInTheDocument()
+    expect(within(dialog.querySelector('table')!).queryByText('Sala A Atualizada')).not.toBeInTheDocument()
   })
 
   it('deve atualizar o mesmo Local reaberto enquanto o save ainda estava pendente', async () => {
@@ -537,14 +558,14 @@ describe('LocaisView', () => {
     vi.mocked(apiClient.postWithAuth).mockReturnValueOnce(savePendente as any)
 
     render(<LocaisView />)
-    await waitFor(() => expect(screen.getByText('Templo Central')).toBeInTheDocument())
+    await waitFor(() => expect(within(screen.getByRole('table')).getByText('Templo Central')).toBeInTheDocument())
 
-    const linha = screen.getByText('Templo Central').closest('tr')
+    const linha = within(screen.getByRole('table')).getByText('Templo Central').closest('tr')
     expect(linha).not.toBeNull()
     fireEvent.click(within(linha!).getByRole('button', { name: 'Espaços' }))
 
     let dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
-    expect(await within(dialog).findByText('Sala Antiga')).toBeInTheDocument()
+    expect(await within(dialog.querySelector('table')!).findByText('Sala Antiga')).toBeInTheDocument()
 
     fireEvent.change(within(dialog).getByLabelText(/nome do espaço/i), {
       target: { value: 'Sala Nova' },
@@ -563,8 +584,8 @@ describe('LocaisView', () => {
     fireEvent.click(within(linha!).getByRole('button', { name: 'Espaços' }))
     dialog = await screen.findByRole('dialog', { name: /espaços do local/i })
 
-    expect(await within(dialog).findByText('Sala Antiga')).toBeInTheDocument()
-    expect(within(dialog).queryByText('Sala Nova')).not.toBeInTheDocument()
+    expect(await within(dialog.querySelector('table')!).findByText('Sala Antiga')).toBeInTheDocument()
+    expect(within(dialog.querySelector('table')!).queryByText('Sala Nova')).not.toBeInTheDocument()
 
     const botaoSaveReaberto = within(dialog).getByRole('button', { name: /salvando/i })
     expect(botaoSaveReaberto).toBeDisabled()
@@ -577,7 +598,7 @@ describe('LocaisView', () => {
     })
 
     await waitFor(() => {
-      expect(within(dialog).getByText('Sala Nova')).toBeInTheDocument()
+      expect(within(dialog.querySelector('table')!).getByText('Sala Nova')).toBeInTheDocument()
       expect(within(dialog).getByRole('button', { name: /adicionar espaço/i })).not.toBeDisabled()
     })
     expect(apiClient.postWithAuth).toHaveBeenCalledTimes(1)

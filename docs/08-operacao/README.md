@@ -67,3 +67,15 @@ pnpm --filter @piedade/worker deploy
 | M2.8 | Relatórios e Auditoria | [Abrir](manual-uso-relatorios-indicadores-auditoria.md) |
 
 **Atenções editoriais:** filtros nominais corrigidos na PR #340 e validados em smoke Beta (na aba **Relatório do Evento**); relatório agregado requer UUID de escopo fornecido pela administração; capturas e exemplos devem ser anonimizados. Nenhuma publicação em `main` está implícita nesta documentação.
+
+## Release de produção — 22/10/2026
+
+- [Registro de encerramento da PR #352](registro-release-352-2026-10-22.md) — deploys Worker/Pages no mesmo SHA, proteção do D1, smoke de produção 7/7 e pendências pós-release.
+- [Complemento ao Manual de Uso — release #352](manual-uso-complemento-release-352.md) — pesquisa e paginação de Membros, filtros e ordenação de Eventos na versão publicada.
+
+> A documentação acima descreve o código já publicado; capturas e rótulos finais dependem de conferência editorial. O redesenho Stitch ainda não faz parte desta versão.
+
+## Continuidade após o release #352
+
+- [Plano de trabalho: Manual e fechamento do Gate A Stitch](plano-manual-gate-a-2026-10-22.md) — trilhas, matrizes e critérios de aceite sem autorização de implementação.
+- [Proposta funcional: Avisos por função](../10-planejamento-s13/avisos-convocacoes-funcoes-proposta.md) — pop-ups contextuais, elegibilidade por função e distinção entre aviso interno e push, pendente de refinamento funcional.

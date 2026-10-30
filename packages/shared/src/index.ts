@@ -6,6 +6,7 @@
 // GOVERNANÇA: Não adicionar regras de negócio sem aprovação do PMO.
 
 import { z } from 'zod'
+export { z } from 'zod'
 
 export * from './schemas/institucional'
 export * from './schemas/membros'

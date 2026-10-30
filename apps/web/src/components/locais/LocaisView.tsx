@@ -539,7 +539,7 @@ export function LocaisView() {
         </div>
         <button
           onClick={handleOpenCreate}
-          className="px-5 py-2.5 bg-white text-brand-900 font-semibold rounded-lg text-sm hover:bg-brand-50 transition-colors shadow-sm whitespace-nowrap"
+          className="px-5 py-2.5 bg-blue-600 text-white font-semibold rounded-lg text-sm hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300 transition-colors shadow-sm whitespace-nowrap"
         >
           + Novo Local
         </button>
@@ -586,10 +586,31 @@ export function LocaisView() {
           <p className="text-slate-500">Nenhum local encontrado para a pesquisa informada.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
+        <>
+          {/* Mobile: cartões completos; tabela exclusiva do desktop, sem colunas comprimidas. */}
+          <div className="md:hidden space-y-3" aria-label="Lista de locais">
+            {locaisFiltrados.map((local) => (
+              <article key={local.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm text-slate-900">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-semibold text-base break-words min-w-0">{local.nome}</h3>
+                  <span className={`shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${local.ativo ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'}`}>
+                    {local.ativo ? 'Ativo' : 'Inativo'}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-slate-700 break-words">{local.endereco}, {local.numero}</p>
+                <p className="mt-1 text-sm text-slate-600">{local.cidade} - {local.uf}</p>
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  <button type="button" onClick={() => handleOpenDetail(local.id)} className="min-w-0 rounded-lg border border-slate-300 bg-slate-100 px-2 py-2.5 text-sm font-medium text-slate-900 hover:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600">Ver</button>
+                  <button type="button" onClick={() => void abrirEspacos(local)} className="min-w-0 rounded-lg border border-blue-300 bg-blue-50 px-2 py-2.5 text-sm font-medium text-blue-900 hover:bg-blue-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600">Espaços</button>
+                  <button type="button" onClick={() => handleOpenEdit(local.id)} className="min-w-0 rounded-lg border border-amber-300 bg-amber-50 px-2 py-2.5 text-sm font-medium text-amber-900 hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600">Editar</button>
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
+              <thead className="bg-slate-800 text-slate-50 font-medium border-b border-slate-600">
                 <tr>
                   <th className="px-6 py-4">Nome</th>
                   <th className="px-6 py-4">Endereço</th>
@@ -598,7 +619,7 @@ export function LocaisView() {
                   <th className="px-6 py-4 text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 text-slate-700">
+              <tbody className="divide-y divide-slate-200 bg-white text-slate-900">
                 {locaisFiltrados.map((local) => (
                   <tr key={local.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4 font-medium text-slate-900">{local.nome}</td>
@@ -633,8 +654,9 @@ export function LocaisView() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Formulário Modal */}
@@ -644,22 +666,22 @@ export function LocaisView() {
             role="dialog" 
             aria-modal="true" 
             aria-labelledby="modal-form-title"
-            className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95"
+            className="bg-[#0F172A] text-[#F8FAFC] rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95"
           >
-            <AjudaContextual /><span data-screen-code={editingId ? 'AGD-ADM-056' : 'AGD-ADM-055'} className="block shrink-0 px-6 pt-3 pb-1 text-right text-[10px] font-medium text-slate-500">Tela {editingId ? 'AGD-ADM-056' : 'AGD-ADM-055'}</span>
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 id="modal-form-title" className="text-lg font-semibold text-slate-900">
+            <AjudaContextual /><span data-screen-code={editingId ? 'AGD-ADM-056' : 'AGD-ADM-055'} className="block shrink-0 px-6 pt-3 pb-1 text-right text-[10px] font-medium text-slate-300">Tela {editingId ? 'AGD-ADM-056' : 'AGD-ADM-055'}</span>
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-600 flex justify-between items-center bg-[#1E293B]">
+              <h3 id="modal-form-title" className="text-lg font-semibold text-[#F8FAFC]">
                 {editingId ? 'Editar Local' : 'Novo Local'}
               </h3>
               <button
                 onClick={fecharFormulario}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
+                className="text-slate-200 hover:text-white transition-colors"
               >
                 ✕
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} noValidate className="p-6 overflow-y-auto space-y-6">
+            <form onSubmit={handleSubmit} noValidate className="p-4 sm:p-6 overflow-y-auto space-y-6">
               {error && (
                 <div role="alert" className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
                   {error}
@@ -667,9 +689,9 @@ export function LocaisView() {
               )}
               {(!editingId || (masterCadastro && editandoLegado)) && (
                 <div>
-                  <label htmlFor="escopo-local" className="block text-sm font-medium text-slate-700 mb-1">{editingId ? 'Classificar local legado — escopo institucional *' : 'Escopo institucional *'}</label>
+                  <label htmlFor="escopo-local" className="block text-sm font-medium text-[#F8FAFC] mb-1">{editingId ? 'Classificar local legado — escopo institucional *' : 'Escopo institucional *'}</label>
                   <select id="escopo-local" value={escopoSelecionado} onChange={e => setEscopoSelecionado(e.target.value)}
-                    required className="w-full rounded-lg border border-slate-300 p-2.5 text-sm">
+                    required className="w-full rounded-lg border border-slate-300 bg-white text-[#0F172A] p-2.5 text-sm">
                     <option value="">{carregandoEscopos ? "Carregando escopos..." : "Selecione um escopo"}</option>
                     {[...escoposCadastro].sort((a, b) => (a.escopoTipo === "SETOR" ? -1 : 0) - (b.escopoTipo === "SETOR" ? -1 : 0) || a.nome.localeCompare(b.nome, "pt-BR")).map(item => (
                       <option key={item.escopoTipo + item.escopoId} value={item.escopoTipo + ':' + item.escopoId}>
@@ -677,33 +699,33 @@ export function LocaisView() {
                       </option>
                     ))}
                   </select>
-                  {erroEscoposCadastro && <p role="alert" className="mt-2 text-sm text-red-700">{erroEscoposCadastro}</p>}
+                  {erroEscoposCadastro && <p role="alert" className="mt-2 text-sm text-red-300">{erroEscoposCadastro}</p>}
                   {!carregandoEscopos && !erroEscoposCadastro && escoposCadastro.length === 0 &&
-                    <p role="status" className="mt-2 text-sm text-amber-800">Nenhum escopo institucional disponível. Verifique se sua Casa de Oração e Setor de origem estão cadastrados.</p>}
+                    <p role="status" className="mt-2 text-sm text-amber-200">Nenhum escopo institucional disponível. Verifique se sua Casa de Oração e Setor de origem estão cadastrados.</p>}
                 </div>
               )}
-              <div className="space-y-4">
-                <h4 className="font-medium text-slate-900 border-b pb-2">Informações Básicas</h4>
+              <div className="space-y-4 rounded-xl bg-[#1E293B] p-4 sm:p-5">
+                <h4 className="font-medium text-[#F8FAFC] border-b border-slate-500 pb-2">Informações Básicas</h4>
                 <div>
-                  <label htmlFor="nome" className="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
+                  <label htmlFor="nome" className="block text-sm font-medium text-[#F8FAFC] mb-1">Nome *</label>
                   <input
                     id="nome"
                     type="text"
                     value={formData.nome}
                     onChange={e => setFormData({ ...formData, nome: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                    className="w-full p-2.5 bg-white text-[#0F172A] border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     placeholder="Ex: Templo Central"
                   />
                   {formErrors.nome && <p role="alert" className="text-red-500 text-xs mt-1">{formErrors.nome}</p>}
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <h4 className="font-medium text-slate-900 border-b pb-2">Endereço</h4>
+              <div className="space-y-4 rounded-xl bg-[#1E293B] p-4 sm:p-5">
+                <h4 className="font-medium text-[#F8FAFC] border-b border-slate-500 pb-2">Endereço</h4>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="cep" className="block text-sm font-medium text-slate-700 mb-1">CEP</label>
+                    <label htmlFor="cep" className="block text-sm font-medium text-[#F8FAFC] mb-1">CEP</label>
                     <input
                       id="cep"
                       type="text"
@@ -711,55 +733,55 @@ export function LocaisView() {
                       autoComplete="postal-code"
                       value={formData.cep || ''}
                       onChange={e => handleCepChange(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                      className="w-full p-2.5 bg-white text-[#0F172A] border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                       placeholder="00000-000"
                       aria-describedby="cep-feedback"
                     />
-                    <div id="cep-feedback" className={`text-xs mt-1 min-h-4 ${cepErro ? 'text-red-600' : 'text-slate-500'}`}>
+                    <div id="cep-feedback" className={`text-xs mt-1 min-h-4 ${cepErro ? 'text-red-300' : 'text-slate-200'}`}>
                       {consultandoCep ? 'Consultando CEP...' : cepMensagem}
                     </div>
                     {consultandoCep && (
                       <button
                         type="button"
                         onClick={cancelarConsultaCep}
-                        className="mt-1 text-xs font-medium text-brand-700 hover:underline"
+                        className="mt-1 text-xs font-medium text-blue-200 hover:text-white hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300"
                       >
                         Usar endereço manualmente
                       </button>
                     )}
                   </div>
                   <div>
-                    <label htmlFor="bairro" className="block text-sm font-medium text-slate-700 mb-1">Bairro</label>
+                    <label htmlFor="bairro" className="block text-sm font-medium text-[#F8FAFC] mb-1">Bairro</label>
                     <input
                       id="bairro"
                       type="text"
                       value={formData.bairro || ''}
                       onChange={e => setFormData({ ...formData, bairro: e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                      className="w-full p-2.5 bg-white text-[#0F172A] border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                   <div className="sm:col-span-3">
-                    <label htmlFor="endereco" className="block text-sm font-medium text-slate-700 mb-1">Endereço *</label>
+                    <label htmlFor="endereco" className="block text-sm font-medium text-[#F8FAFC] mb-1">Endereço *</label>
                     <input
                       id="endereco"
                       type="text"
                       value={formData.endereco}
                       onChange={e => setFormData({ ...formData, endereco: e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                      className="w-full p-2.5 bg-white text-[#0F172A] border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     />
                     {formErrors.endereco && <p role="alert" className="text-red-500 text-xs mt-1">{formErrors.endereco}</p>}
                   </div>
                   <div>
-                    <label htmlFor="numero" className="block text-sm font-medium text-slate-700 mb-1">Número *</label>
+                    <label htmlFor="numero" className="block text-sm font-medium text-[#F8FAFC] mb-1">Número *</label>
                     <input
                       id="numero"
                       type="text"
                       value={formData.numero}
                       onChange={e => setFormData({ ...formData, numero: e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                      className="w-full p-2.5 bg-white text-[#0F172A] border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     />
                     {formErrors.numero && <p role="alert" className="text-red-500 text-xs mt-1">{formErrors.numero}</p>}
                   </div>
@@ -767,48 +789,48 @@ export function LocaisView() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="complemento" className="block text-sm font-medium text-slate-700 mb-1">Complemento</label>
+                    <label htmlFor="complemento" className="block text-sm font-medium text-[#F8FAFC] mb-1">Complemento</label>
                     <input
                       id="complemento"
                       type="text"
                       value={formData.complemento || ''}
                       onChange={e => setFormData({ ...formData, complemento: e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                      className="w-full p-2.5 bg-white text-[#0F172A] border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     />
                   </div>
                   <div>
-                    <label htmlFor="referencia" className="block text-sm font-medium text-slate-700 mb-1">Referência</label>
+                    <label htmlFor="referencia" className="block text-sm font-medium text-[#F8FAFC] mb-1">Referência</label>
                     <input
                       id="referencia"
                       type="text"
                       value={formData.referencia || ''}
                       onChange={e => setFormData({ ...formData, referencia: e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                      className="w-full p-2.5 bg-white text-[#0F172A] border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                   <div className="sm:col-span-3">
-                    <label htmlFor="cidade" className="block text-sm font-medium text-slate-700 mb-1">Cidade *</label>
+                    <label htmlFor="cidade" className="block text-sm font-medium text-[#F8FAFC] mb-1">Cidade *</label>
                     <input
                       id="cidade"
                       type="text"
                       value={formData.cidade}
                       onChange={e => setFormData({ ...formData, cidade: e.target.value })}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                      className="w-full p-2.5 bg-white text-[#0F172A] border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     />
                     {formErrors.cidade && <p role="alert" className="text-red-500 text-xs mt-1">{formErrors.cidade}</p>}
                   </div>
                   <div>
-                    <label htmlFor="uf" className="block text-sm font-medium text-slate-700 mb-1">UF *</label>
+                    <label htmlFor="uf" className="block text-sm font-medium text-[#F8FAFC] mb-1">UF *</label>
                     <input
                       id="uf"
                       type="text"
                       maxLength={2}
                       value={formData.uf}
                       onChange={e => setFormData({ ...formData, uf: e.target.value.toUpperCase() })}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 uppercase"
+                      className="w-full p-2.5 bg-white text-[#0F172A] border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 uppercase"
                       placeholder="SP"
                     />
                     {formErrors.uf && <p role="alert" className="text-red-500 text-xs mt-1">{formErrors.uf}</p>}
@@ -816,56 +838,56 @@ export function LocaisView() {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <h4 className="font-medium text-slate-900 border-b pb-2">Geolocalização & Navegação (Opcional)</h4>
+              <div className="space-y-4 rounded-xl bg-[#1E293B] p-4 sm:p-5">
+                <h4 className="font-medium text-[#F8FAFC] border-b border-slate-500 pb-2">Geolocalização & Navegação (Opcional)</h4>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="latitude" className="block text-sm font-medium text-slate-700 mb-1">Latitude</label>
+                    <label htmlFor="latitude" className="block text-sm font-medium text-[#F8FAFC] mb-1">Latitude</label>
                     <input
                       id="latitude"
                       type="number"
                       step="any"
                       value={formData.latitude === null ? '' : formData.latitude}
                       onChange={e => setFormData({ ...formData, latitude: e.target.value ? Number(e.target.value) : null })}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                      className="w-full p-2.5 bg-white text-[#0F172A] border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                       placeholder="-23.5505"
                     />
                   </div>
                   <div>
-                    <label htmlFor="longitude" className="block text-sm font-medium text-slate-700 mb-1">Longitude</label>
+                    <label htmlFor="longitude" className="block text-sm font-medium text-[#F8FAFC] mb-1">Longitude</label>
                     <input
                       id="longitude"
                       type="number"
                       step="any"
                       value={formData.longitude === null ? '' : formData.longitude}
                       onChange={e => setFormData({ ...formData, longitude: e.target.value ? Number(e.target.value) : null })}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                      className="w-full p-2.5 bg-white text-[#0F172A] border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                       placeholder="-46.6333"
                     />
                   </div>
                 </div>
                 
                 <div>
-                  <label htmlFor="urlMaps" className="block text-sm font-medium text-slate-700 mb-1">URL Google Maps</label>
+                  <label htmlFor="urlMaps" className="block text-sm font-medium text-[#F8FAFC] mb-1">URL Google Maps</label>
                   <input
                     id="urlMaps"
                     type="url"
                     value={formData.urlMaps || ''}
                     onChange={e => setFormData({ ...formData, urlMaps: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                    className="w-full p-2.5 bg-white text-[#0F172A] border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     placeholder="https://maps.google.com/..."
                   />
                   {formErrors.urlMaps && <p role="alert" className="text-red-500 text-xs mt-1">{formErrors.urlMaps}</p>}
                 </div>
                 <div>
-                  <label htmlFor="urlWaze" className="block text-sm font-medium text-slate-700 mb-1">URL Waze</label>
+                  <label htmlFor="urlWaze" className="block text-sm font-medium text-[#F8FAFC] mb-1">URL Waze</label>
                   <input
                     id="urlWaze"
                     type="url"
                     value={formData.urlWaze || ''}
                     onChange={e => setFormData({ ...formData, urlWaze: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                    className="w-full p-2.5 bg-white text-[#0F172A] border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                     placeholder="https://waze.com/ul?..."
                   />
                   {formErrors.urlWaze && <p role="alert" className="text-red-500 text-xs mt-1">{formErrors.urlWaze}</p>}
@@ -881,22 +903,22 @@ export function LocaisView() {
                     onChange={e => setFormData({ ...formData, ativo: e.target.checked })}
                     className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500"
                   />
-                  <span className="text-sm font-medium text-slate-700">Local Ativo</span>
+                  <span className="text-sm font-medium text-[#F8FAFC]">Local Ativo</span>
                 </label>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+              <div className="flex flex-wrap justify-end gap-3 pt-4 border-t border-slate-600">
                 <button
                   type="button"
                   onClick={fecharFormulario}
-                  className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors text-sm"
+                  className="px-5 py-2.5 text-[#0F172A] bg-[#CBD5E1] font-medium hover:bg-white rounded-lg transition-colors text-sm"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving || consultandoCep}
-                  className="px-6 py-2.5 bg-brand-600 text-white font-medium rounded-lg text-sm hover:bg-brand-700 transition-colors disabled:opacity-50"
+                  className="px-6 py-2.5 bg-[#2563EB] text-white font-medium rounded-lg text-sm hover:bg-[#1D4ED8] transition-colors disabled:opacity-50"
                 >
                   {saving ? 'Salvando...' : consultandoCep ? 'Consultando CEP...' : 'Salvar Local'}
                 </button>
@@ -908,56 +930,70 @@ export function LocaisView() {
 
       {espacosOpen && localEspacos && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div role="dialog" aria-modal="true" aria-labelledby="modal-espacos-title" className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-            <AjudaContextual /><span data-screen-code="AGD-ADM-058" className="block shrink-0 px-6 pt-3 pb-1 text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-058</span>
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          <div role="dialog" aria-modal="true" aria-labelledby="modal-espacos-title" className="bg-[#0F172A] text-[#F8FAFC] rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <AjudaContextual /><span data-screen-code="AGD-ADM-058" className="block shrink-0 px-6 pt-3 pb-1 text-right text-[10px] font-medium text-slate-300">Tela AGD-ADM-058</span>
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-600 flex justify-between items-center bg-[#1E293B]">
               <div>
-                <h3 id="modal-espacos-title" className="text-lg font-semibold text-slate-900">Espaços do Local</h3>
-                <p className="text-sm text-slate-500">{localEspacos.nome}</p>
+                <h3 id="modal-espacos-title" className="text-lg font-semibold text-[#F8FAFC]">Espaços do Local</h3>
+                <p className="text-sm text-slate-300 break-words">{localEspacos.nome}</p>
               </div>
-              <button onClick={fecharEspacos} className="text-slate-400 hover:text-slate-600">✕</button>
+              <button onClick={fecharEspacos} className="text-slate-200 hover:text-white">✕</button>
             </div>
-            <div className="p-6 overflow-y-auto space-y-6">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-6">
               {espacoErro && <div role="alert" className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{espacoErro}</div>}
-              <form onSubmit={salvarEspaco} className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 border rounded-xl bg-slate-50">
+              <form onSubmit={salvarEspaco} className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 sm:p-5 border border-slate-600 rounded-xl bg-[#1E293B]">
                 <div>
-                  <label htmlFor="espacoNome" className="block text-sm font-medium text-slate-700 mb-1">Nome do Espaço *</label>
-                  <input id="espacoNome" value={espacoForm.nome} onChange={e => setEspacoForm({ ...espacoForm, nome: e.target.value })} className="w-full p-2.5 border rounded-lg text-sm" placeholder="Ex: Salão de Reunião" />
+                  <label htmlFor="espacoNome" className="block text-sm font-medium text-[#F8FAFC] mb-1">Nome do Espaço *</label>
+                  <input id="espacoNome" value={espacoForm.nome} onChange={e => setEspacoForm({ ...espacoForm, nome: e.target.value })} className="w-full min-w-0 p-2.5 border border-slate-300 bg-white text-[#0F172A] rounded-lg text-sm" placeholder="Ex: Salão de Reunião" />
                 </div>
                 <div>
-                  <label htmlFor="espacoCapacidade" className="block text-sm font-medium text-slate-700 mb-1">Capacidade</label>
-                  <input id="espacoCapacidade" type="number" min="1" value={espacoForm.capacidade} onChange={e => setEspacoForm({ ...espacoForm, capacidade: e.target.value })} className="w-full p-2.5 border rounded-lg text-sm" />
+                  <label htmlFor="espacoCapacidade" className="block text-sm font-medium text-[#F8FAFC] mb-1">Capacidade</label>
+                  <input id="espacoCapacidade" type="number" min="1" value={espacoForm.capacidade} onChange={e => setEspacoForm({ ...espacoForm, capacidade: e.target.value })} className="w-full min-w-0 p-2.5 border border-slate-300 bg-white text-[#0F172A] rounded-lg text-sm" />
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="espacoDescricao" className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
-                  <input id="espacoDescricao" value={espacoForm.descricao} onChange={e => setEspacoForm({ ...espacoForm, descricao: e.target.value })} className="w-full p-2.5 border rounded-lg text-sm" />
+                  <label htmlFor="espacoDescricao" className="block text-sm font-medium text-[#F8FAFC] mb-1">Descrição</label>
+                  <input id="espacoDescricao" value={espacoForm.descricao} onChange={e => setEspacoForm({ ...espacoForm, descricao: e.target.value })} className="w-full min-w-0 p-2.5 border border-slate-300 bg-white text-[#0F172A] rounded-lg text-sm" />
                 </div>
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={espacoForm.ativo} onChange={e => setEspacoForm({ ...espacoForm, ativo: e.target.checked })} />
                   Espaço ativo
                 </label>
-                <div className="flex justify-end gap-2">
-                  {espacoEditandoId && <button type="button" onClick={() => { setEspacoEditandoId(null); setEspacoForm({ nome: '', descricao: '', capacidade: '', ativo: true }) }} className="px-3 py-2 text-sm">Cancelar edição</button>}
-                  <button type="submit" disabled={salvandoEspaco} className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm disabled:opacity-50">{salvandoEspaco ? 'Salvando...' : espacoEditandoId ? 'Atualizar Espaço' : '+ Adicionar Espaço'}</button>
+                <div className="flex flex-wrap justify-end gap-2 sm:col-span-2">
+                  {espacoEditandoId && <button type="button" onClick={() => { setEspacoEditandoId(null); setEspacoForm({ nome: '', descricao: '', capacidade: '', ativo: true }) }} className="px-3 py-2 bg-[#CBD5E1] text-[#0F172A] hover:bg-white rounded-lg text-sm font-medium">Cancelar edição</button>}
+                  <button type="submit" disabled={salvandoEspaco} className="px-4 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-lg text-sm font-medium disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300">{salvandoEspaco ? 'Salvando...' : espacoEditandoId ? 'Atualizar Espaço' : '+ Adicionar Espaço'}</button>
                 </div>
               </form>
-              <div className="border rounded-xl overflow-hidden">
+              <div className="border border-slate-600 rounded-xl overflow-hidden bg-white text-[#0F172A]">
                 {espacos.length === 0 ? (
                   <p className="p-4 text-sm text-slate-500">Nenhum espaço cadastrado para este Local.</p>
                 ) : (
-                  <table className="w-full text-sm">
-                    <thead className="bg-slate-50"><tr><th className="text-left px-4 py-3">Espaço</th><th className="text-left px-4 py-3">Capacidade</th><th className="text-left px-4 py-3">Status</th><th className="px-4 py-3"></th></tr></thead>
-                    <tbody className="divide-y">
+                  <>
+                    <div className="divide-y divide-slate-200 md:hidden" aria-label="Lista de espaços">
                       {espacos.map(espaco => (
-                        <tr key={espaco.id}>
-                          <td className="px-4 py-3">{espaco.nome}</td>
-                          <td className="px-4 py-3">{espaco.capacidade ?? '—'}</td>
-                          <td className="px-4 py-3">{espaco.ativo ? 'Ativo' : 'Inativo'}</td>
-                          <td className="px-4 py-3 text-right"><button onClick={() => editarEspaco(espaco)} className="text-brand-700 font-medium">Editar</button></td>
-                        </tr>
+                        <div key={espaco.id} className="space-y-3 p-4 text-sm">
+                          <p className="font-semibold text-slate-900 break-words">{espaco.nome}</p>
+                          <div className="flex flex-wrap gap-x-5 gap-y-2 text-slate-700">
+                            <p>Capacidade: <span className="font-medium">{espaco.capacidade ?? '—'}</span></p>
+                            <p>Status: <span className="font-medium">{espaco.ativo ? 'Ativo' : 'Inativo'}</span></p>
+                          </div>
+                          <button type="button" onClick={() => editarEspaco(espaco)} className="min-h-11 rounded-lg px-3 py-2 font-medium text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">Editar</button>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                    <table className="hidden w-full text-sm text-[#0F172A] md:table">
+                      <thead className="bg-slate-50"><tr><th className="text-left px-4 py-3">Espaço</th><th className="text-left px-4 py-3">Capacidade</th><th className="text-left px-4 py-3">Status</th><th className="px-4 py-3"></th></tr></thead>
+                      <tbody className="divide-y">
+                        {espacos.map(espaco => (
+                          <tr key={espaco.id}>
+                            <td className="px-4 py-3 break-words">{espaco.nome}</td>
+                            <td className="px-4 py-3">{espaco.capacidade ?? '—'}</td>
+                            <td className="px-4 py-3">{espaco.ativo ? 'Ativo' : 'Inativo'}</td>
+                            <td className="px-4 py-3 text-right"><button type="button" onClick={() => editarEspaco(espaco)} className="text-blue-700 font-medium hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">Editar</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </>
                 )}
               </div>
             </div>
@@ -972,45 +1008,45 @@ export function LocaisView() {
             role="dialog" 
             aria-modal="true" 
             aria-labelledby="modal-detail-title"
-            className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95"
+            className="bg-[#0F172A] text-[#F8FAFC] rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95"
           >
-            <AjudaContextual /><span data-screen-code="AGD-ADM-057" className="block shrink-0 px-6 pt-3 pb-1 text-right text-[10px] font-medium text-slate-500">Tela AGD-ADM-057</span>
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 id="modal-detail-title" className="text-lg font-semibold text-slate-900">
+            <AjudaContextual /><span data-screen-code="AGD-ADM-057" className="block shrink-0 px-6 pt-3 pb-1 text-right text-[10px] font-medium text-slate-300">Tela AGD-ADM-057</span>
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-600 flex justify-between items-center bg-[#1E293B]">
+              <h3 id="modal-detail-title" className="text-lg font-semibold text-[#F8FAFC]">
                 Detalhes do Local
               </h3>
               <button
                 onClick={() => setDetailOpen(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
+                className="text-slate-200 hover:text-white transition-colors"
               >
                 ✕
               </button>
             </div>
             
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 break-words">
               <div>
-                <p className="text-sm text-slate-500 mb-1">Nome</p>
-                <p className="font-medium text-slate-900">{selectedLocal.nome}</p>
+                <p className="text-sm text-slate-300 mb-1">Nome</p>
+                <p className="font-medium text-[#F8FAFC]">{selectedLocal.nome}</p>
               </div>
               
               <div>
-                <p className="text-sm text-slate-500 mb-1">Endereço Completo</p>
-                <p className="text-slate-900">
+                <p className="text-sm text-slate-300 mb-1">Endereço Completo</p>
+                <p className="text-[#F8FAFC]">
                   {selectedLocal.endereco}, {selectedLocal.numero}
                   {selectedLocal.complemento && ` - ${selectedLocal.complemento}`}
                 </p>
-                <p className="text-slate-900">
+                <p className="text-[#F8FAFC]">
                   {selectedLocal.bairro && `${selectedLocal.bairro} - `}
                   {selectedLocal.cidade} / {selectedLocal.uf}
                 </p>
-                {selectedLocal.cep && <p className="text-slate-900">CEP: {selectedLocal.cep}</p>}
-                {selectedLocal.referencia && <p className="text-slate-500 text-sm italic mt-1">Ref: {selectedLocal.referencia}</p>}
+                {selectedLocal.cep && <p className="text-[#F8FAFC]">CEP: {selectedLocal.cep}</p>}
+                {selectedLocal.referencia && <p className="text-slate-300 text-sm italic mt-1">Ref: {selectedLocal.referencia}</p>}
               </div>
 
               {(selectedLocal.latitude || selectedLocal.longitude) && (
                 <div>
-                  <p className="text-sm text-slate-500 mb-1">Coordenadas</p>
-                  <p className="text-slate-900 font-mono text-sm">
+                  <p className="text-sm text-slate-300 mb-1">Coordenadas</p>
+                  <p className="text-[#F8FAFC] font-mono text-sm">
                     {selectedLocal.latitude}, {selectedLocal.longitude}
                   </p>
                 </div>
@@ -1018,15 +1054,15 @@ export function LocaisView() {
 
               {(selectedLocal.urlMaps || selectedLocal.urlWaze) && (
                 <div className="pt-2 flex flex-col gap-2">
-                  <p className="text-sm text-slate-500">Navegação</p>
-                  <div className="flex gap-3">
+                  <p className="text-sm text-slate-300">Navegação</p>
+                  <div className="flex flex-wrap gap-3">
                     {selectedLocal.urlMaps && (
-                      <a href={selectedLocal.urlMaps} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline text-sm font-medium">
+                      <a href={selectedLocal.urlMaps} target="_blank" rel="noreferrer" className="text-blue-200 hover:text-white hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300 text-sm font-medium">
                         Ver no Google Maps
                       </a>
                     )}
                     {selectedLocal.urlWaze && (
-                      <a href={selectedLocal.urlWaze} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline text-sm font-medium">
+                      <a href={selectedLocal.urlWaze} target="_blank" rel="noreferrer" className="text-blue-200 hover:text-white hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-300 text-sm font-medium">
                         Ver no Waze
                       </a>
                     )}
@@ -1041,10 +1077,10 @@ export function LocaisView() {
               </div>
             </div>
             
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+            <div className="px-4 sm:px-6 py-4 border-t border-slate-600 bg-[#1E293B] flex justify-end">
               <button
                 onClick={() => setDetailOpen(false)}
-                className="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-200 rounded-lg transition-colors text-sm"
+                className="px-5 py-2.5 bg-[#CBD5E1] text-[#0F172A] font-medium hover:bg-white rounded-lg transition-colors text-sm"
               >
                 Fechar
               </button>

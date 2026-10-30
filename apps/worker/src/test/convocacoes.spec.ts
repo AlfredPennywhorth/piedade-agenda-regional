@@ -7,6 +7,7 @@ import {
   regionais,
   administracoes,
   setores,
+  pontosAtendimento,
   casas,
   gruposTrabalho,
   membros,
@@ -565,6 +566,59 @@ describe('S06 - Convocações', () => {
       .toMatchObject({ setor_id: outroSetorId })
   })
 
+  it('PA-01: publicação e sincronização DCO não alcançam Casas de outro Ponto do mesmo Setor', async () => {
+    const ctx = await setupBaseData()
+    const pontoA = crypto.randomUUID()
+    const pontoB = crypto.randomUUID()
+    await db.insert(pontosAtendimento).values([
+      { id: pontoA, nome: 'Ponto A', setorId: ctx.setId },
+      { id: pontoB, nome: 'Ponto B', setorId: ctx.setId },
+    ])
+    await db.update(casas).set({ pontoAtendimentoId: pontoA }).where(eq(casas.id, ctx.casId))
+    await db.update(casas).set({ pontoAtendimentoId: pontoB }).where(eq(casas.id, ctx.cas2Id))
+    const dco = await db.select().from(funcoes).where(eq(funcoes.codigo, 'DCO')).get()
+    const criarDco = async (casaId: string, nome: string) => {
+      const id = crypto.randomUUID()
+      await db.insert(membros).values({ id, nome, casaId, ativo: true })
+      await db.insert(vinculosFuncionais).values({
+        id: crypto.randomUUID(), membroId: id, funcaoId: dco!.id, casaId, ativo: true,
+      })
+      return id
+    }
+    const dentro = await criarDco(ctx.casId, 'DCO Ponto A')
+    const fora = await criarDco(ctx.cas2Id, 'DCO Ponto B')
+    const eventoId = crypto.randomUUID()
+    await db.insert(eventos).values({
+      id: eventoId, titulo: 'Reunião no Ponto A', modalidade: 'ONLINE',
+      inicioEm: '2030-03-01T10:00:00.000Z', fimEm: '2030-03-01T11:00:00.000Z',
+      setorId: ctx.setId, pontoAtendimentoId: pontoA, ativo: true,
+    })
+    const criar = await app.request('/api/v1/convocacoes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId }),
+    })
+    expect(criar.status).toBe(201)
+    const { id } = await criar.json()
+    expect((await app.request(`/api/v1/convocacoes/${id}/funcoes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ funcaoId: dco!.id }),
+    })).status).toBe(201)
+    expect((await app.request(`/api/v1/convocacoes/${id}/publicar`, { method: 'POST' })).status).toBe(200)
+    const listaInicial = await (await app.request(`/api/v1/convocacoes/${id}/destinatarios`)).json() as Array<{ membroId: string }>
+    expect(listaInicial.some(item => item.membroId === dentro)).toBe(true)
+    expect(listaInicial.some(item => item.membroId === fora)).toBe(false)
+
+    const dentroNovo = await criarDco(ctx.casId, 'DCO Ponto A posterior')
+    const foraNovo = await criarDco(ctx.cas2Id, 'DCO Ponto B posterior')
+    for (let i = 0; i < 2; i++) {
+      expect((await app.request(`/api/v1/convocacoes/${id}/sincronizar-dco`, { method: 'POST' })).status).toBe(200)
+    }
+    const listaFinal = await (await app.request(`/api/v1/convocacoes/${id}/destinatarios`)).json() as Array<{ membroId: string }>
+    expect(listaFinal.filter(item => item.membroId === dentroNovo)).toHaveLength(1)
+    expect(listaFinal.some(item => item.membroId === foraNovo)).toBe(false)
+    expect(listaFinal.some(item => item.membroId === fora)).toBe(false)
+  })
+
   it('15bc. Recusa sincronização de convocação DCO encerrada sem auditoria', async () => {
     const ctx = await setupBaseData()
     const dco = await db.select().from(funcoes).where(eq(funcoes.codigo, 'DCO')).get()
@@ -967,6 +1021,139 @@ describe('S06 - Convocações', () => {
       )
       .get(conv.id) as any
     expect(countEvidencias.c).toBe(0)
+  })
+
+  it('PA-06: vinculo exclusivo, transferencia auditada e protecoes territoriais', async () => {
+    const ctx = await setupBaseData()
+    const paA = crypto.randomUUID()
+    const paB = crypto.randomUUID()
+    await db.insert(pontosAtendimento).values([
+      { id: paA, nome: 'Ponto A transferencias', setorId: ctx.setId },
+      { id: paB, nome: 'Ponto B transferencias', setorId: ctx.setId },
+    ])
+    // A configuração de base usa GESTOR_AGENDA, sem permissão para administrar estrutura.
+    // Conceder administrador regional somente neste cenário de teste.
+    const conta = sqlite.prepare('SELECT conta_acesso_id AS id FROM acessos_conta WHERE perfil_codigo=? AND escopo_id=? ORDER BY rowid DESC LIMIT 1')
+      .get('GESTOR_AGENDA', ctx.setId) as { id: string }
+    // Administrador regional exige ciência formal do PMO; usar MASTER no teste
+    // de sucesso e validar a negativa do GESTOR_AGENDA antes de concedê-lo.
+    const semPermissao = await app.request(`/api/v1/pontos-atendimento/${paA}/casas/${ctx.casId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    })
+    expect(semPermissao.status).toBe(403)
+    sqlite.prepare("INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, 'MASTER_SISTEMA', 'GLOBAL', NULL)")
+      .run(crypto.randomUUID(), conta.id)
+    // Vincular a sessão de teste à conta que recebeu o perfil Master.
+    sqlite.prepare('UPDATE sessoes SET conta_acesso_id=? WHERE token_hash=?')
+      .run(conta.id, await hashToken(tokenSessaoAtual))
+    const vincular = (id: string, casaId: string) => app.request(
+      `/api/v1/pontos-atendimento/${id}/casas/${casaId}`,
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+    )
+    const transferir = (id: string, casaId: string, origemPontoId: string, motivo: string) => app.request(
+      `/api/v1/pontos-atendimento/${id}/casas/${casaId}/transferir`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ origemPontoId, motivo }) },
+    )
+    expect((await vincular(paA, ctx.casId)).status).toBe(200)
+    expect((await vincular(paB, ctx.casId)).status).toBe(409)
+    expect((await transferir(paB, ctx.casId, paA, 'Redistribuicao territorial')).status).toBe(200)
+    expect(sqlite.prepare('SELECT ponto_atendimento_id AS pa FROM casas WHERE id=?')
+      .get(ctx.casId)).toMatchObject({ pa: paB })
+    const desvincular = await app.request(`/api/v1/pontos-atendimento/${paB}/casas/${ctx.casId}/desvincular`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo: 'Redistribuicao para outro Setor' }),
+    })
+    expect(desvincular.status).toBe(200)
+    expect(sqlite.prepare('SELECT ponto_atendimento_id AS pa FROM casas WHERE id=?')
+      .get(ctx.casId)).toMatchObject({ pa: null })
+    expect((await vincular(paA, ctx.casId)).status).toBe(200)
+    expect(sqlite.prepare("SELECT COUNT(*) AS total FROM auditoria_logs WHERE recurso_id=? AND acao='CASA_DESVINCULADA_PONTO'")
+      .get(ctx.casId)).toMatchObject({ total: 1 })
+    expect((await transferir(paB, ctx.casId, paB, 'Origem desatualizada')).status).toBe(409)
+    expect((await transferir(paB, ctx.casId, paA, 'x')).status).toBe(400)
+    const outroSetor = crypto.randomUUID()
+    await db.insert(setores).values({ id: outroSetor, nome: 'Outro setor PA-06', administracaoId: (await db.select().from(administracoes).where(eq(administracoes.id, (await db.select().from(setores).where(eq(setores.id, ctx.setId)).get()).administracaoId)).get()).id })
+    const paExterno = crypto.randomUUID()
+    await db.insert(pontosAtendimento).values({ id: paExterno, nome: 'Ponto outro setor', setorId: outroSetor })
+    expect((await transferir(paExterno, ctx.casId, paA, 'Transferencia proibida')).status).toBe(400)
+    expect(sqlite.prepare("SELECT COUNT(*) AS total FROM auditoria_logs WHERE recurso_id=? AND acao='CASA_TRANSFERIDA_PONTO'")
+      .get(ctx.casId)).toMatchObject({ total: 1 })
+  })
+
+  it('PA-07: Master autoriza Casa de outro Setor sem modificar Setor institucional', async () => {
+    const ctx = await setupBaseData()
+    const outroSetor = crypto.randomUUID()
+    await db.insert(setores).values({ id: outroSetor, nome: 'Setor excepcional',
+      administracaoId: (await db.select().from(setores).where(eq(setores.id, ctx.setId)).get()).administracaoId })
+    const pontoCentro = crypto.randomUUID()
+    await db.insert(pontosAtendimento).values({ id: pontoCentro, setorId: ctx.setId, nome: 'Ponto de destino excepcional' })
+    await db.update(casas).set({ setorId: outroSetor }).where(eq(casas.id, ctx.cas2Id))
+    const url = '/api/v1/pontos-atendimento/excecoes-intersetoriais'
+    const request = () => app.request(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ casaId: ctx.cas2Id, pontoAtendimentoId: pontoCentro, motivo: 'Atendimento excepcional autorizado' }) })
+    expect((await request()).status).toBe(403)
+    const conta = sqlite.prepare('SELECT conta_acesso_id AS id FROM acessos_conta WHERE perfil_codigo=? AND escopo_id=? ORDER BY rowid DESC LIMIT 1')
+      .get('GESTOR_AGENDA', ctx.setId) as { id: string }
+    sqlite.prepare("INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, 'MASTER_SISTEMA', 'GLOBAL', NULL)")
+      .run(crypto.randomUUID(), conta.id)
+    sqlite.prepare('UPDATE sessoes SET conta_acesso_id=? WHERE token_hash=?')
+      .run(conta.id, await hashToken(tokenSessaoAtual))
+    expect((await request()).status).toBe(201)
+    expect(sqlite.prepare('SELECT setor_id AS setor, ponto_atendimento_id AS ponto FROM casas WHERE id=?')
+      .get(ctx.cas2Id)).toMatchObject({ setor: outroSetor, ponto: pontoCentro })
+    expect((await request()).status).toBe(409)
+    const desvinculo = await app.request(`/api/v1/pontos-atendimento/${pontoCentro}/casas/${ctx.cas2Id}/desvincular`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo: 'Reorganizacao de atendimento' }),
+    })
+    expect(desvinculo.status).toBe(200)
+    expect((await request()).status).toBe(201)
+    expect(sqlite.prepare('SELECT ponto_atendimento_id AS ponto FROM casas WHERE id=?')
+      .get(ctx.cas2Id)).toMatchObject({ ponto: pontoCentro })
+    expect(sqlite.prepare("SELECT COUNT(*) AS total FROM auditoria_logs WHERE recurso_id=? AND acao='CASA_PONTO_EXCECAO_INTERSETORIAL'")
+      .get(ctx.cas2Id)).toMatchObject({ total: 2 })
+  })
+
+  it('PA-05: aborta publicacao se o Ponto mudar apos selecionar destinatarios', async () => {
+    const ctx = await setupBaseData()
+    const paA = crypto.randomUUID()
+    const paB = crypto.randomUUID()
+    await db.insert(pontosAtendimento).values([
+      { id: paA, nome: 'PA concorrencia A', setorId: ctx.setId },
+      { id: paB, nome: 'PA concorrencia B', setorId: ctx.setId },
+    ])
+    await db.update(eventos).set({ pontoAtendimentoId: paA }).where(eq(eventos.id, ctx.evSetorId))
+    const criado = await app.request('/api/v1/convocacoes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId: ctx.evSetorId }),
+    })
+    expect(criado.status).toBe(201)
+    const { id } = await criado.json()
+    expect((await app.request(`/api/v1/convocacoes/${id}/funcoes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ funcaoId: ctx.f1Id }),
+    })).status).toBe(201)
+    const originalTransaction = db.transaction.bind(db)
+    let interceptado = false
+    db.transaction = (...args: any[]) => {
+      if (!interceptado) {
+        interceptado = true
+        sqlite.prepare('UPDATE eventos SET ponto_atendimento_id = ? WHERE id = ?')
+          .run(paB, ctx.evSetorId)
+      }
+      return originalTransaction(...args)
+    }
+    try {
+      const resposta = await app.request(`/api/v1/convocacoes/${id}/publicar`, { method: 'POST' })
+      expect(resposta.status).toBe(409)
+      expect(interceptado).toBe(true)
+    } finally {
+      db.transaction = originalTransaction
+    }
+    expect(sqlite.prepare('SELECT status FROM convocacoes WHERE id = ?').get(id))
+      .toMatchObject({ status: 'RASCUNHO' })
+    expect(sqlite.prepare('SELECT COUNT(*) AS total FROM convocacao_destinatarios WHERE convocacao_id = ?')
+      .get(id)).toMatchObject({ total: 0 })
   })
 
   it('29. publicação autenticada registra o ator da sessão e ignora header forjado', async () => {
