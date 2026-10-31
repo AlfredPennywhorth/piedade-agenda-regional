@@ -33,9 +33,26 @@ export type UpdateAdministracao = z.infer<typeof UpdateAdministracaoSchema>
 // ---------------------------------------------
 // Setor
 // ---------------------------------------------
+// O CNPJ é atribuído ao Setor, não à Casa sede nem ao Ponto de Atendimento.
+const validarCnpj = (cnpj: string): boolean => {
+  const digitos = cnpj.replace(/\D/g, '')
+  if (digitos.length !== 14 || /^(\d)\1{13}$/.test(digitos)) return false
+  const dv = (base: string, pesos: number[]) => {
+    const soma = pesos.reduce((acc, peso, i) => acc + Number(base[i]) * peso, 0)
+    const resto = soma % 11
+    return resto < 2 ? 0 : 11 - resto
+  }
+  return dv(digitos.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]) === Number(digitos[12]) &&
+    dv(digitos.slice(0, 13), [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]) === Number(digitos[13])
+}
+const cnpjSetor = z.string().trim().nullable().optional()
+  .refine(valor => valor == null || valor === '' || validarCnpj(valor), 'CNPJ inválido')
+  .transform(valor => valor ? valor.replace(/\D/g, '') : null)
+
 export const CreateSetorSchema = z.object({
   administracaoId: z.string().uuid("administracaoId deve ser um UUID válido"),
   ...baseEntity,
+  cnpj: cnpjSetor,
 })
 export const UpdateSetorSchema = CreateSetorSchema.partial()
 
