@@ -27,6 +27,11 @@ interface Regional { id: string; nome: string }
 interface Administracao { id: string; nome: string; regionalId: string }
 interface Setor { id: string; nome: string; administracaoId: string }
 interface Casa { id: string; nome: string; setorId: string }
+interface GrupoTrabalho { id: string; nome: string }
+interface ParticipacaoGt { grupoTrabalhoId: string; membroId: string }
+
+const compararNomes = new Intl.Collator('pt-BR', { sensitivity: 'base', numeric: true })
+const TAMANHO_LOTE = 25
 
 interface LinkTemporario {
   token: string
@@ -136,6 +141,14 @@ export function ContasAcessoView({
   const [statusFiltro, setStatusFiltro] = useState('')
   const [buscaFiltro, setBuscaFiltro] = useState('')
   const [perfilFiltro, setPerfilFiltro] = useState('')
+  const [gtFiltro, setGtFiltro] = useState('')
+  const [gts, setGts] = useState<GrupoTrabalho[]>([])
+  const [participacoesGt, setParticipacoesGt] = useState<ParticipacaoGt[]>([])
+  const [gtIndisponivel, setGtIndisponivel] = useState(false)
+  const [gtCarregando, setGtCarregando] = useState(true)
+  const [ordemNome, setOrdemNome] = useState<'az' | 'za'>('az')
+  const [gruposAbertos, setGruposAbertos] = useState<Record<string, boolean>>({})
+  const [limitesPorGrupo, setLimitesPorGrupo] = useState<Record<string, number>>({})
 
   const carregar = async () => {
     setErroGlobal(null)
@@ -169,6 +182,19 @@ export function ContasAcessoView({
       .catch(() => {
         // A listagem principal continua utilizável mesmo se algum lookup falhar.
       })
+    // Consulta auxiliar: indisponibilidade nunca significa ausência de participantes.
+    void Promise.all([
+      fetchWithAuth<GrupoTrabalho[]>('/grupos-trabalho'),
+      fetchWithAuth<ParticipacaoGt[]>('/vinculos-funcionais/participantes-gt'),
+    ]).then(([grupos, participantes]) => {
+      if (!Array.isArray(grupos) || !Array.isArray(participantes)) throw new Error('Dados de GT inválidos')
+      setGts(grupos)
+      setParticipacoesGt(participantes)
+      setGtIndisponivel(false)
+    }).catch(() => {
+      setGtIndisponivel(true)
+      setGtFiltro('')
+    }).finally(() => setGtCarregando(false))
   }, [])
 
   const administracoesFiltradas = useMemo(
@@ -202,7 +228,22 @@ export function ContasAcessoView({
     return Array.from(perfis).sort((a, b) => a.localeCompare(b, 'pt-BR'))
   }, [contas, perfilFiltro])
 
+  const gtsDisponiveis = useMemo(() => {
+    const membrosComConta = new Set(contas.map(conta => conta.membroId))
+    const gtIdsComParticipantes = new Set(
+      participacoesGt
+        .filter(participacao => membrosComConta.has(participacao.membroId))
+        .map(participacao => participacao.grupoTrabalhoId)
+    )
+    return gts
+      .filter(gt => gtIdsComParticipantes.has(gt.id))
+      .sort((a, b) => compararNomes.compare(a.nome, b.nome))
+  }, [contas, participacoesGt, gts])
+
+  const participantesGtIds = useMemo(() => new Set(participacoesGt.filter(p => p.grupoTrabalhoId === gtFiltro).map(p => p.membroId)), [participacoesGt, gtFiltro])
+
   const contasFiltradas = useMemo(() => contas.filter(conta => {
+    if (gtFiltro && !participantesGtIds.has(conta.membroId)) return false
     const casa = casas.find(item => item.id === conta.casaId)
     const setor = setores.find(item => item.id === casa?.setorId)
     const administracao = administracoes.find(item => item.id === setor?.administracaoId)
@@ -236,7 +277,7 @@ export function ContasAcessoView({
     if (statusFiltro === 'RECUPERACAO_PIN' && !conta.recuperacaoPinPendente) return false
     if (statusFiltro && !['SEM_CONTA', 'RECUPERACAO_PIN'].includes(statusFiltro) && conta.status !== statusFiltro) return false
     return true
-  }), [contas, casas, setores, administracoes, regionalFiltro, administracaoFiltro, setorFiltro, casaFiltro, statusFiltro, buscaFiltro, perfilFiltro])
+  }), [contas, casas, setores, administracoes, regionalFiltro, administracaoFiltro, setorFiltro, casaFiltro, statusFiltro, buscaFiltro, perfilFiltro, gtFiltro, participantesGtIds])
 
   const limparFiltros = () => {
     setRegionalFiltro('')
@@ -246,19 +287,38 @@ export function ContasAcessoView({
     setStatusFiltro('')
     setBuscaFiltro('')
     setPerfilFiltro('')
+    setGtFiltro('')
   }
 
+  // Preserve todos os contextos independentes: link, feedback, painel e sessões.
+  const idsContextuais = useMemo(() => new Set(
+    [linkTemporario?.membroId, feedback?.membroId, gerenciandoMembroId,
+      sessoesAbertasMembroId, processando]
+      .filter((id): id is string => Boolean(id))
+  ), [linkTemporario, feedback, gerenciandoMembroId, sessoesAbertasMembroId, processando])
+
   const contasExibidas = useMemo(() => {
-    const idsPreservados = new Set(
-      [linkTemporario?.membroId, feedback?.membroId, gerenciandoMembroId]
-        .filter((id): id is string => Boolean(id))
-    )
     const idsJaExibidos = new Set(contasFiltradas.map(conta => conta.membroId))
     const preservadas = contas.filter(
-      conta => idsPreservados.has(conta.membroId) && !idsJaExibidos.has(conta.membroId)
+      conta => idsContextuais.has(conta.membroId) && !idsJaExibidos.has(conta.membroId)
     )
-    return [...preservadas, ...contasFiltradas]
-  }, [contas, contasFiltradas, feedback, linkTemporario, gerenciandoMembroId])
+    return [...preservadas, ...contasFiltradas].sort((a, b) => {
+      const nome = compararNomes.compare(a.nome, b.nome)
+      return (ordemNome === 'az' ? nome : -nome) || a.membroId.localeCompare(b.membroId)
+    })
+  }, [contas, contasFiltradas, idsContextuais, ordemNome])
+
+  const gruposContas = useMemo(() => {
+    const grupos = new Map<string, ContaAdministrada[]>()
+    for (const conta of contasExibidas) {
+      const inicial = conta.nome.trim().charAt(0).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleUpperCase('pt-BR')
+      const letra = /^[A-Z]$/.test(inicial) ? inicial : '#'
+      const pessoas = grupos.get(letra) ?? []
+      pessoas.push(conta)
+      grupos.set(letra, pessoas)
+    }
+    return [...grupos.entries()].sort(([a], [b]) => ordemNome === 'az' ? compararNomes.compare(a, b) : compararNomes.compare(b, a))
+  }, [contasExibidas, ordemNome])
 
   useEffect(() => {
     const membroId = feedback?.membroId ?? linkTemporario?.membroId
@@ -505,7 +565,7 @@ export function ContasAcessoView({
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
           />
         </label>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <label className="text-sm text-slate-700">
             <span className="mb-1 block font-medium">Regional</span>
             <select
@@ -590,6 +650,19 @@ export function ContasAcessoView({
             </select>
           </label>
           <label className="text-sm text-slate-700">
+            <span className="mb-1 block font-medium">Grupo de Trabalho</span>
+            <select
+              aria-label="Filtrar por Grupo de Trabalho"
+              value={gtFiltro}
+              disabled={gtIndisponivel || gtCarregando}
+              onChange={event => setGtFiltro(event.target.value)}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"
+            >
+              <option value="">Todos os GTs</option>
+              {gtsDisponiveis.map(gt => <option key={gt.id} value={gt.id}>{gt.nome}</option>)}
+            </select>
+          </label>
+          <label className="text-sm text-slate-700">
             <span className="mb-1 block font-medium">Status</span>
             <select
               aria-label="Filtrar por Status"
@@ -607,7 +680,17 @@ export function ContasAcessoView({
             </select>
           </label>
         </div>
-        <div className="mt-3 flex items-center justify-between gap-3 text-sm text-slate-600">
+        {gtIndisponivel && <p role="status" className="mt-3 text-sm text-amber-800">A participação em GT está indisponível. Os demais filtros continuam disponíveis.</p>}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+          <label className="flex items-center gap-2">
+            <span>Ordenar por nome</span>
+            <select aria-label="Ordenar por nome" value={ordemNome}
+              onChange={event => setOrdemNome(event.target.value as 'az' | 'za')}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2">
+              <option value="az">A–Z</option>
+              <option value="za">Z–A</option>
+            </select>
+          </label>
           <span>{contasFiltradas.length} de {contas.length} pessoa(s)</span>
           <button type="button" onClick={limparFiltros} className="font-medium text-brand-700 hover:underline">
             Limpar filtros
@@ -616,9 +699,26 @@ export function ContasAcessoView({
       </div>
 
       <div className="space-y-3">
-        {[...contasExibidas]
-          .sort((a, b) => Number(Boolean(b.recuperacaoPinPendente)) - Number(Boolean(a.recuperacaoPinPendente)))
-          .map(conta => (
+        {gruposContas.map(([letra, pessoas]) => {
+          // A decisão de manter um grupo aberto não pode depender apenas da busca.
+          const contemContexto = pessoas.some(conta => idsContextuais.has(conta.membroId))
+          const aberturaPadrao = contasExibidas.length <= 30 || Boolean(buscaFiltro.trim())
+          const grupoAberto = contemContexto || (gruposAbertos[letra] ?? aberturaPadrao)
+          // Todos os membros em contexto devem permanecer dentro do lote exibido.
+          const ultimoIndiceContextual = pessoas.reduce(
+            (ultimo, conta, indice) => idsContextuais.has(conta.membroId) ? indice + 1 : ultimo, 0
+          )
+          const limiteExibicao = Math.max(limitesPorGrupo[letra] ?? TAMANHO_LOTE, ultimoIndiceContextual)
+          return (
+          <section key={letra} className="rounded-xl border border-slate-200 bg-white">
+            <button type="button" className="flex w-full items-center justify-between p-3 text-left font-semibold text-slate-800"
+              aria-expanded={grupoAberto}
+              onClick={() => setGruposAbertos(atual => ({ ...atual, [letra]: !grupoAberto }))}>
+              <span>Grupo {letra}</span><span className="text-sm font-normal">{pessoas.length} pessoa(s) · Abrir/fechar</span>
+            </button>
+            {grupoAberto && (
+              <div className="space-y-3 border-t border-slate-200 p-3">
+                {pessoas.slice(0, limiteExibicao).map(conta => (
           <article key={conta.membroId} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -836,7 +936,21 @@ export function ContasAcessoView({
               />
             )}
           </article>
-        ))}
+                ))}
+                {pessoas.length > limiteExibicao && (
+                  <button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium"
+                    onClick={() => setLimitesPorGrupo(atual => ({
+                      ...atual,
+                      [letra]: Math.max(atual[letra] ?? TAMANHO_LOTE, ultimoIndiceContextual) + TAMANHO_LOTE,
+                    }))}>
+                    Mostrar mais pessoas de {letra}
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+          )
+        })}
         {contasFiltradas.length === 0 && (
           <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
             {contas.length === 0
