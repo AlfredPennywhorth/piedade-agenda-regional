@@ -860,4 +860,66 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(screen.getByText('Pessoa Teste')).toBeDefined()
   })
 
+  it('preserva grupo do link temporário após limpar busca em lista grande', async () => {
+    const contas = Array.from({ length: 35 }, (_, i) => ({
+      ...contaAtiva,
+      membroId: `pessoa-${i}`,
+      nome: `Ana ${String(i).padStart(2, '0')}`,
+      contaAcessoId: null,
+      acessos: [],
+    }))
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return contas as any
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-exemplo', membroId: 'pessoa-34', expiraEm: '2026-11-02T12:00:00.000Z',
+    } as any)
+    render(<ContasAcessoView />)
+    await screen.findByText('35 de 35 pessoa(s)')
+    fireEvent.change(screen.getByLabelText('Buscar por nome, celular ou carteirinha'), {
+      target: { value: 'Ana 34' },
+    })
+    const artigo = (await screen.findByText('Ana 34')).closest('article')!
+    fireEvent.click(within(artigo).getByRole('button', { name: 'Gerar ativação' }))
+    expect(await within(artigo).findByText('Link temporário gerado')).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    expect(screen.getByText('Ana 34')).toBeDefined()
+    expect(screen.getByText('Link temporário gerado')).toBeDefined()
+    expect(screen.getByRole('button', { name: /Grupo A/ }).getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('preserva painel de outra pessoa além do 25º registro com link pré-existente', async () => {
+    const contas = Array.from({ length: 40 }, (_, i) => ({
+      ...contaAtiva,
+      membroId: `pessoa-${i}`,
+      nome: `Ana ${String(i).padStart(2, '0')}`,
+      contaAcessoId: i === 0 ? null : `conta-${i}`,
+      acessos: [],
+    }))
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return contas as any
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-exemplo', membroId: 'pessoa-0', expiraEm: '2026-11-02T12:00:00.000Z',
+    } as any)
+    render(<ContasAcessoView />)
+    await screen.findByText('40 de 40 pessoa(s)')
+    const busca = screen.getByLabelText('Buscar por nome, celular ou carteirinha')
+    fireEvent.change(busca, { target: { value: 'Ana 00' } })
+    const artigoLink = (await screen.findByText('Ana 00')).closest('article')!
+    fireEvent.click(within(artigoLink).getByRole('button', { name: 'Gerar ativação' }))
+    expect(await screen.findByText('Link temporário gerado')).toBeDefined()
+    fireEvent.change(busca, { target: { value: 'Ana 39' } })
+    const artigoPainel = (await screen.findByText('Ana 39')).closest('article')!
+    fireEvent.click(within(artigoPainel).getByRole('button', { name: 'Gerenciar acessos' }))
+    expect(await within(artigoPainel).findByRole('button', { name: 'Atribuir acesso' })).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    expect(screen.getByText('Ana 39')).toBeDefined()
+    expect(screen.getByText('Ana 00')).toBeDefined()
+    expect(screen.getByText('Link temporário gerado')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Atribuir acesso' })).toBeDefined()
+  })
+
 })
