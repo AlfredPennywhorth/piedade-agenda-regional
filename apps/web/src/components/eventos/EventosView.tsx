@@ -1182,6 +1182,10 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
       if (err instanceof ApiError &&
         (err.body?.code === 'EVENTO_DATA_DESATUALIZADA' ||
          err.body?.code === 'EVENTO_DATA_ESPERADA_OBRIGATORIA')) {
+        // A lista e o modal mantêm estados independentes. Fechar o detalhe
+        // obsoleto impede uma nova tentativa com a data anterior enquanto
+        // recarregamos os dados persistidos. O alerta permanece na listagem.
+        if (eventoDetalheIdRef.current === item.id) fecharDetalheEvento()
         void carregarDados().catch(() => undefined)
       }
     }
