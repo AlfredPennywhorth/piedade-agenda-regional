@@ -228,6 +228,18 @@ export function ContasAcessoView({
     return Array.from(perfis).sort((a, b) => a.localeCompare(b, 'pt-BR'))
   }, [contas, perfilFiltro])
 
+  const gtsDisponiveis = useMemo(() => {
+    const membrosComConta = new Set(contas.map(conta => conta.membroId))
+    const gtIdsComParticipantes = new Set(
+      participacoesGt
+        .filter(participacao => membrosComConta.has(participacao.membroId))
+        .map(participacao => participacao.grupoTrabalhoId)
+    )
+    return gts
+      .filter(gt => gtIdsComParticipantes.has(gt.id))
+      .sort((a, b) => compararNomes.compare(a.nome, b.nome))
+  }, [contas, participacoesGt, gts])
+
   const participantesGtIds = useMemo(() => new Set(participacoesGt.filter(p => p.grupoTrabalhoId === gtFiltro).map(p => p.membroId)), [participacoesGt, gtFiltro])
 
   const contasFiltradas = useMemo(() => contas.filter(conta => {
@@ -647,9 +659,7 @@ export function ContasAcessoView({
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 disabled:bg-slate-100"
             >
               <option value="">Todos os GTs</option>
-              {gts.filter(gt => participacoesGt.some(p => p.grupoTrabalhoId === gt.id && contas.some(c => c.membroId === p.membroId)))
-                .sort((a, b) => compararNomes.compare(a.nome, b.nome))
-                .map(gt => <option key={gt.id} value={gt.id}>{gt.nome}</option>)}
+              {gtsDisponiveis.map(gt => <option key={gt.id} value={gt.id}>{gt.nome}</option>)}
             </select>
           </label>
           <label className="text-sm text-slate-700">
@@ -929,7 +939,10 @@ export function ContasAcessoView({
                 ))}
                 {pessoas.length > limiteExibicao && (
                   <button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium"
-                    onClick={() => setLimitesPorGrupo(atual => ({ ...atual, [letra]: (atual[letra] ?? TAMANHO_LOTE) + TAMANHO_LOTE }))}>
+                    onClick={() => setLimitesPorGrupo(atual => ({
+                      ...atual,
+                      [letra]: Math.max(atual[letra] ?? TAMANHO_LOTE, ultimoIndiceContextual) + TAMANHO_LOTE,
+                    }))}>
                     Mostrar mais pessoas de {letra}
                   </button>
                 )}
