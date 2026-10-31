@@ -5,7 +5,7 @@ const base = { administracaoId: 'a0000000-0000-4000-8000-000000000001', nome: 'S
 
 describe('CNPJ institucional do Setor', () => {
   it('aceita legado sem CNPJ e permite limpeza por null', () => {
-    expect(CreateSetorSchema.parse(base).cnpj).toBeUndefined()
+    expect(CreateSetorSchema.parse(base).cnpj).toBeNull()
     expect(UpdateSetorSchema.parse({ cnpj: null }).cnpj).toBeNull()
   })
 
