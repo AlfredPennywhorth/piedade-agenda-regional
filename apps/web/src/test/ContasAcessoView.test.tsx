@@ -780,12 +780,12 @@ describe('ContasAcessoView — PR-ACC-05', () => {
   })
 
 
-  it('informa a quantidade de recuperações pendentes e prioriza essas contas', async () => {
+  it('informa recuperações pendentes sem alterar a ordenação alfabética', async () => {
     const onPendenciasAtualizadas = vi.fn()
     vi.mocked(apiClient.fetchWithAuth).mockResolvedValueOnce([
       {
         membroId: 'membro-1',
-        nome: 'Sem pendência',
+        nome: 'Ana sem pendência',
         celular: '11911111111',
         codigoCarteirinha: 'C1',
         casaId: 'casa-1',
@@ -798,7 +798,7 @@ describe('ContasAcessoView — PR-ACC-05', () => {
       },
       {
         membroId: 'membro-2',
-        nome: 'Com pendência',
+        nome: 'Zélia com pendência',
         celular: '11922222222',
         codigoCarteirinha: 'C2',
         casaId: 'casa-1',
@@ -815,7 +815,158 @@ describe('ContasAcessoView — PR-ACC-05', () => {
 
     await waitFor(() => expect(onPendenciasAtualizadas).toHaveBeenCalledWith(1))
     const titulos = screen.getAllByRole('heading', { level: 3 }).map(item => item.textContent)
-    expect(titulos.slice(0, 2)).toEqual(['Com pendência', 'Sem pendência'])
+    expect(titulos.slice(0, 2)).toEqual(['Ana sem pendência', 'Zélia com pendência'])
+    fireEvent.change(screen.getByLabelText('Ordenar por nome'), { target: { value: 'za' } })
+    expect(screen.getAllByRole('heading', { level: 3 }).map(item => item.textContent).slice(0, 2))
+      .toEqual(['Zélia com pendência', 'Ana sem pendência'])
+  })
+
+  it('filtra por participação real em GT combinada com território, sem usar perfil', async () => {
+    const maria = { ...contaAtiva, membroId: 'membro-2', nome: 'Maria de GT', casaId: 'casa-2' }
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva, maria] as any
+      if (endpoint === '/grupos-trabalho') return [{ id: 'gt-1', nome: 'Secretaria' }] as any
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return [
+        { grupoTrabalhoId: 'gt-1', membroId: 'membro-2' },
+      ] as any
+      if (endpoint === '/regionais') return [{ id: 'regional-1', nome: 'São Paulo' }] as any
+      if (endpoint === '/administracoes') return [{ id: 'adm-1', nome: 'Sede', regionalId: 'regional-1' }] as any
+      if (endpoint === '/setores') return [{ id: 'setor-1', nome: 'Centro', administracaoId: 'adm-1' }] as any
+      if (endpoint === '/casas') return [
+        { id: 'casa-1', nome: 'Casa 1', setorId: 'setor-1' },
+        { id: 'casa-2', nome: 'Casa 2', setorId: 'setor-1' },
+      ] as any
+      return [] as any
+    })
+    render(<ContasAcessoView />)
+    const seletor = await screen.findByLabelText('Filtrar por Grupo de Trabalho') as HTMLSelectElement
+    await waitFor(() => expect(seletor.disabled).toBe(false))
+    fireEvent.change(seletor, { target: { value: 'gt-1' } })
+    expect(screen.queryByText('Pessoa Teste')).toBeNull()
+    expect(screen.getByText('Maria de GT')).toBeDefined()
+    fireEvent.change(screen.getByLabelText('Filtrar por Casa de Oração'), { target: { value: 'casa-1' } })
+    expect(screen.queryByText('Maria de GT')).toBeNull()
+  })
+
+  it('não interpreta falha da consulta de GT como ausência de participantes', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva] as any
+      if (endpoint === '/vinculos-funcionais/participantes-gt') throw new Error('indisponível')
+      return [] as any
+    })
+    render(<ContasAcessoView />)
+    expect(await screen.findByText(/participação em GT está indisponível/)).toBeDefined()
+    expect((screen.getByLabelText('Filtrar por Grupo de Trabalho') as HTMLSelectElement).disabled).toBe(true)
+    expect(screen.getByText('Pessoa Teste')).toBeDefined()
+  })
+
+  it('preserva grupo do link temporário após limpar busca em lista grande', async () => {
+    const contas = Array.from({ length: 35 }, (_, i) => ({
+      ...contaAtiva,
+      membroId: `pessoa-${i}`,
+      nome: `Ana ${String(i).padStart(2, '0')}`,
+      contaAcessoId: null,
+      acessos: [],
+    }))
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return contas as any
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-exemplo', membroId: 'pessoa-34', expiraEm: '2026-11-02T12:00:00.000Z',
+    } as any)
+    render(<ContasAcessoView />)
+    await screen.findByText('35 de 35 pessoa(s)')
+    fireEvent.change(screen.getByLabelText('Buscar por nome, celular ou carteirinha'), {
+      target: { value: 'Ana 34' },
+    })
+    const artigo = (await screen.findByText('Ana 34')).closest('article')!
+    fireEvent.click(within(artigo).getByRole('button', { name: 'Gerar ativação' }))
+    expect(await within(artigo).findByText('Link temporário gerado')).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    expect(screen.getByText('Ana 34')).toBeDefined()
+    expect(screen.getByText('Link temporário gerado')).toBeDefined()
+    expect(screen.getByRole('button', { name: /Grupo A/ }).getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('preserva painel de outra pessoa além do 25º registro com link pré-existente', async () => {
+    const contas = Array.from({ length: 40 }, (_, i) => ({
+      ...contaAtiva,
+      membroId: `pessoa-${i}`,
+      nome: `Ana ${String(i).padStart(2, '0')}`,
+      contaAcessoId: i === 0 ? null : `conta-${i}`,
+      acessos: [],
+    }))
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return contas as any
+      return [] as any
+    })
+    vi.mocked(apiClient.postWithAuth).mockResolvedValue({
+      token: 'token-exemplo', membroId: 'pessoa-0', expiraEm: '2026-11-02T12:00:00.000Z',
+    } as any)
+    render(<ContasAcessoView />)
+    await screen.findByText('40 de 40 pessoa(s)')
+    const busca = screen.getByLabelText('Buscar por nome, celular ou carteirinha')
+    fireEvent.change(busca, { target: { value: 'Ana 00' } })
+    const artigoLink = (await screen.findByText('Ana 00')).closest('article')!
+    fireEvent.click(within(artigoLink).getByRole('button', { name: 'Gerar ativação' }))
+    expect(await screen.findByText('Link temporário gerado')).toBeDefined()
+    fireEvent.change(busca, { target: { value: 'Ana 39' } })
+    const artigoPainel = (await screen.findByText('Ana 39')).closest('article')!
+    fireEvent.click(within(artigoPainel).getByRole('button', { name: 'Gerenciar acessos' }))
+    expect(await within(artigoPainel).findByRole('button', { name: 'Atribuir acesso' })).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    expect(screen.getByText('Ana 39')).toBeDefined()
+    expect(screen.getByText('Ana 00')).toBeDefined()
+    expect(screen.getByText('Link temporário gerado')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Atribuir acesso' })).toBeDefined()
+  })
+
+  it('Mostrar mais avança um lote além do contexto já visível', async () => {
+    const contas = Array.from({ length: 80 }, (_, i) => ({
+      ...contaAtiva,
+      membroId: `pessoa-${i}`,
+      nome: `Ana ${String(i).padStart(2, '0')}`,
+      contaAcessoId: `conta-${i}`,
+      acessos: [],
+    }))
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return contas as any
+      return [] as any
+    })
+    render(<ContasAcessoView />)
+    await screen.findByText('80 de 80 pessoa(s)')
+    const busca = screen.getByLabelText('Buscar por nome, celular ou carteirinha')
+    fireEvent.change(busca, { target: { value: 'Ana 59' } })
+    const artigo = (await screen.findByText('Ana 59')).closest('article')!
+    fireEvent.click(within(artigo).getByRole('button', { name: 'Gerenciar acessos' }))
+    expect(await within(artigo).findByRole('button', { name: 'Atribuir acesso' })).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    expect(screen.getByText('Ana 59')).toBeDefined()
+    expect(screen.queryByText('Ana 60')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar mais pessoas de A' }))
+    expect(screen.getByText('Ana 60')).toBeDefined()
+    expect(screen.getByText('Ana 79')).toBeDefined()
+  })
+
+  it('mostra somente GTs com participantes entre as contas retornadas', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva] as any
+      if (endpoint === '/grupos-trabalho') return [
+        { id: 'gt-1', nome: 'Secretaria' },
+        { id: 'gt-2', nome: 'Tesouraria' },
+      ] as any
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return [
+        { grupoTrabalhoId: 'gt-1', membroId: 'membro-1' },
+        { grupoTrabalhoId: 'gt-2', membroId: 'fora-do-escopo' },
+      ] as any
+      return [] as any
+    })
+    render(<ContasAcessoView />)
+    const select = await screen.findByLabelText('Filtrar por Grupo de Trabalho')
+    await waitFor(() => expect((select as HTMLSelectElement).disabled).toBe(false))
+    expect(within(select).getByRole('option', { name: 'Secretaria' })).toBeDefined()
+    expect(within(select).queryByRole('option', { name: 'Tesouraria' })).toBeNull()
   })
 
 })
