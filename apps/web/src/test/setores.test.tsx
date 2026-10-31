@@ -167,6 +167,7 @@ describe('S01 — SetoresView (Gestão Territorial Frontend)', () => {
         administracaoId: ADM_1_ID,
         nome: 'Setor 03 — Rochdale',
         codigo: 'SET-03',
+        cnpj: null,
         ativo: true
       })
     })
@@ -240,6 +241,7 @@ describe('S01 — SetoresView (Gestão Territorial Frontend)', () => {
         administracaoId: ADM_1_ID,
         nome: 'Setor 01 — Osasco Norte',
         codigo: 'SET-01-NTE',
+        cnpj: null,
         ativo: false
       })
     })
