@@ -9,7 +9,7 @@ describe('CNPJ institucional do Setor', () => {
     expect(UpdateSetorSchema.parse({ cnpj: null }).cnpj).toBeNull()
   })
 
-  it('aceita o mesmo CNPJ para Setores diferentes, normalizado em dígitos', () => {
+  it('normaliza CNPJ; exclusividade entre Setores é validada pela API e pelo D1', () => {
     expect(CreateSetorSchema.parse({ ...base, cnpj: '61.526.398/0004-31' }).cnpj).toBe('61526398000431')
     expect(CreateSetorSchema.parse({ ...base, nome: 'Setor Norte', cnpj: '61526398000431' }).cnpj).toBe('61526398000431')
   })
