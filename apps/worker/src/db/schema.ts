@@ -57,6 +57,7 @@ export const setores = sqliteTable('setores', {
     .references(() => administracoes.id),
   nome: text('nome').notNull(),
   codigo: text('codigo'),
+  cnpj: text('cnpj'), // CNPJ institucional do Setor; pode ser compartilhado.
   ativo: ativoDefault,
   ...timestamps,
 })
