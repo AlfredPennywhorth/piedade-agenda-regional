@@ -53,8 +53,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   try {
     const repository = process.env.GITHUB_REPOSITORY
     if (!repository) throw new Error('GITHUB_REPOSITORY ausente')
-    const issues = JSON.parse(gh('--method', 'GET', 'search/issues',
-      '-f', `q=repo:${repository} is:issue is:open label:P0`, '-f', 'per_page=100')).items
+    const resultadoBusca = JSON.parse(gh('--method', 'GET', 'search/issues',
+      '-f', `q=repo:${repository} is:issue is:open label:P0`, '-f', 'per_page=100'))
+    const issues = resultadoBusca.items
+    if (!Array.isArray(issues) || resultadoBusca.total_count !== issues.length) {
+      throw new Error('Busca de issues P0 incompleta; bloqueando por segurança')
+    }
     let event = null
     let files = []
     if (issues.length) {
