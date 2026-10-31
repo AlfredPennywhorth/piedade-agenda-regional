@@ -79,13 +79,16 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       }
       event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
       // Arquivos são obtidos da API, não de declarações do autor da PR.
-      const arquivosTsv = gh('--paginate', `repos/${repository}/pulls/${event.number}/files?per_page=100`,
-        '--jq', '.[] | [.filename, .status, (.previous_filename // "")] | @tsv')
-      files = arquivosTsv.split('\n').filter(Boolean).map(linha => {
-        const partes = linha.split('\t')
-        if (partes.length !== 3) throw new Error('Metadados incompletos na lista de arquivos')
-        const [filename, status, previous_filename] = partes
-        return { filename, status, previous_filename: previous_filename || null }
+      // Um JSON por linha preserva status e origem mesmo quando
+      // previous_filename não está presente em arquivos comuns.
+      const arquivosJson = gh('--paginate', `repos/${repository}/pulls/${event.number}/files?per_page=100`,
+        '--jq', '.[] | {filename, status, previous_filename} | @json')
+      files = arquivosJson.split('\n').filter(Boolean).map(linha => {
+        const file = JSON.parse(linha)
+        if (!file || typeof file.filename !== 'string' || typeof file.status !== 'string') {
+          throw new Error('Metadados incompletos na lista de arquivos')
+        }
+        return file
       })
     }
     const decisao = avaliarGateP0({ issues, event, files, repository })
