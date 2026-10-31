@@ -355,6 +355,45 @@ describe('EventosView', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Este evento foi reagendado')
   })
 
+  it('P2 Codex #438: fecha detalhe obsoleto e preserva alerta após conflito de reagendamento', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const inicioReagendado = '2026-10-17T10:00:00.000Z'
+    const novoEvento = {
+      ...mockEventos[0],
+      inicioEm: inicioReagendado,
+      fimEm: '2026-10-17T12:00:00.000Z',
+    }
+    let chamadasLista = 0
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos') return ++chamadasLista === 1 ? mockEventos : [novoEvento]
+      if (url === `/eventos/${EVENTO_ID}`) return mockEventos[0]
+      return original(url)
+    })
+    vi.mocked(apiClient.postWithAuth).mockRejectedValueOnce(
+      new apiClient.ApiError(409, 'Conflito', {
+        error: 'Este evento foi reagendado. Atualize a lista.',
+        code: 'EVENTO_DATA_DESATUALIZADA',
+      })
+    )
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /^ver$/i }))
+    const detalhe = await screen.findByRole('dialog', { name: /detalhes do evento/i })
+    fireEvent.click(within(detalhe).getByRole('button', { name: /cancelar evento/i }))
+
+    await waitFor(() => {
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith(
+        `/eventos/${EVENTO_ID}/cancelar`,
+        { expectedInicioEm: mockEventos[0].inicioEm }
+      )
+      expect(screen.queryByRole('dialog', { name: /detalhes do evento/i })).not.toBeInTheDocument()
+      expect(chamadasLista).toBeGreaterThanOrEqual(2)
+    })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Este evento foi reagendado')
+    expect(screen.getByText('17/10/2026, 07:00:00')).toBeInTheDocument()
+  })
+
   it('deve continuar o fluxo para convocação após criar evento', async () => {
     const onEventoCriado = vi.fn()
     const novoEvento = {
