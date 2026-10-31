@@ -45,7 +45,24 @@ test('rejeita outros P0 e inconsistências de rótulos', () => {
   assert.equal(run({ issues: [{ number: 437, labels: [] }] }).allowed, false)
   assert.equal(run({ issues: [{ number: 439, labels: ['P0'] }] }).allowed, false)
 })
-test('rejeita PR de release main, outra PR e outros branches', () => {
+test('permite apenas a PR #439 develop -> main para P0 #437 com mesmo escopo', () => {
+  const release = {
+    number: 439,
+    pull_request: {
+      number: 439,
+      base: { ref: 'main', repo: { full_name: repo } },
+      head: { ref: 'develop', repo: { full_name: repo } },
+    },
+  }
+  assert.equal(run({ event: release }).allowed, true)
+  assert.equal(run({ event: release, issues: [...issues, { number: 321, labels: ['P0'] }] }).allowed, false)
+  assert.equal(run({ event: release, files: [...files, { filename: 'apps/worker/drizzle/9999.sql', status: 'added' }] }).allowed, false)
+  assert.equal(run({ event: release, files: files.map(file => file.filename === 'scripts/p0-gate.mjs' ? { ...file, status: 'renamed', previous_filename: 'docs/README.md' } : file) }).allowed, false)
+  assert.equal(run({ event: { ...release, pull_request: { ...release.pull_request, head: { ref: 'other', repo: { full_name: repo } } } } }).allowed, false)
+  assert.equal(run({ event: { ...release, pull_request: { ...release.pull_request, head: { ref: 'develop', repo: { full_name: 'other/repo' } } } } }).allowed, false)
+})
+
+test('rejeita PR de release main indevida, outra PR e outros branches', () => {
   assert.equal(run({ event: { ...event, number: 439 } }).allowed, false)
   assert.equal(run({ event: { ...event, pull_request: { ...event.pull_request, base: { ref: 'main', repo: { full_name: repo } } } } }).allowed, false)
   assert.equal(run({ event: { ...event, pull_request: { ...event.pull_request, head: { ref: 'fix/p0-437-alternativo', repo: { full_name: repo } } } } }).allowed, false)
