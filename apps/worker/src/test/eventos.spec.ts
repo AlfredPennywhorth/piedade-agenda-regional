@@ -883,7 +883,7 @@ describe('Eventos API (S04)', () => {
       ativo: true,
     })
 
-    const res = await req(`/api/v1/eventos/${eventoId}/cancelar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedInicioEm: validDate1 }) })
+    const res = await req(`/api/v1/eventos/${eventoId}/cancelar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedInicioEm: '2020-01-01T10:00:00.000Z' }) })
 
     expect(res.status).toBe(409)
     expect(await res.json()).toMatchObject({ code: 'EVENTO_PASSADO_IMUTAVEL' })
