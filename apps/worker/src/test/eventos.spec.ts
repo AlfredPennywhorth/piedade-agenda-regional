@@ -701,7 +701,7 @@ describe('Eventos API (S04)', () => {
       funcaoId
     })
 
-    const cancelar = await req(`/api/v1/eventos/${eventoCriado.id}/cancelar`, { method: 'POST' })
+    const cancelar = await req(`/api/v1/eventos/${eventoCriado.id}/cancelar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedInicioEm: eventoCriado.inicioEm }) })
     expect(cancelar.status).toBe(200)
     expect(await cancelar.json()).toMatchObject({
       success: true,
@@ -739,7 +739,7 @@ describe('Eventos API (S04)', () => {
     expect(createRes.status).toBe(201)
     const eventoCriado = await createRes.json()
 
-    const cancelar = await req(`/api/v1/eventos/${eventoCriado.id}/cancelar`, { method: 'POST' })
+    const cancelar = await req(`/api/v1/eventos/${eventoCriado.id}/cancelar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedInicioEm: eventoCriado.inicioEm }) })
     expect(cancelar.status).toBe(200)
     expect(await cancelar.json()).toMatchObject({
       success: true,
@@ -753,6 +753,54 @@ describe('Eventos API (S04)', () => {
 
     expect(eventoPersistido?.ativo).toBe(false)
     expect(logs.some((item: any) => item.acao === 'EVENTO_CANCELADO')).toBe(true)
+  })
+
+  it('P0 #437: cartão antigo não cancela evento reagendado para outra data', async () => {
+    const regionalId = await createRegional()
+    const criado = await req('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Reunião reagendada',
+        modalidade: 'ONLINE',
+        urlOnline: 'https://meet.example.com/reuniao',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        regionalId,
+      })
+    })
+    expect(criado.status).toBe(201)
+    const item = await criado.json()
+
+    const novoInicio = validDateNextDay
+    const novoFim = new Date(new Date(novoInicio).getTime() + 2 * 3600_000).toISOString()
+    const editar = await req(`/api/v1/eventos/${item.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inicioEm: novoInicio, fimEm: novoFim }),
+    })
+    expect(editar.status).toBe(200)
+
+    const tentarComDataAntiga = await req(`/api/v1/eventos/${item.id}/cancelar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedInicioEm: validDate1 }),
+    })
+    expect(tentarComDataAntiga.status).toBe(409)
+    expect(await tentarComDataAntiga.json()).toMatchObject({ code: 'EVENTO_DATA_DESATUALIZADA' })
+    expect((await db.select().from(eventos).where(eq(eventos.id, item.id)).get()).ativo).toBe(true)
+
+    const semConfirmacao = await req(`/api/v1/eventos/${item.id}/cancelar`, { method: 'POST' })
+    expect(semConfirmacao.status).toBe(428)
+    expect(await semConfirmacao.json()).toMatchObject({ code: 'EVENTO_DATA_ESPERADA_OBRIGATORIA' })
+
+    const cancelarAtual = await req(`/api/v1/eventos/${item.id}/cancelar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedInicioEm: novoInicio }),
+    })
+    expect(cancelarAtual.status).toBe(200)
+    expect((await db.select().from(eventos).where(eq(eventos.id, item.id)).get()).ativo).toBe(false)
   })
 
   it('23. não cancela evento enquanto a convocação estiver publicada', async () => {
@@ -781,7 +829,7 @@ describe('Eventos API (S04)', () => {
       publicadaEm: new Date().toISOString()
     })
 
-    const cancelar = await req(`/api/v1/eventos/${eventoCriado.id}/cancelar`, { method: 'POST' })
+    const cancelar = await req(`/api/v1/eventos/${eventoCriado.id}/cancelar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedInicioEm: eventoCriado.inicioEm }) })
     expect(cancelar.status).toBe(409)
     expect(await cancelar.json()).toMatchObject({ code: 'EVENTO_COM_CONVOCACAO_PUBLICADA' })
 
@@ -835,7 +883,7 @@ describe('Eventos API (S04)', () => {
       ativo: true,
     })
 
-    const res = await req(`/api/v1/eventos/${eventoId}/cancelar`, { method: 'POST' })
+    const res = await req(`/api/v1/eventos/${eventoId}/cancelar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedInicioEm: '2020-01-01T10:00:00.000Z' }) })
 
     expect(res.status).toBe(409)
     expect(await res.json()).toMatchObject({ code: 'EVENTO_PASSADO_IMUTAVEL' })

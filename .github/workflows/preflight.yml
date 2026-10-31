@@ -45,17 +45,10 @@ jobs:
           echo "Threads de review devem ser bloqueadas pela proteção nativa do GitHub: Require conversation resolution before merging."
           echo "O workflow não replica esse bloqueio porque a resolução de uma conversa não gera um gatilho confiável de GitHub Actions para reavaliar o mesmo SHA."
 
-      - name: Bloquear issues P0 abertas
+      - name: Bloquear issues P0 abertas (exceção restrita #438)
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          total="$(gh api --method GET search/issues             -f q="repo:$GITHUB_REPOSITORY is:issue is:open label:P0"             --jq '.total_count')"
-          test "$total" = "0" || {
-            echo "Bloqueio: existem $total issue(s) P0 abertas."
-            exit 1
-          }
+        run: node scripts/p0-gate.mjs
 
       - name: Resumo de impacto
         shell: bash
