@@ -1154,8 +1154,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
   }
 
   const handleCancelarEvento = async (item: Evento, _origem: 'lista' | 'detalhe' = 'lista') => {
+    const dataExibida = new Date(item.inicioEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
     const confirmou = window.confirm(
-      `Cancelar o evento "${item.titulo}"? Se houver convocação em rascunho, as funções serão removidas e a convocação também será cancelada.`
+      `Cancelar o evento "${item.titulo}" de ${dataExibida}? Confirme a data antes de cancelar. Se houver convocação em rascunho, as funções serão removidas e a convocação também será cancelada.`
     )
     if (!confirmou) return
 
@@ -1163,7 +1164,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
     setErroCancelamento(null)
 
     try {
-      await postWithAuth(`/eventos/${item.id}/cancelar`, {})
+      await postWithAuth(`/eventos/${item.id}/cancelar`, { expectedInicioEm: item.inicioEm })
       setEventos(atuais => atuais.filter(evento => evento.id !== item.id))
       if (eventoDetalheIdRef.current === item.id) {
         fecharDetalheEvento()
@@ -1176,6 +1177,13 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
             ? (err.message || 'Não foi possível cancelar o evento.')
             : 'Não foi possível cancelar o evento.'
       setErroCancelamento(mensagem)
+      // O servidor rejeitou um cartão desatualizado: recarregar antes de
+      // qualquer nova tentativa, preservando a mensagem para o operador.
+      if (err instanceof ApiError &&
+        (err.body?.code === 'EVENTO_DATA_DESATUALIZADA' ||
+         err.body?.code === 'EVENTO_DATA_ESPERADA_OBRIGATORIA')) {
+        void carregarDados().catch(() => undefined)
+      }
     }
   }
 
