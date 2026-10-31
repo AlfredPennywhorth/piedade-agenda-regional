@@ -15,6 +15,16 @@ const PERMITIDOS_438 = [
   'scripts/p0-gate.test.mjs',
 ].sort()
 
+export function validarResultadoBuscaP0(resultado) {
+  if (resultado?.incomplete_results !== false ||
+      !Array.isArray(resultado?.items) ||
+      !Number.isSafeInteger(resultado?.total_count) ||
+      resultado.total_count !== resultado.items.length) {
+    throw new Error('Busca de issues P0 incompleta ou inválida; bloqueando por segurança')
+  }
+  return resultado.items
+}
+
 /** Regra de exceção TEMPORÁRIA e fechada para a PR corretiva #438 / P0 #437.
  * Qualquer outro P0, PR, branch, base ou arquivo extra continua bloqueado.
  */
@@ -37,9 +47,14 @@ export function avaliarGateP0({ issues, event, files, repository }) {
       pr.head?.repo?.full_name !== repository) {
     return { allowed: false, reason: 'PR, base, head ou origem fora da exceção #438' }
   }
+  // Exigir status e origem: um rename de caminho não autorizado não pode
+  // apresentar somente um destino permitido e ocultar a exclusão de origem.
   if (!Array.isArray(files) ||
       files.length !== PERMITIDOS_438.length ||
-      [...files].sort().some((path, i) => path !== PERMITIDOS_438[i])) {
+      files.some(file => !file || typeof file.filename !== 'string' ||
+        !['added', 'modified'].includes(file.status) ||
+        file.previous_filename != null) ||
+      files.map(file => file.filename).sort().some((path, i) => path !== PERMITIDOS_438[i])) {
     return { allowed: false, reason: 'Escopo da PR #438 diverge dos arquivos autorizados' }
   }
   return { allowed: true, reason: 'Exceção restrita à PR #438 corrigindo P0 #437' }
@@ -55,10 +70,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     if (!repository) throw new Error('GITHUB_REPOSITORY ausente')
     const resultadoBusca = JSON.parse(gh('--method', 'GET', 'search/issues',
       '-f', `q=repo:${repository} is:issue is:open label:P0`, '-f', 'per_page=100'))
-    const issues = resultadoBusca.items
-    if (!Array.isArray(issues) || resultadoBusca.total_count !== issues.length) {
-      throw new Error('Busca de issues P0 incompleta; bloqueando por segurança')
-    }
+    const issues = validarResultadoBuscaP0(resultadoBusca)
     let event = null
     let files = []
     if (issues.length) {
@@ -67,8 +79,14 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       }
       event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
       // Arquivos são obtidos da API, não de declarações do autor da PR.
-      files = gh('--paginate', `repos/${repository}/pulls/${event.number}/files?per_page=100`,
-        '--jq', '.[].filename').split('\n').filter(Boolean)
+      const arquivosTsv = gh('--paginate', `repos/${repository}/pulls/${event.number}/files?per_page=100`,
+        '--jq', '.[] | [.filename, .status, (.previous_filename // "")] | @tsv')
+      files = arquivosTsv.split('\n').filter(Boolean).map(linha => {
+        const partes = linha.split('\t')
+        if (partes.length !== 3) throw new Error('Metadados incompletos na lista de arquivos')
+        const [filename, status, previous_filename] = partes
+        return { filename, status, previous_filename: previous_filename || null }
+      })
     }
     const decisao = avaliarGateP0({ issues, event, files, repository })
     console.log(decisao.reason)
