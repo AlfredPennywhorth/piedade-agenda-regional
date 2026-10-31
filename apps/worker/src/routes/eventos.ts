@@ -379,6 +379,23 @@ eventosRouter.post('/:id/cancelar', async (c) => {
   if (!(await podeGerenciarEvento(db, c.get('membroId'), evento))) return c.json({ error: 'Acesso não autorizado para este evento', code: 'FORBIDDEN' }, 403)
   if (!evento.ativo) return c.json({ error: 'Evento já está cancelado', code: 'EVENTO_JA_CANCELADO' }, 409)
 
+  // Uma ocorrência reagendada conserva o ID. Não permitir que uma tela/PWA
+  // desatualizada cancele a nova data usando o cartão da data antiga.
+  const body = await c.req.json().catch(() => null)
+  const expectedInicioEm = body?.expectedInicioEm
+  if (typeof expectedInicioEm !== 'string' || !Number.isFinite(Date.parse(expectedInicioEm))) {
+    return c.json({
+      error: 'Atualize a lista de eventos antes de cancelar. A confirmação da data é obrigatória.',
+      code: 'EVENTO_DATA_ESPERADA_OBRIGATORIA'
+    }, 428)
+  }
+  if (new Date(expectedInicioEm).getTime() !== new Date(evento.inicioEm).getTime()) {
+    return c.json({
+      error: 'Este evento foi reagendado ou atualizado em outra tela. A data mudou: atualize a lista antes de decidir cancelar.',
+      code: 'EVENTO_DATA_DESATUALIZADA'
+    }, 409)
+  }
+
   if (new Date(evento.fimEm).getTime() <= Date.now()) {
     return c.json({
       error: 'Eventos já encerrados não podem ser alterados. O registro deve preservar o que efetivamente ocorreu.',
