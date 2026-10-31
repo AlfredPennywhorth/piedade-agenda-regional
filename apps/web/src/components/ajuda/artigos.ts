@@ -144,7 +144,8 @@ export const artigosAjuda: ArtigoAjuda[] = [
     capacidade: 'podeAdministrarEstrutura',
     passos: [
       'Filtre por Regional e Administração. Trocar a Regional limpa a Administração selecionada.',
-      'Em + Novo Setor, escolha uma Administração da Regional informada e confira nome, código e situação antes de salvar.',
+      'Em + Novo Setor, escolha uma Administração da Regional informada e confira nome, código, CNPJ do Setor e situação antes de salvar.',
+      'Informe o CNPJ utilizado oficialmente pelo Setor, no formato 00.000.000/0000-00. Confira o cadastro institucional antes de preencher. O campo é opcional durante a atualização gradual.',
     ],
     cuidados: [
       'O vínculo com a Administração é obrigatório. Não crie outro Setor para corrigir um relacionamento sem conferência institucional.',
