@@ -922,4 +922,51 @@ describe('ContasAcessoView — PR-ACC-05', () => {
     expect(screen.getByRole('button', { name: 'Atribuir acesso' })).toBeDefined()
   })
 
+  it('Mostrar mais avança um lote além do contexto já visível', async () => {
+    const contas = Array.from({ length: 80 }, (_, i) => ({
+      ...contaAtiva,
+      membroId: `pessoa-${i}`,
+      nome: `Ana ${String(i).padStart(2, '0')}`,
+      contaAcessoId: `conta-${i}`,
+      acessos: [],
+    }))
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return contas as any
+      return [] as any
+    })
+    render(<ContasAcessoView />)
+    await screen.findByText('80 de 80 pessoa(s)')
+    const busca = screen.getByLabelText('Buscar por nome, celular ou carteirinha')
+    fireEvent.change(busca, { target: { value: 'Ana 59' } })
+    const artigo = (await screen.findByText('Ana 59')).closest('article')!
+    fireEvent.click(within(artigo).getByRole('button', { name: 'Gerenciar acessos' }))
+    expect(await within(artigo).findByRole('button', { name: 'Atribuir acesso' })).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros' }))
+    expect(screen.getByText('Ana 59')).toBeDefined()
+    expect(screen.queryByText('Ana 60')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar mais pessoas de A' }))
+    expect(screen.getByText('Ana 60')).toBeDefined()
+    expect(screen.getByText('Ana 79')).toBeDefined()
+  })
+
+  it('mostra somente GTs com participantes entre as contas retornadas', async () => {
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/admin/acessos') return [contaAtiva] as any
+      if (endpoint === '/grupos-trabalho') return [
+        { id: 'gt-1', nome: 'Secretaria' },
+        { id: 'gt-2', nome: 'Tesouraria' },
+      ] as any
+      if (endpoint === '/vinculos-funcionais/participantes-gt') return [
+        { grupoTrabalhoId: 'gt-1', membroId: 'membro-1' },
+        { grupoTrabalhoId: 'gt-2', membroId: 'fora-do-escopo' },
+      ] as any
+      return [] as any
+    })
+    render(<ContasAcessoView />)
+    const select = await screen.findByLabelText('Filtrar por Grupo de Trabalho')
+    await waitFor(() => expect((select as HTMLSelectElement).disabled).toBe(false))
+    expect(within(select).getByRole('option', { name: 'Secretaria' })).toBeDefined()
+    expect(within(select).queryByRole('option', { name: 'Tesouraria' })).toBeNull()
+  })
+
 })
