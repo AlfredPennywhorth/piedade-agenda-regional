@@ -25,7 +25,7 @@ export function validarResultadoBuscaP0(resultado) {
   return resultado.items
 }
 
-/** Regra de exceção TEMPORÁRIA e fechada para a PR corretiva #438 / P0 #437.
+/** Regras TEMPORÁRIAS e fechadas para correção #438 e release #439 do P0 #437.
  * Qualquer outro P0, PR, branch, base ou arquivo extra continua bloqueado.
  */
 export function avaliarGateP0({ issues, event, files, repository }) {
@@ -39,13 +39,15 @@ export function avaliarGateP0({ issues, event, files, repository }) {
     return { allowed: false, reason: 'Existem P0 não autorizados ou #437 não é P0' }
   }
   const pr = event?.pull_request
-  if (Number(event?.number) !== 438 || !pr ||
-      pr.number !== 438 ||
-      pr.base?.ref !== 'develop' ||
-      pr.head?.ref !== 'fix/p0-437-reagendamento-cancelamento-stale-20261031' ||
-      pr.base?.repo?.full_name !== repository ||
-      pr.head?.repo?.full_name !== repository) {
-    return { allowed: false, reason: 'PR, base, head ou origem fora da exceção #438' }
+  const release438 = Number(event?.number) === 438 && pr?.number === 438 &&
+    pr.base?.ref === 'develop' &&
+    pr.head?.ref === 'fix/p0-437-reagendamento-cancelamento-stale-20261031'
+  const release439 = Number(event?.number) === 439 && pr?.number === 439 &&
+    pr.base?.ref === 'main' && pr.head?.ref === 'develop'
+  if ((!release438 && !release439) ||
+      pr?.base?.repo?.full_name !== repository ||
+      pr?.head?.repo?.full_name !== repository) {
+    return { allowed: false, reason: 'PR, base, head ou origem fora das exceções #438/#439' }
   }
   // Exigir status e origem: um rename de caminho não autorizado não pode
   // apresentar somente um destino permitido e ocultar a exclusão de origem.
@@ -55,9 +57,9 @@ export function avaliarGateP0({ issues, event, files, repository }) {
         !['added', 'modified'].includes(file.status) ||
         file.previous_filename != null) ||
       files.map(file => file.filename).sort().some((path, i) => path !== PERMITIDOS_438[i])) {
-    return { allowed: false, reason: 'Escopo da PR #438 diverge dos arquivos autorizados' }
+    return { allowed: false, reason: 'Escopo da PR P0 diverge dos arquivos autorizados' }
   }
-  return { allowed: true, reason: 'Exceção restrita à PR #438 corrigindo P0 #437' }
+  return { allowed: true, reason: `Exceção restrita à PR #${release439 ? 439 : 438} corrigindo P0 #437` }
 }
 
 function gh(...args) {
