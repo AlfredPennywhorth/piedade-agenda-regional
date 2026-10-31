@@ -149,6 +149,8 @@ export const artigosAjuda: ArtigoAjuda[] = [
     ],
     cuidados: [
       'O vínculo com a Administração é obrigatório. Não crie outro Setor para corrigir um relacionamento sem conferência institucional.',
+      'O CNPJ é vinculado ao Setor, e não à Casa ou ao Ponto de Atendimento. Casas diferentes podem usar o mesmo CNPJ institucional; não presuma exclusividade.',
+      'Para listas de presença, o cabeçalho usa o CNPJ do Setor responsável pela reunião e o endereço da Casa de Oração escolhida como sede. Em participação intersetorial, não use automaticamente o Setor de origem da Casa. Na ausência de CNPJ, regularize o cadastro antes da emissão definitiva.',
     ],
   },
   {
