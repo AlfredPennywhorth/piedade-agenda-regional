@@ -732,7 +732,7 @@ describe('Eventos pessoais e segregação', () => {
       (await req(autor, `/eventos/${id}`, 'PATCH', { organizadorMembroId: colega.id })).status
     ).toBe(403)
     expect((await req(master, '/convocacoes', 'POST', { eventoId: id })).status).toBe(409)
-    expect((await req(autor, `/eventos/${id}/cancelar`, 'POST', {})).status).toBe(200)
+    expect((await req(autor, `/eventos/${id}/cancelar`, 'POST', { expectedInicioEm: horario.inicioEm })).status).toBe(200)
     expect(await (await req(autor, '/minha-agenda')).json()).toEqual([])
   })
   it('pessoal participa dos conflitos e priorização sem RSVP', async () => {
