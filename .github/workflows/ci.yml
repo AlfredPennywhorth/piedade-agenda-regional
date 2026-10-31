@@ -68,7 +68,7 @@ jobs:
       # 8. Regressão do Preflight (isolada, sem credenciais ou rede)
       # --------------------------------------------------------
       - name: Test preflight policy
-        run: node --test scripts/preflight.test.mjs
+        run: node --test scripts/preflight.test.mjs scripts/p0-gate.test.mjs
 
       # --------------------------------------------------------
       # 9. Build (todos os workspaces, ordem topológica)
