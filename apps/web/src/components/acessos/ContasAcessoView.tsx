@@ -278,20 +278,23 @@ export function ContasAcessoView({
     setGtFiltro('')
   }
 
+  // Preserve todos os contextos independentes: link, feedback, painel e sessões.
+  const idsContextuais = useMemo(() => new Set(
+    [linkTemporario?.membroId, feedback?.membroId, gerenciandoMembroId,
+      sessoesAbertasMembroId, processando]
+      .filter((id): id is string => Boolean(id))
+  ), [linkTemporario, feedback, gerenciandoMembroId, sessoesAbertasMembroId, processando])
+
   const contasExibidas = useMemo(() => {
-    const idsPreservados = new Set(
-      [linkTemporario?.membroId, feedback?.membroId, gerenciandoMembroId]
-        .filter((id): id is string => Boolean(id))
-    )
     const idsJaExibidos = new Set(contasFiltradas.map(conta => conta.membroId))
     const preservadas = contas.filter(
-      conta => idsPreservados.has(conta.membroId) && !idsJaExibidos.has(conta.membroId)
+      conta => idsContextuais.has(conta.membroId) && !idsJaExibidos.has(conta.membroId)
     )
     return [...preservadas, ...contasFiltradas].sort((a, b) => {
       const nome = compararNomes.compare(a.nome, b.nome)
       return (ordemNome === 'az' ? nome : -nome) || a.membroId.localeCompare(b.membroId)
     })
-  }, [contas, contasFiltradas, feedback, linkTemporario, gerenciandoMembroId, ordemNome])
+  }, [contas, contasFiltradas, idsContextuais, ordemNome])
 
   const gruposContas = useMemo(() => {
     const grupos = new Map<string, ContaAdministrada[]>()
@@ -686,17 +689,26 @@ export function ContasAcessoView({
       </div>
 
       <div className="space-y-3">
-        {gruposContas.map(([letra, pessoas]) => (
+        {gruposContas.map(([letra, pessoas]) => {
+          // A decisão de manter um grupo aberto não pode depender apenas da busca.
+          const contemContexto = pessoas.some(conta => idsContextuais.has(conta.membroId))
+          const aberturaPadrao = contasExibidas.length <= 30 || Boolean(buscaFiltro.trim())
+          const grupoAberto = contemContexto || (gruposAbertos[letra] ?? aberturaPadrao)
+          // Todos os membros em contexto devem permanecer dentro do lote exibido.
+          const ultimoIndiceContextual = pessoas.reduce(
+            (ultimo, conta, indice) => idsContextuais.has(conta.membroId) ? indice + 1 : ultimo, 0
+          )
+          const limiteExibicao = Math.max(limitesPorGrupo[letra] ?? TAMANHO_LOTE, ultimoIndiceContextual)
+          return (
           <section key={letra} className="rounded-xl border border-slate-200 bg-white">
             <button type="button" className="flex w-full items-center justify-between p-3 text-left font-semibold text-slate-800"
-              aria-expanded={gruposAbertos[letra] ?? (contasExibidas.length <= 30 || Boolean(buscaFiltro.trim()))}
-              onClick={() => setGruposAbertos(atual => ({ ...atual, [letra]: !(atual[letra] ?? (contasExibidas.length <= 30 || Boolean(buscaFiltro.trim()))) }))}>
+              aria-expanded={grupoAberto}
+              onClick={() => setGruposAbertos(atual => ({ ...atual, [letra]: !grupoAberto }))}>
               <span>Grupo {letra}</span><span className="text-sm font-normal">{pessoas.length} pessoa(s) · Abrir/fechar</span>
             </button>
-            {(gruposAbertos[letra] ?? (contasExibidas.length <= 30 || Boolean(buscaFiltro.trim()))) && (
+            {grupoAberto && (
               <div className="space-y-3 border-t border-slate-200 p-3">
-                {pessoas.slice(0, Math.max(limitesPorGrupo[letra] ?? TAMANHO_LOTE,
-                  pessoas.findIndex(c => c.membroId === (linkTemporario?.membroId ?? feedback?.membroId ?? gerenciandoMembroId)) + 1)).map(conta => (
+                {pessoas.slice(0, limiteExibicao).map(conta => (
           <article key={conta.membroId} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -915,7 +927,7 @@ export function ContasAcessoView({
             )}
           </article>
                 ))}
-                {pessoas.length > (limitesPorGrupo[letra] ?? TAMANHO_LOTE) && (
+                {pessoas.length > limiteExibicao && (
                   <button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium"
                     onClick={() => setLimitesPorGrupo(atual => ({ ...atual, [letra]: (atual[letra] ?? TAMANHO_LOTE) + TAMANHO_LOTE }))}>
                     Mostrar mais pessoas de {letra}
@@ -924,7 +936,8 @@ export function ContasAcessoView({
               </div>
             )}
           </section>
-        ))}
+          )
+        })}
         {contasFiltradas.length === 0 && (
           <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
             {contas.length === 0
