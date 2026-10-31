@@ -328,9 +328,31 @@ describe('EventosView', () => {
     fireEvent.click(screen.getByRole('button', { name: /cancelar evento/i }))
 
     await waitFor(() => {
-      expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/eventos/${EVENTO_ID}/cancelar`, {})
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/eventos/${EVENTO_ID}/cancelar`, { expectedInicioEm: mockEventos[0].inicioEm })
       expect(screen.queryByText('Reunião Presencial')).not.toBeInTheDocument()
     })
+  })
+
+  it('P0 #437: confirma a data do cartão e recarrega após conflito de reagendamento', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.mocked(apiClient.postWithAuth).mockRejectedValueOnce(
+      new apiClient.ApiError(409, 'Falha', {
+        error: 'Este evento foi reagendado. Atualize a lista.',
+        code: 'EVENTO_DATA_DESATUALIZADA',
+      })
+    )
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /cancelar evento/i }))
+    await waitFor(() => {
+      expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('10/10/2026'))
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith(
+        `/eventos/${EVENTO_ID}/cancelar`,
+        { expectedInicioEm: mockEventos[0].inicioEm }
+      )
+      expect(apiClient.fetchWithAuth).toHaveBeenCalledWith('/eventos')
+    })
+    expect(await screen.findByRole('alert')).toHaveTextContent('Este evento foi reagendado')
   })
 
   it('deve continuar o fluxo para convocação após criar evento', async () => {
@@ -1108,7 +1130,7 @@ describe('EventosView', () => {
     fireEvent.click(within(detalhe).getByRole('button', { name: /cancelar evento/i }))
 
     await waitFor(() => {
-      expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/eventos/${EVENTO_ID}/cancelar`, {})
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/eventos/${EVENTO_ID}/cancelar`, { expectedInicioEm: mockEventos[0].inicioEm })
     })
   })
 
@@ -1194,7 +1216,7 @@ describe('EventosView', () => {
     fireEvent.click(within(detalhe).getByRole('button', { name: /cancelar evento/i }))
 
     await waitFor(() => {
-      expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/eventos/${EVENTO_ID}/cancelar`, {})
+      expect(apiClient.postWithAuth).toHaveBeenCalledWith(`/eventos/${EVENTO_ID}/cancelar`, { expectedInicioEm: mockEventos[0].inicioEm })
     })
     expect(await screen.findByRole('alert')).toHaveTextContent('Ocorrências já encerradas não podem ser canceladas.')
     expect(screen.getByRole('dialog', { name: /detalhes do evento/i })).toBeInTheDocument()
