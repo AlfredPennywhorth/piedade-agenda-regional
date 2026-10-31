@@ -83,7 +83,7 @@ test('ponto de entrada bloqueia busca P0 incompleta sem consultar arquivos', () 
   const dir = mkdtempSync(join(tmpdir(), 'agenda-p0-gate-'))
   try {
     const ghPath = join(dir, 'gh')
-    writeFileSync(ghPath, '#!/usr/bin/env node\\nprocess.stdout.write(JSON.stringify({ total_count: 0, incomplete_results: true, items: [] }))\\n')
+    writeFileSync(ghPath, '#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({ total_count: 0, incomplete_results: true, items: [] }))\n')
     chmodSync(ghPath, 0o755)
     const result = spawnSync(process.execPath, [resolve('scripts/p0-gate.mjs')], {
       env: { ...process.env, PATH: dir + ':' + process.env.PATH, GITHUB_REPOSITORY: repo },
