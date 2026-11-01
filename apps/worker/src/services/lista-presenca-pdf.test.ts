@@ -20,7 +20,7 @@ describe('Lista de Presença em PDF', () => {
     const pdf = new TextDecoder().decode(buffer)
     expect(pdf.startsWith('%PDF-1.4')).toBe(true)
     expect(pdf).toContain('61.526.398/0004-31')
-    expect(pdf).toContain('Bom Retiro')
+    expect(pdf).toContain('BOM RETIRO')
     expect(pdf).toContain('P')
     expect((pdf.match(/\/Type \/Page \/Parent/g) || []).length).toBe(1)
     expect(pdf).toContain('startxref')
@@ -36,7 +36,7 @@ describe('Lista de Presença em PDF', () => {
     const paginas = (pdf.match(/\/Type \/Page \/Parent/g) || []).length
     expect(paginas).toBeGreaterThan(2)
     expect(pdf).toContain(` /Count ${paginas} `)
-    expect(pdf).toContain(`P\\341g. ${paginas}/${paginas}`)
+    expect(pdf).toContain(`Folha ${paginas}/${paginas}`)
   })
 
 
@@ -46,7 +46,7 @@ describe('Lista de Presença em PDF', () => {
       ...dados, endereco: longo,
       linhas: [{ nome: 'Participante Exemplo', funcao: 'Diácono', entrada: '05/09/2026, 06:08' }],
     }))
-    const cnpj = pdf.match(/1 0 0 1 44 ([\d.]+) Tm \(CNPJ do Setor:/)
+    const cnpj = pdf.match(/1 0 0 1 308 ([\d.]+) Tm \(CNPJ /)
     const nome = pdf.match(/1 0 0 1 46 ([\d.]+) Tm \(Participante Exemplo\)/)
     expect(cnpj).not.toBeNull()
     expect(nome).not.toBeNull()

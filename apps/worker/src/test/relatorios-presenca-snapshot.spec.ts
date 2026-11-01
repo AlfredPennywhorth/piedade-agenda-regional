@@ -135,7 +135,7 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
     const pdf = new TextDecoder().decode(await res.arrayBuffer())
     expect(pdf.startsWith('%PDF-1.4')).toBe(true)
     expect(pdf).toContain('61.526.398/0004-31')
-    expect(pdf).toContain('Rua Anhaia')
+    expect(pdf).toContain('RUA ANHAIA')
     expect(pdf).toContain('Membro Alvo')
     expect(pdf).toContain('Convidado A')
     expect(pdf).not.toContain('Outro Membro')
@@ -191,7 +191,7 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
     expect(segundo.status).toBe(200)
     expect(await segundo.text()).toBe(primeiroPdf)
     expect(primeiroPdf).not.toContain('Rua Alterada')
-    expect(primeiroPdf).toContain('Rua Anhaia')
+    expect(primeiroPdf).toContain('RUA ANHAIA')
     expect(sqlite.prepare('SELECT COUNT(*) AS total FROM lista_presenca_pdf_atas').get()).toMatchObject({ total: 1 })
   })
 
@@ -223,6 +223,19 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
     expect((await semSede.json()) as any).toMatchObject({ code: 'ENDERECO_SEDE_AUSENTE' })
   })
 
+  it('lista somente reuniões com Portaria fechada e acesso de gestor', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    await sessao(semAcessoId, 'token-sem-acesso')
+    const url = '/api/v1/relatorios/presencas/eventos/fechados'
+    const gestor = await app.request(url, { headers: auth('token-gestor') })
+    expect(gestor.status).toBe(200)
+    expect(await gestor.json()).toEqual(expect.arrayContaining([
+      { eventoId: 'evento-a', fechadoEm: '2026-08-01T12:10:00.000Z' },
+      { eventoId: 'evento-b', fechadoEm: '2026-09-01T12:10:00.000Z' },
+    ]))
+    const usuario = await app.request(url, { headers: auth('token-sem-acesso') })
+    expect(usuario.status).toBe(403)
+  })
   it('relatório final de reunião usa snapshot materializado', async () => {
     await sessao(gestorId, 'token-gestor', 'conta-gestor')
 

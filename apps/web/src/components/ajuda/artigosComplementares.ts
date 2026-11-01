@@ -126,8 +126,8 @@ export const artigosComplementares: ArtigoAjuda[] = [
     capacidade: 'podeVisualizarRelatorios',
     passos: [
       'Em Relatório do Evento, pesquise e selecione a reunião, use Buscar Relatório e confira os indicadores e a lista nominal com os filtros disponíveis.',
-      'Em Presenças, escolha Reunião específica, histórico por Membro ou Período / escopo. Informe os filtros e use Consultar.',
-      'Confira se o resultado é Lista final da reunião ou Prévia operacional. Exportar CSV e impressão devem respeitar a finalidade e o escopo autorizados.',
+      'Em Presenças, escolha Reunião específica, Histórico do membro ou Período / escopo. Ative Mostrar somente reuniões com Portaria fechada para localizar as aptas ao PDF definitivo; as opções indicam FECHADA ou ABERTA.',
+      'Confira se o resultado é Lista final da reunião ou Prévia operacional. A prévia e o relatório impresso pelo navegador não são a Lista de Presença oficial para ata; use exclusivamente o botão Baixar Lista de Presença (PDF) quando disponível.',
       'Quando a Portaria estiver fechada, use Baixar Lista de Presença (PDF) para anexar à ata. O arquivo contém somente presenças registradas, não respostas RSVP.',
       'Relatório Agregado é exclusivo do Master ou de gestor de relatórios autorizado para o escopo consultado. Somente com essa autorização, informe tipo de escopo, ID do Escopo (UUID) e datas. Obtenha o identificador correto com o responsável pelo cadastro; não o adivinhe.',
       'Utilização de locais/espaços também exige ser Master ou gestor de relatórios autorizado para aquele escopo. Confira escopo e período e carregue novamente após alterar filtros.',

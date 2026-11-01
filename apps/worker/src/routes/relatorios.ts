@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { eq, and, or, gte, lt, lte, inArray, sql } from 'drizzle-orm'
 import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, locais, espacosLocal, vinculosFuncionais, funcoes, portariaFechamentos, portariaFechamentoItens, setores, pontosAtendimento, convocacaoDestinatarioEvidencias, auditoriaLogs, listaPresencaPdfAtas } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
-import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo } from '../security/permissoes'
+import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo, eMasterSistema } from '../security/permissoes'
 import { condicaoEscopo, condicaoEventosVisiveis } from '../security/eventos'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
 import { gerarListaPresencaPdf } from '../services/lista-presenca-pdf'
@@ -36,6 +36,47 @@ function consolidarDestinatariosPorMembro(destinatarios: any[], rsvps: any[]) {
 }
 
 relatoriosRouter.use('*', authMiddleware)
+
+// GET /api/v1/relatorios/presencas/eventos/fechados
+relatoriosRouter.get('/presencas/eventos/fechados', async c => {
+  const db = c.get('db')
+  const membroId = c.get('membroId')
+  const contexto = c.get('contextoPermissoes')
+  if (!db || !membroId || !contexto) return c.json({ error: 'Sessão ou banco indisponível' }, 500)
+
+  // Uma consulta indexável por escopo: evita recarregar permissões para cada
+  // evento histórico quando existem centenas de Portarias fechadas.
+  const condicoes = [eq(eventos.organizadorMembroId, membroId)]
+  if (!eMasterSistema(contexto)) {
+    for (const acesso of contexto.acessosAtivos.filter((item: any) => item.perfilCodigo === 'GESTOR_RELATORIOS')) {
+      const condicao = condicaoEscopo(acesso)
+      if (condicao) condicoes.push(condicao)
+    }
+    const legados = await db.select({ v: vinculosFuncionais })
+      .from(vinculosFuncionais)
+      .innerJoin(funcoes, eq(vinculosFuncionais.funcaoId, funcoes.id))
+      .where(and(eq(vinculosFuncionais.membroId, membroId), eq(vinculosFuncionais.ativo, true),
+        eq(funcoes.ativo, true), eq(funcoes.codigo, 'GESTOR_RELATORIOS'))).all()
+    for (const { v } of legados) {
+      const escopos = [
+        ['REGIONAL', v.regionalId], ['ADMINISTRACAO', v.administracaoId],
+        ['SETOR', v.setorId], ['CASA', v.casaId], ['GRUPO_TRABALHO', v.grupoTrabalhoId],
+      ] as const
+      for (const [escopoTipo, escopoId] of escopos) {
+        if (!escopoId) continue
+        const condicao = condicaoEscopo({ id: v.id, perfilCodigo: 'GESTOR_RELATORIOS', escopoTipo, escopoId })
+        if (condicao) condicoes.push(condicao)
+      }
+    }
+  }
+  const fechados = await db.select({ eventoId: eventos.id, fechadoEm: portariaFechamentos.fechadoEm })
+    .from(portariaFechamentos)
+    .innerJoin(eventos, eq(portariaFechamentos.eventoId, eventos.id))
+    .where(and(eq(eventos.pessoal, false), eq(eventos.abrangencia, 'TERRITORIAL'),
+      ...(eMasterSistema(contexto) ? [] : [or(...condicoes)])))
+    .orderBy(sql`${portariaFechamentos.fechadoEm} DESC`).all()
+  return c.json(fechados)
+})
 
 // GET /api/v1/relatorios/presencas/eventos/:eventoId/final
 // Fonte histórica preferencial: snapshot materializado no fechamento.
@@ -130,7 +171,7 @@ relatoriosRouter.get('/presencas/eventos/:eventoId/final', async c => {
 function dataHoraSp(iso: string): string {
   const value = new Date(iso)
   return Number.isNaN(value.getTime()) ? '' : new Intl.DateTimeFormat('pt-BR', {
-    timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short',
+    timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
   }).format(value)
 }
 
@@ -232,11 +273,13 @@ relatoriosRouter.get('/presencas/eventos/:eventoId/lista-presenca.pdf', async c 
   }
 
   const formatarCnpj = (value: string) => value.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
-  const linhas = presencas.map((item: typeof presencas[number]) => ({
+  const linhas = presencas.sort((a: typeof presencas[number], b: typeof presencas[number]) =>
+    (a.registradoEm ?? '').localeCompare(b.registradoEm ?? '') || a.nome.localeCompare(b.nome, 'pt-BR')
+  ).map((item: typeof presencas[number]) => ({
     nome: item.nome,
     funcao: item.tipoPessoa === 'CONVIDADO' ? 'Convidado' : Array.from(funcoesPorMembro.get(item.origemId) || []).join(', ') || 'Não informado',
     entrada: item.registradoEm ? dataHoraSp(item.registradoEm) : 'Não registrado',
-  })).sort((a: { nome: string }, b: { nome: string }) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }))
   const agora = new Date().toISOString()
   const pdf = gerarListaPresencaPdf({
     titulo: evento.titulo,
