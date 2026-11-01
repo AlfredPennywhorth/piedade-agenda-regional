@@ -197,6 +197,16 @@ export function RelatoriosPresencaView() {
 
   const imprimirRelatorio = () => window.print()
 
+  const baixarListaPresenca = () => {
+    if (!evento || evento.fonte !== 'SNAPSHOT_FECHAMENTO') return
+    executar(async () => {
+      await apiClient.baixarPdfAutenticado(
+        `/relatorios/presencas/eventos/${encodeURIComponent(evento.evento.id)}/lista-presenca.pdf`,
+        `lista-presenca-${evento.evento.id}.pdf`
+      )
+    })
+  }
+
   const exportarEventoCsv = () => {
     if (!evento) return
     const csv = montarCsv(
