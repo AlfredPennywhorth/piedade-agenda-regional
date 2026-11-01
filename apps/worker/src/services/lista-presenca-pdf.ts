@@ -105,7 +105,9 @@ function cabecalho(d: DadosListaPresenca, pagina: number): { stream: string; ini
 
   // A direita, como no SIGA. O numero de linhas desloca dinamicamente
   // o CNPJ, o titulo e a tabela para impedir sobreposicoes.
-  let yDireita = 798
+  // Endereço começa abaixo da linha do município (y=791), evitando
+  // sobreposição horizontal em nomes extensos como Santa Rita do Passa Quatro.
+  let yDireita = 776
   out += direita(809, 'Folha ' + pagina, 7)
   for (const parte of dividir(d.endereco.toLocaleUpperCase('pt-BR'), 50)) {
     out += direita(yDireita, parte)
