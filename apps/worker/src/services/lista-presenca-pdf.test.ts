@@ -84,6 +84,18 @@ describe('Lista de Presença em PDF — modelo institucional SIGA', () => {
     expect(pdf).not.toContain('Tm (GUA\\307U - SP)')
   })
 
+  it('evita sobreposição entre município longo e endereço de duas linhas', () => {
+    const pdf = textoPdf([], {
+      local: 'Centro - Santa Rita do Passa Quatro/SP',
+      endereco: 'Avenida dos Trabalhadores, 123 - Jardim Primavera - Santa Rita do Passa Quatro/SP - CEP 13670-000',
+    })
+    const cidade = pdf.match(/1 0 0 1 ([\d.]+) ([\d.]+) Tm \(SANTA RITA DO PASSA QUATRO - SP\)/)
+    const endereco = pdf.match(/1 0 0 1 ([\d.]+) ([\d.]+) Tm \(AVENIDA DOS TRABALHADORES/)
+    expect(cidade).not.toBeNull()
+    expect(endereco).not.toBeNull()
+    expect(Number(cidade![2]) - Number(endereco![2])).toBeGreaterThanOrEqual(14)
+    expect(pdf).toContain('CEP 13670-000')
+  })
   it('não cria dados de presença artificialmente para uma lista vazia', () => {
     const pdf = textoPdf([])
     expect((pdf.match(/\/Type \/Page \/Parent/g) || []).length).toBe(1)
