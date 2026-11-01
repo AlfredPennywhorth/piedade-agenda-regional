@@ -37,6 +37,23 @@ function consolidarDestinatariosPorMembro(destinatarios: any[], rsvps: any[]) {
 
 relatoriosRouter.use('*', authMiddleware)
 
+// GET /api/v1/relatorios/presencas/eventos/fechados
+relatoriosRouter.get('/presencas/eventos/fechados', async c => {
+  const db = c.get('db')
+  const membroId = c.get('membroId')
+  if (!db || !membroId) return c.json({ error: 'Sessão ou banco indisponível' }, 500)
+  const fechados = await db.select({ evento: eventos, fechadoEm: portariaFechamentos.fechadoEm })
+    .from(portariaFechamentos).innerJoin(eventos, eq(portariaFechamentos.eventoId, eventos.id))
+    .where(and(eq(eventos.pessoal, false), eq(eventos.abrangencia, 'TERRITORIAL'))).all()
+  const autorizados: Array<{ eventoId: string; fechadoEm: string }> = []
+  for (const registro of fechados) {
+    if (await eGestorRelatoriosAutorizadoParaEvento(db, membroId, registro.evento)) {
+      autorizados.push({ eventoId: registro.evento.id, fechadoEm: registro.fechadoEm })
+    }
+  }
+  return c.json(autorizados)
+})
+
 // GET /api/v1/relatorios/presencas/eventos/:eventoId/final
 // Fonte histórica preferencial: snapshot materializado no fechamento.
 // Para evento ainda aberto, retorna uma prévia operacional sem persistir histórico.
