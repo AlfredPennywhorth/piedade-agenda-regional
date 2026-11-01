@@ -357,8 +357,29 @@ export function RelatoriosPresencaView() {
                 {resumoCard('Total presentes', evento.resumo.totalPresentes)}
               </div>
             </div>
-            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-              <table className="min-w-[580px] w-full text-sm">
+            <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h4 className="font-semibold text-slate-900">Participantes da reunião</h4>
+                <span className="text-xs text-slate-500">{evento.itens.length} registros</span>
+              </div>
+              <div className="space-y-2 md:hidden">
+                {evento.itens.map(item => (
+                  <article key={`cartao-${item.tipoPessoa}-${item.origemId}`} className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <strong className="min-w-0 flex-1 break-words text-sm text-slate-900">{item.nome}</strong>
+                      <span className={`rounded-full px-2 py-1 text-xs font-medium ${item.situacao === 'PRESENTE' ? 'bg-green-100 text-green-800' : item.situacao === 'PENDENTE' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700'}`}>{item.situacao}</span>
+                    </div>
+                    <dl className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                      <div><dt className="text-slate-500">Tipo</dt><dd>{item.tipoPessoa === 'MEMBRO' ? 'Membro' : 'Convidado'}</dd></div>
+                      <div><dt className="text-slate-500">RSVP</dt><dd>{item.respostaRsvp || '—'}</dd></div>
+                      <div className="col-span-2"><dt className="text-slate-500">Localidade</dt><dd className="break-words">{item.localidade || '—'}</dd></div>
+                      {item.situacao === 'PRESENTE' && <div className="col-span-2"><dt className="text-slate-500">Entrada validada</dt><dd>{item.registradoEm ? new Date(item.registradoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : 'Horário não informado'}</dd></div>}
+                    </dl>
+                  </article>
+                ))}
+              </div>
+              <div className="hidden md:block">
+              <table className="w-full table-fixed text-sm">
                 <caption className="sr-only">Participantes e situação de presença da reunião selecionada</caption>
                 <thead className="bg-slate-50 text-left text-slate-600"><tr>
                   <th className="p-3">Nome</th><th className="p-3">Tipo</th><th className="p-3">Localidade</th><th className="p-3">Situação</th><th className="p-3">RSVP</th>
@@ -371,6 +392,7 @@ export function RelatoriosPresencaView() {
                   </tr>
                 ))}</tbody>
               </table>
+              </div>
             </div>
           </div>}
         </div>
