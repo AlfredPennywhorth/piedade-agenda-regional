@@ -46,7 +46,7 @@ describe('Lista de Presença em PDF', () => {
       ...dados, endereco: longo,
       linhas: [{ nome: 'Participante Exemplo', funcao: 'Diácono', entrada: '05/09/2026, 06:08' }],
     }))
-    const cnpj = pdf.match(/1 0 0 1 44 ([\d.]+) Tm \(CNPJ do Setor:/)
+    const cnpj = pdf.match(/1 0 0 1 308 ([\d.]+) Tm \(CNPJ /)
     const nome = pdf.match(/1 0 0 1 46 ([\d.]+) Tm \(Participante Exemplo\)/)
     expect(cnpj).not.toBeNull()
     expect(nome).not.toBeNull()
