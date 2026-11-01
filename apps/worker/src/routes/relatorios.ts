@@ -147,7 +147,7 @@ relatoriosRouter.get('/presencas/eventos/:eventoId/final', async c => {
 function dataHoraSp(iso: string): string {
   const value = new Date(iso)
   return Number.isNaN(value.getTime()) ? '' : new Intl.DateTimeFormat('pt-BR', {
-    timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short',
+    timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
   }).format(value)
 }
 
@@ -253,7 +253,7 @@ relatoriosRouter.get('/presencas/eventos/:eventoId/lista-presenca.pdf', async c 
     nome: item.nome,
     funcao: item.tipoPessoa === 'CONVIDADO' ? 'Convidado' : Array.from(funcoesPorMembro.get(item.origemId) || []).join(', ') || 'Não informado',
     entrada: item.registradoEm ? dataHoraSp(item.registradoEm) : 'Não registrado',
-  })).sort((a: { nome: string }, b: { nome: string }) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  })).sort((a: { entrada: string; nome: string }, b: { entrada: string; nome: string }) => a.entrada.localeCompare(b.entrada, 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'))
   const agora = new Date().toISOString()
   const pdf = gerarListaPresencaPdf({
     titulo: evento.titulo,
