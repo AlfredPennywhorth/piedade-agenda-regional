@@ -20,7 +20,7 @@ describe('Lista de Presença em PDF', () => {
     const pdf = new TextDecoder().decode(buffer)
     expect(pdf.startsWith('%PDF-1.4')).toBe(true)
     expect(pdf).toContain('61.526.398/0004-31')
-    expect(pdf).toContain('Bom Retiro')
+    expect(pdf).toContain('BOM RETIRO')
     expect(pdf).toContain('P')
     expect((pdf.match(/\/Type \/Page \/Parent/g) || []).length).toBe(1)
     expect(pdf).toContain('startxref')
