@@ -143,6 +143,34 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
   })
 
 
+
+  it('não atribui ao presente função de convocação cancelada', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    sqlite.exec(`
+      UPDATE setores SET cnpj = '61526398000431' WHERE id = '${setorId}';
+      INSERT INTO locais (id, nome, endereco, numero, cidade, uf)
+        VALUES ('sede-convocacao-cancelada', 'Bom Retiro', 'Rua Anhaia', '613', 'São Paulo', 'SP');
+      UPDATE eventos SET local_id = 'sede-convocacao-cancelada' WHERE id = 'evento-a';
+      INSERT INTO funcoes (id, nome, codigo, ativo) VALUES ('funcao-cancelada', 'Função Cancelada', 'CANCELADA', 1);
+      INSERT INTO vinculos_funcionais (id, membro_id, funcao_id, setor_id, ativo)
+        VALUES ('vinculo-cancelado', 'membro-alvo', 'funcao-cancelada', '${setorId}', 1);
+      INSERT INTO convocacoes (id, evento_id, status, ativo)
+        VALUES ('convocacao-cancelada', 'evento-a', 'CANCELADA', 0);
+      INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id)
+        VALUES ('destino-cancelado', 'convocacao-cancelada', 'membro-alvo');
+      INSERT INTO convocacao_destinatario_evidencias
+        (id, convocacao_destinatario_id, funcao_id, vinculo_funcional_id, funcao_nome_snapshot)
+        VALUES ('evidencia-cancelada', 'destino-cancelado', 'funcao-cancelada', 'vinculo-cancelado', 'Função Cancelada');
+    `)
+    const res = await app.request('/api/v1/relatorios/presencas/eventos/evento-a/lista-presenca.pdf', {
+      headers: auth('token-gestor'),
+    })
+    expect(res.status).toBe(200)
+    const pdf = await res.text()
+    expect(pdf).toContain('Membro Alvo')
+    expect(pdf).not.toContain('Cancelada')
+  })
+
   it('congela PDF de ata mesmo após alteração posterior de endereço e CNPJ', async () => {
     await sessao(gestorId, 'token-gestor', 'conta-gestor')
     sqlite.exec(`
