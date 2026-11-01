@@ -223,7 +223,7 @@ relatoriosRouter.get('/presencas/eventos/:eventoId/lista-presenca.pdf', async c 
     .innerJoin(convocacaoDestinatarios, eq(convocacaoDestinatarioEvidencias.convocacaoDestinatarioId, convocacaoDestinatarios.id))
     .innerJoin(convocacoes, eq(convocacaoDestinatarios.convocacaoId, convocacoes.id))
     .innerJoin(funcoes, eq(convocacaoDestinatarioEvidencias.funcaoId, funcoes.id))
-    .where(eq(convocacoes.eventoId, eventoId)).all()
+    .where(and(eq(convocacoes.eventoId, eventoId), eq(convocacoes.status, 'PUBLICADA'), eq(convocacoes.ativo, true))).all()
   const funcoesPorMembro = new Map<string, Set<string>>()
   for (const evidencia of evidencias) {
     const nomes = funcoesPorMembro.get(evidencia.membroId) || new Set<string>()
