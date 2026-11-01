@@ -135,7 +135,7 @@ export const artigosComplementares: ArtigoAjuda[] = [
     cuidados: [
       'Ser organizador e conseguir abrir Relatórios não autoriza consultas agregadas ou de utilização por escopo; a API pode recusá-las com 403. RSVP confirmado não equivale a presença registrada. Prévia operacional não é fechamento oficial da Portaria.',
       'Históricos e consolidados de presença usam fechamentos materializados e escopos autorizados. Eventos pessoais e externos não integram o relatório de Portaria.',
-      'Antes da primeira emissão definitiva, confira o CNPJ exclusivo do Setor responsável, o endereço do Local escolhido para a reunião e as funções. O PDF emitido fica preservado para a ata; mudanças posteriores no cadastro não reescrevem o documento.',
+      'Antes da primeira emissão definitiva, confira o CNPJ exclusivo do Setor responsável, o endereço do Local escolhido para a reunião e as funções. Em reuniões de GT sem Setor territorial definido, selecione explicitamente o Setor responsável no próprio relatório antes de baixar o PDF. A escolha é limitada ao escopo institucional do GT, não altera o cadastro da reunião e fica congelada no documento da ata.',
       'O ranking de locais considera apenas instalações visíveis e pode diferir do total de eventos. Não distribua relatórios nominais em canais públicos.',
     ],
   },
