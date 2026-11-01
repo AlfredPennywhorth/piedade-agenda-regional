@@ -10,6 +10,7 @@ vi.mock('../api/apiClient', async importOriginal => {
 
 const lookups: Record<string, unknown> = {
   '/eventos': [{ id: 'evento-1', titulo: 'Reunião Regional', inicioEm: '2026-09-01T10:00:00.000Z', ativo: true }],
+  '/relatorios/presencas/eventos/fechados': [{ eventoId: 'evento-1', fechadoEm: '2026-09-01T12:10:00.000Z' }],
   '/membros': [{ id: 'm1', nome: 'Membro Alvo', casaId: 'casa-1', ativo: true }],
   '/regionais': [{ id: 'reg-1', nome: 'Regional São Paulo', ativo: true }],
   '/administracoes': [{ id: 'adm-1', regionalId: 'reg-1', nome: 'Administração Central', ativo: true }],
@@ -61,7 +62,7 @@ describe('REL-PRES-03 — seletores amigáveis dos relatórios de presença', ()
     fireEvent.click(screen.getByRole('button', { name: 'Consultar' }))
 
     expect(await screen.findByText('Reunião Regional')).toBeInTheDocument()
-    expect(screen.getByText('Ana')).toBeInTheDocument()
+    expect(screen.getAllByText('Ana').length).toBeGreaterThan(0)
   })
 
   it('pesquisa e seleciona membro por nome para consultar histórico', async () => {

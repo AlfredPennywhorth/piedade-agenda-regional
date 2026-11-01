@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, ne } from 'drizzle-orm'
 import { setores, administracoes, participacoesGruposTrabalho, gruposTrabalho } from '../db/schema'
 import { CreateSetorSchema, UpdateSetorSchema } from '@piedade/shared'
 import { authMiddleware } from '../middleware/auth'
@@ -68,6 +68,12 @@ setoresRouter.post('/', async (c) => {
       return c.json({ error: 'Acesso não autorizado para administrar este escopo', code: 'FORBIDDEN' }, 403)
     }
 
+    if (parsed.cnpj) {
+      const duplicado = await db.select({ id: setores.id }).from(setores)
+        .where(eq(setores.cnpj, parsed.cnpj)).get()
+      if (duplicado) return c.json({ error: 'CNPJ já cadastrado em outro Setor.', code: 'CNPJ_SETOR_DUPLICADO' }, 409)
+    }
+
     const id = crypto.randomUUID()
     await executarOperacaoComAudit(
       db,
@@ -85,6 +91,9 @@ setoresRouter.post('/', async (c) => {
     const result = await db.select().from(setores).where(eq(setores.id, id)).get()
     return c.json(result, 201)
   } catch (err: any) {
+    if (String(err.message).includes('UNIQUE constraint failed: setores.cnpj')) {
+      return c.json({ error: 'CNPJ já cadastrado em outro Setor.', code: 'CNPJ_SETOR_DUPLICADO' }, 409)
+    }
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
       return c.json({ error: 'Administração vinculada não existe' }, 400)
     }
@@ -110,6 +119,12 @@ setoresRouter.patch('/:id', async (c) => {
     ])
     if (!podeAtual || !podeFinal) {
       return c.json({ error: 'Acesso não autorizado para administrar este escopo', code: 'FORBIDDEN' }, 403)
+    }
+
+    if (parsed.cnpj) {
+      const duplicado = await db.select({ id: setores.id }).from(setores)
+        .where(and(eq(setores.cnpj, parsed.cnpj), ne(setores.id, id))).get()
+      if (duplicado) return c.json({ error: 'CNPJ já cadastrado em outro Setor.', code: 'CNPJ_SETOR_DUPLICADO' }, 409)
     }
 
     if (parsed.administracaoId && parsed.administracaoId !== existing.administracaoId) {
@@ -163,6 +178,9 @@ setoresRouter.patch('/:id', async (c) => {
     const updated = await db.select().from(setores).where(eq(setores.id, id)).get()
     return c.json(updated)
   } catch (err: any) {
+    if (String(err.message).includes('UNIQUE constraint failed: setores.cnpj')) {
+      return c.json({ error: 'CNPJ já cadastrado em outro Setor.', code: 'CNPJ_SETOR_DUPLICADO' }, 409)
+    }
     if (err.message && err.message.includes('FOREIGN KEY constraint failed')) {
       return c.json({ error: 'Administração vinculada não existe' }, 400)
     }

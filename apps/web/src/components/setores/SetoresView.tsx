@@ -10,6 +10,7 @@ export interface Setor {
   administracaoId: string
   nome: string
   codigo: string | null
+  cnpj?: string | null
   ativo: boolean
   createdAt?: string
   updatedAt?: string
@@ -50,6 +51,7 @@ export function SetoresView() {
   const [administracaoId, setAdministracaoId] = useState<string>('')
   const [nome, setNome] = useState<string>('')
   const [codigo, setCodigo] = useState<string>('')
+  const [cnpj, setCnpj] = useState<string>('')
   const [ativo, setAtivo] = useState<boolean>(true)
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
   const [salvando, setSalvando] = useState<boolean>(false)
@@ -94,6 +96,7 @@ export function SetoresView() {
     )
     setNome('')
     setCodigo('')
+    setCnpj('')
     setAtivo(true)
     setErrosForm({})
     setErro(null)
@@ -115,6 +118,7 @@ export function SetoresView() {
       setAdministracaoId(item.administracaoId || '')
       setNome(item.nome || '')
       setCodigo(item.codigo || '')
+      setCnpj(item.cnpj || '')
       setAtivo(item.ativo ?? true)
     } catch (err: any) {
       setErro(err.message || 'Erro ao carregar os detalhes do setor para edição.')
@@ -153,6 +157,7 @@ export function SetoresView() {
       administracaoId,
       nome: nome.trim(),
       codigo: codigo.trim() ? codigo.trim() : null,
+      cnpj: cnpj.trim() || null,
       ativo,
     }
 
@@ -430,6 +435,27 @@ export function SetoresView() {
                 )}
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1" htmlFor="input-cnpj">
+                  CNPJ do Setor (opcional)
+                </label>
+                <input
+                  id="input-cnpj"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={18}
+                  autoComplete="off"
+                  value={cnpj}
+                  onChange={(e) => setCnpj(e.target.value)}
+                  placeholder="00.000.000/0000-00"
+                  aria-describedby="cnpj-orientacao"
+                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${errosForm.cnpj ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:ring-brand-200'}`}
+                  disabled={salvando}
+                />
+                <p id="cnpj-orientacao" className="text-xs text-slate-500 mt-1">Informe o CNPJ oficial do Setor. A Lista de Presença utiliza esse CNPJ; o endereço será o da Casa de Oração escolhida para a reunião. Consulte a ajuda desta tela.</p>
+                {errosForm.cnpj && <p className="text-xs text-red-600 mt-1">{errosForm.cnpj}</p>}
+              </div>
+
               <div className="flex items-center space-x-2 pt-1">
                 <input
                   id="input-ativo"
@@ -487,6 +513,7 @@ export function SetoresView() {
                 <h3 className="text-base font-semibold text-[#F8FAFC] break-words [overflow-wrap:anywhere]">{setor.nome}</h3>
                 <dl className="space-y-2 text-sm">
                   <div><dt className="inline text-slate-300 font-semibold">Administração: </dt><dd className="inline text-slate-100 break-words [overflow-wrap:anywhere]">{getAdministracaoNome(setor.administracaoId)}</dd></div>
+                  <div><dt className="inline text-slate-300 font-semibold">CNPJ do Setor: </dt><dd className="inline text-slate-100">{setor.cnpj ? setor.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : 'Não informado'}</dd></div>
                   <div><dt className="inline text-slate-300 font-semibold">Código: </dt><dd className="inline font-mono text-slate-100 break-all">{setor.codigo || 'Não informado'}</dd></div>
                   <div><dt className="inline text-slate-300 font-semibold">Status: </dt><dd className="inline"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${setor.ativo ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-800'}`}>{setor.ativo ? 'Ativo' : 'Inativo'}</span></dd></div>
                 </dl>
@@ -529,6 +556,10 @@ export function SetoresView() {
                 <div>
                   <span className="text-xs font-semibold text-slate-500 block">Código:</span>
                   <span className="font-mono text-slate-700">{setorDetalhe.codigo || 'Não informado'}</span>
+                </div>
+                <div>
+                  <span className="text-xs font-semibold text-slate-500 block">CNPJ do Setor:</span>
+                  <span className="text-slate-700">{setorDetalhe.cnpj ? setorDetalhe.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : 'Não informado'}</span>
                 </div>
                 <div>
                   <span className="text-xs font-semibold text-slate-500 block">Status:</span>

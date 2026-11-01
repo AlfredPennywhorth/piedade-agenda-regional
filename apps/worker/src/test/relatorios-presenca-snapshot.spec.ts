@@ -118,6 +118,209 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
     Authorization: `Bearer ${token}`,
   })
 
+
+
+  it('seleciona Setor responsável do GT regional sem alterar o escopo da reunião', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    sqlite.exec(`
+      INSERT INTO setores (id, administracao_id, nome, cnpj)
+        VALUES ('setor-candidato', 'adm-rel', 'Setor de Apoio', '61526398000431');
+      INSERT INTO regionais (id, nome) VALUES ('reg-outra', 'Outra Regional');
+      INSERT INTO administracoes (id, regional_id, nome)
+        VALUES ('adm-outra', 'reg-outra', 'Outra Administração');
+      INSERT INTO setores (id, administracao_id, nome, cnpj)
+        VALUES ('setor-fora', 'adm-outra', 'Setor Fora de Escopo', '61526398000432');
+      INSERT INTO grupos_trabalho (id, nome, regional_id)
+        VALUES ('gt-secretaria', 'Secretaria', 'regional-rel');
+      INSERT INTO locais (id, nome, endereco, numero, cidade, uf)
+        VALUES ('sede-gt', 'Sede GT', 'Rua Exemplo', '100', 'São Paulo', 'SP');
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, grupo_trabalho_id, organizador_membro_id, local_id)
+      VALUES ('evento-gt', 'Reunião GT Secretaria', 'PRESENCIAL',
+        '2026-10-21T10:00:00.000Z', '2026-10-21T12:00:00.000Z',
+        'gt-secretaria', '${gestorId}', 'sede-gt');
+      INSERT INTO portaria_fechamentos
+        (id, evento_id, fechado_por_membro_id, fechado_em,
+         total_convocados, total_convocados_presentes, total_convocados_ausentes,
+         total_convidados_validados, total_convidados_pendentes, total_presentes)
+      VALUES ('fech-gt', 'evento-gt', '${gestorId}', '2026-10-21T12:10:00.000Z',
+        0, 0, 0, 0, 0, 0);
+    `)
+    const base = '/api/v1/relatorios/presencas/eventos/evento-gt'
+    const contexto = await app.request(`${base}/contexto-pdf`, { headers: auth('token-gestor') })
+    expect(contexto.status).toBe(200)
+    const opcoes = (await contexto.json()) as any
+    expect(opcoes.requerEscolha).toBe(true)
+    expect(opcoes.setorFixoId).toBeNull()
+    expect(opcoes.setores.map((x: any) => x.id)).toContain('setor-candidato')
+    expect(opcoes.setores.map((x: any) => x.id)).not.toContain('setor-fora')
+    const ausente = await app.request(`${base}/lista-presenca.pdf`, { headers: auth('token-gestor') })
+    expect(ausente.status).toBe(409)
+    expect(await ausente.json()).toMatchObject({ code: 'SETOR_RESPONSAVEL_AUSENTE' })
+    const fora = await app.request(`${base}/lista-presenca.pdf?setorResponsavelId=setor-fora`, {
+      headers: auth('token-gestor'),
+    })
+    expect(fora.status).toBe(403)
+    const pdfResposta = await app.request(`${base}/lista-presenca.pdf?setorResponsavelId=setor-candidato`, {
+      headers: auth('token-gestor'),
+    })
+    expect(pdfResposta.status).toBe(200)
+    expect(await pdfResposta.text()).toContain('61.526.398/0004-31')
+    expect(sqlite.prepare("SELECT setor_id, grupo_trabalho_id FROM eventos WHERE id = 'evento-gt'").get())
+      .toMatchObject({ setor_id: null, grupo_trabalho_id: 'gt-secretaria' })
+    const novoContexto = await app.request(`${base}/contexto-pdf`, { headers: auth('token-gestor') })
+    expect(await novoContexto.json()).toMatchObject({ emitido: true, requerEscolha: false })
+  })
+
+  it('resolve Setor e CNPJ da Casa de escopo, independentemente do Local físico', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    sqlite.exec(`
+      UPDATE setores SET cnpj = '61526398000431' WHERE id = '${setorId}';
+      INSERT INTO locais (id, nome, endereco, numero, cidade, uf)
+        VALUES ('sede-casa-escopo', 'Outro Local', 'Rua Exemplo', '100', 'São Paulo', 'SP');
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, casa_id, local_id, organizador_membro_id)
+        VALUES ('evento-casa-escopo', 'Reunião da Casa', 'PRESENCIAL',
+        '2026-09-15T10:00:00.000Z', '2026-09-15T12:00:00.000Z',
+        'casa-rel', 'sede-casa-escopo', '${gestorId}');
+      INSERT INTO portaria_fechamentos
+        (id, evento_id, fechado_por_membro_id, fechado_em,
+         total_convocados, total_convocados_presentes, total_convocados_ausentes,
+         total_convidados_validados, total_convidados_pendentes, total_presentes)
+        VALUES ('fech-casa-escopo', 'evento-casa-escopo', '${gestorId}',
+        '2026-09-15T12:10:00.000Z', 0, 0, 0, 0, 0, 0);
+    `)
+    const base = '/api/v1/relatorios/presencas/eventos/evento-casa-escopo'
+    const contexto = await app.request(`${base}/contexto-pdf`, { headers: auth('token-gestor') })
+    expect(contexto.status).toBe(200)
+    expect(await contexto.json()).toMatchObject({
+      setorFixoId: setorId, requerEscolha: false,
+      setores: [expect.objectContaining({ id: setorId, cnpj: '61526398000431' })],
+    })
+    const pdf = await app.request(`${base}/lista-presenca.pdf`, { headers: auth('token-gestor') })
+    expect(pdf.status).toBe(200)
+    const conteudo = await pdf.text()
+    expect(conteudo).toContain('61.526.398/0004-31')
+    expect(conteudo).toContain('RUA EXEMPLO')
+    const evento = sqlite.prepare("SELECT setor_id, casa_id FROM eventos WHERE id = 'evento-casa-escopo'").get()
+    expect(evento).toMatchObject({ setor_id: null, casa_id: 'casa-rel' })
+  })
+  it('gera PDF apenas após fechamento, com CNPJ do Setor e endereço do local escolhido', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    sqlite.exec(`
+      UPDATE setores SET cnpj = '61526398000431' WHERE id = '${setorId}';
+      INSERT INTO locais (id, nome, endereco, numero, cidade, uf)
+        VALUES ('sede-ata', 'Bom Retiro', 'Rua Anhaia', '613', 'São Paulo', 'SP');
+      UPDATE eventos SET local_id = 'sede-ata' WHERE id = 'evento-a';
+    `)
+    const res = await app.request('/api/v1/relatorios/presencas/eventos/evento-a/lista-presenca.pdf', {
+      headers: auth('token-gestor'),
+    })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('application/pdf')
+    const pdf = new TextDecoder().decode(await res.arrayBuffer())
+    expect(pdf.startsWith('%PDF-1.4')).toBe(true)
+    expect(pdf).toContain('61.526.398/0004-31')
+    expect(pdf).toContain('RUA ANHAIA')
+    expect(pdf).toContain('MEMBRO ALVO')
+    expect(pdf).toContain('CONVIDADO A')
+    expect(pdf).not.toContain('OUTRO MEMBRO')
+    expect(sqlite.prepare("SELECT COUNT(*) AS total FROM auditoria_logs WHERE acao = 'LISTA_PRESENCA_PDF_EMITIDA'").get()).toMatchObject({ total: 1 })
+  })
+
+
+
+  it('não atribui ao presente função de convocação cancelada', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    sqlite.exec(`
+      UPDATE setores SET cnpj = '61526398000431' WHERE id = '${setorId}';
+      INSERT INTO locais (id, nome, endereco, numero, cidade, uf)
+        VALUES ('sede-convocacao-cancelada', 'Bom Retiro', 'Rua Anhaia', '613', 'São Paulo', 'SP');
+      UPDATE eventos SET local_id = 'sede-convocacao-cancelada' WHERE id = 'evento-a';
+      INSERT INTO funcoes (id, nome, codigo, ativo) VALUES ('funcao-cancelada', 'Função Cancelada', 'CANCELADA', 1);
+      INSERT INTO vinculos_funcionais (id, membro_id, funcao_id, setor_id, ativo)
+        VALUES ('vinculo-cancelado', 'membro-alvo', 'funcao-cancelada', '${setorId}', 1);
+      INSERT INTO convocacoes (id, evento_id, status, ativo)
+        VALUES ('convocacao-cancelada', 'evento-a', 'CANCELADA', 0);
+      INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id)
+        VALUES ('destino-cancelado', 'convocacao-cancelada', 'membro-alvo');
+      INSERT INTO convocacao_destinatario_evidencias
+        (id, convocacao_destinatario_id, funcao_id, vinculo_funcional_id, funcao_nome_snapshot)
+        VALUES ('evidencia-cancelada', 'destino-cancelado', 'funcao-cancelada', 'vinculo-cancelado', 'Função Cancelada');
+    `)
+    const res = await app.request('/api/v1/relatorios/presencas/eventos/evento-a/lista-presenca.pdf', {
+      headers: auth('token-gestor'),
+    })
+    expect(res.status).toBe(200)
+    const pdf = await res.text()
+    expect(pdf).toContain('MEMBRO ALVO')
+    expect(pdf).not.toContain('Cancelada')
+  })
+
+  it('congela PDF de ata mesmo após alteração posterior de endereço e CNPJ', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    sqlite.exec(`
+      UPDATE setores SET cnpj = '61526398000431' WHERE id = '${setorId}';
+      INSERT INTO locais (id, nome, endereco, numero, cidade, uf)
+        VALUES ('sede-imutavel', 'Bom Retiro', 'Rua Anhaia', '613', 'São Paulo', 'SP');
+      UPDATE eventos SET local_id = 'sede-imutavel' WHERE id = 'evento-a';
+    `)
+    const path = '/api/v1/relatorios/presencas/eventos/evento-a/lista-presenca.pdf'
+    const primeiro = await app.request(path, { headers: auth('token-gestor') })
+    expect(primeiro.status).toBe(200)
+    const primeiroPdf = await primeiro.text()
+    sqlite.exec(`
+      UPDATE locais SET endereco = 'Rua Alterada' WHERE id = 'sede-imutavel';
+      UPDATE setores SET cnpj = '00000000000000' WHERE id = '${setorId}';
+    `)
+    const segundo = await app.request(path, { headers: auth('token-gestor') })
+    expect(segundo.status).toBe(200)
+    expect(await segundo.text()).toBe(primeiroPdf)
+    expect(primeiroPdf).not.toContain('Rua Alterada')
+    expect(primeiroPdf).toContain('RUA ANHAIA')
+    expect(sqlite.prepare('SELECT COUNT(*) AS total FROM lista_presenca_pdf_atas').get()).toMatchObject({ total: 1 })
+  })
+
+  it('bloqueia PDF de Portaria não fechada e de usuário sem permissão', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    await sessao(semAcessoId, 'token-sem-acesso')
+    const aberto = await app.request('/api/v1/relatorios/presencas/eventos/evento-inexistente/lista-presenca.pdf', {
+      headers: auth('token-gestor'),
+    })
+    expect(aberto.status).toBe(404)
+    const proibido = await app.request('/api/v1/relatorios/presencas/eventos/evento-a/lista-presenca.pdf', {
+      headers: auth('token-sem-acesso'),
+    })
+    expect(proibido.status).toBe(403)
+  })
+
+  it('não emite PDF definitivo quando faltam CNPJ ou sede', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    const semCnpj = await app.request('/api/v1/relatorios/presencas/eventos/evento-a/lista-presenca.pdf', {
+      headers: auth('token-gestor'),
+    })
+    expect(semCnpj.status).toBe(409)
+    expect((await semCnpj.json()) as any).toMatchObject({ code: 'CNPJ_SETOR_AUSENTE' })
+    sqlite.exec(`UPDATE setores SET cnpj = '61526398000431' WHERE id = '${setorId}';`)
+    const semSede = await app.request('/api/v1/relatorios/presencas/eventos/evento-a/lista-presenca.pdf', {
+      headers: auth('token-gestor'),
+    })
+    expect(semSede.status).toBe(409)
+    expect((await semSede.json()) as any).toMatchObject({ code: 'ENDERECO_SEDE_AUSENTE' })
+  })
+
+  it('lista somente reuniões com Portaria fechada e acesso de gestor', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    await sessao(semAcessoId, 'token-sem-acesso')
+    const url = '/api/v1/relatorios/presencas/eventos/fechados'
+    const gestor = await app.request(url, { headers: auth('token-gestor') })
+    expect(gestor.status).toBe(200)
+    expect(await gestor.json()).toEqual(expect.arrayContaining([
+      { eventoId: 'evento-a', fechadoEm: '2026-08-01T12:10:00.000Z' },
+      { eventoId: 'evento-b', fechadoEm: '2026-09-01T12:10:00.000Z' },
+    ]))
+    const usuario = await app.request(url, { headers: auth('token-sem-acesso') })
+    expect(usuario.status).toBe(403)
+  })
   it('relatório final de reunião usa snapshot materializado', async () => {
     await sessao(gestorId, 'token-gestor', 'conta-gestor')
 

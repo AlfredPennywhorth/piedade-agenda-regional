@@ -57,6 +57,7 @@ export const setores = sqliteTable('setores', {
     .references(() => administracoes.id),
   nome: text('nome').notNull(),
   codigo: text('codigo'),
+  cnpj: text('cnpj').unique(), // Exclusivo por Setor; Pontos de Atendimento do mesmo Setor o reutilizam.
   ativo: ativoDefault,
   ...timestamps,
 })
@@ -1169,6 +1170,15 @@ export const portariaFechamentoItens = sqliteTable(
     idxEvento: index('idx_portaria_fechamento_itens_evento').on(table.eventoId),
   })
 )
+
+// Documento PDF imutável da primeira emissão de Lista de Presença para ata.
+export const listaPresencaPdfAtas = sqliteTable('lista_presenca_pdf_atas', {
+  eventoId: text('evento_id').primaryKey().references(() => eventos.id),
+  fechamentoId: text('fechamento_id').notNull(),
+  documentoPdf: text('documento_pdf').notNull(),
+  emitidoEm: text('emitido_em').notNull(),
+  emitidoPorMembroId: text('emitido_por_membro_id').references(() => membros.id),
+})
 
 // ============================================================
 // Auditoria (S12)

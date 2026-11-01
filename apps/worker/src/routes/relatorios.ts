@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
 import { eq, and, or, gte, lt, lte, inArray, sql } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, locais, espacosLocal, vinculosFuncionais, funcoes, portariaFechamentos, portariaFechamentoItens } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, locais, espacosLocal, vinculosFuncionais, funcoes, portariaFechamentos, portariaFechamentoItens, setores, pontosAtendimento, administracoes, gruposTrabalho, convocacaoDestinatarioEvidencias, auditoriaLogs, listaPresencaPdfAtas } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
-import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo } from '../security/permissoes'
+import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo, eMasterSistema } from '../security/permissoes'
 import { condicaoEscopo, condicaoEventosVisiveis } from '../security/eventos'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
+import { gerarListaPresencaPdf } from '../services/lista-presenca-pdf'
 import { dataValidaRelatorio, inicioDiaSaoPauloUtc, limiteFinalExclusivoSaoPauloUtc } from './relatorios-periodo'
 import { consolidarUtilizacao, type OcorrenciaUtilizacao, type CadastroUtilizacao } from './relatorios-utilizacao'
 
@@ -35,6 +36,47 @@ function consolidarDestinatariosPorMembro(destinatarios: any[], rsvps: any[]) {
 }
 
 relatoriosRouter.use('*', authMiddleware)
+
+// GET /api/v1/relatorios/presencas/eventos/fechados
+relatoriosRouter.get('/presencas/eventos/fechados', async c => {
+  const db = c.get('db')
+  const membroId = c.get('membroId')
+  const contexto = c.get('contextoPermissoes')
+  if (!db || !membroId || !contexto) return c.json({ error: 'Sessão ou banco indisponível' }, 500)
+
+  // Uma consulta indexável por escopo: evita recarregar permissões para cada
+  // evento histórico quando existem centenas de Portarias fechadas.
+  const condicoes = [eq(eventos.organizadorMembroId, membroId)]
+  if (!eMasterSistema(contexto)) {
+    for (const acesso of contexto.acessosAtivos.filter((item: any) => item.perfilCodigo === 'GESTOR_RELATORIOS')) {
+      const condicao = condicaoEscopo(acesso)
+      if (condicao) condicoes.push(condicao)
+    }
+    const legados = await db.select({ v: vinculosFuncionais })
+      .from(vinculosFuncionais)
+      .innerJoin(funcoes, eq(vinculosFuncionais.funcaoId, funcoes.id))
+      .where(and(eq(vinculosFuncionais.membroId, membroId), eq(vinculosFuncionais.ativo, true),
+        eq(funcoes.ativo, true), eq(funcoes.codigo, 'GESTOR_RELATORIOS'))).all()
+    for (const { v } of legados) {
+      const escopos = [
+        ['REGIONAL', v.regionalId], ['ADMINISTRACAO', v.administracaoId],
+        ['SETOR', v.setorId], ['CASA', v.casaId], ['GRUPO_TRABALHO', v.grupoTrabalhoId],
+      ] as const
+      for (const [escopoTipo, escopoId] of escopos) {
+        if (!escopoId) continue
+        const condicao = condicaoEscopo({ id: v.id, perfilCodigo: 'GESTOR_RELATORIOS', escopoTipo, escopoId })
+        if (condicao) condicoes.push(condicao)
+      }
+    }
+  }
+  const fechados = await db.select({ eventoId: eventos.id, fechadoEm: portariaFechamentos.fechadoEm })
+    .from(portariaFechamentos)
+    .innerJoin(eventos, eq(portariaFechamentos.eventoId, eventos.id))
+    .where(and(eq(eventos.pessoal, false), eq(eventos.abrangencia, 'TERRITORIAL'),
+      ...(eMasterSistema(contexto) ? [] : [or(...condicoes)])))
+    .orderBy(sql`${portariaFechamentos.fechadoEm} DESC`).all()
+  return c.json(fechados)
+})
 
 // GET /api/v1/relatorios/presencas/eventos/:eventoId/final
 // Fonte histórica preferencial: snapshot materializado no fechamento.
@@ -124,6 +166,253 @@ relatoriosRouter.get('/presencas/eventos/:eventoId/final', async c => {
     itens: previa.itens,
   })
 })
+
+
+function dataHoraSp(iso: string): string {
+  const value = new Date(iso)
+  return Number.isNaN(value.getTime()) ? '' : new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).format(value)
+}
+
+
+type OpcaoSetorPdf = { id: string; nome: string; cnpj: string | null }
+
+async function contextoSetorPdf(db: any, evento: typeof eventos.$inferSelect): Promise<{
+  fixoId: string | null; opcoes: OpcaoSetorPdf[]
+}> {
+  // Usar o Setor da própria reunião ou do PA responsável; nunca substituir
+  // pelo Setor da Casa onde ocorreu uma exceção intersetorial.
+  let fixoId: string | null = evento.setorId ?? null
+  if (!fixoId && evento.pontoAtendimentoId) {
+    const pa = await db.select({ setorId: pontosAtendimento.setorId })
+      .from(pontosAtendimento).where(eq(pontosAtendimento.id, evento.pontoAtendimentoId)).get()
+    fixoId = pa?.setorId ?? null
+  }
+  // Reuniões territoriais da Casa têm somente casaId como escopo.
+  // Recuperar seu Setor institucional; não derivar do Local físico da reunião.
+  if (!fixoId && evento.casaId) {
+    const casaEscopo = await db.select({ setorId: casas.setorId })
+      .from(casas).where(eq(casas.id, evento.casaId)).get()
+    fixoId = casaEscopo?.setorId ?? null
+  }
+  let escopoAdministracaoId: string | null = evento.administracaoId ?? null
+  let escopoRegionalId: string | null = evento.regionalId ?? null
+  if (evento.grupoTrabalhoId) {
+    const gt = await db.select({
+      setorId: gruposTrabalho.setorId,
+      administracaoId: gruposTrabalho.administracaoId,
+      regionalId: gruposTrabalho.regionalId,
+    }).from(gruposTrabalho).where(eq(gruposTrabalho.id, evento.grupoTrabalhoId)).get()
+    if (gt?.setorId) fixoId = fixoId ?? gt.setorId
+    else if (gt?.administracaoId) escopoAdministracaoId = gt.administracaoId
+    else if (gt?.regionalId) escopoRegionalId = gt.regionalId
+  }
+  if (fixoId) {
+    const setor = await db.select({ id: setores.id, nome: setores.nome, cnpj: setores.cnpj })
+      .from(setores).where(eq(setores.id, fixoId)).get()
+    return { fixoId, opcoes: setor ? [setor] : [] }
+  }
+  if (!escopoAdministracaoId && !escopoRegionalId) {
+    return { fixoId: null, opcoes: [] }
+  }
+  const opcoes = await db.select({ id: setores.id, nome: setores.nome, cnpj: setores.cnpj })
+    .from(setores)
+    .innerJoin(administracoes, eq(setores.administracaoId, administracoes.id))
+    .where(and(eq(setores.ativo, true),
+      ...(escopoAdministracaoId ? [eq(setores.administracaoId, escopoAdministracaoId)] : [eq(administracoes.regionalId, escopoRegionalId!)])))
+    .orderBy(setores.nome).all()
+  return { fixoId: null, opcoes }
+}
+
+// Retorna candidatos institucionais do escopo da reunião. A escolha não altera
+// o cadastro nem o escopo de um evento GT e é congelada na primeira emissão.
+relatoriosRouter.get('/presencas/eventos/:eventoId/contexto-pdf', async c => {
+  const db = c.get('db')
+  const membroId = c.get('membroId')
+  const eventoId = c.req.param('eventoId')
+  if (!db || !membroId) return c.json({ error: 'Sessão ou banco indisponível' }, 500)
+  const evento = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
+  if (!evento) return c.json({ error: 'Reunião não encontrada' }, 404)
+  if (!(await eGestorRelatoriosAutorizadoParaEvento(db, membroId, evento))) {
+    return c.json({ error: 'Acesso não autorizado', code: 'FORBIDDEN' }, 403)
+  }
+  const fechado = await db.select({ id: portariaFechamentos.id }).from(portariaFechamentos)
+    .where(eq(portariaFechamentos.eventoId, eventoId)).get()
+  if (!fechado) return c.json({ error: 'Portaria aberta', code: 'PORTARIA_ABERTA' }, 409)
+  const emitido = await db.select({ fechamentoId: listaPresencaPdfAtas.fechamentoId })
+    .from(listaPresencaPdfAtas).where(eq(listaPresencaPdfAtas.eventoId, eventoId)).get()
+  const contexto = await contextoSetorPdf(db, evento)
+  return c.json({
+    setorFixoId: contexto.fixoId,
+    setores: contexto.opcoes,
+    requerEscolha: !emitido && !contexto.fixoId,
+    emitido: !!emitido,
+  })
+})
+
+// GET /api/v1/relatorios/presencas/eventos/:eventoId/lista-presenca.pdf
+// Somente fechamento materializado: nem RSVP nem prévia operacional geram ata.
+relatoriosRouter.get('/presencas/eventos/:eventoId/lista-presenca.pdf', async c => {
+  const db = c.get('db')
+  const membroId = c.get('membroId')
+  const eventoId = c.req.param('eventoId')
+  if (!db || !membroId) return c.json({ error: 'Sessão ou banco indisponível' }, 500)
+
+  const evento = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
+  if (!evento) return c.json({ error: 'Evento não encontrado', code: 'NOT_FOUND' }, 404)
+  if (!(await eGestorRelatoriosAutorizadoParaEvento(db, membroId, evento))) {
+    return c.json({ error: 'Acesso não autorizado para esta Lista de Presença', code: 'FORBIDDEN' }, 403)
+  }
+  if (evento.pessoal || evento.abrangencia !== 'TERRITORIAL' || evento.modalidade === 'ONLINE') {
+    return c.json({ error: 'Lista de Presença indisponível para este evento', code: 'EVENTO_INCOMPATIVEL' }, 409)
+  }
+
+  const fechamento = await db.select().from(portariaFechamentos)
+    .where(eq(portariaFechamentos.eventoId, eventoId)).get()
+  if (!fechamento) {
+    return c.json({ error: 'A Lista de Presença só pode ser emitida após o fechamento da Portaria.', code: 'PORTARIA_ABERTA' }, 409)
+  }
+
+
+  // O PDF da primeira emissão é preservado; alterações posteriores no cadastro
+  // institucional não podem reescrever uma ata já emitida.
+  const emissaoAnterior = await db.select().from(listaPresencaPdfAtas)
+    .where(eq(listaPresencaPdfAtas.eventoId, eventoId)).get()
+  if (emissaoAnterior) {
+    if (emissaoAnterior.fechamentoId !== fechamento.id) {
+      return c.json({
+        error: 'A Portaria recebeu novo fechamento após emissão anterior. Regularize a ata antes de nova emissão.',
+        code: 'LISTA_PRESENCA_FECHAMENTO_DIVERGENTE',
+      }, 409)
+    }
+    await db.insert(auditoriaLogs).values({
+      id: crypto.randomUUID(),
+      acao: 'LISTA_PRESENCA_PDF_CONSULTADA',
+      atorMembroId: membroId,
+      recursoTipo: 'EVENTO',
+      recursoId: eventoId,
+      escopoTipo: evento.setorId ? 'SETOR' : null,
+      escopoId: evento.setorId ?? null,
+      contexto: { fechamentoId: fechamento.id, emitidoEm: emissaoAnterior.emitidoEm },
+    }).run()
+    return new Response(new TextEncoder().encode(emissaoAnterior.documentoPdf).buffer as ArrayBuffer, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="lista-presenca-${eventoId}.pdf"`,
+        'Cache-Control': 'no-store, private',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    })
+  }
+
+  const contexto = await contextoSetorPdf(db, evento)
+  const informado = c.req.query('setorResponsavelId') || null
+  // A escolha explícita só é permitida entre Setores da Administração/Regional
+  // institucional do evento. A API nunca aceita IDs arbitrários.
+  if (informado && !contexto.opcoes.some(item => item.id === informado)) {
+    return c.json({ error: 'Setor não pertence ao escopo da reunião.', code: 'SETOR_FORA_ESCOPO' }, 403)
+  }
+  if (contexto.fixoId && informado && informado !== contexto.fixoId) {
+    return c.json({ error: 'O Setor responsável pela reunião já está definido.', code: 'SETOR_FIXO' }, 409)
+  }
+  const setorResponsavelId = contexto.fixoId ?? informado
+  if (!setorResponsavelId) {
+    return c.json({ error: 'Selecione o Setor responsável pela reunião antes de emitir a Lista de Presença.', code: 'SETOR_RESPONSAVEL_AUSENTE' }, 409)
+  }
+  const setor = await db.select({ nome: setores.nome, cnpj: setores.cnpj })
+    .from(setores).where(eq(setores.id, setorResponsavelId)).get()
+  if (!setor?.cnpj) {
+    return c.json({ error: 'Cadastre o CNPJ do Setor responsável antes de emitir a Lista de Presença.', code: 'CNPJ_SETOR_AUSENTE' }, 409)
+  }
+  const local = evento.localId ? await db.select().from(locais).where(eq(locais.id, evento.localId)).get() : null
+  if (!local || !local.endereco || !local.numero || !local.cidade || !local.uf) {
+    return c.json({ error: 'O local da reunião deve possuir endereço completo antes da emissão.', code: 'ENDERECO_SEDE_AUSENTE' }, 409)
+  }
+  const endereco = [local.endereco + ', ' + local.numero, local.complemento, local.bairro, `${local.cidade}/${local.uf}`, local.cep ? `CEP ${local.cep}` : null]
+    .filter(Boolean).join(' - ')
+
+  const presencas = await db.select().from(portariaFechamentoItens)
+    .where(and(eq(portariaFechamentoItens.fechamentoId, fechamento.id), eq(portariaFechamentoItens.situacao, 'PRESENTE'))).all()
+
+  // Funções registradas na convocação, utilizando o snapshot institucional da evidência.
+  const evidencias = await db.select({
+    membroId: convocacaoDestinatarios.membroId,
+    nomeFuncaoSnapshot: convocacaoDestinatarioEvidencias.funcaoNomeSnapshot,
+    nomeFuncaoAtual: funcoes.nome,
+  }).from(convocacaoDestinatarioEvidencias)
+    .innerJoin(convocacaoDestinatarios, eq(convocacaoDestinatarioEvidencias.convocacaoDestinatarioId, convocacaoDestinatarios.id))
+    .innerJoin(convocacoes, eq(convocacaoDestinatarios.convocacaoId, convocacoes.id))
+    .innerJoin(funcoes, eq(convocacaoDestinatarioEvidencias.funcaoId, funcoes.id))
+    .where(and(eq(convocacoes.eventoId, eventoId), eq(convocacoes.status, 'PUBLICADA'), eq(convocacoes.ativo, true))).all()
+  const funcoesPorMembro = new Map<string, Set<string>>()
+  for (const evidencia of evidencias) {
+    const nomes = funcoesPorMembro.get(evidencia.membroId) || new Set<string>()
+    nomes.add(evidencia.nomeFuncaoSnapshot || evidencia.nomeFuncaoAtual)
+    funcoesPorMembro.set(evidencia.membroId, nomes)
+  }
+
+  const formatarCnpj = (value: string) => value.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
+  const linhas = presencas.sort((a: typeof presencas[number], b: typeof presencas[number]) =>
+    (a.registradoEm ?? '').localeCompare(b.registradoEm ?? '') || a.nome.localeCompare(b.nome, 'pt-BR')
+  ).map((item: typeof presencas[number]) => ({
+    nome: item.nome,
+    funcao: item.tipoPessoa === 'CONVIDADO' ? 'Convidado' : Array.from(funcoesPorMembro.get(item.origemId) || []).join(', ') || 'Não informado',
+    entrada: item.registradoEm ? dataHoraSp(item.registradoEm) : 'Não registrado',
+  }))
+  const agora = new Date().toISOString()
+  const pdf = gerarListaPresencaPdf({
+    titulo: evento.titulo,
+    local: `${local.nome} - ${local.cidade}/${local.uf}`,
+    endereco,
+    cnpj: formatarCnpj(setor.cnpj),
+    inicio: dataHoraSp(evento.inicioEm),
+    fim: dataHoraSp(evento.fimEm),
+    emitidoEm: dataHoraSp(agora),
+    linhas,
+  })
+
+
+  // Inserção concorrente segura: a primeira emissão é a canônica.
+  const documentoPdf = new TextDecoder().decode(pdf)
+  // INSERT ... SELECT é uma única operação SQLite: se o fechamento já foi
+  // removido por uma reabertura concorrente, não grava nenhum PDF órfão.
+  await db.run(sql`
+    INSERT INTO lista_presenca_pdf_atas
+      (evento_id, fechamento_id, documento_pdf, emitido_em, emitido_por_membro_id)
+    SELECT ${eventoId}, ${fechamento.id}, ${documentoPdf}, ${agora}, ${membroId}
+    FROM portaria_fechamentos
+    WHERE id = ${fechamento.id} AND evento_id = ${eventoId}
+    ON CONFLICT (evento_id) DO NOTHING
+  `)
+  const emissao = await db.select().from(listaPresencaPdfAtas)
+    .where(eq(listaPresencaPdfAtas.eventoId, eventoId)).get()
+  if (!emissao || emissao.fechamentoId !== fechamento.id) {
+    return c.json({ error: 'A emissão anterior não corresponde ao fechamento atual.', code: 'LISTA_PRESENCA_FECHAMENTO_DIVERGENTE' }, 409)
+  }
+
+  // Auditoria do acesso a informações pessoais em documento para ata.
+  await db.insert(auditoriaLogs).values({
+    id: crypto.randomUUID(),
+    acao: 'LISTA_PRESENCA_PDF_EMITIDA',
+    atorMembroId: membroId,
+    recursoTipo: 'EVENTO',
+    recursoId: eventoId,
+    escopoTipo: 'SETOR',
+    escopoId: setorResponsavelId,
+    contexto: { fechamentoId: fechamento.id, totalPresentes: linhas.length, emitidoEm: agora },
+  }).run()
+
+  return new Response(new TextEncoder().encode(emissao.documentoPdf).buffer as ArrayBuffer, {
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="lista-presenca-${eventoId}.pdf"`,
+      'Cache-Control': 'no-store, private',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  })
+})
+
 
 // GET /api/v1/relatorios/presencas/membros/:membroAlvoId
 // Histórico de participação do membro em reuniões fechadas, limitado aos eventos
