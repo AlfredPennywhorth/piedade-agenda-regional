@@ -76,8 +76,13 @@ function formatarHorario(valor: string): string {
 }
 
 function cidadeUf(local: string): string {
-  const match = local.match(/[-–]\s*([^/–-]+)\/([A-Z]{2})\s*$/i)
-  return match ? match[1].trim().toUpperCase() + ' - ' + match[2].toUpperCase() : ''
+  // O separador cadastral é " - "; nomes de municípios podem ter hífen,
+  // como Embu-Guaçu, que não pode perder seu primeiro segmento.
+  const separador = local.lastIndexOf(' - ')
+  if (separador < 0) return ''
+  const municipioUf = local.slice(separador + 3).trim()
+  const match = municipioUf.match(/^(.+)\/([A-Z]{2})$/i)
+  return match ? match[1].trim().toLocaleUpperCase('pt-BR') + ' - ' + match[2].toUpperCase() : ''
 }
 
 function linhasItem(item: LinhaListaPresenca) {
