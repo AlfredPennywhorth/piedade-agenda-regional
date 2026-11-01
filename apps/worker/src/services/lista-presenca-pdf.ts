@@ -82,6 +82,7 @@ export function gerarListaPresencaPdf(dados: DadosListaPresenca): Uint8Array {
   }
   if (atual.length || !grupos.length) grupos.push(atual)
   const objs: string[] = ['', '<< /Type /Catalog /Pages 2 0 R >>', '']
+  objs[3] = '<< /Producer (Agenda Regional Sao Paulo) >>'
   objs[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'
   objs[5] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'
   const ids: number[] = []
