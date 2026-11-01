@@ -317,6 +317,16 @@ export function RelatoriosPresencaView() {
 
           {evento && <div className="relatorio-impressao space-y-5">
             <AcoesRelatorio onCsv={exportarEventoCsv} />
+            {evento.fonte === 'SNAPSHOT_FECHAMENTO' && (
+              <button
+                type="button"
+                onClick={baixarListaPresenca}
+                disabled={carregando}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Baixar Lista de Presença (PDF)
+              </button>
+            )}
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <h3 className="font-semibold text-slate-900">{evento.evento.titulo}</h3>
               <p className="mt-1 text-xs text-slate-500">{evento.fonte === 'SNAPSHOT_FECHAMENTO' ? 'Lista final da reunião' : 'Prévia operacional'}</p>
