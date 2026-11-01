@@ -34,6 +34,31 @@ export async function fetchWithAuth<T = any>(endpoint: string, options: RequestI
   return response.json()
 }
 
+export async function baixarPdfAutenticado(endpoint: string, nomeArquivo: string): Promise<void> {
+  const token = localStorage.getItem('session_token')
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    cache: 'no-store',
+  })
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}))
+    throw new ApiError(response.status, body.error || 'Não foi possível gerar a Lista de Presença.', body)
+  }
+  const blob = await response.blob()
+  if (blob.type !== 'application/pdf') throw new Error('Resposta de PDF inválida')
+  const url = URL.createObjectURL(blob)
+  try {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = nomeArquivo
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
 export async function putWithAuth<T = any>(endpoint: string, body: any): Promise<T> {
   return fetchWithAuth<T>(endpoint, {
     method: 'PUT',
