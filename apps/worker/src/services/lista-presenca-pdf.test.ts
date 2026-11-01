@@ -6,59 +6,82 @@ const dados = {
   local: 'Bom Retiro - São Paulo/SP',
   endereco: 'Rua Anhaia, 613 - Bom Retiro - São Paulo/SP',
   cnpj: '61.526.398/0004-31',
-  inicio: '05/09/2026, 06:05',
-  fim: '05/09/2026, 06:35',
-  emitidoEm: '05/09/2026, 12:15',
+  inicio: '05/09/2026, 06:10:00',
+  fim: '05/09/2026, 09:00:00',
+  emitidoEm: '31/10/2026, 17:30:53',
 }
 
-describe('Lista de Presença em PDF', () => {
-  it('emite PDF A4 válido com cabeçalho institucional, CNPJ e apenas presentes', () => {
-    const buffer = gerarListaPresencaPdf({ ...dados, linhas: [
-      { nome: 'João da Silva', funcao: 'Diácono', entrada: '05/09/2026, 06:07' },
-      { nome: 'Maria Oliveira', funcao: 'Secretaria', entrada: '05/09/2026, 06:09' },
-    ] })
-    const pdf = new TextDecoder().decode(buffer)
+function textoPdf(linhas: Array<{ nome: string; funcao: string; entrada: string }>, sobrescrever = {}) {
+  return new TextDecoder().decode(gerarListaPresencaPdf({ ...dados, ...sobrescrever, linhas }))
+}
+
+describe('Lista de Presença em PDF — modelo institucional SIGA', () => {
+  it('mantém A4, cabeçalho centralizado, colunas SIGA e rodapé Folha', () => {
+    const pdf = textoPdf([
+      { nome: 'Telma Gabriel Alves Campos', funcao: 'Irmã da Obra da Piedade', entrada: '05/09/2026, 06:26:57' },
+    ])
     expect(pdf.startsWith('%PDF-1.4')).toBe(true)
-    expect(pdf).toContain('61.526.398/0004-31')
-    expect(pdf).toContain('BOM RETIRO')
-    expect(pdf).toContain('P')
+    expect(pdf).toContain('/MediaBox [0 0 595 842]')
+    expect(pdf).toContain('/BaseFont /Courier /')
+    expect(pdf).toContain('/BaseFont /Courier-Bold /')
+    expect(pdf).toContain('CONGREGA\\307\\303O CRIST\\303 NO BRASIL')
+    expect(pdf).toContain('S\\303O PAULO - SP')
+    expect(pdf).toContain('CNPJ 61.526.398/0004-31')
+    expect(pdf).toContain('NOME')
+    expect(pdf).toContain('MINIST\\311RIO/FUN\\307\\303O')
+    expect(pdf).toContain('HOR\\301RIO DE ENTRADA')
+    expect(pdf).toContain('TELMA GABRIEL ALVES CAMPOS')
+    expect(pdf).toContain('05/09/2026 06:26:57')
+    expect(pdf).not.toContain('05/09/2026, 06:26:57')
+    expect(pdf).toContain('[1 2] 0 d')
+    expect(pdf).toContain('Folha 1/1')
+    expect(pdf).not.toContain(' - IE')
     expect((pdf.match(/\/Type \/Page \/Parent/g) || []).length).toBe(1)
     expect(pdf).toContain('startxref')
   })
 
-  it('pagina listas extensas sem página extra em branco', () => {
+  it('pagina lista extensa, com o cabeçalho institucional em cada folha e sem página em branco', () => {
     const linhas = Array.from({ length: 180 }, (_, i) => ({
-      nome: `Participante ${String(i + 1).padStart(3, '0')} de uma localidade institucional`,
+      nome: 'Participante ' + String(i + 1).padStart(3, '0') + ' da reunião de atendimento',
       funcao: 'Diácono',
-      entrada: '05/09/2026, 06:08',
+      entrada: '05/09/2026, 06:08:00',
     }))
-    const pdf = new TextDecoder().decode(gerarListaPresencaPdf({ ...dados, linhas }))
+    const pdf = textoPdf(linhas)
     const paginas = (pdf.match(/\/Type \/Page \/Parent/g) || []).length
     expect(paginas).toBeGreaterThan(2)
-    expect(pdf).toContain(` /Count ${paginas} `)
-    expect(pdf).toContain(`Folha ${paginas}/${paginas}`)
+    expect(pdf).toContain(' /Count ' + paginas + ' ')
+    expect(pdf).toContain('Folha ' + paginas + '/' + paginas)
+    expect((pdf.match(/CONGREGA\\307\\303O CRIST\\303 NO BRASIL/g) || []).length).toBe(paginas)
   })
 
-
-  it('reacomoda cabeçalho quando o endereço ocupa três ou mais linhas', () => {
-    const longo = `${'Avenida dos Trabalhadores da Obra da Piedade '.repeat(8)} - São Paulo/SP`
-    const pdf = new TextDecoder().decode(gerarListaPresencaPdf({
-      ...dados, endereco: longo,
-      linhas: [{ nome: 'Participante Exemplo', funcao: 'Diácono', entrada: '05/09/2026, 06:08' }],
-    }))
-    const cnpj = pdf.match(/1 0 0 1 308 ([\d.]+) Tm \(CNPJ /)
-    const nome = pdf.match(/1 0 0 1 46 ([\d.]+) Tm \(Participante Exemplo\)/)
+  it('mantém CNPJ, titulo e tabela separados mesmo com endereço muito extenso', () => {
+    const longo = 'Avenida dos Trabalhadores da Obra da Piedade '.repeat(8) + ' São Paulo/SP'
+    const pdf = textoPdf([
+      { nome: 'Participante Exemplo', funcao: 'Diácono', entrada: '05/09/2026, 06:08:00' },
+    ], { endereco: longo })
+    const cnpj = pdf.match(/1 0 0 1 ([\d.]+) ([\d.]+) Tm \(CNPJ /)
+    const nome = pdf.match(/1 0 0 1 28\.0 ([\d.]+) Tm \(PARTICIPANTE EXEMPLO\)/)
     expect(cnpj).not.toBeNull()
     expect(nome).not.toBeNull()
-    expect(Number(cnpj![1])).toBeGreaterThan(Number(nome![1]) + 30)
-    expect(pdf).toContain('Participante Exemplo')
+    expect(Number(cnpj![2])).toBeGreaterThan(Number(nome![1]) + 35)
   })
 
-  it('codifica caracteres acentuados sem gerar bytes inválidos', () => {
-    const pdf = new TextDecoder().decode(gerarListaPresencaPdf({ ...dados, linhas: [
-      { nome: 'José Antônio', funcao: 'Ancião', entrada: '05/09/2026, 06:08' },
-    ] }))
-    expect(pdf).toContain('Jos\\351')
-    expect(pdf).toContain('Anci\\343o')
+  it('preserva acentos via WinAnsi e quebra nomes e funções longas sem truncar', () => {
+    const pdf = textoPdf([{
+      nome: 'José Antônio de Azevedo dos Santos e Gonçalves da Silva',
+      funcao: 'Irmã da Obra da Piedade e membro de grupo de trabalho',
+      entrada: '05/09/2026, 06:08:00',
+    }])
+    expect(pdf).toContain('JOS\\311 ANT\\324NIO')
+    expect(pdf).toContain('IRM\\303 DA OBRA DA PIEDADE')
+    expect(pdf).toContain('GON\\307ALVES DA SILVA')
+    expect(pdf).toContain('GRUPO DE TRABALHO')
+  })
+
+  it('não cria dados de presença artificialmente para uma lista vazia', () => {
+    const pdf = textoPdf([])
+    expect((pdf.match(/\/Type \/Page \/Parent/g) || []).length).toBe(1)
+    expect(pdf).toContain('Folha 1/1')
+    expect(pdf).not.toContain('N\\343o registrado')
   })
 })
