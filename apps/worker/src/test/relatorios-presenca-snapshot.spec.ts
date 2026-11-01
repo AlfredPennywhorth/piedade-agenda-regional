@@ -223,6 +223,20 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
     expect((await semSede.json()) as any).toMatchObject({ code: 'ENDERECO_SEDE_AUSENTE' })
   })
 
+  it('lista somente reuniões com Portaria fechada e acesso de gestor', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    await sessao(semAcessoId, 'token-sem-acesso')
+    const url = '/api/v1/relatorios/presencas/eventos/fechados'
+    const gestor = await app.request(url, { headers: auth('token-gestor') })
+    expect(gestor.status).toBe(200)
+    expect(await gestor.json()).toEqual(expect.arrayContaining([
+      { eventoId: 'evento-a', fechadoEm: '2026-08-01T12:10:00.000Z' },
+      { eventoId: 'evento-b', fechadoEm: '2026-09-01T12:10:00.000Z' },
+    ]))
+    const usuario = await app.request(url, { headers: auth('token-sem-acesso') })
+    expect(usuario.status).toBe(200)
+    expect(await usuario.json()).toEqual([])
+  })
   it('relatório final de reunião usa snapshot materializado', async () => {
     await sessao(gestorId, 'token-gestor', 'conta-gestor')
 
