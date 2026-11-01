@@ -6,6 +6,12 @@ type EscopoTipo = 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABA
 
 interface EventoLookup { id: string; titulo: string; inicioEm: string; ativo: boolean }
 interface FechamentoLookup { eventoId: string; fechadoEm: string }
+interface ContextoPdf {
+  setorFixoId: string | null
+  setores: Array<{ id: string; nome: string; cnpj: string | null }>
+  requerEscolha: boolean
+  emitido: boolean
+}
 interface MembroLookup { id: string; nome: string; casaId: string; ativo: boolean }
 interface RegionalLookup { id: string; nome: string; ativo: boolean }
 interface AdministracaoLookup { id: string; regionalId: string; nome: string; ativo: boolean }
@@ -82,6 +88,8 @@ export function RelatoriosPresencaView() {
   const [eventoBusca, setEventoBusca] = useState('')
   const [eventoId, setEventoId] = useState('')
   const [evento, setEvento] = useState<RelatorioFinal | null>(null)
+  const [contextoPdf, setContextoPdf] = useState<ContextoPdf | null>(null)
+  const [setorResponsavelPdf, setSetorResponsavelPdf] = useState('')
 
   const [membroBusca, setMembroBusca] = useState('')
   const [membroId, setMembroId] = useState('')
@@ -159,12 +167,28 @@ export function RelatoriosPresencaView() {
     finally { setCarregando(false) }
   }
 
-  useEffect(() => { setEvento(null) }, [eventoId])
+  useEffect(() => {
+    setEvento(null)
+    setContextoPdf(null)
+    setSetorResponsavelPdf('')
+  }, [eventoId])
 
   const buscarEvento = (e: FormEvent) => {
     e.preventDefault()
     if (!eventoId) return
-    executar(async () => setEvento(await apiClient.fetchWithAuth<RelatorioFinal>(`/relatorios/presencas/eventos/${eventoId}/final`)))
+    executar(async () => {
+      const relatorio = await apiClient.fetchWithAuth<RelatorioFinal>(`/relatorios/presencas/eventos/${eventoId}/final`)
+      setEvento(relatorio)
+      setContextoPdf(null)
+      setSetorResponsavelPdf('')
+      if (relatorio.fonte === 'SNAPSHOT_FECHAMENTO') {
+        const contexto = await apiClient.fetchWithAuth<ContextoPdf>(
+          `/relatorios/presencas/eventos/${eventoId}/contexto-pdf`
+        )
+        setContextoPdf(contexto)
+        setSetorResponsavelPdf(contexto.setorFixoId || '')
+      }
+    })
   }
 
   const buscarMembro = (e: FormEvent) => {
@@ -207,10 +231,14 @@ export function RelatoriosPresencaView() {
   const imprimirRelatorio = () => window.print()
 
   const baixarListaPresenca = () => {
-    if (!evento || evento.fonte !== 'SNAPSHOT_FECHAMENTO') return
+    if (!evento || evento.fonte !== 'SNAPSHOT_FECHAMENTO' || !contextoPdf) return
+    if (contextoPdf.requerEscolha && !setorResponsavelPdf) {
+      setErro('Selecione o Setor responsável para emissão do PDF.')
+      return
+    }
     executar(async () => {
       await apiClient.baixarPdfAutenticado(
-        `/relatorios/presencas/eventos/${encodeURIComponent(evento.evento.id)}/lista-presenca.pdf`,
+        `/relatorios/presencas/eventos/${encodeURIComponent(evento.evento.id)}/lista-presenca.pdf${contextoPdf.requerEscolha ? `?setorResponsavelId=${encodeURIComponent(setorResponsavelPdf)}` : ''}`, 
         `lista-presenca-${evento.evento.id}.pdf`
       )
     })
@@ -335,11 +363,39 @@ export function RelatoriosPresencaView() {
           {evento && <div className="relatorio-impressao min-w-0 space-y-5">
             <AcoesRelatorio onCsv={exportarEventoCsv} onPrint={null} />
             {evento.fonte !== 'SNAPSHOT_FECHAMENTO' && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Portaria ainda aberta. Esta é uma prévia operacional: não pode ser utilizada como Lista de Presença para ata.</div>}
+            {evento.fonte === 'SNAPSHOT_FECHAMENTO' && contextoPdf?.requerEscolha && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <label htmlFor="setor-pdf-ata" className="mb-2 block text-sm font-semibold text-slate-900">
+                  Setor responsável pela reunião e pelo CNPJ da ata
+                </label>
+                <select
+                  id="setor-pdf-ata"
+                  value={setorResponsavelPdf}
+                  onChange={e => setSetorResponsavelPdf(e.target.value)}
+                  className="w-full min-w-0 rounded-lg border border-slate-300 bg-white p-2.5 text-sm"
+                >
+                  <option value="">Selecione o Setor responsável</option>
+                  {contextoPdf.setores.map(setor => (
+                    <option key={setor.id} value={setor.id}>
+                      {setor.nome}{setor.cnpj ? '' : ' — CNPJ não cadastrado'}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs text-slate-700">
+                  Para reuniões de GT sem Setor definido, selecione o Setor institucional responsável.
+                  Essa escolha não altera o cadastro da reunião. Confirme os dados antes do primeiro download,
+                  pois o PDF será preservado para a ata.
+                </p>
+                {!contextoPdf.setores.length && <p className="mt-2 text-sm text-red-700">
+                  Nenhum Setor disponível no escopo institucional desta reunião. Verifique o cadastro do GT.
+                </p>}
+              </div>
+            )}
             {evento.fonte === 'SNAPSHOT_FECHAMENTO' && (
               <button
                 type="button"
                 onClick={baixarListaPresenca}
-                disabled={carregando}
+                disabled={carregando || !contextoPdf || (contextoPdf.requerEscolha && !setorResponsavelPdf)}
                 className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
               >
                 Baixar Lista de Presença (PDF)
