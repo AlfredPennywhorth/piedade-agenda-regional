@@ -189,6 +189,13 @@ async function contextoSetorPdf(db: any, evento: typeof eventos.$inferSelect): P
       .from(pontosAtendimento).where(eq(pontosAtendimento.id, evento.pontoAtendimentoId)).get()
     fixoId = pa?.setorId ?? null
   }
+  // Reuniões territoriais da Casa têm somente casaId como escopo.
+  // Recuperar seu Setor institucional; não derivar do Local físico da reunião.
+  if (!fixoId && evento.casaId) {
+    const casaEscopo = await db.select({ setorId: casas.setorId })
+      .from(casas).where(eq(casas.id, evento.casaId)).get()
+    fixoId = casaEscopo?.setorId ?? null
+  }
   let escopoAdministracaoId: string | null = evento.administracaoId ?? null
   let escopoRegionalId: string | null = evento.regionalId ?? null
   if (evento.grupoTrabalhoId) {
