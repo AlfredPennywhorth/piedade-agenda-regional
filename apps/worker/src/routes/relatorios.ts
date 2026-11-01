@@ -74,7 +74,7 @@ relatoriosRouter.get('/presencas/eventos/fechados', async c => {
     .innerJoin(eventos, eq(portariaFechamentos.eventoId, eventos.id))
     .where(and(eq(eventos.pessoal, false), eq(eventos.abrangencia, 'TERRITORIAL'),
       ...(eMasterSistema(contexto) ? [] : [or(...condicoes)])))
-    .orderBy(sql`${portariaFechamentos.fechadoEm} DESC`).limit(500).all()
+    .orderBy(sql`${portariaFechamentos.fechadoEm} DESC`).all()
   return c.json(fechados)
 })
 
