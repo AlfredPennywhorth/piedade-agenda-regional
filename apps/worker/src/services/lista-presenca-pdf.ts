@@ -3,128 +3,201 @@ export interface DadosListaPresenca {
   titulo: string; local: string; endereco: string; cnpj: string;
   inicio: string; fim: string; emitidoEm: string; linhas: LinhaListaPresenca[]
 }
-// PDF A4, Helvetica/WinAnsi, fluxo textual ASCII. Sem bibliotecas externas.
-function escaparPdf(texto: string) {
-  const extras: Record<number, number> = {8211:150, 8212:151, 8216:145, 8217:146, 8220:147, 8221:148, 8230:133, 8364:128}
+
+// Modelo institucional inspirado nas listas SIGA: A4, Courier, tabela compacta.
+// Usa exclusivamente fontes padrao PDF e codificacao WinAnsi; nao depende
+// de arquivos de fonte nem de bibliotecas nativas no Cloudflare Worker.
+const PAGINA_LARGURA = 595
+const PAGINA_ALTURA = 842
+const MARGEM = 28
+const FONTE_LINHA = 7
+const COLUNAS = { nome: 28, funcao: 207, entrada: 369 }
+const ALTURA_LINHA = 10
+const ALTURA_REGISTRO = 18.7
+const RODAPE_SUPERIOR = 61
+
+function pdfTexto(texto: string): string {
+  const extras: Record<number, number> = {
+    8211: 150, 8212: 151, 8216: 145, 8217: 146, 8220: 147,
+    8221: 148, 8230: 133, 8364: 128, 8226: 149,
+  }
   return Array.from(texto.normalize('NFC')).map(c => {
-    const code = c.codePointAt(0) ?? 32
+    const codigo = c.codePointAt(0) ?? 32
     if (c === '(' || c === ')' || c === '\\') return '\\' + c
-    if (code >= 32 && code <= 126) return c
-    const b = code >= 160 && code <= 255 ? code : extras[code]
-    return b === undefined ? '?' : '\\' + b.toString(8).padStart(3, '0')
+    if (codigo >= 32 && codigo <= 126) return c
+    const byte = codigo >= 160 && codigo <= 255 ? codigo : extras[codigo]
+    return byte === undefined ? '?' : '\\' + byte.toString(8).padStart(3, '0')
   }).join('')
 }
-function escrever(x: number, y: number, valor: string, size = 9, bold = false) {
-  return `BT /${bold ? 'F2' : 'F1'} ${size} Tf 1 0 0 1 ${x} ${y} Tm (${escaparPdf(valor)}) Tj ET\n`
-}
-function dividir(texto: string, limite: number) {
-  const saida: string[] = []
-  let atual = ''
-  for (const palavra of texto.trim().split(/\s+/)) {
-    if (atual && atual.length + palavra.length + 1 > limite) {
-      saida.push(atual); atual = ''
-    }
-    for (let i = 0; i < palavra.length; i += limite) {
-      const parte = palavra.slice(i, i + limite)
-      if (atual && atual.length + parte.length + 1 > limite) {
-        saida.push(atual); atual = ''
-      }
-      atual += (atual ? ' ' : '') + parte
-    }
-  }
-  if (atual) saida.push(atual)
-  return saida.length ? saida : ['']
-}
-function altura(item: LinhaListaPresenca) {
-  return Math.max(dividir(item.nome, 41).length, dividir(item.funcao, 22).length) * 12 + 10
+
+function escrever(x: number, y: number, texto: string, tamanho = FONTE_LINHA, negrito = false): string {
+  return 'BT /' + (negrito ? 'F2' : 'F1') + ' ' + tamanho +
+    ' Tf 1 0 0 1 ' + x.toFixed(1) + ' ' + y.toFixed(1) +
+    ' Tm (' + pdfTexto(texto) + ') Tj ET\n'
 }
 
-function cabecalho(d: DadosListaPresenca): { stream: string; inicioLinhas: number } {
-  let stream = '0 G 0.4 w\n'
-  // Padrao documental SIGA: identificacao superior, endereco/CNPJ, titulo e lista nominal.
-  stream += escrever(44, 807, 'CONGREGAÇÃO CRISTÃ NO BRASIL', 11, true)
-  stream += escrever(44, 792, 'SÃO PAULO - SP', 9)
-  const endereco = dividir(d.endereco.toUpperCase(), 55)
-  let y = 807
-  for (const trecho of endereco) {
-    stream += escrever(308, y, trecho, 8)
-    y -= 12
-  }
-  stream += escrever(308, y - 2, `CNPJ ${d.cnpj}`, 8)
-  y = Math.min(754, y - 31)
-  for (const titulo of dividir(`Lista de Presença da ${d.titulo}`, 76)) {
-    stream += escrever(Math.max(44, 297 - titulo.length * 2.7), y, titulo, 11, true)
-    y -= 14
-  }
-  stream += escrever(151, y - 3, `Realizada no dia ${d.inicio}.`, 9)
-  y -= 30
-  stream += `44 ${y} m 551 ${y} l S\n`
-  y -= 17
-  stream += escrever(46, y, 'NOME', 9, true)
-  stream += escrever(284, y, 'MINISTÉRIO/FUNÇÃO', 9, true)
-  stream += escrever(424, y, 'HORÁRIO DE ENTRADA', 9, true)
-  y -= 9
-  stream += `44 ${y} m 551 ${y} l S\n`
-  const inicioLinhas = y - 17
-  if (inicioLinhas < 100) throw new Error('Cabeçalho da Lista de Presença excede a altura do PDF')
-  return { stream, inicioLinhas }
+function largura(texto: string, tamanho: number): number {
+  // Courier e Courier-Bold tem avancos uniformes: 600/1000 em.
+  return Array.from(texto).length * tamanho * 0.6
 }
-function comporPagina(d: DadosListaPresenca, itens: LinhaListaPresenca[], pagina: number, total: number) {
-  const cab = cabecalho(d)
-  let stream = cab.stream
-  let y = cab.inicioLinhas
-  for (const item of itens) {
-    const nomes = dividir(item.nome, 43)
-    const funcoes = dividir(item.funcao, 22)
-    for (let i = 0; i < Math.max(nomes.length, funcoes.length); i++) {
-      if (nomes[i]) stream += escrever(46, y - i * 12, nomes[i], 8.2)
-      if (funcoes[i]) stream += escrever(284, y - i * 12, funcoes[i], 8)
-      if (i === 0) stream += escrever(424, y, item.entrada, 8)
+
+function centralizado(y: number, texto: string, tamanho: number, negrito = false): string {
+  return escrever(Math.max(MARGEM, (PAGINA_LARGURA - largura(texto, tamanho)) / 2), y, texto, tamanho, negrito)
+}
+
+function direita(y: number, texto: string, tamanho = FONTE_LINHA): string {
+  return escrever(Math.max(315, PAGINA_LARGURA - MARGEM - largura(texto, tamanho)), y, texto, tamanho)
+}
+
+function dividir(texto: string, limite: number): string[] {
+  const linhas: string[] = []
+  let atual = ''
+  for (const palavra of texto.trim().split(/\s+/).filter(Boolean)) {
+    if (atual && atual.length + palavra.length + 1 > limite) {
+      linhas.push(atual)
+      atual = ''
     }
-    y -= altura(item)
-    stream += `44 ${y + 6} m 551 ${y + 6} l S\n`
+    for (let i = 0; i < palavra.length; i += limite) {
+      const bloco = palavra.slice(i, i + limite)
+      if (atual && atual.length + bloco.length + 1 > limite) {
+        linhas.push(atual)
+        atual = ''
+      }
+      atual += (atual ? ' ' : '') + bloco
+    }
   }
-  stream += '44 58 m 551 58 l S\n'
-  stream += escrever(44, 43, `Agenda Regional SP - Emitido em ${d.emitidoEm}`, 8)
-  stream += escrever(492, 43, `Folha ${pagina}/${total}`, 8)
-  return stream
+  if (atual) linhas.push(atual)
+  return linhas.length ? linhas : ['']
 }
+
+function formatarHorario(valor: string): string {
+  // O SIGA nao usa virgula entre a data e a hora de entrada.
+  return valor.replace(/(\d{2}\/\d{2}\/\d{4}),\s*(\d{2}:\d{2})/, '$1 $2')
+}
+
+function cidadeUf(local: string): string {
+  const match = local.match(/[-–]\s*([^/–-]+)\/([A-Z]{2})\s*$/i)
+  return match ? match[1].trim().toUpperCase() + ' - ' + match[2].toUpperCase() : ''
+}
+
+function linhasItem(item: LinhaListaPresenca) {
+  return {
+    nomes: dividir(item.nome.toLocaleUpperCase('pt-BR'), 40),
+    funcoes: dividir(item.funcao.toLocaleUpperCase('pt-BR'), 36),
+  }
+}
+
+function alturaItem(item: LinhaListaPresenca): number {
+  const { nomes, funcoes } = linhasItem(item)
+  return ALTURA_REGISTRO + (Math.max(nomes.length, funcoes.length) - 1) * ALTURA_LINHA
+}
+
+function cabecalho(d: DadosListaPresenca, pagina: number): { stream: string; inicioTabela: number } {
+  let out = '0 G 0.35 w\n'
+  out += centralizado(803, 'CONGREGAÇÃO CRISTÃ NO BRASIL', 10, true)
+  const cidade = cidadeUf(d.local)
+  if (cidade) out += centralizado(791, cidade, 9)
+
+  // A direita, como no SIGA. O numero de linhas desloca dinamicamente
+  // o CNPJ, o titulo e a tabela para impedir sobreposicoes.
+  let yDireita = 798
+  out += direita(809, 'Folha ' + pagina, 7)
+  for (const parte of dividir(d.endereco.toLocaleUpperCase('pt-BR'), 50)) {
+    out += direita(yDireita, parte)
+    yDireita -= 10
+  }
+  out += direita(yDireita, 'CNPJ ' + d.cnpj)
+  const separador = Math.min(775, yDireita - 9)
+  out += '28 ' + separador.toFixed(1) + ' m 567 ' + separador.toFixed(1) + ' l S\n'
+
+  let tituloY = separador - 22
+  const titulo = 'Lista de Presença da ' + d.titulo
+  for (const parte of dividir(titulo, 72)) {
+    out += centralizado(tituloY, parte, 12, true)
+    tituloY -= 14
+  }
+  tituloY -= 8
+  out += centralizado(tituloY, 'Realizada no dia ' + formatarHorario(d.inicio) + '.', 12, true)
+
+  const topoTabela = tituloY - 18
+  out += '28 ' + topoTabela.toFixed(1) + ' m 567 ' + topoTabela.toFixed(1) + ' l S\n'
+  const tituloTabelaY = topoTabela - 13
+  out += escrever(COLUNAS.nome, tituloTabelaY, 'NOME')
+  out += escrever(COLUNAS.funcao, tituloTabelaY, 'MINISTÉRIO/FUNÇÃO')
+  out += escrever(COLUNAS.entrada, tituloTabelaY, 'HORÁRIO DE ENTRADA')
+  const inicioTabela = tituloTabelaY - 13
+  if (inicioTabela < 95) throw new Error('Cabeçalho institucional excede a área disponível da página')
+  return { stream: out, inicioTabela }
+}
+
+function pagina(d: DadosListaPresenca, itens: LinhaListaPresenca[], numero: number, total: number): string {
+  const cab = cabecalho(d, numero)
+  let out = cab.stream
+  let y = cab.inicioTabela
+  for (const item of itens) {
+    const linhas = linhasItem(item)
+    const max = Math.max(linhas.nomes.length, linhas.funcoes.length)
+    for (let i = 0; i < max; i++) {
+      const yy = y - i * ALTURA_LINHA
+      if (linhas.nomes[i]) out += escrever(COLUNAS.nome, yy, linhas.nomes[i])
+      if (linhas.funcoes[i]) out += escrever(COLUNAS.funcao, yy, linhas.funcoes[i])
+      if (i === 0) out += escrever(COLUNAS.entrada, yy, formatarHorario(item.entrada))
+    }
+    y -= alturaItem(item)
+    out += '[1 2] 0 d 28 ' + (y + 4).toFixed(1) + ' m 567 ' + (y + 4).toFixed(1) + ' l S [] 0 d\n'
+  }
+  out += '28 ' + RODAPE_SUPERIOR + ' m 567 ' + RODAPE_SUPERIOR + ' l S\n'
+  out += escrever(MARGEM, 45, 'AGENDA REGIONAL SP - Emitido em ' + formatarHorario(d.emitidoEm))
+  out += escrever(PAGINA_LARGURA - MARGEM - largura('Folha ' + numero + '/' + total, 7),
+    45, 'Folha ' + numero + '/' + total)
+  return out
+}
+
 export function gerarListaPresencaPdf(dados: DadosListaPresenca): Uint8Array {
   const grupos: LinhaListaPresenca[][] = []
   let atual: LinhaListaPresenca[] = []
-  let ocupada = 0
-  const disponivel = cabecalho(dados).inicioLinhas - 80
+  let usado = 0
+  const disponivel = cabecalho(dados, 1).inicioTabela - (RODAPE_SUPERIOR + 13)
   for (const item of dados.linhas) {
-    const h = altura(item)
-    if (h > disponivel) throw new Error('Linha de presença maior que a área útil da página')
-    if (atual.length && ocupada + h > disponivel) {
-      grupos.push(atual); atual = []; ocupada = 0
+    const altura = alturaItem(item)
+    if (altura > disponivel) throw new Error('Registro maior do que a área útil da Lista de Presença')
+    if (atual.length && usado + altura > disponivel) {
+      grupos.push(atual)
+      atual = []
+      usado = 0
     }
-    atual.push(item); ocupada += h
+    atual.push(item)
+    usado += altura
   }
   if (atual.length || !grupos.length) grupos.push(atual)
-  const objs: string[] = ['', '<< /Type /Catalog /Pages 2 0 R >>', '']
-  objs[3] = '<< /Producer (Agenda Regional Sao Paulo) >>'
-  objs[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'
-  objs[5] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'
+
+  const objetos: string[] = ['', '<< /Type /Catalog /Pages 2 0 R >>', '']
+  objetos[3] = '<< /Producer (Agenda Regional Sao Paulo) >>'
+  objetos[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>'
+  objetos[5] = '<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold /Encoding /WinAnsiEncoding >>'
   const ids: number[] = []
-  for (const [i, itens] of grupos.entries()) {
-    const id = 6 + i * 2
+  for (const [index, itens] of grupos.entries()) {
+    const id = 6 + index * 2
     ids.push(id)
-    const stream = comporPagina(dados, itens, i + 1, grupos.length)
-    objs[id] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents ${id + 1} 0 R >>`
-    objs[id + 1] = `<< /Length ${stream.length} >>\nstream\n${stream}endstream`
+    const stream = pagina(dados, itens, index + 1, grupos.length)
+    objetos[id] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + PAGINA_LARGURA +
+      ' ' + PAGINA_ALTURA + '] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents ' + (id + 1) + ' 0 R >>'
+    objetos[id + 1] = '<< /Length ' + stream.length + ' >>\nstream\n' + stream + 'endstream'
   }
-  objs[2] = `<< /Type /Pages /Kids [${ids.map(id => `${id} 0 R`).join(' ')}] /Count ${ids.length} >>`
+  objetos[2] = '<< /Type /Pages /Kids [' + ids.map(id => id + ' 0 R').join(' ') +
+    '] /Count ' + ids.length + ' >>'
+
   let pdf = '%PDF-1.4\n'
   const offsets = [0]
-  for (let i = 1; i < objs.length; i++) {
+  for (let i = 1; i < objetos.length; i++) {
     offsets.push(pdf.length)
-    pdf += `${i} 0 obj\n${objs[i]}\nendobj\n`
+    pdf += i + ' 0 obj\n' + objetos[i] + '\nendobj\n'
   }
-  const xref = pdf.length
-  pdf += `xref\n0 ${objs.length}\n0000000000 65535 f \n`
-  for (let i = 1; i < objs.length; i++) pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`
-  pdf += `trailer\n<< /Size ${objs.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`
+  const inicioXref = pdf.length
+  pdf += 'xref\n0 ' + objetos.length + '\n0000000000 65535 f \n'
+  for (let i = 1; i < objetos.length; i++) {
+    pdf += String(offsets[i]).padStart(10, '0') + ' 00000 n \n'
+  }
+  pdf += 'trailer\n<< /Size ' + objetos.length + ' /Root 1 0 R >>\nstartxref\n' + inicioXref + '\n%%EOF\n'
   return new TextEncoder().encode(pdf)
 }
