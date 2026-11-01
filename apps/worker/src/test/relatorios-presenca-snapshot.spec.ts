@@ -189,9 +189,9 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
     expect(pdf.startsWith('%PDF-1.4')).toBe(true)
     expect(pdf).toContain('61.526.398/0004-31')
     expect(pdf).toContain('RUA ANHAIA')
-    expect(pdf).toContain('Membro Alvo')
-    expect(pdf).toContain('Convidado A')
-    expect(pdf).not.toContain('Outro Membro')
+    expect(pdf).toContain('MEMBRO ALVO')
+    expect(pdf).toContain('CONVIDADO A')
+    expect(pdf).not.toContain('OUTRO MEMBRO')
     expect(sqlite.prepare("SELECT COUNT(*) AS total FROM auditoria_logs WHERE acao = 'LISTA_PRESENCA_PDF_EMITIDA'").get()).toMatchObject({ total: 1 })
   })
 
@@ -220,7 +220,7 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
     })
     expect(res.status).toBe(200)
     const pdf = await res.text()
-    expect(pdf).toContain('Membro Alvo')
+    expect(pdf).toContain('MEMBRO ALVO')
     expect(pdf).not.toContain('Cancelada')
   })
 
