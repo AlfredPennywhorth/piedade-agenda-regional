@@ -5,6 +5,7 @@ import { baixarCsv, montarCsv } from '../../utils/csv'
 type EscopoTipo = 'REGIONAL' | 'ADMINISTRACAO' | 'SETOR' | 'CASA' | 'GRUPO_TRABALHO'
 
 interface EventoLookup { id: string; titulo: string; inicioEm: string; ativo: boolean }
+interface FechamentoLookup { eventoId: string; fechadoEm: string }
 interface MembroLookup { id: string; nome: string; casaId: string; ativo: boolean }
 interface RegionalLookup { id: string; nome: string; ativo: boolean }
 interface AdministracaoLookup { id: string; regionalId: string; nome: string; ativo: boolean }
@@ -69,6 +70,8 @@ export function RelatoriosPresencaView() {
   const [carregandoLookups, setCarregandoLookups] = useState(true)
 
   const [eventos, setEventos] = useState<EventoLookup[]>([])
+  const [fechamentos, setFechamentos] = useState<FechamentoLookup[]>([])
+  const [somenteFechadas, setSomenteFechadas] = useState(true)
   const [membros, setMembros] = useState<MembroLookup[]>([])
   const [regionais, setRegionais] = useState<RegionalLookup[]>([])
   const [administracoes, setAdministracoes] = useState<AdministracaoLookup[]>([])
@@ -106,9 +109,11 @@ export function RelatoriosPresencaView() {
       apiClient.fetchWithAuth<SetorLookup[]>('/setores'),
       apiClient.fetchWithAuth<CasaLookup[]>('/casas'),
       apiClient.fetchWithAuth<GrupoLookup[]>('/grupos-trabalho'),
-    ]).then(([ev, me, re, ad, se, ca, gt]) => {
+      apiClient.fetchWithAuth<FechamentoLookup[]>('/relatorios/presencas/eventos/fechados'),
+    ]).then(([ev, me, re, ad, se, ca, gt, fechadas]) => {
       if (!ativo) return
       setEventos((ev || []).filter(x => x.ativo))
+      setFechamentos(fechadas || [])
       setMembros((me || []).filter(x => x.ativo))
       setRegionais((re || []).filter(x => x.ativo))
       setAdministracoes((ad || []).filter(x => x.ativo))
@@ -123,13 +128,15 @@ export function RelatoriosPresencaView() {
     return () => { ativo = false }
   }, [])
 
+  const fechamentosIds = useMemo(() => new Set(fechamentos.map(x => x.eventoId)), [fechamentos])
+
   const eventosFiltrados = useMemo(() => {
     const termo = eventoBusca.trim().toLowerCase()
     return eventos
-      .filter(item => !termo || item.titulo.toLowerCase().includes(termo))
+      .filter(item => (!somenteFechadas || fechamentosIds.has(item.id)) && (!termo || item.titulo.toLowerCase().includes(termo)))
       .sort((a, b) => b.inicioEm.localeCompare(a.inicioEm))
       .slice(0, 50)
-  }, [eventos, eventoBusca])
+  }, [eventos, eventoBusca, somenteFechadas, fechamentosIds])
 
   const membrosFiltrados = useMemo(() => {
     const termo = membroBusca.trim().toLowerCase()
@@ -151,6 +158,8 @@ export function RelatoriosPresencaView() {
     catch (error: any) { setErro(error?.message || 'Não foi possível carregar o relatório.') }
     finally { setCarregando(false) }
   }
+
+  useEffect(() => { setEvento(null) }, [eventoId])
 
   const buscarEvento = (e: FormEvent) => {
     e.preventDefault()
@@ -259,14 +268,14 @@ export function RelatoriosPresencaView() {
     baixarCsv(`presencas-periodo-${periodo.escopo.escopoTipo.toLowerCase()}-${periodo.escopo.escopoId}.csv`, csv)
   }
 
-  const AcoesRelatorio = ({ onCsv }: { onCsv: () => void }) => (
+  const AcoesRelatorio = ({ onCsv, onPrint = imprimirRelatorio }: { onCsv: () => void; onPrint?: (() => void) | null }) => (
     <div className="relatorio-controles flex flex-wrap justify-end gap-2">
       <button type="button" onClick={onCsv} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
         Exportar CSV
       </button>
-      <button type="button" onClick={imprimirRelatorio} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-        Imprimir / Salvar PDF
-      </button>
+      {onPrint && <button type="button" onClick={onPrint} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        Imprimir relatório
+      </button>}
     </div>
   )
 
@@ -300,23 +309,32 @@ export function RelatoriosPresencaView() {
 
       {aba === 'evento' && (
         <div className="space-y-5">
-          <form onSubmit={buscarEvento} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-[1fr_1fr_auto]">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <p className="font-semibold text-slate-900">Lista de Presença para ata</p>
+            <p className="mt-1">A emissão definitiva só é permitida após o fechamento da Portaria. A impressão comum da prévia operacional não é a lista institucional.</p>
+            <label className="mt-3 flex items-center gap-2 font-medium">
+              <input type="checkbox" checked={somenteFechadas} onChange={e => { setSomenteFechadas(e.target.checked); setEventoId(''); setEvento(null) }} />
+              Mostrar somente reuniões com Portaria fechada
+            </label>
+          </div>
+          <form onSubmit={buscarEvento} className="grid min-w-0 gap-3 rounded-xl border border-slate-200 bg-white p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto]">
             <input aria-label="Pesquisar reunião" value={eventoBusca} onChange={e => setEventoBusca(e.target.value)}
               placeholder="Pesquisar reunião por nome" className="rounded-lg border border-slate-300 px-3 py-2 text-sm" />
             <select aria-label="Selecionar reunião" value={eventoId} onChange={e => setEventoId(e.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+              className="min-w-0 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
               <option value="">{optionVazia}</option>
               {eventosFiltrados.map(item => (
                 <option key={item.id} value={item.id}>
-                  {item.titulo} — {new Date(item.inicioEm).toLocaleDateString('pt-BR')}
+                  {fechamentosIds.has(item.id) ? 'FECHADA' : 'ABERTA'} — {item.titulo} — {new Date(item.inicioEm).toLocaleDateString('pt-BR')}
                 </option>
               ))}
             </select>
             <button disabled={carregando || !eventoId} className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">Consultar</button>
           </form>
 
-          {evento && <div className="relatorio-impressao space-y-5">
-            <AcoesRelatorio onCsv={exportarEventoCsv} />
+          {evento && <div className="relatorio-impressao min-w-0 space-y-5">
+            <AcoesRelatorio onCsv={exportarEventoCsv} onPrint={null} />
+            {evento.fonte !== 'SNAPSHOT_FECHAMENTO' && <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Portaria ainda aberta. Esta é uma prévia operacional: não pode ser utilizada como Lista de Presença para ata.</div>}
             {evento.fonte === 'SNAPSHOT_FECHAMENTO' && (
               <button
                 type="button"
@@ -340,7 +358,7 @@ export function RelatoriosPresencaView() {
               </div>
             </div>
             <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-              <table className="w-full text-sm">
+              <table className="min-w-[580px] w-full text-sm">
                 <caption className="sr-only">Participantes e situação de presença da reunião selecionada</caption>
                 <thead className="bg-slate-50 text-left text-slate-600"><tr>
                   <th className="p-3">Nome</th><th className="p-3">Tipo</th><th className="p-3">Localidade</th><th className="p-3">Situação</th><th className="p-3">RSVP</th>
