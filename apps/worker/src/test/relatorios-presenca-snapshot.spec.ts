@@ -119,6 +119,59 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
   })
 
 
+
+  it('seleciona Setor responsável do GT regional sem alterar o escopo da reunião', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    sqlite.exec(`
+      INSERT INTO setores (id, administracao_id, nome, cnpj)
+        VALUES ('setor-candidato', 'adm-rel', 'Setor de Apoio', '61526398000431');
+      INSERT INTO regionais (id, nome) VALUES ('reg-outra', 'Outra Regional');
+      INSERT INTO administracoes (id, regional_id, nome)
+        VALUES ('adm-outra', 'reg-outra', 'Outra Administração');
+      INSERT INTO setores (id, administracao_id, nome, cnpj)
+        VALUES ('setor-fora', 'adm-outra', 'Setor Fora de Escopo', '61526398000432');
+      INSERT INTO grupos_trabalho (id, nome, regional_id)
+        VALUES ('gt-secretaria', 'Secretaria', 'regional-rel');
+      INSERT INTO locais (id, nome, endereco, numero, cidade, uf)
+        VALUES ('sede-gt', 'Sede GT', 'Rua Exemplo', '100', 'São Paulo', 'SP');
+      INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, grupo_trabalho_id, organizador_membro_id, local_id)
+      VALUES ('evento-gt', 'Reunião GT Secretaria', 'PRESENCIAL',
+        '2026-10-21T10:00:00.000Z', '2026-10-21T12:00:00.000Z',
+        'gt-secretaria', '${gestorId}', 'sede-gt');
+      INSERT INTO portaria_fechamentos
+        (id, evento_id, fechado_por_membro_id, fechado_em,
+         total_convocados, total_convocados_presentes, total_convocados_ausentes,
+         total_convidados_validados, total_convidados_pendentes, total_presentes)
+      VALUES ('fech-gt', 'evento-gt', '${gestorId}', '2026-10-21T12:10:00.000Z',
+        0, 0, 0, 0, 0, 0);
+    `)
+    const base = '/api/v1/relatorios/presencas/eventos/evento-gt'
+    const contexto = await app.request(`${base}/contexto-pdf`, { headers: auth('token-gestor') })
+    expect(contexto.status).toBe(200)
+    const opcoes = (await contexto.json()) as any
+    expect(opcoes.requerEscolha).toBe(true)
+    expect(opcoes.setorFixoId).toBeNull()
+    expect(opcoes.setores.map((x: any) => x.id)).toContain('setor-candidato')
+    expect(opcoes.setores.map((x: any) => x.id)).not.toContain('setor-fora')
+    const ausente = await app.request(`${base}/lista-presenca.pdf`, { headers: auth('token-gestor') })
+    expect(ausente.status).toBe(409)
+    expect(await ausente.json()).toMatchObject({ code: 'SETOR_RESPONSAVEL_AUSENTE' })
+    const fora = await app.request(`${base}/lista-presenca.pdf?setorResponsavelId=setor-fora`, {
+      headers: auth('token-gestor'),
+    })
+    expect(fora.status).toBe(403)
+    const pdfResposta = await app.request(`${base}/lista-presenca.pdf?setorResponsavelId=setor-candidato`, {
+      headers: auth('token-gestor'),
+    })
+    expect(pdfResposta.status).toBe(200)
+    expect(await pdfResposta.text()).toContain('61.526.398/0004-31')
+    expect(sqlite.prepare("SELECT setor_id, grupo_trabalho_id FROM eventos WHERE id = 'evento-gt'").get())
+      .toMatchObject({ setor_id: null, grupo_trabalho_id: 'gt-secretaria' })
+    const novoContexto = await app.request(`${base}/contexto-pdf`, { headers: auth('token-gestor') })
+    expect(await novoContexto.json()).toMatchObject({ emitido: true, requerEscolha: false })
+  })
+
   it('gera PDF apenas após fechamento, com CNPJ do Setor e endereço do local escolhido', async () => {
     await sessao(gestorId, 'token-gestor', 'conta-gestor')
     sqlite.exec(`
