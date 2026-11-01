@@ -36,38 +36,33 @@ function dividir(texto: string, limite: number) {
   return saida.length ? saida : ['']
 }
 function altura(item: LinhaListaPresenca) {
-  return Math.max(dividir(item.nome, 43).length, dividir(item.funcao, 28).length) * 12 + 10
+  return Math.max(dividir(item.nome, 41).length, dividir(item.funcao, 22).length) * 12 + 10
 }
 
 function cabecalho(d: DadosListaPresenca): { stream: string; inicioLinhas: number } {
   let stream = '0 G 0.4 w\n'
-  stream += escrever(165, 802, 'CONGREGAÇÃO CRISTÃ NO BRASIL', 13, true)
-  stream += escrever(44, 781, 'LISTA DE PRESENÇA', 12, true)
-  let y = 765
-  for (const titulo of dividir(d.titulo, 88)) {
-    stream += escrever(44, y, titulo, 10, true)
+  // Padrao documental SIGA: identificacao superior, endereco/CNPJ, titulo e lista nominal.
+  stream += escrever(44, 807, 'CONGREGAÇÃO CRISTÃ NO BRASIL', 11, true)
+  stream += escrever(44, 792, 'SÃO PAULO - SP', 9)
+  const endereco = dividir(d.endereco.toUpperCase(), 55)
+  let y = 807
+  for (const trecho of endereco) {
+    stream += escrever(308, y, trecho, 8)
     y -= 12
   }
-  y -= 8
-  for (const local of dividir(`Local: ${d.local}`, 85)) {
-    stream += escrever(44, y, local, 9)
-    y -= 12
+  stream += escrever(308, y - 2, `CNPJ ${d.cnpj}`, 8)
+  y = Math.min(754, y - 31)
+  for (const titulo of dividir(`Lista de Presença da ${d.titulo}`, 76)) {
+    stream += escrever(Math.max(44, 297 - titulo.length * 2.7), y, titulo, 11, true)
+    y -= 14
   }
-  y -= 4
-  for (const endereco of dividir(`Endereço: ${d.endereco}`, 95)) {
-    stream += escrever(44, y, endereco, 8)
-    y -= 12
-  }
-  y -= 6
-  stream += escrever(44, y, `CNPJ do Setor: ${d.cnpj}`, 9)
-  y -= 17
-  stream += escrever(44, y, `Início: ${d.inicio}     Término: ${d.fim}`, 9)
-  y -= 18
+  stream += escrever(151, y - 3, `Realizada no dia ${d.inicio}.`, 9)
+  y -= 30
   stream += `44 ${y} m 551 ${y} l S\n`
   y -= 17
   stream += escrever(46, y, 'NOME', 9, true)
-  stream += escrever(292, y, 'MINISTÉRIO / FUNÇÃO', 9, true)
-  stream += escrever(465, y, 'ENTRADA', 9, true)
+  stream += escrever(284, y, 'MINISTÉRIO/FUNÇÃO', 9, true)
+  stream += escrever(424, y, 'HORÁRIO DE ENTRADA', 9, true)
   y -= 9
   stream += `44 ${y} m 551 ${y} l S\n`
   const inicioLinhas = y - 17
@@ -80,18 +75,18 @@ function comporPagina(d: DadosListaPresenca, itens: LinhaListaPresenca[], pagina
   let y = cab.inicioLinhas
   for (const item of itens) {
     const nomes = dividir(item.nome, 43)
-    const funcoes = dividir(item.funcao, 28)
+    const funcoes = dividir(item.funcao, 22)
     for (let i = 0; i < Math.max(nomes.length, funcoes.length); i++) {
       if (nomes[i]) stream += escrever(46, y - i * 12, nomes[i], 8.2)
-      if (funcoes[i]) stream += escrever(292, y - i * 12, funcoes[i], 8)
-      if (i === 0) stream += escrever(465, y, item.entrada, 8)
+      if (funcoes[i]) stream += escrever(284, y - i * 12, funcoes[i], 8)
+      if (i === 0) stream += escrever(424, y, item.entrada, 8)
     }
     y -= altura(item)
     stream += `44 ${y + 6} m 551 ${y + 6} l S\n`
   }
   stream += '44 58 m 551 58 l S\n'
-  stream += escrever(44, 43, `Emitido em ${d.emitidoEm}`, 8)
-  stream += escrever(491, 43, `Pág. ${pagina}/${total}`, 8)
+  stream += escrever(44, 43, `Agenda Regional SP - Emitido em ${d.emitidoEm}`, 8)
+  stream += escrever(492, 43, `Folha ${pagina}/${total}`, 8)
   return stream
 }
 export function gerarListaPresencaPdf(dados: DadosListaPresenca): Uint8Array {
