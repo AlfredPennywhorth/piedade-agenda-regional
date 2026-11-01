@@ -172,6 +172,38 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
     expect(await novoContexto.json()).toMatchObject({ emitido: true, requerEscolha: false })
   })
 
+  it('resolve Setor e CNPJ da Casa de escopo, independentemente do Local físico', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    sqlite.exec(`
+      UPDATE setores SET cnpj = '61526398000431' WHERE id = '${setorId}';
+      INSERT INTO locais (id, nome, endereco, numero, cidade, uf)
+        VALUES ('sede-casa-escopo', 'Outro Local', 'Rua Exemplo', '100', 'São Paulo', 'SP');
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, casa_id, local_id, organizador_membro_id)
+        VALUES ('evento-casa-escopo', 'Reunião da Casa', 'PRESENCIAL',
+        '2026-09-15T10:00:00.000Z', '2026-09-15T12:00:00.000Z',
+        'casa-rel', 'sede-casa-escopo', '${gestorId}');
+      INSERT INTO portaria_fechamentos
+        (id, evento_id, fechado_por_membro_id, fechado_em,
+         total_convocados, total_convocados_presentes, total_convocados_ausentes,
+         total_convidados_validados, total_convidados_pendentes, total_presentes)
+        VALUES ('fech-casa-escopo', 'evento-casa-escopo', '${gestorId}',
+        '2026-09-15T12:10:00.000Z', 0, 0, 0, 0, 0, 0);
+    `)
+    const base = '/api/v1/relatorios/presencas/eventos/evento-casa-escopo'
+    const contexto = await app.request(`${base}/contexto-pdf`, { headers: auth('token-gestor') })
+    expect(contexto.status).toBe(200)
+    expect(await contexto.json()).toMatchObject({
+      setorFixoId: setorId, requerEscolha: false,
+      setores: [expect.objectContaining({ id: setorId, cnpj: '61526398000431' })],
+    })
+    const pdf = await app.request(`${base}/lista-presenca.pdf`, { headers: auth('token-gestor') })
+    expect(pdf.status).toBe(200)
+    const conteudo = await pdf.text()
+    expect(conteudo).toContain('61.526.398/0004-31')
+    expect(conteudo).toContain('RUA EXEMPLO')
+    const evento = sqlite.prepare("SELECT setor_id, casa_id FROM eventos WHERE id = 'evento-casa-escopo'").get()
+    expect(evento).toMatchObject({ setor_id: null, casa_id: 'casa-rel' })
+  })
   it('gera PDF apenas após fechamento, com CNPJ do Setor e endereço do local escolhido', async () => {
     await sessao(gestorId, 'token-gestor', 'conta-gestor')
     sqlite.exec(`
