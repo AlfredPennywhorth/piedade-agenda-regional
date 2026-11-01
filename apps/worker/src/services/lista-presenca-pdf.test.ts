@@ -78,6 +78,12 @@ describe('Lista de Presença em PDF — modelo institucional SIGA', () => {
     expect(pdf).toContain('GRUPO DE TRABALHO')
   })
 
+  it('não corta nomes de cidades que contêm hífen', () => {
+    const pdf = textoPdf([], { local: 'Centro - Embu-Guaçu/SP' })
+    expect(pdf).toContain('EMBU-GUA\\307U - SP')
+    expect(pdf).not.toContain('Tm (GUA\\307U - SP)')
+  })
+
   it('não cria dados de presença artificialmente para uma lista vazia', () => {
     const pdf = textoPdf([])
     expect((pdf.match(/\/Type \/Page \/Parent/g) || []).length).toBe(1)
