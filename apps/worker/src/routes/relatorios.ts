@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and, or, gte, lt, lte, inArray, sql } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, locais, espacosLocal, vinculosFuncionais, funcoes, portariaFechamentos, portariaFechamentoItens, setores, pontosAtendimento, convocacaoDestinatarioEvidencias, auditoriaLogs, listaPresencaPdfAtas } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, locais, espacosLocal, vinculosFuncionais, funcoes, portariaFechamentos, portariaFechamentoItens, setores, pontosAtendimento, administracoes, gruposTrabalho, convocacaoDestinatarioEvidencias, auditoriaLogs, listaPresencaPdfAtas } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo, eMasterSistema } from '../security/permissoes'
 import { condicaoEscopo, condicaoEventosVisiveis } from '../security/eventos'
@@ -175,6 +175,75 @@ function dataHoraSp(iso: string): string {
   }).format(value)
 }
 
+
+type OpcaoSetorPdf = { id: string; nome: string; cnpj: string | null }
+
+async function contextoSetorPdf(db: any, evento: typeof eventos.$inferSelect): Promise<{
+  fixoId: string | null; opcoes: OpcaoSetorPdf[]
+}> {
+  // Usar o Setor da própria reunião ou do PA responsável; nunca substituir
+  // pelo Setor da Casa onde ocorreu uma exceção intersetorial.
+  let fixoId: string | null = evento.setorId ?? null
+  if (!fixoId && evento.pontoAtendimentoId) {
+    const pa = await db.select({ setorId: pontosAtendimento.setorId })
+      .from(pontosAtendimento).where(eq(pontosAtendimento.id, evento.pontoAtendimentoId)).get()
+    fixoId = pa?.setorId ?? null
+  }
+  let escopoAdministracaoId: string | null = evento.administracaoId ?? null
+  let escopoRegionalId: string | null = evento.regionalId ?? null
+  if (evento.grupoTrabalhoId) {
+    const gt = await db.select({
+      setorId: gruposTrabalho.setorId,
+      administracaoId: gruposTrabalho.administracaoId,
+      regionalId: gruposTrabalho.regionalId,
+    }).from(gruposTrabalho).where(eq(gruposTrabalho.id, evento.grupoTrabalhoId)).get()
+    if (gt?.setorId) fixoId = fixoId ?? gt.setorId
+    else if (gt?.administracaoId) escopoAdministracaoId = gt.administracaoId
+    else if (gt?.regionalId) escopoRegionalId = gt.regionalId
+  }
+  if (fixoId) {
+    const setor = await db.select({ id: setores.id, nome: setores.nome, cnpj: setores.cnpj })
+      .from(setores).where(eq(setores.id, fixoId)).get()
+    return { fixoId, opcoes: setor ? [setor] : [] }
+  }
+  if (!escopoAdministracaoId && !escopoRegionalId) {
+    return { fixoId: null, opcoes: [] }
+  }
+  const opcoes = await db.select({ id: setores.id, nome: setores.nome, cnpj: setores.cnpj })
+    .from(setores)
+    .innerJoin(administracoes, eq(setores.administracaoId, administracoes.id))
+    .where(and(eq(setores.ativo, true),
+      ...(escopoAdministracaoId ? [eq(setores.administracaoId, escopoAdministracaoId)] : [eq(administracoes.regionalId, escopoRegionalId!)])))
+    .orderBy(setores.nome).all()
+  return { fixoId: null, opcoes }
+}
+
+// Retorna candidatos institucionais do escopo da reunião. A escolha não altera
+// o cadastro nem o escopo de um evento GT e é congelada na primeira emissão.
+relatoriosRouter.get('/presencas/eventos/:eventoId/contexto-pdf', async c => {
+  const db = c.get('db')
+  const membroId = c.get('membroId')
+  const eventoId = c.req.param('eventoId')
+  if (!db || !membroId) return c.json({ error: 'Sessão ou banco indisponível' }, 500)
+  const evento = await db.select().from(eventos).where(eq(eventos.id, eventoId)).get()
+  if (!evento) return c.json({ error: 'Reunião não encontrada' }, 404)
+  if (!(await eGestorRelatoriosAutorizadoParaEvento(db, membroId, evento))) {
+    return c.json({ error: 'Acesso não autorizado', code: 'FORBIDDEN' }, 403)
+  }
+  const fechado = await db.select({ id: portariaFechamentos.id }).from(portariaFechamentos)
+    .where(eq(portariaFechamentos.eventoId, eventoId)).get()
+  if (!fechado) return c.json({ error: 'Portaria aberta', code: 'PORTARIA_ABERTA' }, 409)
+  const emitido = await db.select({ fechamentoId: listaPresencaPdfAtas.fechamentoId })
+    .from(listaPresencaPdfAtas).where(eq(listaPresencaPdfAtas.eventoId, eventoId)).get()
+  const contexto = await contextoSetorPdf(db, evento)
+  return c.json({
+    setorFixoId: contexto.fixoId,
+    setores: contexto.opcoes,
+    requerEscolha: !emitido && !contexto.fixoId,
+    emitido: !!emitido,
+  })
+})
+
 // GET /api/v1/relatorios/presencas/eventos/:eventoId/lista-presenca.pdf
 // Somente fechamento materializado: nem RSVP nem prévia operacional geram ata.
 relatoriosRouter.get('/presencas/eventos/:eventoId/lista-presenca.pdf', async c => {
@@ -230,15 +299,19 @@ relatoriosRouter.get('/presencas/eventos/:eventoId/lista-presenca.pdf', async c 
     })
   }
 
-  // O setor responsável prevalece sobre o Setor da Casa sede, inclusive em exceções intersetoriais.
-  let setorResponsavelId = evento.setorId
-  if (!setorResponsavelId && evento.pontoAtendimentoId) {
-    const pa = await db.select({ setorId: pontosAtendimento.setorId })
-      .from(pontosAtendimento).where(eq(pontosAtendimento.id, evento.pontoAtendimentoId)).get()
-    setorResponsavelId = pa?.setorId ?? null
+  const contexto = await contextoSetorPdf(db, evento)
+  const informado = c.req.query('setorResponsavelId') || null
+  // A escolha explícita só é permitida entre Setores da Administração/Regional
+  // institucional do evento. A API nunca aceita IDs arbitrários.
+  if (informado && !contexto.opcoes.some(item => item.id === informado)) {
+    return c.json({ error: 'Setor não pertence ao escopo da reunião.', code: 'SETOR_FORA_ESCOPO' }, 403)
   }
+  if (contexto.fixoId && informado && informado !== contexto.fixoId) {
+    return c.json({ error: 'O Setor responsável pela reunião já está definido.', code: 'SETOR_FIXO' }, 409)
+  }
+  const setorResponsavelId = contexto.fixoId ?? informado
   if (!setorResponsavelId) {
-    return c.json({ error: 'Defina o Setor responsável pela reunião para emitir a Lista de Presença.', code: 'SETOR_RESPONSAVEL_AUSENTE' }, 409)
+    return c.json({ error: 'Selecione o Setor responsável pela reunião antes de emitir a Lista de Presença.', code: 'SETOR_RESPONSAVEL_AUSENTE' }, 409)
   }
   const setor = await db.select({ nome: setores.nome, cnpj: setores.cnpj })
     .from(setores).where(eq(setores.id, setorResponsavelId)).get()
