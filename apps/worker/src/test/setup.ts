@@ -994,4 +994,13 @@ export function setupDb(sqlite: any) {
   sqlite.exec(excecaoIntersetorialSql)
   sqlite.exec(portariaIntegridadeSql)
   sqlite.exec(escopoConfirmacoesSql)
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS lista_presenca_pdf_atas (
+      evento_id TEXT PRIMARY KEY NOT NULL REFERENCES eventos(id),
+      fechamento_id TEXT NOT NULL,
+      documento_pdf TEXT NOT NULL,
+      emitido_em TEXT NOT NULL,
+      emitido_por_membro_id TEXT REFERENCES membros(id)
+    );
+  `)
 }
