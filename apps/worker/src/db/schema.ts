@@ -1171,6 +1171,15 @@ export const portariaFechamentoItens = sqliteTable(
   })
 )
 
+// Documento PDF imutável da primeira emissão de Lista de Presença para ata.
+export const listaPresencaPdfAtas = sqliteTable('lista_presenca_pdf_atas', {
+  eventoId: text('evento_id').primaryKey().references(() => eventos.id),
+  fechamentoId: text('fechamento_id').notNull(),
+  documentoPdf: text('documento_pdf').notNull(),
+  emitidoEm: text('emitido_em').notNull(),
+  emitidoPorMembroId: text('emitido_por_membro_id').references(() => membros.id),
+})
+
 // ============================================================
 // Auditoria (S12)
 // ============================================================
