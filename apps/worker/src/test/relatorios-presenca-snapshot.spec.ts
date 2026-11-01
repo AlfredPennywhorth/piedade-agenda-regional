@@ -145,10 +145,6 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
   it('bloqueia PDF de Portaria não fechada e de usuário sem permissão', async () => {
     await sessao(gestorId, 'token-gestor', 'conta-gestor')
     await sessao(semAcessoId, 'token-sem-acesso')
-    sqlite.exec(`
-      INSERT INTO setores (id, administracao_id, nome, cnpj)
-        VALUES ('setor-novo', 'adm-rel', 'Setor Novo', '61526398000431');
-    `)
     const aberto = await app.request('/api/v1/relatorios/presencas/eventos/evento-inexistente/lista-presenca.pdf', {
       headers: auth('token-gestor'),
     })
