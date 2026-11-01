@@ -36,7 +36,7 @@ describe('Lista de Presença em PDF', () => {
     const paginas = (pdf.match(/\/Type \/Page \/Parent/g) || []).length
     expect(paginas).toBeGreaterThan(2)
     expect(pdf).toContain(` /Count ${paginas} `)
-    expect(pdf).toContain(`P\\341g. ${paginas}/${paginas}`)
+    expect(pdf).toContain(`Folha ${paginas}/${paginas}`)
   })
 
 
