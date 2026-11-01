@@ -273,11 +273,13 @@ relatoriosRouter.get('/presencas/eventos/:eventoId/lista-presenca.pdf', async c 
   }
 
   const formatarCnpj = (value: string) => value.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')
-  const linhas = presencas.map((item: typeof presencas[number]) => ({
+  const linhas = presencas.sort((a: typeof presencas[number], b: typeof presencas[number]) =>
+    (a.registradoEm ?? '').localeCompare(b.registradoEm ?? '') || a.nome.localeCompare(b.nome, 'pt-BR')
+  ).map((item: typeof presencas[number]) => ({
     nome: item.nome,
     funcao: item.tipoPessoa === 'CONVIDADO' ? 'Convidado' : Array.from(funcoesPorMembro.get(item.origemId) || []).join(', ') || 'Não informado',
     entrada: item.registradoEm ? dataHoraSp(item.registradoEm) : 'Não registrado',
-  })).sort((a: { entrada: string; nome: string }, b: { entrada: string; nome: string }) => a.entrada.localeCompare(b.entrada, 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'))
+  }))
   const agora = new Date().toISOString()
   const pdf = gerarListaPresencaPdf({
     titulo: evento.titulo,
