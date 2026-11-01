@@ -251,13 +251,17 @@ relatoriosRouter.get('/presencas/eventos/:eventoId/lista-presenca.pdf', async c 
 
 
   // Inserção concorrente segura: a primeira emissão é a canônica.
-  await db.insert(listaPresencaPdfAtas).values({
-    eventoId,
-    fechamentoId: fechamento.id,
-    documentoPdf: new TextDecoder().decode(pdf),
-    emitidoEm: agora,
-    emitidoPorMembroId: membroId,
-  }).onConflictDoNothing().run()
+  const documentoPdf = new TextDecoder().decode(pdf)
+  // INSERT ... SELECT é uma única operação SQLite: se o fechamento já foi
+  // removido por uma reabertura concorrente, não grava nenhum PDF órfão.
+  await db.run(sql`
+    INSERT INTO lista_presenca_pdf_atas
+      (evento_id, fechamento_id, documento_pdf, emitido_em, emitido_por_membro_id)
+    SELECT ${eventoId}, ${fechamento.id}, ${documentoPdf}, ${agora}, ${membroId}
+    FROM portaria_fechamentos
+    WHERE id = ${fechamento.id} AND evento_id = ${eventoId}
+    ON CONFLICT (evento_id) DO NOTHING
+  `)
   const emissao = await db.select().from(listaPresencaPdfAtas)
     .where(eq(listaPresencaPdfAtas.eventoId, eventoId)).get()
   if (!emissao || emissao.fechamentoId !== fechamento.id) {
