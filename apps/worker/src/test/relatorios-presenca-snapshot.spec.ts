@@ -118,6 +118,62 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
     Authorization: `Bearer ${token}`,
   })
 
+
+  it('gera PDF apenas após fechamento, com CNPJ do Setor e endereço do local escolhido', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    sqlite.exec(`
+      UPDATE setores SET cnpj = '61526398000431' WHERE id = '${setorId}';
+      INSERT INTO locais (id, nome, endereco, numero, cidade, uf)
+        VALUES ('sede-ata', 'Bom Retiro', 'Rua Anhaia', '613', 'São Paulo', 'SP');
+      UPDATE eventos SET local_id = 'sede-ata' WHERE id = 'evento-a';
+    `)
+    const res = await app.request('/api/v1/relatorios/presencas/eventos/evento-a/lista-presenca.pdf', {
+      headers: auth('token-gestor'),
+    })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('application/pdf')
+    const pdf = new TextDecoder().decode(await res.arrayBuffer())
+    expect(pdf.startsWith('%PDF-1.4')).toBe(true)
+    expect(pdf).toContain('61.526.398/0004-31')
+    expect(pdf).toContain('Rua Anhaia')
+    expect(pdf).toContain('Membro Alvo')
+    expect(pdf).toContain('Convidado A')
+    expect(pdf).not.toContain('Outro Membro')
+    expect(sqlite.prepare("SELECT COUNT(*) AS total FROM auditoria_logs WHERE acao = 'LISTA_PRESENCA_PDF_EMITIDA'").get()).toMatchObject({ total: 1 })
+  })
+
+  it('bloqueia PDF de Portaria não fechada e de usuário sem permissão', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    await sessao(semAcessoId, 'token-sem-acesso')
+    sqlite.exec(`
+      INSERT INTO setores (id, administracao_id, nome, cnpj)
+        VALUES ('setor-novo', 'adm-rel', 'Setor Novo', '61526398000431');
+    `)
+    const aberto = await app.request('/api/v1/relatorios/presencas/eventos/evento-inexistente/lista-presenca.pdf', {
+      headers: auth('token-gestor'),
+    })
+    expect(aberto.status).toBe(404)
+    const proibido = await app.request('/api/v1/relatorios/presencas/eventos/evento-a/lista-presenca.pdf', {
+      headers: auth('token-sem-acesso'),
+    })
+    expect(proibido.status).toBe(403)
+  })
+
+  it('não emite PDF definitivo quando faltam CNPJ ou sede', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    const semCnpj = await app.request('/api/v1/relatorios/presencas/eventos/evento-a/lista-presenca.pdf', {
+      headers: auth('token-gestor'),
+    })
+    expect(semCnpj.status).toBe(409)
+    expect((await semCnpj.json()) as any).toMatchObject({ code: 'CNPJ_SETOR_AUSENTE' })
+    sqlite.exec(`UPDATE setores SET cnpj = '61526398000431' WHERE id = '${setorId}';`)
+    const semSede = await app.request('/api/v1/relatorios/presencas/eventos/evento-a/lista-presenca.pdf', {
+      headers: auth('token-gestor'),
+    })
+    expect(semSede.status).toBe(409)
+    expect((await semSede.json()) as any).toMatchObject({ code: 'ENDERECO_SEDE_AUSENTE' })
+  })
+
   it('relatório final de reunião usa snapshot materializado', async () => {
     await sessao(gestorId, 'token-gestor', 'conta-gestor')
 
