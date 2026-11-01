@@ -38,21 +38,46 @@ function dividir(texto: string, limite: number) {
 function altura(item: LinhaListaPresenca) {
   return Math.max(dividir(item.nome, 43).length, dividir(item.funcao, 28).length) * 12 + 10
 }
-function comporPagina(d: DadosListaPresenca, itens: LinhaListaPresenca[], pagina: number, total: number) {
+
+function cabecalho(d: DadosListaPresenca): { stream: string; inicioLinhas: number } {
   let stream = '0 G 0.4 w\n'
   stream += escrever(165, 802, 'CONGREGAÇÃO CRISTÃ NO BRASIL', 13, true)
   stream += escrever(44, 781, 'LISTA DE PRESENÇA', 12, true)
-  for (const [i, t] of dividir(d.titulo, 90).entries()) stream += escrever(44, 764 - i * 12, t, 10, true)
-  stream += escrever(44, 735, `Local: ${d.local}`, 9)
-  for (const [i, t] of dividir(`Endereço: ${d.endereco}`, 95).entries()) stream += escrever(44, 720 - i * 12, t, 8)
-  stream += escrever(44, 694, `CNPJ do Setor: ${d.cnpj}`, 9)
-  stream += escrever(44, 679, `Início: ${d.inicio}     Término: ${d.fim}`, 9)
-  stream += '44 666 m 551 666 l S\n'
-  stream += escrever(46, 649, 'NOME', 9, true)
-  stream += escrever(292, 649, 'MINISTÉRIO / FUNÇÃO', 9, true)
-  stream += escrever(465, 649, 'ENTRADA', 9, true)
-  stream += '44 641 m 551 641 l S\n'
-  let y = 624
+  let y = 765
+  for (const titulo of dividir(d.titulo, 88)) {
+    stream += escrever(44, y, titulo, 10, true)
+    y -= 12
+  }
+  y -= 8
+  for (const local of dividir(`Local: ${d.local}`, 85)) {
+    stream += escrever(44, y, local, 9)
+    y -= 12
+  }
+  y -= 4
+  for (const endereco of dividir(`Endereço: ${d.endereco}`, 95)) {
+    stream += escrever(44, y, endereco, 8)
+    y -= 12
+  }
+  y -= 6
+  stream += escrever(44, y, `CNPJ do Setor: ${d.cnpj}`, 9)
+  y -= 17
+  stream += escrever(44, y, `Início: ${d.inicio}     Término: ${d.fim}`, 9)
+  y -= 18
+  stream += `44 ${y} m 551 ${y} l S\n`
+  y -= 17
+  stream += escrever(46, y, 'NOME', 9, true)
+  stream += escrever(292, y, 'MINISTÉRIO / FUNÇÃO', 9, true)
+  stream += escrever(465, y, 'ENTRADA', 9, true)
+  y -= 9
+  stream += `44 ${y} m 551 ${y} l S\n`
+  const inicioLinhas = y - 17
+  if (inicioLinhas < 100) throw new Error('Cabeçalho da Lista de Presença excede a altura do PDF')
+  return { stream, inicioLinhas }
+}
+function comporPagina(d: DadosListaPresenca, itens: LinhaListaPresenca[], pagina: number, total: number) {
+  const cab = cabecalho(d)
+  let stream = cab.stream
+  let y = cab.inicioLinhas
   for (const item of itens) {
     const nomes = dividir(item.nome, 43)
     const funcoes = dividir(item.funcao, 28)
@@ -73,9 +98,11 @@ export function gerarListaPresencaPdf(dados: DadosListaPresenca): Uint8Array {
   const grupos: LinhaListaPresenca[][] = []
   let atual: LinhaListaPresenca[] = []
   let ocupada = 0
+  const disponivel = cabecalho(dados).inicioLinhas - 80
   for (const item of dados.linhas) {
     const h = altura(item)
-    if (atual.length && ocupada + h > 558) {
+    if (h > disponivel) throw new Error('Linha de presença maior que a área útil da página')
+    if (atual.length && ocupada + h > disponivel) {
       grupos.push(atual); atual = []; ocupada = 0
     }
     atual.push(item); ocupada += h
