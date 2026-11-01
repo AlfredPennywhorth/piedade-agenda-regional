@@ -142,6 +142,31 @@ describe('REL-PRES-01 — relatórios históricos por snapshot', () => {
     expect(sqlite.prepare("SELECT COUNT(*) AS total FROM auditoria_logs WHERE acao = 'LISTA_PRESENCA_PDF_EMITIDA'").get()).toMatchObject({ total: 1 })
   })
 
+
+  it('congela PDF de ata mesmo após alteração posterior de endereço e CNPJ', async () => {
+    await sessao(gestorId, 'token-gestor', 'conta-gestor')
+    sqlite.exec(`
+      UPDATE setores SET cnpj = '61526398000431' WHERE id = '${setorId}';
+      INSERT INTO locais (id, nome, endereco, numero, cidade, uf)
+        VALUES ('sede-imutavel', 'Bom Retiro', 'Rua Anhaia', '613', 'São Paulo', 'SP');
+      UPDATE eventos SET local_id = 'sede-imutavel' WHERE id = 'evento-a';
+    `)
+    const path = '/api/v1/relatorios/presencas/eventos/evento-a/lista-presenca.pdf'
+    const primeiro = await app.request(path, { headers: auth('token-gestor') })
+    expect(primeiro.status).toBe(200)
+    const primeiroPdf = await primeiro.text()
+    sqlite.exec(`
+      UPDATE locais SET endereco = 'Rua Alterada' WHERE id = 'sede-imutavel';
+      UPDATE setores SET cnpj = '00000000000000' WHERE id = '${setorId}';
+    `)
+    const segundo = await app.request(path, { headers: auth('token-gestor') })
+    expect(segundo.status).toBe(200)
+    expect(await segundo.text()).toBe(primeiroPdf)
+    expect(primeiroPdf).not.toContain('Rua Alterada')
+    expect(primeiroPdf).toContain('Rua Anhaia')
+    expect(sqlite.prepare('SELECT COUNT(*) AS total FROM lista_presenca_pdf_atas').get()).toMatchObject({ total: 1 })
+  })
+
   it('bloqueia PDF de Portaria não fechada e de usuário sem permissão', async () => {
     await sessao(gestorId, 'token-gestor', 'conta-gestor')
     await sessao(semAcessoId, 'token-sem-acesso')
