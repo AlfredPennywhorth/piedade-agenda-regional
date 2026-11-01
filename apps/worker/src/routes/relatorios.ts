@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { eq, and, or, gte, lt, lte, inArray, sql } from 'drizzle-orm'
 import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, locais, espacosLocal, vinculosFuncionais, funcoes, portariaFechamentos, portariaFechamentoItens, setores, pontosAtendimento, convocacaoDestinatarioEvidencias, auditoriaLogs, listaPresencaPdfAtas } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
-import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo } from '../security/permissoes'
+import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo, eMasterSistema } from '../security/permissoes'
 import { condicaoEscopo, condicaoEventosVisiveis } from '../security/eventos'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
 import { gerarListaPresencaPdf } from '../services/lista-presenca-pdf'
@@ -41,17 +41,41 @@ relatoriosRouter.use('*', authMiddleware)
 relatoriosRouter.get('/presencas/eventos/fechados', async c => {
   const db = c.get('db')
   const membroId = c.get('membroId')
-  if (!db || !membroId) return c.json({ error: 'Sessão ou banco indisponível' }, 500)
-  const fechados = await db.select({ evento: eventos, fechadoEm: portariaFechamentos.fechadoEm })
-    .from(portariaFechamentos).innerJoin(eventos, eq(portariaFechamentos.eventoId, eventos.id))
-    .where(and(eq(eventos.pessoal, false), eq(eventos.abrangencia, 'TERRITORIAL'))).all()
-  const autorizados: Array<{ eventoId: string; fechadoEm: string }> = []
-  for (const registro of fechados) {
-    if (await eGestorRelatoriosAutorizadoParaEvento(db, membroId, registro.evento)) {
-      autorizados.push({ eventoId: registro.evento.id, fechadoEm: registro.fechadoEm })
+  const contexto = c.get('contextoPermissoes')
+  if (!db || !membroId || !contexto) return c.json({ error: 'Sessão ou banco indisponível' }, 500)
+
+  // Uma consulta indexável por escopo: evita recarregar permissões para cada
+  // evento histórico quando existem centenas de Portarias fechadas.
+  const condicoes = [eq(eventos.organizadorMembroId, membroId)]
+  if (!eMasterSistema(contexto)) {
+    for (const acesso of contexto.acessosAtivos.filter((item: any) => item.perfilCodigo === 'GESTOR_RELATORIOS')) {
+      const condicao = condicaoEscopo(acesso)
+      if (condicao) condicoes.push(condicao)
+    }
+    const legados = await db.select({ v: vinculosFuncionais })
+      .from(vinculosFuncionais)
+      .innerJoin(funcoes, eq(vinculosFuncionais.funcaoId, funcoes.id))
+      .where(and(eq(vinculosFuncionais.membroId, membroId), eq(vinculosFuncionais.ativo, true),
+        eq(funcoes.ativo, true), eq(funcoes.codigo, 'GESTOR_RELATORIOS'))).all()
+    for (const { v } of legados) {
+      const escopos = [
+        ['REGIONAL', v.regionalId], ['ADMINISTRACAO', v.administracaoId],
+        ['SETOR', v.setorId], ['CASA', v.casaId], ['GRUPO_TRABALHO', v.grupoTrabalhoId],
+      ] as const
+      for (const [escopoTipo, escopoId] of escopos) {
+        if (!escopoId) continue
+        const condicao = condicaoEscopo({ id: v.id, perfilCodigo: 'GESTOR_RELATORIOS', escopoTipo, escopoId })
+        if (condicao) condicoes.push(condicao)
+      }
     }
   }
-  return c.json(autorizados)
+  const fechados = await db.select({ eventoId: eventos.id, fechadoEm: portariaFechamentos.fechadoEm })
+    .from(portariaFechamentos)
+    .innerJoin(eventos, eq(portariaFechamentos.eventoId, eventos.id))
+    .where(and(eq(eventos.pessoal, false), eq(eventos.abrangencia, 'TERRITORIAL'),
+      ...(eMasterSistema(contexto) ? [] : [or(...condicoes)])))
+    .orderBy(sql`${portariaFechamentos.fechadoEm} DESC`).limit(500).all()
+  return c.json(fechados)
 })
 
 // GET /api/v1/relatorios/presencas/eventos/:eventoId/final
