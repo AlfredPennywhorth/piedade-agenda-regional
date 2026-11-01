@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and, or, gte, lt, lte, inArray, sql } from 'drizzle-orm'
-import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, locais, espacosLocal, vinculosFuncionais, funcoes, portariaFechamentos, portariaFechamentoItens, setores, pontosAtendimento, convocacaoDestinatarioEvidencias, auditoriaLogs } from '../db/schema'
+import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, locais, espacosLocal, vinculosFuncionais, funcoes, portariaFechamentos, portariaFechamentoItens, setores, pontosAtendimento, convocacaoDestinatarioEvidencias, auditoriaLogs, listaPresencaPdfAtas } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo } from '../security/permissoes'
 import { condicaoEscopo, condicaoEventosVisiveis } from '../security/eventos'
@@ -157,6 +157,38 @@ relatoriosRouter.get('/presencas/eventos/:eventoId/lista-presenca.pdf', async c 
     return c.json({ error: 'A Lista de Presença só pode ser emitida após o fechamento da Portaria.', code: 'PORTARIA_ABERTA' }, 409)
   }
 
+
+  // O PDF da primeira emissão é preservado; alterações posteriores no cadastro
+  // institucional não podem reescrever uma ata já emitida.
+  const emissaoAnterior = await db.select().from(listaPresencaPdfAtas)
+    .where(eq(listaPresencaPdfAtas.eventoId, eventoId)).get()
+  if (emissaoAnterior) {
+    if (emissaoAnterior.fechamentoId !== fechamento.id) {
+      return c.json({
+        error: 'A Portaria recebeu novo fechamento após emissão anterior. Regularize a ata antes de nova emissão.',
+        code: 'LISTA_PRESENCA_FECHAMENTO_DIVERGENTE',
+      }, 409)
+    }
+    await db.insert(auditoriaLogs).values({
+      id: crypto.randomUUID(),
+      acao: 'LISTA_PRESENCA_PDF_CONSULTADA',
+      atorMembroId: membroId,
+      recursoTipo: 'EVENTO',
+      recursoId: eventoId,
+      escopoTipo: evento.setorId ? 'SETOR' : null,
+      escopoId: evento.setorId ?? null,
+      contexto: { fechamentoId: fechamento.id, emitidoEm: emissaoAnterior.emitidoEm },
+    }).run()
+    return new Response(new TextEncoder().encode(emissaoAnterior.documentoPdf).buffer as ArrayBuffer, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="lista-presenca-${eventoId}.pdf"`,
+        'Cache-Control': 'no-store, private',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    })
+  }
+
   // O setor responsável prevalece sobre o Setor da Casa sede, inclusive em exceções intersetoriais.
   let setorResponsavelId = evento.setorId
   if (!setorResponsavelId && evento.pontoAtendimentoId) {
@@ -217,6 +249,21 @@ relatoriosRouter.get('/presencas/eventos/:eventoId/lista-presenca.pdf', async c 
     linhas,
   })
 
+
+  // Inserção concorrente segura: a primeira emissão é a canônica.
+  await db.insert(listaPresencaPdfAtas).values({
+    eventoId,
+    fechamentoId: fechamento.id,
+    documentoPdf: new TextDecoder().decode(pdf),
+    emitidoEm: agora,
+    emitidoPorMembroId: membroId,
+  }).onConflictDoNothing().run()
+  const emissao = await db.select().from(listaPresencaPdfAtas)
+    .where(eq(listaPresencaPdfAtas.eventoId, eventoId)).get()
+  if (!emissao || emissao.fechamentoId !== fechamento.id) {
+    return c.json({ error: 'A emissão anterior não corresponde ao fechamento atual.', code: 'LISTA_PRESENCA_FECHAMENTO_DIVERGENTE' }, 409)
+  }
+
   // Auditoria do acesso a informações pessoais em documento para ata.
   await db.insert(auditoriaLogs).values({
     id: crypto.randomUUID(),
@@ -229,7 +276,7 @@ relatoriosRouter.get('/presencas/eventos/:eventoId/lista-presenca.pdf', async c 
     contexto: { fechamentoId: fechamento.id, totalPresentes: linhas.length, emitidoEm: agora },
   }).run()
 
-  return new Response(pdf.buffer as ArrayBuffer, {
+  return new Response(new TextEncoder().encode(emissao.documentoPdf).buffer as ArrayBuffer, {
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="lista-presenca-${eventoId}.pdf"`,
