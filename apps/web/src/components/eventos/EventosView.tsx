@@ -857,7 +857,23 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
     e.preventDefault()
     if (envioEventoEmAndamento.current) return
     setErrosForm({})
-    
+
+    // O calendário mobile permite preencher a data e o horário em qualquer ordem.
+    // Bloquear valores parciais antes de convertê-los em UTC e validar a duração.
+    const errosDatas: Record<string, string> = {}
+    for (const campo of ['inicioEm', 'fimEm'] as const) {
+      const [data, hora] = (formData[campo] || '').split('T')
+      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(data || '')) {
+        errosDatas[campo] = 'Selecione a data.'
+      } else if (!/^\\d{2}:\\d{2}$/.test(hora || '')) {
+        errosDatas[campo] = 'Selecione o horário.'
+      }
+    }
+    if (Object.keys(errosDatas).length > 0) {
+      setErrosForm(errosDatas)
+      return
+    }
+
     const payload = {
       ...formData,
       descricao: formData.descricao || null,
@@ -1595,6 +1611,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                           <input
                             id="inicioEm-data-calendario"
                             type="date"
+                            required
+                            aria-invalid={!!errosForm.inicioEm}
+                            aria-describedby={errosForm.inicioEm ? 'descricao-inicioEm-dia-semana erro-inicioEm' : 'descricao-inicioEm-dia-semana'}
                             aria-label="Dia inicial no calendário"
                             aria-describedby="descricao-inicioEm-dia-semana"
                             value={(formData.inicioEm || '').split('T')[0] || ''}
@@ -1608,6 +1627,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                           <input
                             id="inicioEm-hora-mobile"
                             type="time"
+                            required
+                            aria-invalid={!!errosForm.inicioEm}
+                            aria-describedby={errosForm.inicioEm ? 'descricao-inicioEm-dia-semana erro-inicioEm' : 'descricao-inicioEm-dia-semana'}
                             aria-label="Hora inicial"
                             value={(formData.inicioEm || '').split('T')[1] || ''}
                             onChange={e => {
@@ -1629,7 +1651,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                         />
                         </div>
                         <p id="descricao-inicioEm-dia-semana" className="mt-1 text-sm font-medium text-brand-700" aria-live="polite" aria-atomic="true">{formatarDiaSemana(formData.inicioEm || '')}</p>
-                        {errosForm.inicioEm && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.inicioEm}</p>}
+                        {errosForm.inicioEm && <p id="erro-inicioEm" role="alert" className="text-red-500 text-xs mt-1">{errosForm.inicioEm}</p>}
                       </div>
                       <div>
                         <div className="sm:hidden space-y-2 mb-3">
@@ -1637,6 +1659,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                           <input
                             id="fimEm-data-calendario"
                             type="date"
+                            required
+                            aria-invalid={!!errosForm.fimEm}
+                            aria-describedby={errosForm.fimEm ? 'descricao-fimEm-dia-semana erro-fimEm' : 'descricao-fimEm-dia-semana'}
                             aria-label="Dia final no calendário"
                             aria-describedby="descricao-fimEm-dia-semana"
                             value={(formData.fimEm || '').split('T')[0] || ''}
@@ -1650,6 +1675,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                           <input
                             id="fimEm-hora-mobile"
                             type="time"
+                            required
+                            aria-invalid={!!errosForm.fimEm}
+                            aria-describedby={errosForm.fimEm ? 'descricao-fimEm-dia-semana erro-fimEm' : 'descricao-fimEm-dia-semana'}
                             aria-label="Hora final"
                             value={(formData.fimEm || '').split('T')[1] || ''}
                             onChange={e => {
@@ -1671,7 +1699,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                         />
                         </div>
                         <p id="descricao-fimEm-dia-semana" className="mt-1 text-sm font-medium text-brand-700" aria-live="polite" aria-atomic="true">{formatarDiaSemana(formData.fimEm || '')}</p>
-                        {errosForm.fimEm && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.fimEm}</p>}
+                        {errosForm.fimEm && <p id="erro-fimEm" role="alert" className="text-red-500 text-xs mt-1">{errosForm.fimEm}</p>}
                       </div>
                     </div>
 
