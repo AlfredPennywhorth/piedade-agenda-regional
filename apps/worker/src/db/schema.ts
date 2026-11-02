@@ -487,6 +487,20 @@ export const sessoes = sqliteTable('sessoes', {
     .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
 })
 
+// Ciência versionada do aviso institucional de privacidade por pessoa.
+export const cienciasPrivacidade = sqliteTable('ciencias_privacidade', {
+  id: text('id').primaryKey(),
+  membroId: text('membro_id').notNull().references(() => membros.id),
+  contaAcessoId: text('conta_acesso_id').notNull().references(() => contasAcesso.id),
+  versao: text('versao').notNull(),
+  textoHash: text('texto_hash').notNull(),
+  leituraConfirmada: integer('leitura_confirmada', { mode: 'boolean' }).notNull(),
+  tratamentoNecessarioCiente: integer('tratamento_necessario_ciente', { mode: 'boolean' }).notNull(),
+  registradoEm: text('registrado_em').notNull(),
+}, table => ({
+  membroVersao: uniqueIndex('idx_ciencias_privacidade_membro_versao').on(table.membroId, table.versao),
+}))
+
 export const tentativasAcesso = sqliteTable('tentativas_acesso', {
   id: text('id').primaryKey(), // UUID
   contaAcessoId: text('conta_acesso_id').references(() => contasAcesso.id),
