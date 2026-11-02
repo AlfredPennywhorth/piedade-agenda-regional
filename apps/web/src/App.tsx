@@ -201,7 +201,7 @@ function App() {
   }
 
   return (
-    <LgpdPrimeiroAcessoGate onSair={sair}>
+    <LgpdPrimeiroAcessoGate onSair={sair} onCienciaRegistrada={carregarIdentidade}>
     <ResponsabilidadeRegionalGate onCienciaRegistrada={carregarIdentidade}>
     <MainLayout
       currentTab={currentTab}
