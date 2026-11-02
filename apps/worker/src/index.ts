@@ -54,6 +54,7 @@ import { relatoriosRouter } from './routes/relatorios'
 import { auditoriaRouter } from './routes/auditoria'
 import { bootstrapMasterApp } from './routes/bootstrap/master'
 import { responsabilidadeRegionalApp } from './routes/governanca/responsabilidade-regional'
+import { lgpdApp } from './routes/lgpd'
 export interface AppOptions {
   enableAdminRoutes?: boolean
 }
@@ -208,6 +209,7 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.route('/api/v1/auth/recuperacao-pin', recuperacaoPinApp)
   app.route('/api/v1/bootstrap/master', bootstrapMasterApp)
   app.route('/api/v1/governanca/responsabilidade-regional', responsabilidadeRegionalApp)
+  app.route('/api/v1/lgpd', lgpdApp)
   app.route('/api/v1/admin/acessos', adminAcessosApp)
   app.route('/api/v1/admin/pre-cadastros-ministeriais', adminPreCadastrosMinisteriaisApp)
 
