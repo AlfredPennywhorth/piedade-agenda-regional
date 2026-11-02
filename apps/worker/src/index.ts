@@ -54,12 +54,14 @@ import { relatoriosRouter } from './routes/relatorios'
 import { auditoriaRouter } from './routes/auditoria'
 import { bootstrapMasterApp } from './routes/bootstrap/master'
 import { responsabilidadeRegionalApp } from './routes/governanca/responsabilidade-regional'
+import { lgpdApp } from './routes/lgpd'
 export interface AppOptions {
   enableAdminRoutes?: boolean
+  enforceLgpd?: boolean
 }
 
 export function createApp(injectedDb?: any, options?: AppOptions) {
-  const app = new Hono<{ Bindings: Env; Variables: { db: any } }>()
+  const app = new Hono<{ Bindings: Env; Variables: { db: any; enforceLgpd: boolean } }>()
 
   // Middlewares globais
   // Evita registrar URLs de credenciais/tokens em Beta e produção.
@@ -136,6 +138,9 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   // Middlewares da API
   // ============================================================
   app.use('/api/v1/*', async (c, next) => {
+    // Os testes legados com banco injetado podem habilitar enforcement explicitamente.
+    // Em Cloudflare (sem injeção), o bloqueio de privacidade é sempre obrigatório.
+    c.set('enforceLgpd', options?.enforceLgpd ?? !injectedDb)
     if (injectedDb) {
       c.set('db', injectedDb)
     } else if (!c.get('db') && c.env?.DB) {
@@ -208,6 +213,7 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   app.route('/api/v1/auth/recuperacao-pin', recuperacaoPinApp)
   app.route('/api/v1/bootstrap/master', bootstrapMasterApp)
   app.route('/api/v1/governanca/responsabilidade-regional', responsabilidadeRegionalApp)
+  app.route('/api/v1/lgpd', lgpdApp)
   app.route('/api/v1/admin/acessos', adminAcessosApp)
   app.route('/api/v1/admin/pre-cadastros-ministeriais', adminPreCadastrosMinisteriaisApp)
 

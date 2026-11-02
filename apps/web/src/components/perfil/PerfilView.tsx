@@ -46,6 +46,8 @@ export function PerfilView() {
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [sucesso, setSucesso] = useState<string | null>(null)
+  const [avisoPrivacidade, setAvisoPrivacidade] = useState<{ versao: string; titulo: string; paragrafos: string[]; registradoEm: string | null } | null>(null)
+  const [avisoAberto, setAvisoAberto] = useState(false)
 
   const [celular, setCelular] = useState('')
   const [pinAtualCelular, setPinAtualCelular] = useState('')
@@ -166,6 +168,33 @@ export function PerfilView() {
           Consulte seus dados institucionais e mantenha seus dados de acesso atualizados.
         </p>
       </div>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+        <h3 className="font-semibold text-slate-800">Privacidade e proteção de dados</h3>
+        <p className="text-sm text-slate-600">Você pode consultar novamente o aviso vigente e a data em que registrou sua ciência.</p>
+        <button type="button" className="rounded-lg border border-brand-700 px-3 py-2 text-sm font-medium text-brand-700"
+          onClick={async () => {
+            if (avisoAberto) { setAvisoAberto(false); return }
+            try {
+              const dados = await fetchWithAuth<{ versao: string; titulo: string; paragrafos: string[]; registradoEm: string | null }>('/lgpd')
+              setAvisoPrivacidade(dados)
+              setAvisoAberto(true)
+            } catch {
+              setErro('Não foi possível consultar o Aviso de Privacidade.')
+            }
+          }}>
+          {avisoAberto ? 'Fechar aviso de privacidade' : 'Consultar Aviso de Privacidade'}
+        </button>
+        {avisoAberto && avisoPrivacidade && (
+          <div className="max-h-80 overflow-y-auto rounded-lg bg-slate-50 p-4 text-sm leading-6 text-slate-700 space-y-3">
+            <h4 className="font-semibold">{avisoPrivacidade.titulo}</h4>
+            {(avisoPrivacidade.paragrafos || []).map((texto, i) => <p key={i}>{texto}</p>)}
+            <p className="text-xs text-slate-500">Versão: {avisoPrivacidade.versao}.
+              {avisoPrivacidade.registradoEm ? ` Ciência registrada em ${new Date(avisoPrivacidade.registradoEm).toLocaleString('pt-BR')}.` : ''}
+            </p>
+          </div>
+        )}
+      </section>
 
       {erro && (
         <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">

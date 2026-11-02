@@ -994,6 +994,7 @@ export function setupDb(sqlite: any) {
   sqlite.exec(excecaoIntersetorialSql)
   sqlite.exec(portariaIntegridadeSql)
   sqlite.exec(escopoConfirmacoesSql)
+  sqlite.exec(readFileSync(decodeURIComponent(new URL('../../drizzle/0053_lgpd_ciencias_primeiro_acesso.sql', import.meta.url).pathname)).toString('utf8'))
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS lista_presenca_pdf_atas (
       evento_id TEXT PRIMARY KEY NOT NULL REFERENCES eventos(id),
