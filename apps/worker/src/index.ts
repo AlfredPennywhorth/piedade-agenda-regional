@@ -57,10 +57,11 @@ import { responsabilidadeRegionalApp } from './routes/governanca/responsabilidad
 import { lgpdApp } from './routes/lgpd'
 export interface AppOptions {
   enableAdminRoutes?: boolean
+  enforceLgpd?: boolean
 }
 
 export function createApp(injectedDb?: any, options?: AppOptions) {
-  const app = new Hono<{ Bindings: Env; Variables: { db: any } }>()
+  const app = new Hono<{ Bindings: Env; Variables: { db: any; enforceLgpd: boolean } }>()
 
   // Middlewares globais
   // Evita registrar URLs de credenciais/tokens em Beta e produção.
@@ -137,6 +138,9 @@ export function createApp(injectedDb?: any, options?: AppOptions) {
   // Middlewares da API
   // ============================================================
   app.use('/api/v1/*', async (c, next) => {
+    // Os testes legados com banco injetado podem habilitar enforcement explicitamente.
+    // Em Cloudflare (sem injeção), o bloqueio de privacidade é sempre obrigatório.
+    c.set('enforceLgpd', options?.enforceLgpd ?? !injectedDb)
     if (injectedDb) {
       c.set('db', injectedDb)
     } else if (!c.get('db') && c.env?.DB) {
