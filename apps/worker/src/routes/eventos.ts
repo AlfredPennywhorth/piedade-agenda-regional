@@ -663,6 +663,12 @@ eventosRouter.patch('/:id', async (c) => {
     const updated = await db.select().from(eventos).where(eq(eventos.id, id)).get()
     return c.json(updated)
   } catch (err: any) {
+    if (String(err?.message).includes('EVENTO_PONTO_COM_CONVOCACAO_PUBLICADA')) {
+      return c.json({
+        error: 'O Ponto de Atendimento não pode ser alterado porque este evento já possui convocação publicada. Para convocar outro Ponto, cancele a convocação e o evento conforme o procedimento institucional e crie uma nova reunião, preservando o histórico existente.',
+        code: 'EVENTO_PONTO_COM_CONVOCACAO_PUBLICADA'
+      }, 409)
+    }
     if (String(err?.message).includes('EVENTO_ABRANGENCIA_DESTINO_INVALIDO')) {
       return c.json({ error: 'A alteração do escopo ou destino não é permitida para este evento. Verifique os dados e vínculos existentes.', code: 'EVENTO_ABRANGENCIA_DESTINO_INVALIDO' }, 409)
     }
