@@ -191,6 +191,30 @@ describe('SeriesView', () => {
     })
   })
 
+  it('exibe o dia da semana para início e fim na criação e edição de séries', async () => {
+    render(<SeriesView />)
+    await screen.findByText('Reunião Semanal')
+    fireEvent.click(screen.getByText('+ Nova Série'))
+    const inicio = screen.getByLabelText(/Data Início \*/i)
+    const fim = screen.getByLabelText(/Data Fim \*/i)
+    expect(inicio).toHaveAttribute('aria-describedby', 'descricao-dataInicio-dia-semana')
+    expect(document.getElementById('descricao-dataInicio-dia-semana')).toBeInTheDocument()
+    fireEvent.change(inicio, { target: { value: '2026-11-10' } })
+    fireEvent.change(fim, { target: { value: '2026-11-11' } })
+    expect(document.getElementById('descricao-dataInicio-dia-semana')).toHaveTextContent('Terça-feira, 10 de novembro de 2026')
+    expect(document.getElementById('descricao-dataFim-dia-semana')).toHaveTextContent('Quarta-feira, 11 de novembro de 2026')
+    fireEvent.change(inicio, { target: { value: '2026-11-12' } })
+    expect(document.getElementById('descricao-dataInicio-dia-semana')).toHaveTextContent('Quinta-feira, 12 de novembro de 2026')
+
+    fireEvent.click(screen.getByText('✕'))
+    fireEvent.click(screen.getByText('Editar'))
+    const dialog = screen.getByRole('dialog', { name: 'Editar Série de Recorrência' })
+    fireEvent.change(within(dialog).getByLabelText(/Data Início \*/i), { target: { value: '2026-12-31' } })
+    fireEvent.change(within(dialog).getByLabelText(/Data Fim \*/i), { target: { value: '2027-01-01' } })
+    expect(document.getElementById('descricao-dataInicio-dia-semana')).toHaveTextContent('Quinta-feira, 31 de dezembro de 2026')
+    expect(document.getElementById('descricao-dataFim-dia-semana')).toHaveTextContent('Sexta-feira, 1 de janeiro de 2027')
+  })
+
   it('deve permitir criar uma série com strings nativas de data/hora, validando o envio', async () => {
     render(<SeriesView />)
 
