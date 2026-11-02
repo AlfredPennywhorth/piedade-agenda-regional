@@ -651,6 +651,51 @@ describe('EventosView', () => {
     expect(document.getElementById('descricao-fimEm-dia-semana')).toHaveTextContent('Sexta-feira, 1 de janeiro de 2027')
   })
 
+  it('oferece calendário nativo mobile e preserva horários ao trocar datas', async () => {
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+    const dataInicio = within(dialog).getByLabelText('Dia inicial no calendário') as HTMLInputElement
+    const dataFim = within(dialog).getByLabelText('Dia final no calendário') as HTMLInputElement
+    const horaInicio = within(dialog).getByLabelText('Hora inicial') as HTMLInputElement
+    const horaFim = within(dialog).getByLabelText('Hora final') as HTMLInputElement
+    expect(dataInicio).toHaveAttribute('type', 'date')
+    expect(dataFim).toHaveAttribute('type', 'date')
+    expect(horaInicio).toHaveAttribute('type', 'time')
+    fireEvent.change(dataInicio, { target: { value: '2026-11-10' } })
+    expect(horaInicio).toHaveValue('')
+    expect(document.getElementById('descricao-inicioEm-dia-semana')).toHaveTextContent('Terça-feira, 10 de novembro de 2026')
+    fireEvent.change(horaInicio, { target: { value: '19:30' } })
+    fireEvent.change(dataInicio, { target: { value: '2026-11-12' } })
+    expect(horaInicio).toHaveValue('19:30')
+    expect(document.getElementById('descricao-inicioEm-dia-semana')).toHaveTextContent('Quinta-feira, 12 de novembro de 2026')
+    fireEvent.change(dataFim, { target: { value: '2026-11-12' } })
+    fireEvent.change(horaFim, { target: { value: '21:00' } })
+    expect(horaFim).toHaveValue('21:00')
+    expect(document.getElementById('descricao-fimEm-dia-semana')).toHaveTextContent('Quinta-feira, 12 de novembro de 2026')
+  })
+
+  it('calendário mobile mantém data e horário do evento na edição', async () => {
+    const fetchOriginal = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === `/eventos/${EVENTO_ID}`) return mockEventos[0]
+      return fetchOriginal(url)
+    })
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
+    const dialog = await screen.findByRole('dialog', { name: /editar evento/i })
+    const calendario = within(dialog).getByLabelText('Dia inicial no calendário') as HTMLInputElement
+    const hora = within(dialog).getByLabelText('Hora inicial') as HTMLInputElement
+    await waitFor(() => expect(calendario).not.toHaveValue(''))
+    const horaOriginal = hora.value
+    fireEvent.change(calendario, { target: { value: '2026-11-10' } })
+    expect(calendario).toHaveValue('2026-11-10')
+    expect(hora).toHaveValue(horaOriginal)
+    expect(document.getElementById('descricao-inicioEm-dia-semana')).toHaveTextContent('Terça-feira, 10 de novembro de 2026')
+  })
+
   it('deve validar regra temporal: fim anterior ao início', async () => {
     vi.mocked(apiClient.postWithAuth).mockResolvedValueOnce({})
     render(<EventosView />)
