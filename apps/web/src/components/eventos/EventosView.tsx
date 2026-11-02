@@ -1597,9 +1597,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                             type="date"
                             aria-label="Dia inicial no calendário"
                             aria-describedby="descricao-inicioEm-dia-semana"
-                            value={formData.inicioEm.split('T')[0] || ''}
+                            value={(formData.inicioEm || '').split('T')[0] || ''}
                             onChange={e => {
-                              const horaAtual = formData.inicioEm.split('T')[1] || ''
+                              const horaAtual = (formData.inicioEm || '').split('T')[1] || ''
                               setFormData({ ...formData, inicioEm: e.target.value ? `${e.target.value}T${horaAtual}` : '' })
                             }}
                             className="w-full min-w-0 p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
@@ -1609,9 +1609,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                             id="inicioEm-hora-mobile"
                             type="time"
                             aria-label="Hora inicial"
-                            value={formData.inicioEm.split('T')[1] || ''}
+                            value={(formData.inicioEm || '').split('T')[1] || ''}
                             onChange={e => {
-                              const dataAtual = formData.inicioEm.split('T')[0]
+                              const dataAtual = (formData.inicioEm || '').split('T')[0]
                               setFormData({ ...formData, inicioEm: dataAtual ? `${dataAtual}T${e.target.value}` : '' })
                             }}
                             className="w-full min-w-0 p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
@@ -1639,9 +1639,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                             type="date"
                             aria-label="Dia final no calendário"
                             aria-describedby="descricao-fimEm-dia-semana"
-                            value={formData.fimEm.split('T')[0] || ''}
+                            value={(formData.fimEm || '').split('T')[0] || ''}
                             onChange={e => {
-                              const horaAtual = formData.fimEm.split('T')[1] || ''
+                              const horaAtual = (formData.fimEm || '').split('T')[1] || ''
                               setFormData({ ...formData, fimEm: e.target.value ? `${e.target.value}T${horaAtual}` : '' })
                             }}
                             className="w-full min-w-0 p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
@@ -1651,9 +1651,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                             id="fimEm-hora-mobile"
                             type="time"
                             aria-label="Hora final"
-                            value={formData.fimEm.split('T')[1] || ''}
+                            value={(formData.fimEm || '').split('T')[1] || ''}
                             onChange={e => {
-                              const dataAtual = formData.fimEm.split('T')[0]
+                              const dataAtual = (formData.fimEm || '').split('T')[0]
                               setFormData({ ...formData, fimEm: dataAtual ? `${dataAtual}T${e.target.value}` : '' })
                             }}
                             className="w-full min-w-0 p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
