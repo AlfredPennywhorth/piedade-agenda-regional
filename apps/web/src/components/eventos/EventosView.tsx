@@ -1593,24 +1593,26 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                         <label htmlFor="inicioEm" className="block text-sm font-medium text-slate-700 mb-1">Início *</label>
                         <input
                           id="inicioEm"
+                          aria-describedby="descricao-inicioEm-dia-semana"
                           type="datetime-local"
                           value={formData.inicioEm}
                           onChange={e => setFormData({ ...formData, inicioEm: e.target.value })}
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         />
-                        {formData.inicioEm && <p className="mt-1 text-sm font-medium text-brand-700" aria-live="polite" aria-atomic="true">{formatarDiaSemana(formData.inicioEm)}</p>}
+                        <p id="descricao-inicioEm-dia-semana" className="mt-1 text-sm font-medium text-brand-700" aria-live="polite" aria-atomic="true">{formatarDiaSemana(formData.inicioEm || '')}</p>
                         {errosForm.inicioEm && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.inicioEm}</p>}
                       </div>
                       <div>
                         <label htmlFor="fimEm" className="block text-sm font-medium text-slate-700 mb-1">Fim *</label>
                         <input
                           id="fimEm"
+                          aria-describedby="descricao-fimEm-dia-semana"
                           type="datetime-local"
                           value={formData.fimEm}
                           onChange={e => setFormData({ ...formData, fimEm: e.target.value })}
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         />
-                        {formData.fimEm && <p className="mt-1 text-sm font-medium text-brand-700" aria-live="polite" aria-atomic="true">{formatarDiaSemana(formData.fimEm)}</p>}
+                        <p id="descricao-fimEm-dia-semana" className="mt-1 text-sm font-medium text-brand-700" aria-live="polite" aria-atomic="true">{formatarDiaSemana(formData.fimEm || '')}</p>
                         {errosForm.fimEm && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.fimEm}</p>}
                       </div>
                     </div>
