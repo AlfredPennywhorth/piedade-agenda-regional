@@ -1,3 +1,4 @@
+import { formatarDiaSemana } from '../../utils/formatarDiaSemana'
 import { AjudaContextual } from '../ajuda/AjudaContextual'
 import { useState, useEffect, useRef } from 'react'
 import { SerieCreate, SerieCreateInput, LocalCreate, EspacoLocalCreate } from '@piedade/shared'
@@ -505,6 +506,7 @@ export function SerieFormModal({
                         onChange={e => setFormData({ ...formData, dataInicio: e.target.value })}
                         className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                       />
+                      {formData.dataInicio && <p className="mt-1 text-sm font-medium text-brand-700" aria-live="polite" aria-atomic="true">{formatarDiaSemana(formData.dataInicio)}</p>}
                       {errosForm.dataInicio && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.dataInicio}</p>}
                     </div>
                     <div>
@@ -516,6 +518,7 @@ export function SerieFormModal({
                         onChange={e => setFormData({ ...formData, dataFim: e.target.value })}
                         className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                       />
+                      {formData.dataFim && <p className="mt-1 text-sm font-medium text-brand-700" aria-live="polite" aria-atomic="true">{formatarDiaSemana(formData.dataFim)}</p>}
                       {errosForm.dataFim && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.dataFim}</p>}
                     </div>
                   </div>
