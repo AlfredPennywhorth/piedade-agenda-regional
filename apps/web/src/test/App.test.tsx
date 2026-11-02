@@ -16,6 +16,7 @@ describe('App — S07 Minha Agenda', () => {
     vi.clearAllMocks()
     localStorage.setItem('session_token', 'sessao-teste')
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/lgpd') return { versao: 'teste', titulo: 'Aviso', paragrafos: [], hash: 'teste', ciente: true, registradoEm: '2026-11-01' }
       if (endpoint === '/auth/me') {
         return { nome: 'Pessoa Teste', capacidades: {} }
       }
@@ -63,6 +64,7 @@ describe('App — S07 Minha Agenda', () => {
 
   it('exibe módulos restritos quando as capacidades são concedidas', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/lgpd') return { versao: 'teste', titulo: 'Aviso', paragrafos: [], hash: 'teste', ciente: true, registradoEm: '2026-11-01' }
       if (endpoint === '/auth/me') {
         return {
           nome: 'Pessoa Teste',
