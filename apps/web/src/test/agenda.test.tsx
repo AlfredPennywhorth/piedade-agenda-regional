@@ -107,6 +107,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
 
   const mockAgenda = (dados: unknown) => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/lgpd') return { versao: 'teste', titulo: 'Aviso', paragrafos: [], hash: 'teste', ciente: true, registradoEm: '2026-11-01' }
       if (endpoint === '/auth/me') return { nome: 'Pessoa Teste', capacidades: {} }
       if (endpoint === '/governanca/responsabilidade-regional') {
         return { versao: 'teste', texto: 'Responsabilidades', acessos: [] }
@@ -120,6 +121,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
 
   const mockAgendaError = (erro: Error) => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/lgpd') return { versao: 'teste', titulo: 'Aviso', paragrafos: [], hash: 'teste', ciente: true, registradoEm: '2026-11-01' }
       if (endpoint === '/auth/me') return { nome: 'Pessoa Teste', capacidades: {} }
       if (endpoint === '/governanca/responsabilidade-regional') {
         return { versao: 'teste', texto: 'Responsabilidades', acessos: [] }
@@ -255,6 +257,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
 
     let leiturasAgenda = 0
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/lgpd') return { versao: 'teste', titulo: 'Aviso', paragrafos: [], hash: 'teste', ciente: true, registradoEm: '2026-11-01' }
       if (endpoint === '/auth/me') return { nome: 'Pessoa Teste', capacidades: {} }
       if (endpoint === '/governanca/responsabilidade-regional') {
         return { versao: 'teste', texto: 'Responsabilidades', acessos: [] }
@@ -468,6 +471,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
 
     let leiturasAgenda = 0
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (endpoint: string) => {
+      if (endpoint === '/lgpd') return { versao: 'teste', titulo: 'Aviso', paragrafos: [], hash: 'teste', ciente: true, registradoEm: '2026-11-01' }
       if (endpoint === '/auth/me') return { nome: 'Pessoa Teste', capacidades: {} }
       if (endpoint === '/governanca/responsabilidade-regional') {
         return { versao: 'teste', texto: 'Responsabilidades', acessos: [] }
