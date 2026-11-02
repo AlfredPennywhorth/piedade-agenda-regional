@@ -663,6 +663,10 @@ describe('EventosView', () => {
     expect(dataInicio).toHaveAttribute('type', 'date')
     expect(dataFim).toHaveAttribute('type', 'date')
     expect(horaInicio).toHaveAttribute('type', 'time')
+    for (const campo of [dataInicio, dataFim, horaInicio, horaFim]) {
+      expect(campo).toBeRequired()
+      expect(campo).toHaveAttribute('aria-invalid', 'false')
+    }
     // Preenchimento em ordem inversa: hora antes da data deve ser preservada.
     fireEvent.change(horaInicio, { target: { value: '08:45' } })
     fireEvent.change(horaFim, { target: { value: '10:15' } })
@@ -680,6 +684,36 @@ describe('EventosView', () => {
     fireEvent.change(horaFim, { target: { value: '21:00' } })
     expect(horaFim).toHaveValue('21:00')
     expect(document.getElementById('descricao-fimEm-dia-semana')).toHaveTextContent('Quinta-feira, 12 de novembro de 2026')
+  })
+
+  it('informa horário ausente sem apresentar erro de duração e associa mensagem aos controles mobile', async () => {
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+    fireEvent.change(within(dialog).getByLabelText('Dia inicial no calendário'), { target: { value: '2026-11-10' } })
+    fireEvent.change(within(dialog).getByLabelText('Hora inicial'), { target: { value: '19:00' } })
+    fireEvent.change(within(dialog).getByLabelText('Dia final no calendário'), { target: { value: '2026-11-11' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar evento/i }))
+    expect(document.getElementById('erro-fimEm')).toHaveTextContent('Selecione o horário.')
+    expect(within(dialog).queryByText(/múltiplos dias/i)).not.toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Dia final no calendário')).toHaveAttribute('aria-invalid', 'true')
+    expect(within(dialog).getByLabelText('Hora final')).toHaveAttribute('aria-invalid', 'true')
+    expect(within(dialog).getByLabelText('Hora final')).toHaveAttribute('aria-describedby', 'descricao-fimEm-dia-semana erro-fimEm')
+    expect(apiClient.postWithAuth).not.toHaveBeenCalled()
+  })
+
+  it('informa a data ausente quando o usuário preenche apenas o horário', async () => {
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
+    const dialog = await screen.findByRole('dialog', { name: /novo evento/i })
+    fireEvent.change(within(dialog).getByLabelText('Hora inicial'), { target: { value: '08:45' } })
+    fireEvent.change(within(dialog).getByLabelText('Hora final'), { target: { value: '10:15' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar evento/i }))
+    expect(document.getElementById('erro-inicioEm')).toHaveTextContent('Selecione a data.')
+    expect(document.getElementById('erro-fimEm')).toHaveTextContent('Selecione a data.')
+    expect(apiClient.postWithAuth).not.toHaveBeenCalled()
   })
 
   it('calendário mobile mantém data e horário do evento na edição', async () => {
