@@ -1615,7 +1615,6 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                             aria-invalid={!!errosForm.inicioEm}
                             aria-describedby={errosForm.inicioEm ? 'descricao-inicioEm-dia-semana erro-inicioEm' : 'descricao-inicioEm-dia-semana'}
                             aria-label="Dia inicial no calendário"
-                            aria-describedby="descricao-inicioEm-dia-semana"
                             value={(formData.inicioEm || '').split('T')[0] || ''}
                             onChange={e => {
                               const horaAtual = (formData.inicioEm || '').split('T')[1] || ''
@@ -1663,7 +1662,6 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                             aria-invalid={!!errosForm.fimEm}
                             aria-describedby={errosForm.fimEm ? 'descricao-fimEm-dia-semana erro-fimEm' : 'descricao-fimEm-dia-semana'}
                             aria-label="Dia final no calendário"
-                            aria-describedby="descricao-fimEm-dia-semana"
                             value={(formData.fimEm || '').split('T')[0] || ''}
                             onChange={e => {
                               const horaAtual = (formData.fimEm || '').split('T')[1] || ''
