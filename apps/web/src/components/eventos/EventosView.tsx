@@ -863,9 +863,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
     const errosDatas: Record<string, string> = {}
     for (const campo of ['inicioEm', 'fimEm'] as const) {
       const [data, hora] = (formData[campo] || '').split('T')
-      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(data || '')) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(data || '')) {
         errosDatas[campo] = 'Selecione a data.'
-      } else if (!/^\\d{2}:\\d{2}$/.test(hora || '')) {
+      } else if (!/^\d{2}:\d{2}$/.test(hora || '')) {
         errosDatas[campo] = 'Selecione o horário.'
       }
     }
