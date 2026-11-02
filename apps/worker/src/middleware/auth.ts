@@ -2,6 +2,7 @@ import { Context, Next } from 'hono'
 import { eq, and, isNull } from 'drizzle-orm'
 import * as schema from '../db/schema'
 import { hashToken } from '../security/tokens'
+import { LGPD_VERSAO } from '../security/lgpd-termos'
 import { carregarContextoPermissoes, ContextoPermissoes } from '../security/permissoes'
 
 export type Variables = {
@@ -9,6 +10,7 @@ export type Variables = {
   membroId: string
   contaAcessoId: string
   contextoPermissoes: ContextoPermissoes
+  enforceLgpd?: boolean
 }
 
 export const INATIVIDADE_MAXIMA_MS = 12 * 60 * 60 * 1000
@@ -98,6 +100,28 @@ export async function authMiddleware(c: Context<{ Variables: Variables }>, next:
   c.set('membroId', membro.id)
   c.set('contaAcessoId', conta.id)
   c.set('contextoPermissoes', contextoPermissoes)
+
+  // Controle server-side: ocultar telas não basta, a API deve negar consultas
+  // por token direto enquanto a ciência vigente não for registrada.
+  // Auth/me habilita a identificação inicial; lgpd e logout permitem concluir
+  // ou encerrar a sessão sem acesso aos dados operacionais.
+  const caminho = new URL(c.req.url).pathname
+  const liberada = caminho === '/api/v1/auth/me' ||
+    caminho === '/api/v1/auth/logout' ||
+    caminho === '/api/v1/lgpd' || caminho.startsWith('/api/v1/lgpd/')
+  if (c.get('enforceLgpd') && !liberada) {
+    const ciencia = await db.select({ id: schema.cienciasPrivacidade.id })
+      .from(schema.cienciasPrivacidade)
+      .where(and(eq(schema.cienciasPrivacidade.membroId, membro.id),
+        eq(schema.cienciasPrivacidade.versao, LGPD_VERSAO))).get()
+    if (!ciencia) {
+      return c.json({
+        error: 'Leia e confirme o Aviso de Privacidade vigente antes de utilizar a Agenda.',
+        code: 'CIENCIA_PRIVACIDADE_PENDENTE',
+        versao: LGPD_VERSAO,
+      }, 403)
+    }
+  }
 
   await next()
 }
