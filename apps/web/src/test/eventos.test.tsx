@@ -619,6 +619,11 @@ describe('EventosView', () => {
   })
 
   it('exibe e atualiza dias da semana nas datas de criação e edição, com descrições acessíveis', async () => {
+    const fetchOriginal = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === `/eventos/${EVENTO_ID}`) return mockEventos[0]
+      return fetchOriginal(url)
+    })
     render(<EventosView />)
     await screen.findByText('Reunião Presencial')
     fireEvent.click(screen.getByRole('button', { name: /\+ novo evento/i }))
