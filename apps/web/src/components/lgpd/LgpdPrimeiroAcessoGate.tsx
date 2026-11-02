@@ -10,9 +10,10 @@ type AvisoPrivacidade = {
   registradoEm: string | null
 }
 
-export function LgpdPrimeiroAcessoGate({ children, onSair }: {
+export function LgpdPrimeiroAcessoGate({ children, onSair, onCienciaRegistrada }: {
   children: ReactNode
   onSair: () => Promise<void>
+  onCienciaRegistrada?: () => Promise<void> | void
 }) {
   const [aviso, setAviso] = useState<AvisoPrivacidade | null>(null)
   const [consultando, setConsultando] = useState(true)
@@ -47,6 +48,7 @@ export function LgpdPrimeiroAcessoGate({ children, onSair }: {
         leituraConfirmada: true,
         tratamentoNecessarioCiente: true,
       })
+      await onCienciaRegistrada?.()
       await consultar()
     } catch (error) {
       setErro(error instanceof ApiError ? error.message : 'Não foi possível salvar sua confirmação.')
