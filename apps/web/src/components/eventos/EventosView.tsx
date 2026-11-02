@@ -1,3 +1,4 @@
+import { formatarDiaSemana } from '../../utils/formatarDiaSemana'
 import { AjudaContextual } from '../ajuda/AjudaContextual'
 import { useState, useEffect, useRef } from 'react'
 import { EventoCreate, EventoUpdate, EventoCreateInput, EventoUpdateInput, SerieCreateInput, LocalCreate, EspacoLocalCreate, createUtcDateFromSaoPaulo, UF_BRASIL, PAISES_ISO } from '@piedade/shared'
@@ -1597,6 +1598,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                           onChange={e => setFormData({ ...formData, inicioEm: e.target.value })}
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         />
+                        {formData.inicioEm && <p className="mt-1 text-sm font-medium text-brand-700" aria-live="polite" aria-atomic="true">{formatarDiaSemana(formData.inicioEm)}</p>}
                         {errosForm.inicioEm && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.inicioEm}</p>}
                       </div>
                       <div>
@@ -1608,6 +1610,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                           onChange={e => setFormData({ ...formData, fimEm: e.target.value })}
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         />
+                        {formData.fimEm && <p className="mt-1 text-sm font-medium text-brand-700" aria-live="polite" aria-atomic="true">{formatarDiaSemana(formData.fimEm)}</p>}
                         {errosForm.fimEm && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.fimEm}</p>}
                       </div>
                     </div>
