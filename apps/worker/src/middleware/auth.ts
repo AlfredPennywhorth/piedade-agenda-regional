@@ -106,7 +106,7 @@ export async function authMiddleware(c: Context<{ Variables: Variables }>, next:
   // Auth/me habilita a identificação inicial; lgpd e logout permitem concluir
   // ou encerrar a sessão sem acesso aos dados operacionais.
   const caminho = new URL(c.req.url).pathname
-  const liberada = caminho === '/api/v1/auth/me' ||
+  const liberada = (caminho === '/api/v1/auth/me' && c.req.method === 'GET') ||
     caminho === '/api/v1/auth/logout' ||
     caminho === '/api/v1/lgpd' || caminho.startsWith('/api/v1/lgpd/')
   if (c.get('enforceLgpd') && !liberada) {
