@@ -1600,7 +1600,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                             value={(formData.inicioEm || '').split('T')[0] || ''}
                             onChange={e => {
                               const horaAtual = (formData.inicioEm || '').split('T')[1] || ''
-                              setFormData({ ...formData, inicioEm: e.target.value ? `${e.target.value}T${horaAtual}` : '' })
+                              setFormData({ ...formData, inicioEm: e.target.value ? `${e.target.value}T${horaAtual}` : (horaAtual ? `T${horaAtual}` : '') })
                             }}
                             className="w-full min-w-0 p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                           />
@@ -1612,7 +1612,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                             value={(formData.inicioEm || '').split('T')[1] || ''}
                             onChange={e => {
                               const dataAtual = (formData.inicioEm || '').split('T')[0]
-                              setFormData({ ...formData, inicioEm: dataAtual ? `${dataAtual}T${e.target.value}` : '' })
+                              setFormData({ ...formData, inicioEm: dataAtual ? `${dataAtual}T${e.target.value}` : (e.target.value ? `T${e.target.value}` : '') })
                             }}
                             className="w-full min-w-0 p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                           />
@@ -1642,7 +1642,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                             value={(formData.fimEm || '').split('T')[0] || ''}
                             onChange={e => {
                               const horaAtual = (formData.fimEm || '').split('T')[1] || ''
-                              setFormData({ ...formData, fimEm: e.target.value ? `${e.target.value}T${horaAtual}` : '' })
+                              setFormData({ ...formData, fimEm: e.target.value ? `${e.target.value}T${horaAtual}` : (horaAtual ? `T${horaAtual}` : '') })
                             }}
                             className="w-full min-w-0 p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                           />
@@ -1654,7 +1654,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                             value={(formData.fimEm || '').split('T')[1] || ''}
                             onChange={e => {
                               const dataAtual = (formData.fimEm || '').split('T')[0]
-                              setFormData({ ...formData, fimEm: dataAtual ? `${dataAtual}T${e.target.value}` : '' })
+                              setFormData({ ...formData, fimEm: dataAtual ? `${dataAtual}T${e.target.value}` : (e.target.value ? `T${e.target.value}` : '') })
                             }}
                             className="w-full min-w-0 p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                           />
