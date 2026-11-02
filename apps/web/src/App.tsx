@@ -23,6 +23,7 @@ import { ConvocacoesView } from './components/convocacoes/ConvocacoesView'
 import { fetchWithAuth, limparTokenSessao, possuiTokenSessao, postWithAuth } from './api/apiClient'
 import { AuthView } from './components/auth/AuthView'
 import { ResponsabilidadeRegionalGate } from './components/governanca/ResponsabilidadeRegionalGate'
+import { LgpdPrimeiroAcessoGate } from './components/lgpd/LgpdPrimeiroAcessoGate'
 import { CadastroConvidadoView } from './components/portaria/CadastroConvidadoView'
 import { ContasAcessoView } from './components/acessos/ContasAcessoView'
 import { PerfilView } from './components/perfil/PerfilView'
@@ -200,6 +201,7 @@ function App() {
   }
 
   return (
+    <LgpdPrimeiroAcessoGate onSair={sair}>
     <ResponsabilidadeRegionalGate onCienciaRegistrada={carregarIdentidade}>
     <MainLayout
       currentTab={currentTab}
@@ -269,6 +271,7 @@ function App() {
       {currentTab === 'cadastro' && <PerfilView />}
     </MainLayout>
     </ResponsabilidadeRegionalGate>
+    </LgpdPrimeiroAcessoGate>
   )
 }
 
