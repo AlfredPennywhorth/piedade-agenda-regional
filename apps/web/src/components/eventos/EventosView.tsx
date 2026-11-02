@@ -1590,6 +1590,34 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
+                        <div className="sm:hidden space-y-2 mb-3">
+                          <label htmlFor="inicioEm-data-calendario" className="block text-sm font-medium text-slate-700">Dia inicial — calendário *</label>
+                          <input
+                            id="inicioEm-data-calendario"
+                            type="date"
+                            aria-label="Dia inicial no calendário"
+                            aria-describedby="descricao-inicioEm-dia-semana"
+                            value={formData.inicioEm.split('T')[0] || ''}
+                            onChange={e => {
+                              const horaAtual = formData.inicioEm.split('T')[1] || ''
+                              setFormData({ ...formData, inicioEm: e.target.value ? `${e.target.value}T${horaAtual}` : '' })
+                            }}
+                            className="w-full min-w-0 p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                          />
+                          <label htmlFor="inicioEm-hora-mobile" className="block text-sm font-medium text-slate-700">Hora inicial *</label>
+                          <input
+                            id="inicioEm-hora-mobile"
+                            type="time"
+                            aria-label="Hora inicial"
+                            value={formData.inicioEm.split('T')[1] || ''}
+                            onChange={e => {
+                              const dataAtual = formData.inicioEm.split('T')[0]
+                              setFormData({ ...formData, inicioEm: dataAtual ? `${dataAtual}T${e.target.value}` : '' })
+                            }}
+                            className="w-full min-w-0 p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div className="hidden sm:block">
                         <label htmlFor="inicioEm" className="block text-sm font-medium text-slate-700 mb-1">Início *</label>
                         <input
                           id="inicioEm"
@@ -1599,10 +1627,39 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                           onChange={e => setFormData({ ...formData, inicioEm: e.target.value })}
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         />
+                        </div>
                         <p id="descricao-inicioEm-dia-semana" className="mt-1 text-sm font-medium text-brand-700" aria-live="polite" aria-atomic="true">{formatarDiaSemana(formData.inicioEm || '')}</p>
                         {errosForm.inicioEm && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.inicioEm}</p>}
                       </div>
                       <div>
+                        <div className="sm:hidden space-y-2 mb-3">
+                          <label htmlFor="fimEm-data-calendario" className="block text-sm font-medium text-slate-700">Dia final — calendário *</label>
+                          <input
+                            id="fimEm-data-calendario"
+                            type="date"
+                            aria-label="Dia final no calendário"
+                            aria-describedby="descricao-fimEm-dia-semana"
+                            value={formData.fimEm.split('T')[0] || ''}
+                            onChange={e => {
+                              const horaAtual = formData.fimEm.split('T')[1] || ''
+                              setFormData({ ...formData, fimEm: e.target.value ? `${e.target.value}T${horaAtual}` : '' })
+                            }}
+                            className="w-full min-w-0 p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                          />
+                          <label htmlFor="fimEm-hora-mobile" className="block text-sm font-medium text-slate-700">Hora final *</label>
+                          <input
+                            id="fimEm-hora-mobile"
+                            type="time"
+                            aria-label="Hora final"
+                            value={formData.fimEm.split('T')[1] || ''}
+                            onChange={e => {
+                              const dataAtual = formData.fimEm.split('T')[0]
+                              setFormData({ ...formData, fimEm: dataAtual ? `${dataAtual}T${e.target.value}` : '' })
+                            }}
+                            className="w-full min-w-0 p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div className="hidden sm:block">
                         <label htmlFor="fimEm" className="block text-sm font-medium text-slate-700 mb-1">Fim *</label>
                         <input
                           id="fimEm"
@@ -1612,6 +1669,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                           onChange={e => setFormData({ ...formData, fimEm: e.target.value })}
                           className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                         />
+                        </div>
                         <p id="descricao-fimEm-dia-semana" className="mt-1 text-sm font-medium text-brand-700" aria-live="polite" aria-atomic="true">{formatarDiaSemana(formData.fimEm || '')}</p>
                         {errosForm.fimEm && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.fimEm}</p>}
                       </div>
