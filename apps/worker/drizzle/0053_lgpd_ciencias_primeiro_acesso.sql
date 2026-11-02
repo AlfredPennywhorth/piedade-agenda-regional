@@ -11,5 +11,5 @@ CREATE TABLE ciencias_privacidade (
   registrado_em TEXT NOT NULL,
   UNIQUE(membro_id, versao)
 );
-CREATE INDEX idx_ciencias_privacidade_membro_versao
+CREATE UNIQUE INDEX idx_ciencias_privacidade_membro_versao
   ON ciencias_privacidade (membro_id, versao);
