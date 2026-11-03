@@ -60,11 +60,18 @@ describe('PORT — credencial temporária do operador', () => {
       INSERT INTO locais (id, nome, endereco, numero, cidade, uf)
       VALUES ('local-a', 'Casa do Ponto A', 'Rua A', '100', 'São Paulo', 'SP'),
              ('local-b', 'Casa do Ponto B', 'Rua B', '200', 'São Paulo', 'SP');
-      UPDATE eventos SET local_id = 'local-a' WHERE id = 'evento-1';
-      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, casa_id, local_id, ativo)
+      INSERT INTO espacos_local (id, local_id, nome)
+      VALUES ('espaco-a', 'local-a', 'Nave A'),
+             ('espaco-b', 'local-b', 'Nave B');
+      INSERT INTO pontos_atendimento (id, setor_id, nome)
+      VALUES ('ponto-a', 'setor-1', 'Ponto A'),
+             ('ponto-b', 'setor-1', 'Ponto B');
+      UPDATE eventos SET local_id = 'local-a', espaco_id = 'espaco-a', ponto_atendimento_id = 'ponto-a'
+      WHERE id = 'evento-1';
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, casa_id, local_id, espaco_id, ponto_atendimento_id, ativo)
       VALUES ('evento-2', 'Reunião Teste', 'PRESENCIAL',
               '2099-01-01T15:00:00.000Z', '2099-01-01T18:00:00.000Z',
-              'casa-1', 'local-b', 1);
+              'casa-1', 'local-b', 'espaco-b', 'ponto-b', 1);
     `)
     sqlite.prepare(`INSERT INTO credenciais_operador_portaria_evento
       (id, evento_id, token_hash, expira_em, ativo) VALUES (?, ?, ?, ?, 1)`)
@@ -75,13 +82,13 @@ describe('PORT — credencial temporária do operador', () => {
         headers: { Authorization: `Bearer ${token}` },
       })
       expect(response.status).toBe(200)
-      return await response.json() as { evento: { id: string; titulo: string; local: { nome: string; endereco: string; numero: string } | null } }
+      return await response.json() as { evento: { id: string; titulo: string; local: { nome: string; endereco: string; numero: string } | null; espacoNome: string | null; pontoAtendimentoNome: string | null } }
     }
     const a = await obterSessao('token-operador-valido')
     const b = await obterSessao('token-operador-b')
     expect(a.evento.titulo).toBe(b.evento.titulo)
-    expect(a.evento).toMatchObject({ id: 'evento-1', local: { nome: 'Casa do Ponto A', endereco: 'Rua A', numero: '100' } })
-    expect(b.evento).toMatchObject({ id: 'evento-2', local: { nome: 'Casa do Ponto B', endereco: 'Rua B', numero: '200' } })
+    expect(a.evento).toMatchObject({ id: 'evento-1', local: { nome: 'Casa do Ponto A', endereco: 'Rua A', numero: '100' }, espacoNome: 'Nave A', pontoAtendimentoNome: 'Ponto A' })
+    expect(b.evento).toMatchObject({ id: 'evento-2', local: { nome: 'Casa do Ponto B', endereco: 'Rua B', numero: '200' }, espacoNome: 'Nave B', pontoAtendimentoNome: 'Ponto B' })
   })
 
   it('PORT-464: evento sem local exibe ausência de local sem inventar endereço', async () => {
