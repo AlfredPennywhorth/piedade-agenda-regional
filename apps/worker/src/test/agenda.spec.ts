@@ -750,6 +750,8 @@ describe('S07 - Minha Agenda', () => {
       { nome: 'sem-local', dia: '05', fimA: '11:00', inicioB: '11:15', localA: null, localB: null, espacoA: null, espacoB: null, tipo: 'PROXIMIDADE' },
       // Dois eventos online não ficam isentos apenas por um local associado indevidamente.
       { nome: 'online', dia: '06', fimA: '11:00', inicioB: '11:15', localA: 'loc-1', localB: 'loc-1', espacoA: null, espacoB: null, tipo: 'PROXIMIDADE', modalidade: 'ONLINE' },
+      // Um evento online e outro presencial no mesmo local também exigem transição.
+      { nome: 'misto', dia: '07', fimA: '11:00', inicioB: '11:15', localA: 'loc-1', localB: 'loc-1', espacoA: null, espacoB: 'esp-1', tipo: 'PROXIMIDADE', modalidadeA: 'ONLINE' },
     ] as const
 
     const inserirEvento = sqlite.prepare(`
@@ -766,7 +768,9 @@ describe('S07 - Minha Agenda', () => {
         const fim = lado === 'a' ? caso.fimA : '12:00'
         const local = lado === 'a' ? caso.localA : caso.localB
         const espaco = lado === 'a' ? caso.espacoA : caso.espacoB
-        const modalidade = 'modalidade' in caso ? caso.modalidade : 'PRESENCIAL'
+        const modalidade = 'modalidade' in caso ? caso.modalidade
+          : lado === 'a' && 'modalidadeA' in caso ? caso.modalidadeA
+          : 'PRESENCIAL'
         inserirEvento.run(id, id, modalidade, `2034-06-${caso.dia}T${inicio}:00Z`, `2034-06-${caso.dia}T${fim}:00Z`, local, espaco)
         inserirConvocacao.run(`conv-${id}`, id)
         inserirDestinatario.run(`dest-${id}`, `conv-${id}`, membroId)
