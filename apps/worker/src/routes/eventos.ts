@@ -665,7 +665,7 @@ eventosRouter.patch('/:id', async (c) => {
   } catch (err: any) {
     if (String(err?.message).includes('EVENTO_PONTO_COM_CONVOCACAO_PUBLICADA')) {
       return c.json({
-        error: 'O Ponto de Atendimento não pode ser alterado porque este evento já possui convocação publicada. Para convocar outro Ponto, cancele a convocação e o evento conforme o procedimento institucional e crie uma nova reunião, preservando o histórico existente.',
+        error: 'O Ponto de Atendimento não pode ser alterado porque este evento já possui convocação publicada. Para convocar outro Ponto, defina antes como serão tratadas as confirmações de participação (RSVP), pois elas não são transferidas automaticamente para uma nova reunião. Depois, siga o procedimento institucional de cancelamento da convocação e do evento e de criação de uma nova reunião, preservando o histórico existente.',
         code: 'EVENTO_PONTO_COM_CONVOCACAO_PUBLICADA'
       }, 409)
     }
