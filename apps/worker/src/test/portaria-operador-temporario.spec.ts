@@ -55,6 +55,44 @@ describe('PORT — credencial temporária do operador', () => {
     }
   })
 
+  it('PORT-464: credencial identifica local correto para reuniões de mesmo título e horário', async () => {
+    sqlite.exec(`
+      INSERT INTO locais (id, nome, endereco, numero, cidade, uf)
+      VALUES ('local-a', 'Casa do Ponto A', 'Rua A', '100', 'São Paulo', 'SP'),
+             ('local-b', 'Casa do Ponto B', 'Rua B', '200', 'São Paulo', 'SP');
+      UPDATE eventos SET local_id = 'local-a' WHERE id = 'evento-1';
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, casa_id, local_id, ativo)
+      VALUES ('evento-2', 'Reunião Teste', 'PRESENCIAL',
+              '2099-01-01T15:00:00.000Z', '2099-01-01T18:00:00.000Z',
+              'casa-1', 'local-b', 1);
+    `)
+    sqlite.prepare(`INSERT INTO credenciais_operador_portaria_evento
+      (id, evento_id, token_hash, expira_em, ativo) VALUES (?, ?, ?, ?, 1)`)
+      .run('cred-2', 'evento-2', await hashToken('token-operador-b'), '2099-01-02T02:59:59.000Z')
+
+    const obterSessao = async (token: string) => {
+      const response = await app.request('/api/v1/portaria-operador-publica/sessao', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      expect(response.status).toBe(200)
+      return await response.json() as { evento: { id: string; titulo: string; local: { nome: string; endereco: string; numero: string } | null } }
+    }
+    const a = await obterSessao('token-operador-valido')
+    const b = await obterSessao('token-operador-b')
+    expect(a.evento.titulo).toBe(b.evento.titulo)
+    expect(a.evento).toMatchObject({ id: 'evento-1', local: { nome: 'Casa do Ponto A', endereco: 'Rua A', numero: '100' } })
+    expect(b.evento).toMatchObject({ id: 'evento-2', local: { nome: 'Casa do Ponto B', endereco: 'Rua B', numero: '200' } })
+  })
+
+  it('PORT-464: evento sem local exibe ausência de local sem inventar endereço', async () => {
+    const response = await app.request('/api/v1/portaria-operador-publica/sessao', {
+      headers: { Authorization: 'Bearer token-operador-valido' },
+    })
+    expect(response.status).toBe(200)
+    const sessao = await response.json() as { evento: { local: unknown; espacoNome: unknown; pontoAtendimentoNome: unknown } }
+    expect(sessao.evento).toMatchObject({ local: null, espacoNome: null, pontoAtendimentoNome: null })
+  })
+
   it('rejeita token desconhecido', async () => {
     const resultado = await validarCredencialOperadorPortaria(db, 'token-inexistente')
 
