@@ -66,12 +66,12 @@ describe('PORT — credencial temporária do operador', () => {
       INSERT INTO pontos_atendimento (id, setor_id, nome)
       VALUES ('ponto-a', 'setor-1', 'Ponto A'),
              ('ponto-b', 'setor-1', 'Ponto B');
-      UPDATE eventos SET local_id = 'local-a', espaco_id = 'espaco-a', ponto_atendimento_id = 'ponto-a'
+      UPDATE eventos SET casa_id = NULL, setor_id = 'setor-1', local_id = 'local-a', espaco_id = 'espaco-a', ponto_atendimento_id = 'ponto-a'
       WHERE id = 'evento-1';
-      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, casa_id, local_id, espaco_id, ponto_atendimento_id, ativo)
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, setor_id, local_id, espaco_id, ponto_atendimento_id, ativo)
       VALUES ('evento-2', 'Reunião Teste', 'PRESENCIAL',
               '2099-01-01T15:00:00.000Z', '2099-01-01T18:00:00.000Z',
-              'casa-1', 'local-b', 'espaco-b', 'ponto-b', 1);
+              'setor-1', 'local-b', 'espaco-b', 'ponto-b', 1);
     `)
     sqlite.prepare(`INSERT INTO credenciais_operador_portaria_evento
       (id, evento_id, token_hash, expira_em, ativo) VALUES (?, ?, ?, ?, 1)`)
