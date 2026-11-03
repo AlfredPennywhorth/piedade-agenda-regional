@@ -731,6 +731,80 @@ describe('S07 - Minha Agenda', () => {
     expect(itemDepois.rsvp.reconfirmacaoPendente).toBe(false)
   })
 
+  it('REG-462: eventos sucessivos no mesmo local não geram falso conflito', async () => {
+    sqlite.exec(`
+      INSERT INTO locais (id, nome, endereco, numero, cidade, uf)
+      VALUES ('loc-prox-outro', 'Local Distinto', 'Rua B', '2', 'SP', 'SP');
+      INSERT INTO espacos_local (id, local_id, nome, ativo)
+      VALUES ('esp-prox-2', 'loc-1', 'Sala B', 1);
+    `)
+
+    const casos = [
+      // Mesmo local, inclusive em espaços diferentes: sem necessidade de deslocamento.
+      { nome: 'contiguo', dia: '01', fimA: '11:00', inicioB: '11:00', localA: 'loc-1', localB: 'loc-1', espacoA: 'esp-1', espacoB: 'esp-prox-2', tipo: null },
+      { nome: 'intervalo', dia: '02', fimA: '11:00', inicioB: '11:15', localA: 'loc-1', localB: 'loc-1', espacoA: 'esp-1', espacoB: 'esp-1', tipo: null },
+      // Deslocamento entre locais continua marcado, assim como sobreposição real.
+      { nome: 'distintos', dia: '03', fimA: '11:00', inicioB: '11:15', localA: 'loc-1', localB: 'loc-prox-outro', espacoA: 'esp-1', espacoB: null, tipo: 'PROXIMIDADE' },
+      { nome: 'sobrepostos', dia: '04', fimA: '11:00', inicioB: '10:59', localA: 'loc-1', localB: 'loc-1', espacoA: 'esp-1', espacoB: 'esp-prox-2', tipo: 'SOBREPOSICAO' },
+      // Local não informado não pode ser considerado o mesmo local.
+      { nome: 'sem-local', dia: '05', fimA: '11:00', inicioB: '11:15', localA: null, localB: null, espacoA: null, espacoB: null, tipo: 'PROXIMIDADE' },
+      // Dois eventos online não ficam isentos apenas por um local associado indevidamente.
+      { nome: 'online', dia: '06', fimA: '11:00', inicioB: '11:15', localA: 'loc-1', localB: 'loc-1', espacoA: null, espacoB: null, tipo: 'PROXIMIDADE', modalidade: 'ONLINE' },
+      // Um evento online e outro presencial no mesmo local também exigem transição.
+      { nome: 'misto', dia: '07', fimA: '11:00', inicioB: '11:15', localA: 'loc-1', localB: 'loc-1', espacoA: null, espacoB: 'esp-1', tipo: 'PROXIMIDADE', modalidadeA: 'ONLINE' },
+    ] as const
+
+    const inserirEvento = sqlite.prepare(`
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, local_id, espaco_id, regional_id, ativo)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'reg-1', 1)
+    `)
+    const inserirConvocacao = sqlite.prepare("INSERT INTO convocacoes (id, evento_id, status, ativo) VALUES (?, ?, 'PUBLICADA', 1)")
+    const inserirDestinatario = sqlite.prepare('INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES (?, ?, ?)')
+
+    for (const caso of casos) {
+      for (const lado of ['a', 'b'] as const) {
+        const id = `ev-prox-${caso.nome}-${lado}`
+        const inicio = lado === 'a' ? '10:00' : caso.inicioB
+        const fim = lado === 'a' ? caso.fimA : '12:00'
+        const local = lado === 'a' ? caso.localA : caso.localB
+        const espaco = lado === 'a' ? caso.espacoA : caso.espacoB
+        const modalidade = 'modalidade' in caso ? caso.modalidade
+          : lado === 'a' && 'modalidadeA' in caso ? caso.modalidadeA
+          : 'PRESENCIAL'
+        inserirEvento.run(id, id, modalidade, `2034-06-${caso.dia}T${inicio}:00Z`, `2034-06-${caso.dia}T${fim}:00Z`, local, espaco)
+        inserirConvocacao.run(`conv-${id}`, id)
+        inserirDestinatario.run(`dest-${id}`, `conv-${id}`, membroId)
+      }
+    }
+
+    const resposta = await req('/api/v1/minha-agenda', {
+      headers: { Authorization: `Bearer ${sessionToken}` },
+    })
+    expect(resposta.status).toBe(200)
+    const agenda = await resposta.json() as Array<{
+      evento: { id: string }
+      conflito: { tipo: string; eventos: Array<{ eventoId: string; tipo: string }> } | null
+    }>
+
+    for (const caso of casos) {
+      const a = agenda.find(item => item.evento.id === `ev-prox-${caso.nome}-a`)
+      const b = agenda.find(item => item.evento.id === `ev-prox-${caso.nome}-b`)
+      expect(a).toBeDefined()
+      expect(b).toBeDefined()
+      if (caso.tipo === null) {
+        expect(a?.conflito).toBeNull()
+        expect(b?.conflito).toBeNull()
+      } else {
+        expect(a?.conflito?.eventos).toEqual(expect.arrayContaining([
+          expect.objectContaining({ eventoId: b?.evento.id, tipo: caso.tipo }),
+        ]))
+        expect(b?.conflito?.eventos).toEqual(expect.arrayContaining([
+          expect.objectContaining({ eventoId: a?.evento.id, tipo: caso.tipo }),
+        ]))
+      }
+    }
+  })
+
   it('PA-03: alternativas de Pontos distintos não conflitam, mas assuntos diferentes sim', async () => {
     const paA = crypto.randomUUID()
     const paB = crypto.randomUUID()
