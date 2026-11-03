@@ -107,10 +107,12 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
 
     const sincronizar = async () => {
       try {
-        const [participantesData, convidadosData] = await Promise.all([
+        const [sessaoData, participantesData, convidadosData] = await Promise.all([
+          chamadaOperador<Sessao>(token, '/sessao'),
           chamadaOperador<{ participantes: Participante[] }>(token, '/participantes'),
           chamadaOperador<{ data: Convidado[] }>(token, '/convidados'),
         ])
+        setSessao(sessaoData)
         setParticipantes(participantesData.participantes || [])
         setConvidados(convidadosData.data || [])
       } catch (err) {
