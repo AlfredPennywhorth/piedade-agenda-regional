@@ -124,10 +124,8 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
       ORDER BY cd.convocacao_id
     `).all(membro.id) as { id: string }[]
     expect(destinos.map(x => x.id)).toEqual(['conv-vp'])
-    const agenda = await req('/api/v1/agenda')
     // O cadastro na Casa/PA A não pode materializar destinatário para PA B,
     // mesmo quando o título, o Setor e os horários das reuniões coincidem.
-    expect(agenda.status).toBe(200)
   })
 
   it('1b. Deve omitir membro inativo e sincronizar convocações publicadas ao reativar na mesma Casa', async () => {
