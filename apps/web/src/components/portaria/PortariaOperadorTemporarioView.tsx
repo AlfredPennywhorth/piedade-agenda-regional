@@ -105,7 +105,9 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
   useEffect(() => {
     void carregar()
 
+    let acessoRevogado = false
     const sincronizar = async () => {
+      if (acessoRevogado) return
       // Uma falha transitória em /sessao não pode descartar listas válidas.
       const [resultadoSessao, resultadoParticipantes, resultadoConvidados] = await Promise.allSettled([
         chamadaOperador<Sessao>(token, '/sessao'),
@@ -122,6 +124,8 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
         apiErr.status === 410
       )
       if (acessoInvalido) {
+        acessoRevogado = true
+        window.clearInterval(intervalo)
         pararCamera()
         setSessao(null)
         setErro(acessoInvalido.body?.code === 'PORTARIA_FECHADA'
