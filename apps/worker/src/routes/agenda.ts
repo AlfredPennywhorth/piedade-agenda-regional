@@ -70,6 +70,8 @@ type RegistroAgenda = {
     titulo: string
     inicioEm: string
     fimEm: string
+    modalidade: string
+    localId: string | null
     agendaRevisao: string
     grupoEquivalenciaId: string | null
     pontoAtendimentoId: string | null
@@ -92,6 +94,11 @@ function tipoConflito(a: RegistroAgenda, b: RegistroAgenda): 'SOBREPOSICAO' | 'P
   const fimB = new Date(b.evento.fimEm).getTime()
 
   if (inicioA < fimB && inicioB < fimA) return 'SOBREPOSICAO'
+
+  // Eventos presenciais consecutivos no mesmo local não exigem deslocamento.
+  // Uma sobreposição real continua sendo conflito, inclusive no mesmo local.
+  if (a.evento.modalidade !== 'ONLINE' && b.evento.modalidade !== 'ONLINE' &&
+    a.evento.localId && a.evento.localId === b.evento.localId) return null
 
   const distancia = inicioB >= fimA
     ? inicioB - fimA
