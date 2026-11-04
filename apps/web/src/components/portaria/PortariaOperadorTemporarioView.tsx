@@ -106,32 +106,37 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
     void carregar()
 
     const sincronizar = async () => {
-      try {
-        const [sessaoData, participantesData, convidadosData] = await Promise.all([
-          chamadaOperador<Sessao>(token, '/sessao'),
-          chamadaOperador<{ participantes: Participante[] }>(token, '/participantes'),
-          chamadaOperador<{ data: Convidado[] }>(token, '/convidados'),
-        ])
-        setSessao(sessaoData)
-        setParticipantes(participantesData.participantes || [])
-        setConvidados(convidadosData.data || [])
-      } catch (err) {
-        const apiErr = err as ApiError<any>
-        if (
-          apiErr.body?.code === 'PORTARIA_FECHADA' ||
-          apiErr.body?.code === 'CREDENCIAL_EXPIRADA' ||
-          apiErr.status === 401 ||
-          apiErr.status === 403 ||
-          apiErr.status === 410
-        ) {
-          pararCamera()
-          setSessao(null)
-          setErro(apiErr.body?.code === 'PORTARIA_FECHADA'
-            ? 'Esta Portaria já foi encerrada.'
-            : apiErr.body?.code === 'CREDENCIAL_EXPIRADA' || apiErr.status === 410
-              ? 'Este acesso temporário expirou.'
-              : 'Este acesso temporário não está mais disponível.')
-        }
+      // Uma falha transitória em /sessao não pode descartar listas válidas.
+      const [resultadoSessao, resultadoParticipantes, resultadoConvidados] = await Promise.allSettled([
+        chamadaOperador<Sessao>(token, '/sessao'),
+        chamadaOperador<{ participantes: Participante[] }>(token, '/participantes'),
+        chamadaOperador<{ data: Convidado[] }>(token, '/convidados'),
+      ])
+      const falhas = [resultadoSessao, resultadoParticipantes, resultadoConvidados]
+        .filter((resultado): resultado is PromiseRejectedResult => resultado.status === 'rejected')
+      const acessoInvalido = falhas.map(resultado => resultado.reason as ApiError<any>).find(apiErr =>
+        apiErr.body?.code === 'PORTARIA_FECHADA' ||
+        apiErr.body?.code === 'CREDENCIAL_EXPIRADA' ||
+        apiErr.status === 401 ||
+        apiErr.status === 403 ||
+        apiErr.status === 410
+      )
+      if (acessoInvalido) {
+        pararCamera()
+        setSessao(null)
+        setErro(acessoInvalido.body?.code === 'PORTARIA_FECHADA'
+          ? 'Esta Portaria já foi encerrada.'
+          : acessoInvalido.body?.code === 'CREDENCIAL_EXPIRADA' || acessoInvalido.status === 410
+            ? 'Este acesso temporário expirou.'
+            : 'Este acesso temporário não está mais disponível.')
+        return
+      }
+      if (resultadoSessao.status === 'fulfilled') setSessao(resultadoSessao.value)
+      if (resultadoParticipantes.status === 'fulfilled') {
+        setParticipantes(resultadoParticipantes.value.participantes || [])
+      }
+      if (resultadoConvidados.status === 'fulfilled') {
+        setConvidados(resultadoConvidados.value.data || [])
       }
     }
 
@@ -367,7 +372,7 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
         <header className="rounded-2xl bg-brand-900 p-5 text-white shadow">
           <p className="text-xs uppercase tracking-wide text-brand-200">Acesso temporário de Portaria</p>
           <h1 className="mt-1 break-words text-2xl font-bold">{sessao.evento.titulo}</h1><AjudaIsolada assunto="portaria-temporaria" />
-          <div aria-label="Identificação da reunião" className="mt-4 space-y-2 rounded-xl border border-white/30 bg-white/10 p-4 text-sm">
+          <div role="group" aria-label="Identificação da reunião" className="mt-4 space-y-2 rounded-xl border border-white/30 bg-white/10 p-4 text-sm">
             <p><span className="font-semibold">Data e horário:</span> {dataReuniao}, {horaReuniao(sessao.evento.inicioEm)} às {horaReuniao(sessao.evento.fimEm)}</p>
             <p><span className="font-semibold">Código da reunião:</span> <span className="font-mono" title="Identificador para conferência com o cadastro do evento">{sessao.evento.id.slice(0, 12)}</span></p>
             {sessao.evento.pontoAtendimentoNome && <p className="break-words"><span className="font-semibold">Ponto de Atendimento:</span> {sessao.evento.pontoAtendimentoNome}</p>}
