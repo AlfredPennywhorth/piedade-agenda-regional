@@ -112,7 +112,9 @@ function eventoCorrespondeAoVinculo(evento: any, vinculo: any, hierarquiaDco: {
     if (evento.pontoAtendimentoId && evento.pontoAtendimentoId !== hierarquiaDco.pontoAtendimentoId) return false
     if (evento.casaId) return hierarquiaDco.casaAtiva && evento.casaId === hierarquiaDco.casaId
     if (evento.setorId) return hierarquiaDco.casaAtiva && hierarquiaDco.setorAtivo
-      && evento.setorId === hierarquiaDco.setorId
+      && (evento.pontoAtendimentoId
+        ? evento.pontoAtendimentoId === hierarquiaDco.pontoAtendimentoId
+        : evento.setorId === hierarquiaDco.setorId)
     if (evento.administracaoId) return hierarquiaDco.casaAtiva && hierarquiaDco.setorAtivo
       && hierarquiaDco.administracaoAtiva && evento.administracaoId === hierarquiaDco.administracaoId
     if (evento.regionalId) return hierarquiaDco.casaAtiva && hierarquiaDco.setorAtivo
