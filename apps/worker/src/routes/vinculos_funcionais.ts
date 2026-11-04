@@ -100,16 +100,21 @@ function escopoDoVinculo(vinculo: any): {
 }
 
 function eventoCorrespondeAoVinculo(evento: any, vinculo: any, hierarquiaDco: {
-  casaId: string; setorId: string; administracaoId: string; regionalId: string
+  casaId: string; pontoAtendimentoId: string | null; setorId: string; administracaoId: string; regionalId: string
   casaAtiva: boolean; setorAtivo: boolean; administracaoAtiva: boolean; regionalAtiva: boolean
 } | null, dcoAutomatico: boolean): boolean {
   // Apenas o DCO automático segue a hierarquia da Casa, respeitando os níveis ativos.
   // O evento de Setor não exige Administração ativa; o de Casa exige Casa ativa.
   if (dcoAutomatico) {
     if (!hierarquiaDco || evento.abrangencia !== 'TERRITORIAL' || evento.grupoTrabalhoId) return false
+    // Ao cadastrar um DCO após a publicação, só sincronizar convocações do seu PA.
+    // Sem PA no evento, mantém a herança territorial normal (Casa/Setor/Regional).
+    if (evento.pontoAtendimentoId && evento.pontoAtendimentoId !== hierarquiaDco.pontoAtendimentoId) return false
     if (evento.casaId) return hierarquiaDco.casaAtiva && evento.casaId === hierarquiaDco.casaId
     if (evento.setorId) return hierarquiaDco.casaAtiva && hierarquiaDco.setorAtivo
-      && evento.setorId === hierarquiaDco.setorId
+      && (evento.pontoAtendimentoId
+        ? evento.pontoAtendimentoId === hierarquiaDco.pontoAtendimentoId
+        : evento.setorId === hierarquiaDco.setorId)
     if (evento.administracaoId) return hierarquiaDco.casaAtiva && hierarquiaDco.setorAtivo
       && hierarquiaDco.administracaoAtiva && evento.administracaoId === hierarquiaDco.administracaoId
     if (evento.regionalId) return hierarquiaDco.casaAtiva && hierarquiaDco.setorAtivo
@@ -162,7 +167,7 @@ export async function prepararSincronizacaoConvocacoes(db: any, vinculo: any, as
   const dcoAutomatico = funcaoDco?.codigo === 'DCO' && funcaoDco.ativo
   const casaDco = dcoAutomatico
     ? await db.select({
-        casaId: casas.id, setorId: setores.id,
+        casaId: casas.id, pontoAtendimentoId: casas.pontoAtendimentoId, setorId: setores.id,
         administracaoId: administracoes.id, regionalId: administracoes.regionalId,
         casaAtiva: casas.ativo, setorAtivo: setores.ativo, administracaoAtiva: administracoes.ativo,
         regionalAtiva: regionais.ativo,
