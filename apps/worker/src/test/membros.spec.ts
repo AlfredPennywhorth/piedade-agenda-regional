@@ -86,6 +86,50 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     expect(json.id).toBeDefined()
   })
 
+  it('PA-08: novo DCO entra só nas convocações publicadas do PA da Casa', async () => {
+    const dco = sqlite.prepare("SELECT id FROM funcoes WHERE codigo = 'DCO' AND ativo = 1")
+      .get() as { id: string }
+    sqlite.exec(`
+      INSERT INTO pontos_atendimento (id, nome, setor_id) VALUES
+        ('pa-vp', 'Vila Prudente', '${setorId}'),
+        ('pa-br', 'Bom Retiro', '${setorId}');
+      UPDATE casas SET ponto_atendimento_id = 'pa-vp' WHERE id = '${casaId}';
+      UPDATE casas SET ponto_atendimento_id = 'pa-br' WHERE id = '${casaId2}';
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, setor_id, ponto_atendimento_id, ativo)
+      VALUES
+        ('evento-vp', 'Reunião Mensal - VP', 'PRESENCIAL', '2099-01-01T12:00:00.000Z', '2099-01-01T16:00:00.000Z', '${setorId}', 'pa-vp', 1),
+        ('evento-br', 'Reunião Mensal - BR', 'PRESENCIAL', '2099-01-01T12:00:00.000Z', '2099-01-01T16:00:00.000Z', '${setorId}', 'pa-br', 1);
+      INSERT INTO convocacoes (id, evento_id, status, publicada_em, ativo) VALUES
+        ('conv-vp', 'evento-vp', 'PUBLICADA', CURRENT_TIMESTAMP, 1),
+        ('conv-br', 'evento-br', 'PUBLICADA', CURRENT_TIMESTAMP, 1);
+      INSERT INTO convocacao_funcoes (id, convocacao_id, funcao_id) VALUES
+        ('func-vp', 'conv-vp', '${dco.id}'),
+        ('func-br', 'conv-br', '${dco.id}');
+    `)
+
+    const res = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'DCO Novo Vila Prudente',
+        dataOrdenacao: '2000-01-01',
+        codigoCarteirinha: 'TESTE-PA-08',
+        casaId,
+      }),
+    })
+    expect(res.status).toBe(201)
+    const membro = await res.json() as MembroResponse
+    const destinos = sqlite.prepare(`
+      SELECT cd.convocacao_id AS id
+      FROM convocacao_destinatarios cd WHERE cd.membro_id = ?
+      ORDER BY cd.convocacao_id
+    `).all(membro.id) as { id: string }[]
+    expect(destinos.map(x => x.id)).toEqual(['conv-vp'])
+    const agenda = await req('/api/v1/agenda')
+    // O cadastro na Casa/PA A não pode materializar destinatário para PA B,
+    // mesmo quando o título, o Setor e os horários das reuniões coincidem.
+    expect(agenda.status).toBe(200)
+  })
+
   it('1b. Deve omitir membro inativo e sincronizar convocações publicadas ao reativar na mesma Casa', async () => {
     const funcaoDco = sqlite.prepare(
       "SELECT id FROM funcoes WHERE codigo = 'DCO' AND ativo = 1"
