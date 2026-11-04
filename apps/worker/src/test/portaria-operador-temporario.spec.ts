@@ -127,15 +127,15 @@ describe('PORT — credencial temporária do operador', () => {
       expect(participantes.status).toBe(200)
       return {
         sessao: await sessao.json() as { evento: { id: string } },
-        participantes: await participantes.json() as { participantes: Array<{ membro: { id: string } }> },
+        participantes: await participantes.json() as { participantes: Array<{ convocacaoDestinatarioId: string; membro: { id: string } }> },
       }
     }
     const a = await carregar('token-operador-valido')
     const b = await carregar('token-operador-b')
     expect(a.sessao.evento.id).toBe('evento-1')
     expect(b.sessao.evento.id).toBe('evento-2')
-    expect(a.participantes.participantes.map(x => x.membro.id)).toEqual(['participante-a'])
-    expect(b.participantes.participantes.map(x => x.membro.id)).toEqual(['participante-b'])
+    expect(a.participantes.participantes.map(x => [x.membro.id, x.convocacaoDestinatarioId])).toEqual([['participante-a', 'dest-a']])
+    expect(b.participantes.participantes.map(x => [x.membro.id, x.convocacaoDestinatarioId])).toEqual([['participante-b', 'dest-b']])
   })
 
   it('rejeita token desconhecido', async () => {
