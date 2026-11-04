@@ -2,6 +2,21 @@
 
 > **Estado: PREPARAÇÃO.** Não executar criação ou deploy sem verificar capacidade/consumo da conta Cloudflare. A autorização do PMO está condicionada a **custo incremental US$ 0**, sem upgrade ou cobrança. Não executar merge em `main`, deploy em produção, nem alterar Beta compartilhado. O material deste documento não substitui aprovação de cada gate.
 
+
+## 0. Alternativa prioritária sem uso da conta Cloudflare — integração efêmera no GitHub Actions
+
+A conta Cloudflare foi informada pelo PMO como **no limite de utilização**. Por isso, a primeira opção é a homologação automatizada no **runner temporário do GitHub Actions**, sem criar Worker, D1 ou Pages na Cloudflare e sem consumir as respectivas cotas. **Não** iniciar a topologia da seção 3 sem inventário financeiro aprovado. Desligar recursos após o uso não garante liberação das cotas de quantidade/armazenamento; após homologação em Cloudflare, planejar exclusão nominal e confirmada dos recursos exclusivamente HML, não somente inativação.
+
+Workflow proposto: `.github/workflows/hml469-integracao-local.yml`, inicialmente disparado na própria PR draft #471. O workflow:
+
+1. Exige o número exato da PR de planejamento (#471), sem usar tokens de deploy ou credenciais Cloudflare.
+2. Faz checkout **fixado no SHA** da PR #469 (`49eedc3e40133dee9bdc4e6295a4e2acc619c2fa`); aborta se esse SHA deixar de ser o HEAD da PR #469, evitando resultados obsoletos.
+3. Executa os testes de integração existentes de membros/PA, agenda, eventos e Portaria, incluindo os casos automatizados de #468, #463, #459, #465 e #467.
+4. Executa testes gerais da aplicação, verificação de tipos e builds locais do Worker (Wrangler `--dry-run`) e Web. Não executa `wrangler deploy`, migrations `--remote`, nem comandos de criação de recursos.
+5. Produz um resumo verificável e o SHA efetivo do código. O runner será descartado ao final; os testes existentes usam dados sintéticos e banco local em memória.
+
+**Limites:** esse workflow demonstra integração automatizada no SHA de release, mas não representa um smoke completo no runtime da Cloudflare, não comprova CORS real nem permissões/credenciais reais, e não substitui os cenários manuais HML469-01 a 12. Para a publicação em produção permanecerá obrigatório um plano explícito de backup/reversão e smoke pós-deploy, com gates separados. O uso do GitHub Actions também consome a franquia de minutos da plataforma; se não houver saldo gratuito, interromper e informar antes de execução faturável.
+
 ## 1. Referências fixadas
 
 - Release: [PR #469](https://github.com/AlfredPennywhorth/piedade-agenda-regional/pull/469), branch `release/selective-fixes-pa-portaria-20261104`.
