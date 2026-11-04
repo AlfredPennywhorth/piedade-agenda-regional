@@ -15,7 +15,7 @@ const required = {
 }
 const sha = 'a'.repeat(40)
 
-function scenario({ base = 'develop', head = 'feature/x', actualSha = sha, expectedSha = sha, changes = [], fetchFails = false, diffFails = false, omitDeclaration, output = false, githubEvent = null, repository = null } = {}) {
+function scenario({ base = 'develop', head = 'feature/x', actualSha = sha, expectedSha = sha, changes = [], fetchFails = false, diffFails = false, omitDeclaration, output = false, githubEvent = null, repository = null, eventName = 'pull_request', rawEvent = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'agenda-preflight-'))
   const bin = join(dir, 'bin')
   mkdirSync(bin)
@@ -42,7 +42,7 @@ function scenario({ base = 'develop', head = 'feature/x', actualSha = sha, expec
   }
   const outputPath = join(dir, 'github-output')
   const eventPath = join(dir, 'github-event.json')
-  if (githubEvent) writeFileSync(eventPath, JSON.stringify(githubEvent))
+  if (githubEvent || rawEvent !== null) writeFileSync(eventPath, rawEvent ?? JSON.stringify(githubEvent))
   try {
     const env = {
       ...process.env,
@@ -57,9 +57,9 @@ function scenario({ base = 'develop', head = 'feature/x', actualSha = sha, expec
       MOCK_CHANGED: changes.join('\n'),
       MOCK_HEAD: head,
     }
-    if (githubEvent) {
+    if (githubEvent || rawEvent !== null) {
       env.GITHUB_EVENT_PATH = eventPath
-      env.GITHUB_EVENT_NAME = 'pull_request'
+      env.GITHUB_EVENT_NAME = eventName
     } else {
       delete env.GITHUB_EVENT_PATH
       delete env.GITHUB_EVENT_NAME
@@ -197,22 +197,28 @@ test('release #469: qualquer arquivo extra ou substituição é bloqueado', () =
     assert.match(r.log, /PR #469: escopo divergente/)
   }
 })
-test('release #469: origem, identidade e metadados falsos falham fechados', () => {
+test('release #469: identidade e metadados inválidos falham pela política de branch', () => {
+  const pr = release469Event().pull_request
   const cases = [
     { repository: 'outro/ambiente' },
     { githubEvent: release469Event({ number: 470 }) },
-    { githubEvent: release469Event({ pull_request: { ...release469Event().pull_request, number: 470 } }) },
-    { githubEvent: release469Event({ pull_request: { ...release469Event().pull_request, head: { ref: 'develop', repo: { full_name: release469Repo } } } }) },
-    { githubEvent: release469Event({ pull_request: { ...release469Event().pull_request, head: { ref: release469Head, repo: { full_name: 'outra/conta' } } } }) },
+    { githubEvent: release469Event({ pull_request: { ...pr, number: 470 } }) },
+    { githubEvent: release469Event({ pull_request: { ...pr, head: { ref: 'develop', repo: { full_name: release469Repo } } } }) },
+    { githubEvent: release469Event({ pull_request: { ...pr, head: { ref: release469Head, repo: { full_name: 'outra/conta' } } } }) },
+    { githubEvent: release469Event({ pull_request: { ...pr, base: { ref: 'main', repo: { full_name: 'outra/conta' } } } }) },
+    { githubEvent: release469Event({ pull_request: { ...pr, base: { ref: 'develop', repo: { full_name: release469Repo } } } }) },
     { githubEvent: null },
     { head: 'release/falsa-469' },
-    { base: 'other' },
+    { eventName: 'workflow_dispatch' },
+    { rawEvent: '{ invalid json' },
   ]
   for (const options of cases) {
-    const r = release469Scenario(options)
-    assert.equal(r.status, 1, JSON.stringify(options) + '\n' + r.log)
+    const result = release469Scenario(options)
+    assert.equal(result.status, 1, JSON.stringify(options) + '\\n' + result.log)
+    assert.match(result.log, /PR para main deve partir de develop/, JSON.stringify(options))
   }
 })
+
 test('release #469: falha em SHA, diff ou declaração essencial continua bloqueando', () => {
   for (const options of [
     { expectedSha: 'b'.repeat(40) },
