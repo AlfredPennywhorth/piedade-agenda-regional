@@ -128,6 +128,58 @@ describe('Membros (S01) - Testes de Integração Drizzle/SQLite', () => {
     // mesmo quando o título, o Setor e os horários das reuniões coincidem.
   })
 
+  it('PA-09: DCO novo de Casa intersetorial autorizada recebe convocação publicada do PA de destino', async () => {
+    const dco = sqlite.prepare("SELECT id FROM funcoes WHERE codigo = 'DCO' AND ativo = 1")
+      .get() as { id: string }
+    const setorOrigem = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    sqlite.exec(`
+      INSERT INTO setores (id, administracao_id, nome) VALUES
+        ('${setorOrigem}', '${administracaoId}', 'Setor Brás');
+      INSERT INTO pontos_atendimento (id, nome, setor_id) VALUES
+        ('pa-destino', 'Bom Retiro', '${setorId}'),
+        ('pa-vizinho', 'Vila Moraes', '${setorId}');
+      UPDATE casas SET setor_id = '${setorOrigem}' WHERE id = '${casaId2}';
+      INSERT INTO casas_pontos_excecoes (casa_id, ponto_atendimento_id, motivo)
+        VALUES ('${casaId2}', 'pa-destino', 'Exceção de atendimento intersetorial autorizada');
+      UPDATE casas SET ponto_atendimento_id = 'pa-destino' WHERE id = '${casaId2}';
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, setor_id, ponto_atendimento_id, ativo)
+      VALUES
+        ('evento-destino', 'Atendimento - Bom Retiro', 'PRESENCIAL',
+          '2099-01-01T12:00:00.000Z', '2099-01-01T16:00:00.000Z', '${setorId}', 'pa-destino', 1),
+        ('evento-vizinho', 'Atendimento - Vila Moraes', 'PRESENCIAL',
+          '2099-01-01T12:00:00.000Z', '2099-01-01T16:00:00.000Z', '${setorId}', 'pa-vizinho', 1),
+        ('evento-setor-origem', 'Reunião do Setor Brás', 'PRESENCIAL',
+          '2099-01-02T12:00:00.000Z', '2099-01-02T16:00:00.000Z', '${setorOrigem}', NULL, 1);
+      INSERT INTO convocacoes (id, evento_id, status, publicada_em, ativo) VALUES
+        ('conv-destino', 'evento-destino', 'PUBLICADA', CURRENT_TIMESTAMP, 1),
+        ('conv-vizinho', 'evento-vizinho', 'PUBLICADA', CURRENT_TIMESTAMP, 1),
+        ('conv-setor-origem', 'evento-setor-origem', 'PUBLICADA', CURRENT_TIMESTAMP, 1);
+      INSERT INTO convocacao_funcoes (id, convocacao_id, funcao_id) VALUES
+        ('func-destino', 'conv-destino', '${dco.id}'),
+        ('func-vizinho', 'conv-vizinho', '${dco.id}'),
+        ('func-setor-origem', 'conv-setor-origem', '${dco.id}');
+    `)
+
+    const res = await req('/api/v1/membros', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'DCO Novo Casa Brás',
+        dataOrdenacao: '2000-01-01',
+        codigoCarteirinha: 'TESTE-PA-09',
+        casaId: casaId2,
+      }),
+    })
+    expect(res.status).toBe(201)
+    const membro = await res.json() as MembroResponse
+    const destinatarios = sqlite.prepare(`
+      SELECT convocacao_id AS id FROM convocacao_destinatarios
+      WHERE membro_id = ? ORDER BY convocacao_id
+    `).all(membro.id) as { id: string }[]
+    expect(destinatarios.map(x => x.id)).toEqual(['conv-destino', 'conv-setor-origem'])
+    expect(sqlite.prepare('SELECT setor_id AS setor, ponto_atendimento_id AS pa FROM casas WHERE id = ?')
+      .get(casaId2)).toMatchObject({ setor: setorOrigem, pa: 'pa-destino' })
+  })
+
   it('1b. Deve omitir membro inativo e sincronizar convocações publicadas ao reativar na mesma Casa', async () => {
     const funcaoDco = sqlite.prepare(
       "SELECT id FROM funcoes WHERE codigo = 'DCO' AND ativo = 1"
