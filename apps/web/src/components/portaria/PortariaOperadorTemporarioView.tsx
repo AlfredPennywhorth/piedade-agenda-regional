@@ -114,6 +114,8 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
         chamadaOperador<{ participantes: Participante[] }>(token, '/participantes'),
         chamadaOperador<{ data: Convidado[] }>(token, '/convidados'),
       ])
+      // Outro polling pode ter revogado a credencial enquanto este aguardava.
+      if (acessoRevogado) return
       const falhas = [resultadoSessao, resultadoParticipantes, resultadoConvidados]
         .filter((resultado): resultado is PromiseRejectedResult => resultado.status === 'rejected')
       const acessoInvalido = falhas.map(resultado => resultado.reason as ApiError<any>).find(apiErr =>
@@ -147,6 +149,7 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
     const intervalo = window.setInterval(() => void sincronizar(), 8000)
 
     return () => {
+      acessoRevogado = true
       window.clearInterval(intervalo)
       pararCamera()
     }
