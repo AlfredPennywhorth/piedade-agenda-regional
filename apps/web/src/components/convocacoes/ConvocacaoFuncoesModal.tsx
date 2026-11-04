@@ -243,7 +243,7 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose, returnFocusRef }
                       value={funcaoSelecionadaId}
                       onChange={(e) => setFuncaoSelecionadaId(e.target.value)}
                       disabled={salvando}
-                      className="w-full min-w-0 flex-1 rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      className="w-full min-w-0 flex-1 rounded-lg border border-slate-300 p-2 text-base sm:text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                     >
                       <option value="">Selecione uma função...</option>
                       {funcoesDisponiveis.map((f) => (
