@@ -369,6 +369,7 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
           <h1 className="mt-1 break-words text-2xl font-bold">{sessao.evento.titulo}</h1><AjudaIsolada assunto="portaria-temporaria" />
           <div aria-label="Identificação da reunião" className="mt-4 space-y-2 rounded-xl border border-white/30 bg-white/10 p-4 text-sm">
             <p><span className="font-semibold">Data e horário:</span> {dataReuniao}, {horaReuniao(sessao.evento.inicioEm)} às {horaReuniao(sessao.evento.fimEm)}</p>
+            <p><span className="font-semibold">Código da reunião:</span> <span className="font-mono" title="Identificador para conferência com o cadastro do evento">{sessao.evento.id.slice(0, 12)}</span></p>
             {sessao.evento.pontoAtendimentoNome && <p className="break-words"><span className="font-semibold">Ponto de Atendimento:</span> {sessao.evento.pontoAtendimentoNome}</p>}
             <p className="break-words"><span className="font-semibold">Local:</span> {local?.nome || 'Local não informado'}{sessao.evento.espacoNome ? ` — ${sessao.evento.espacoNome}` : ''}</p>
             <p className="break-words"><span className="font-semibold">Endereço:</span> {enderecoReuniao || 'Endereço não informado'}</p>
