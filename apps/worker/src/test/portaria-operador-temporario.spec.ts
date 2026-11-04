@@ -100,6 +100,44 @@ describe('PORT — credencial temporária do operador', () => {
     expect(sessao.evento).toMatchObject({ local: null, espacoNome: null, pontoAtendimentoNome: null })
   })
 
+  it('PORT-466: credenciais de reuniões homônimas isolam destinatários publicados', async () => {
+    sqlite.exec(`
+      INSERT INTO membros (id, nome, casa_id, ativo) VALUES
+        ('participante-a', 'Participante A', 'casa-1', 1),
+        ('participante-b', 'Participante B', 'casa-1', 1);
+      INSERT INTO eventos (id, titulo, modalidade, inicio_em, fim_em, casa_id, ativo)
+      VALUES ('evento-2', 'Reunião Teste', 'PRESENCIAL',
+              '2099-01-01T15:00:00.000Z', '2099-01-01T18:00:00.000Z', 'casa-1', 1);
+      INSERT INTO convocacoes (id, evento_id, status, ativo) VALUES
+        ('conv-a', 'evento-1', 'PUBLICADA', 1),
+        ('conv-b', 'evento-2', 'PUBLICADA', 1);
+      INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES
+        ('dest-a', 'conv-a', 'participante-a'),
+        ('dest-b', 'conv-b', 'participante-b');
+    `)
+    sqlite.prepare(`INSERT INTO credenciais_operador_portaria_evento
+      (id, evento_id, token_hash, expira_em, ativo) VALUES (?, ?, ?, ?, 1)`)
+      .run('cred-2', 'evento-2', await hashToken('token-operador-b'), '2099-01-02T02:59:59.000Z')
+
+    const carregar = async (token: string) => {
+      const headers = { Authorization: `Bearer ${token}` }
+      const sessao = await app.request('/api/v1/portaria-operador-publica/sessao', { headers })
+      const participantes = await app.request('/api/v1/portaria-operador-publica/participantes', { headers })
+      expect(sessao.status).toBe(200)
+      expect(participantes.status).toBe(200)
+      return {
+        sessao: await sessao.json() as { evento: { id: string } },
+        participantes: await participantes.json() as { participantes: Array<{ membro: { id: string } }> },
+      }
+    }
+    const a = await carregar('token-operador-valido')
+    const b = await carregar('token-operador-b')
+    expect(a.sessao.evento.id).toBe('evento-1')
+    expect(b.sessao.evento.id).toBe('evento-2')
+    expect(a.participantes.participantes.map(x => x.membro.id)).toEqual(['participante-a'])
+    expect(b.participantes.participantes.map(x => x.membro.id)).toEqual(['participante-b'])
+  })
+
   it('rejeita token desconhecido', async () => {
     const resultado = await validarCredencialOperadorPortaria(db, 'token-inexistente')
 
