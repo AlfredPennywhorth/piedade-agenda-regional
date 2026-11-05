@@ -279,7 +279,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Reunião de Setor/i }))
 
     const dialog = within(await screen.findByRole('dialog'))
-    fireEvent.click(dialog.getByLabelText('✗ Não vou participar'))
+    fireEvent.click(dialog.getByRole('button', { name: '✗ Não vou participar' }))
     fireEvent.change(dialog.getByPlaceholderText(/justifique sua ausência/i), {
       target: { value: 'Outro compromisso' },
     })
@@ -499,7 +499,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     fireEvent.click(cardInicial)
 
     const dialog = within(await screen.findByRole('dialog'))
-    fireEvent.click(dialog.getByLabelText('✗ Não vou participar'))
+    fireEvent.click(dialog.getByRole('button', { name: '✗ Não vou participar' }))
     fireEvent.change(dialog.getByPlaceholderText(/justifique sua ausência/i), {
       target: { value: 'Outro compromisso' },
     })
@@ -625,9 +625,10 @@ describe('S07 - Minha Agenda e Calendário', () => {
     const dialogQueries = within(dialog)
 
     expect(dialogQueries.getByText('Sua Participação')).toBeInTheDocument()
+    expect(dialogQueries.getByText('Sua Participação').compareDocumentPosition(dialogQueries.getByText('Data e Hora')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(dialogQueries.getByText('✓ Vou participar')).toBeInTheDocument()
     expect(dialogQueries.getByText('? Não sei ainda')).toBeInTheDocument()
-    expect(dialogQueries.getByLabelText('✗ Não vou participar')).toBeInTheDocument()
+    expect(dialogQueries.getByRole('button', { name: '✗ Não vou participar' })).toBeInTheDocument()
   })
 
   it('11. Confirma participação', async () => {
@@ -709,7 +710,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     const dialogQueries = within(dialog)
 
     // Clica no rádio mas NÃO salva
-    const radioNaoVou = dialogQueries.getByLabelText('✗ Não vou participar')
+    const radioNaoVou = dialogQueries.getByRole('button', { name: '✗ Não vou participar' })
     fireEvent.click(radioNaoVou)
 
     // O text-area de justificativa deve aparecer
@@ -874,7 +875,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     fireEvent.click(dq.getByText('✓ Vou participar'))
     expect(dq.getByText(/período de participação/i)).toBeInTheDocument()
     
-    fireEvent.click(dq.getByLabelText('✗ Não vou participar'))
+    fireEvent.click(dq.getByRole('button', { name: '✗ Não vou participar' }))
     
     expect(dq.queryByText(/período de participação/i)).not.toBeInTheDocument()
     expect(dq.getByText('Alimentação Oferecida')).toBeInTheDocument()
