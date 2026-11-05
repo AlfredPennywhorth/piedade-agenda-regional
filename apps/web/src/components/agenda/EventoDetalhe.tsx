@@ -242,13 +242,13 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
     <dialog 
       ref={dialogRef}
       onCancel={handleClose}
-      className="p-0 rounded-xl shadow-2xl backdrop:bg-slate-900/50 backdrop:backdrop-blur-sm bg-white m-auto w-full max-w-lg overflow-hidden border border-slate-200 open:animate-in open:fade-in open:zoom-in-95"
+      className="p-0 rounded-xl shadow-2xl backdrop:bg-slate-900/50 backdrop:backdrop-blur-sm bg-white m-auto w-[calc(100%-1rem)] max-w-lg max-h-[95dvh] overflow-hidden open:flex open:flex-col border border-slate-200 open:animate-in open:fade-in open:zoom-in-95"
       role="dialog"
       aria-modal="true"
       aria-labelledby="evento-detalhe-titulo"
     >
-      <div className="flex justify-between items-center bg-brand-900 text-white p-4 border-b border-brand-800">
-        <h2 id="evento-detalhe-titulo" className="font-semibold text-lg truncate pr-4">{item.evento.titulo}</h2>
+      <div className="flex shrink-0 justify-between items-center gap-2 bg-brand-900 text-white p-4 border-b border-brand-800">
+        <h2 id="evento-detalhe-titulo" className="min-w-0 break-words font-semibold text-base sm:text-lg pr-2">{item.evento.titulo}</h2>
         <div className="flex items-center gap-2">
           <button
             onClick={handleShareWhatsApp}
@@ -268,7 +268,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
         </div>
       </div>
 
-      <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto text-slate-800">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-slate-800">
         <AjudaContextual />
         {reconfirmacaoPendente && item.evento.agendaAviso && (
           <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950" role="alert">
@@ -282,164 +282,8 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
           </div>
         )}
         
-        <div className="flex gap-4">
-          <div className="flex-1">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Data e Hora</h3>
-            <p className="font-medium text-slate-900 flex items-center gap-2">
-              <svg className="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-              {dateStr}
-            </p>
-            <p className="text-slate-600 mt-1 flex items-center gap-2">
-              <svg className="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              {timeInicio} às {timeFim}
-            </p>
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Modalidade</h3>
-            <span className="inline-block px-3 py-1 bg-brand-50 text-brand-700 font-semibold rounded-lg text-sm">
-              {item.evento.modalidade}
-            </span>
-          </div>
-        </div>
-
-        {destinoExterno && (
-          <div className="border-t border-slate-100 pt-6">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Destino da reunião</h3>
-            <div className="bg-slate-50 rounded-lg p-4 border border-slate-100">
-              <p className="font-semibold text-slate-900">{destinoExterno}</p>
-              {item.local?.nome && <p className="text-sm text-slate-600 mt-1">Local: {item.local.nome}</p>}
-              {item.espaco?.nome && <p className="text-sm text-slate-600 mt-1">Espaço: {item.espaco.nome}</p>}
-            </div>
-          </div>
-        )}
-
-        {isPresentialOrHybrid && item.local && !destinoExterno && (
-          <div className="border-t border-slate-100 pt-6">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Local</h3>
-            <div className="bg-slate-50 rounded-lg p-4 border border-slate-100">
-              <p className="font-semibold text-slate-900">{item.local.nome}</p>
-              {item.espaco?.nome && (
-                <p className="text-brand-800 text-sm font-semibold mt-1">Espaço: {item.espaco.nome}</p>
-              )}
-              <p className="text-slate-600 text-sm mt-1">{item.local.endereco}</p>
-              
-              <div className="flex gap-2 mt-3 flex-wrap">
-                {item.local?.urlMaps && (
-                  <a href={item.local?.urlMaps} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
-                    Google Maps
-                  </a>
-                )}
-                {item.local?.urlWaze && (
-                  <a href={item.local?.urlWaze} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
-                    Waze
-                  </a>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isOnlineOrHybrid && item.evento.urlOnline && (
-          <div className="border-t border-slate-100 pt-6">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Link da Transmissão</h3>
-            <a href={item.evento.urlOnline} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-medium bg-brand-50 text-brand-700 px-4 py-2 rounded-lg hover:bg-brand-100 transition-colors w-full justify-center">
-              Acessar Transmissão Online
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-            </a>
-          </div>
-        )}
-
-        {item.vinculo?.funcaoNome && (
-          <div className="border-t border-slate-100 pt-6">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Vínculo da convocação</h3>
-            <p className="font-medium text-slate-900">{item.vinculo.funcaoNome}</p>
-          </div>
-        )}
-
-        {item.convocacao?.observacoes && (
-          <div className="border-t border-slate-100 pt-6">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Observações</h3>
-            <div className="bg-amber-50 text-amber-900 border border-amber-200 rounded-lg p-4 text-sm whitespace-pre-wrap">
-              {item.convocacao?.observacoes}
-            </div>
-          </div>
-        )}
-
-        {convidadosConvocacao && (
-          <div className="border-t border-slate-100 pt-6">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Membros convocados</h3>
-              <span className="text-xs font-semibold text-slate-600">
-                {convidadosConvocacao.length} {convidadosConvocacao.length === 1 ? 'membro' : 'membros'}
-              </span>
-            </div>
-            {convidadosConvocacao.length === 0 ? (
-              <p className="text-sm text-slate-500">Nenhum membro convocado.</p>
-            ) : (
-              <div className="max-h-64 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100 bg-white">
-                {convidadosConvocacao.map(convidado => {
-                  const status = convidado.respostaRsvp === 'PARTICIPAREI'
-                    ? { label: 'Confirmado', classe: 'bg-green-100 text-green-800' }
-                    : convidado.respostaRsvp === 'NAO_PARTICIPAREI'
-                      ? { label: 'Não participará', classe: 'bg-red-100 text-red-800' }
-                      : convidado.respostaRsvp === 'NAO_SEI'
-                        ? { label: 'Não sabe ainda', classe: 'bg-amber-100 text-amber-800' }
-                        : { label: 'Sem resposta', classe: 'bg-slate-100 text-slate-700' }
-
-                  return (
-                    <div key={convidado.destinatarioId} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                      <span className="text-sm font-medium text-slate-900">{convidado.membroNome}</span>
-                      <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${status.classe}`}>
-                        {status.label}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* QR Code do Destinatário de Convocação Publicada */}
-        {!!item.destinatarioId && (
-          <div className="border-t border-slate-100 pt-6">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Check-in na Portaria</h3>
-            <button
-              onClick={() => setShowQrModal(true)}
-              className="w-full py-3 bg-brand-700 text-white rounded-lg text-sm font-medium hover:bg-brand-800 transition-colors flex items-center justify-center gap-2 shadow-sm"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-              </svg>
-              Apresentar QR Code
-            </button>
-          </div>
-        )}
-
-        {showQrModal && item.destinatarioId && (
-          <QrCodeModal
-            destinatarioId={item.destinatarioId}
-            tituloEvento={item.evento.titulo}
-            onClose={() => setShowQrModal(false)}
-          />
-        )}
-
-        {item.participacaoExterna && (
-          <div className="border-t border-slate-100 pt-6 space-y-3">
-            <h3 className="text-sm font-semibold text-slate-500 uppercase">Participação individual</h3>
-            <p className="text-sm text-slate-700">Situação: {statusExterno === 'CONVIDADO' ? 'Convite pendente' : statusExterno === 'ATRIBUIDO' ? 'Atribuição individual' : statusExterno === 'CONFIRMADO' ? 'Confirmado' : 'Recusado'}</p>
-            {statusExterno === 'CONVIDADO' && dateObjInicio > new Date() && (
-              <div className="flex gap-2">
-                <button disabled={isLoadingRsvp} onClick={() => void responderConviteExterno('CONFIRMADO')} className="flex-1 rounded-lg bg-green-700 text-white px-3 py-2 text-sm">Confirmar</button>
-                <button disabled={isLoadingRsvp} onClick={() => void responderConviteExterno('RECUSADO')} className="flex-1 rounded-lg border border-red-300 text-red-700 px-3 py-2 text-sm">Recusar</button>
-              </div>
-            )}
-            {rsvpError && <p role="alert" className="text-sm text-red-700">{rsvpError}</p>}
-          </div>
-        )}
-
-        {!item.evento.pessoal && item.destinatarioId && <div className="border-t border-slate-100 pt-6 pb-2">
-          <div className="flex justify-between items-center mb-4">
+        {!item.evento.pessoal && item.destinatarioId && <div className="rounded-xl border border-brand-200 bg-brand-50/40 p-3 sm:p-4">
+          <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Sua Participação</h3>
             {reconfirmacaoPendente && (
               <span className="text-xs font-bold px-2 py-1 bg-amber-100 text-amber-800 rounded uppercase">Reconfirmar</span>
@@ -455,11 +299,11 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex gap-2">
+              <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-2">
                 <button
                   onClick={() => handleRsvp('PARTICIPAREI')}
                   disabled={isLoadingRsvp}
-                  className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-colors border ${
+                  className={`min-h-11 rounded-lg py-2 px-2 text-sm font-medium leading-tight transition-colors border ${
                     (respostaLocal === 'PARTICIPAREI' || isEditingParticipacao)
                       ? 'bg-green-50 border-green-200 text-green-700' 
                       : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -470,7 +314,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
                 <button
                   onClick={() => { setIsEditingParticipacao(false); handleRsvp('NAO_SEI') }}
                   disabled={isLoadingRsvp}
-                  className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-colors border ${
+                  className={`min-h-11 rounded-lg py-2 px-2 text-sm font-medium leading-tight transition-colors border ${
                     respostaLocal === 'NAO_SEI' && !isEditingParticipacao
                       ? 'bg-slate-100 border-slate-300 text-slate-800' 
                       : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -478,8 +322,21 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
                 >
                   ? Não sei ainda
                 </button>
+                <button
+                  type="button"
+                  onClick={() => { setAusenciaSelecionada(true); setIsEditingParticipacao(false); setRsvpError('') }}
+                  disabled={isLoadingRsvp}
+                  aria-pressed={ausenciaSelecionada || (respostaLocal === 'NAO_PARTICIPAREI' && !isEditingParticipacao)}
+                  className={`min-h-11 rounded-lg py-2 px-2 text-sm font-medium leading-tight transition-colors border ${
+                    ausenciaSelecionada || (respostaLocal === 'NAO_PARTICIPAREI' && !isEditingParticipacao)
+                      ? 'bg-red-50 border-red-300 text-red-800'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  ✗ Não vou participar
+                </button>
               </div>
-              
+
               {isEditingParticipacao && (
                 <div className="p-4 bg-green-50/50 border border-green-100 rounded-lg animate-in slide-in-from-top-2">
                   <div className="mb-4">
@@ -537,23 +394,9 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
                 </div>
               )}
 
-              <div className="pt-2">
-                <div className="flex items-center gap-2 mb-2">
-                  <input 
-                    type="radio" 
-                    id="radio-nao-vou" 
-                    checked={ausenciaSelecionada || (respostaLocal === 'NAO_PARTICIPAREI' && !isEditingParticipacao)}
-                    onChange={() => { setAusenciaSelecionada(true); setIsEditingParticipacao(false) }}
-                    disabled={isLoadingRsvp}
-                    className="w-4 h-4 text-red-600 focus:ring-red-500"
-                  />
-                  <label htmlFor="radio-nao-vou" className="text-sm font-medium text-slate-700 cursor-pointer">
-                    ✗ Não vou participar
-                  </label>
-                </div>
-
+              <div className="pt-1">
                 {(ausenciaSelecionada || (respostaLocal === 'NAO_PARTICIPAREI' && !isEditingParticipacao)) && (
-                  <div className="pl-6 animate-in slide-in-from-top-2">
+                  <div className="animate-in slide-in-from-top-2">
                     <textarea
                       value={justificativa}
                       onChange={(e) => setJustificativa(e.target.value)}
@@ -574,7 +417,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
               </div>
 
               {rsvpError && (
-                <div className="text-red-600 text-sm mt-2 font-medium bg-red-50 p-2 rounded">
+                <div role="alert" className="text-red-600 text-sm mt-2 font-medium bg-red-50 p-2 rounded">
                   {rsvpError}
                 </div>
               )}
@@ -582,10 +425,167 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
           )}
         </div>}
 
+
+        <div className="flex flex-wrap items-start gap-3 sm:gap-4">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Data e Hora</h3>
+            <p className="font-medium text-slate-900 flex items-center gap-2">
+              <svg className="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              {dateStr}
+            </p>
+            <p className="text-slate-600 mt-1 flex items-center gap-2">
+              <svg className="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              {timeInicio} às {timeFim}
+            </p>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-1">Modalidade</h3>
+            <span className="inline-block px-3 py-1 bg-brand-50 text-brand-700 font-semibold rounded-lg text-sm">
+              {item.evento.modalidade}
+            </span>
+          </div>
+        </div>
+
+        {destinoExterno && (
+          <div className="border-t border-slate-100 pt-4">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Destino da reunião</h3>
+            <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 break-words">
+              <p className="font-semibold text-slate-900">{destinoExterno}</p>
+              {item.local?.nome && <p className="text-sm text-slate-600 mt-1">Local: {item.local.nome}</p>}
+              {item.espaco?.nome && <p className="text-sm text-slate-600 mt-1">Espaço: {item.espaco.nome}</p>}
+            </div>
+          </div>
+        )}
+
+        {isPresentialOrHybrid && item.local && !destinoExterno && (
+          <div className="border-t border-slate-100 pt-4">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Local</h3>
+            <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 break-words">
+              <p className="font-semibold text-slate-900">{item.local.nome}</p>
+              {item.espaco?.nome && (
+                <p className="text-brand-800 text-sm font-semibold mt-1">Espaço: {item.espaco.nome}</p>
+              )}
+              <p className="text-slate-600 text-sm mt-1">{item.local.endereco}</p>
+              
+              <div className="flex gap-2 mt-2 flex-wrap">
+                {item.local?.urlMaps && (
+                  <a href={item.local?.urlMaps} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
+                    Google Maps
+                  </a>
+                )}
+                {item.local?.urlWaze && (
+                  <a href={item.local?.urlWaze} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
+                    Waze
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isOnlineOrHybrid && item.evento.urlOnline && (
+          <div className="border-t border-slate-100 pt-4">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Link da Transmissão</h3>
+            <a href={item.evento.urlOnline} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm font-medium bg-brand-50 text-brand-700 px-4 py-2 rounded-lg hover:bg-brand-100 transition-colors w-full justify-center">
+              Acessar Transmissão Online
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+            </a>
+          </div>
+        )}
+
+        {item.vinculo?.funcaoNome && (
+          <div className="border-t border-slate-100 pt-4">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Vínculo da convocação</h3>
+            <p className="font-medium text-slate-900">{item.vinculo.funcaoNome}</p>
+          </div>
+        )}
+
+        {item.convocacao?.observacoes && (
+          <div className="border-t border-slate-100 pt-4">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Observações</h3>
+            <div className="bg-amber-50 text-amber-900 border border-amber-200 rounded-lg p-4 text-sm whitespace-pre-wrap">
+              {item.convocacao?.observacoes}
+            </div>
+          </div>
+        )}
+
+        {convidadosConvocacao && (
+          <div className="border-t border-slate-100 pt-4">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Membros convocados</h3>
+              <span className="text-xs font-semibold text-slate-600">
+                {convidadosConvocacao.length} {convidadosConvocacao.length === 1 ? 'membro' : 'membros'}
+              </span>
+            </div>
+            {convidadosConvocacao.length === 0 ? (
+              <p className="text-sm text-slate-500">Nenhum membro convocado.</p>
+            ) : (
+              <div className="max-h-64 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100 bg-white">
+                {convidadosConvocacao.map(convidado => {
+                  const status = convidado.respostaRsvp === 'PARTICIPAREI'
+                    ? { label: 'Confirmado', classe: 'bg-green-100 text-green-800' }
+                    : convidado.respostaRsvp === 'NAO_PARTICIPAREI'
+                      ? { label: 'Não participará', classe: 'bg-red-100 text-red-800' }
+                      : convidado.respostaRsvp === 'NAO_SEI'
+                        ? { label: 'Não sabe ainda', classe: 'bg-amber-100 text-amber-800' }
+                        : { label: 'Sem resposta', classe: 'bg-slate-100 text-slate-700' }
+
+                  return (
+                    <div key={convidado.destinatarioId} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                      <span className="text-sm font-medium text-slate-900">{convidado.membroNome}</span>
+                      <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${status.classe}`}>
+                        {status.label}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* QR Code do Destinatário de Convocação Publicada */}
+        {!!item.destinatarioId && (
+          <div className="border-t border-slate-100 pt-4">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Check-in na Portaria</h3>
+            <button
+              onClick={() => setShowQrModal(true)}
+              className="w-full py-3 bg-brand-700 text-white rounded-lg text-sm font-medium hover:bg-brand-800 transition-colors flex items-center justify-center gap-2 shadow-sm"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+              </svg>
+              Apresentar QR Code
+            </button>
+          </div>
+        )}
+
+        {showQrModal && item.destinatarioId && (
+          <QrCodeModal
+            destinatarioId={item.destinatarioId}
+            tituloEvento={item.evento.titulo}
+            onClose={() => setShowQrModal(false)}
+          />
+        )}
+
+        {item.participacaoExterna && (
+          <div className="border-t border-slate-100 pt-6 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase">Participação individual</h3>
+            <p className="text-sm text-slate-700">Situação: {statusExterno === 'CONVIDADO' ? 'Convite pendente' : statusExterno === 'ATRIBUIDO' ? 'Atribuição individual' : statusExterno === 'CONFIRMADO' ? 'Confirmado' : 'Recusado'}</p>
+            {statusExterno === 'CONVIDADO' && dateObjInicio > new Date() && (
+              <div className="flex gap-2">
+                <button disabled={isLoadingRsvp} onClick={() => void responderConviteExterno('CONFIRMADO')} className="flex-1 rounded-lg bg-green-700 text-white px-3 py-2 text-sm">Confirmar</button>
+                <button disabled={isLoadingRsvp} onClick={() => void responderConviteExterno('RECUSADO')} className="flex-1 rounded-lg border border-red-300 text-red-700 px-3 py-2 text-sm">Recusar</button>
+              </div>
+            )}
+            {rsvpError && <p role="alert" className="text-sm text-red-700">{rsvpError}</p>}
+          </div>
+        )}
+
         {item.evento.pessoal && <p className="rounded-lg bg-brand-50 p-4 text-sm text-brand-800">Evento Próprio — já incluído na sua agenda.</p>}
 
         {item.evento.refeicoesOferecidas && item.evento.refeicoesOferecidas.length > 0 && (
-          <div className="border-t border-slate-100 pt-6">
+          <div className="border-t border-slate-100 pt-4">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Alimentação Oferecida</h3>
             <div className="bg-slate-50 text-slate-700 border border-slate-100 rounded-lg p-4 text-sm">
               <ul className="list-disc pl-5">
