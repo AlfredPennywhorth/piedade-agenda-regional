@@ -242,12 +242,12 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
     <dialog 
       ref={dialogRef}
       onCancel={handleClose}
-      className="p-0 rounded-xl shadow-2xl backdrop:bg-slate-900/50 backdrop:backdrop-blur-sm bg-white m-auto w-[calc(100%-1rem)] max-w-lg max-h-[95dvh] overflow-hidden border border-slate-200 open:animate-in open:fade-in open:zoom-in-95"
+      className="p-0 rounded-xl shadow-2xl backdrop:bg-slate-900/50 backdrop:backdrop-blur-sm bg-white m-auto w-[calc(100%-1rem)] max-w-lg max-h-[95dvh] overflow-hidden open:flex open:flex-col border border-slate-200 open:animate-in open:fade-in open:zoom-in-95"
       role="dialog"
       aria-modal="true"
       aria-labelledby="evento-detalhe-titulo"
     >
-      <div className="flex justify-between items-center bg-brand-900 text-white p-4 border-b border-brand-800">
+      <div className="flex shrink-0 justify-between items-center gap-2 bg-brand-900 text-white p-4 border-b border-brand-800">
         <h2 id="evento-detalhe-titulo" className="min-w-0 break-words font-semibold text-base sm:text-lg pr-2">{item.evento.titulo}</h2>
         <div className="flex items-center gap-2">
           <button
@@ -268,7 +268,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
         </div>
       </div>
 
-      <div className="p-4 sm:p-6 space-y-4 max-h-[calc(95dvh-4.5rem)] overflow-y-auto text-slate-800">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-slate-800">
         <AjudaContextual />
         {reconfirmacaoPendente && item.evento.agendaAviso && (
           <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950" role="alert">
