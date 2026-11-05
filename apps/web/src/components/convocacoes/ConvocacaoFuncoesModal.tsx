@@ -173,11 +173,11 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose, returnFocusRef }
       aria-modal="true"
       aria-labelledby="modal-funcoes-title"
       onKeyDown={handleDialogKeyDown}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-3 sm:p-4"
     >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
-        <div className="p-6 border-b border-slate-200 flex justify-between items-center">
-          <h2 id="modal-funcoes-title" className="text-xl font-bold text-slate-900">
+      <div className="min-w-0 w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+        <div className="flex min-w-0 items-center justify-between gap-2 border-b border-slate-200 p-4 sm:p-6">
+          <h2 id="modal-funcoes-title" className="min-w-0 break-words text-lg font-bold text-slate-900 sm:text-xl">
             Gerenciar Funções do Rascunho
           </h2><AjudaContextual />
           <button
@@ -191,7 +191,7 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose, returnFocusRef }
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto flex-1">
+        <div className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6">
           {erro && (
             <div role="alert" className="mb-4 bg-red-50 text-red-700 p-3 rounded-lg border border-red-200 text-sm">
               {erro}
@@ -211,14 +211,14 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose, returnFocusRef }
                 ) : (
                   <ul className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
                     {funcoesVinculadas.map((vinculo) => (
-                      <li key={vinculo.id} className="p-3 flex justify-between items-center bg-white hover:bg-slate-50">
-                        <span className="text-sm font-medium text-slate-800">
+                      <li key={vinculo.id} className="flex min-w-0 items-center justify-between gap-2 bg-white p-3 hover:bg-slate-50">
+                        <span className="min-w-0 break-words text-sm font-medium text-slate-800">
                           {getNomeFuncao(vinculo.funcaoId)}
                         </span>
                         <button
                           onClick={() => handleRemover(vinculo.funcaoId)}
                           disabled={salvando}
-                          className="text-red-600 hover:text-red-800 text-xs font-semibold px-2 py-1 rounded bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-50"
+                          className="shrink-0 rounded bg-red-50 px-2 py-1 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100 hover:text-red-800 disabled:opacity-50"
                         >
                           Remover
                         </button>
@@ -235,7 +235,7 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose, returnFocusRef }
                     Nenhuma função disponível para adicionar.
                   </p>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch">
                     <label htmlFor="funcao-convocacao" className="sr-only">Função para adicionar</label>
                     <select
                       id="funcao-convocacao"
@@ -243,7 +243,7 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose, returnFocusRef }
                       value={funcaoSelecionadaId}
                       onChange={(e) => setFuncaoSelecionadaId(e.target.value)}
                       disabled={salvando}
-                      className="flex-1 p-2 border border-slate-300 rounded-lg text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                      className="w-full min-w-0 flex-1 rounded-lg border border-slate-300 p-2 text-base sm:text-sm outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
                     >
                       <option value="">Selecione uma função...</option>
                       {funcoesDisponiveis.map((f) => (
@@ -255,7 +255,7 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose, returnFocusRef }
                     <button
                       onClick={handleAdicionar}
                       disabled={!funcaoSelecionadaId || salvando}
-                      className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                      className="w-full shrink-0 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-700 disabled:opacity-50 sm:w-auto"
                     >
                       Adicionar
                     </button>
@@ -266,7 +266,7 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose, returnFocusRef }
           )}
         </div>
         <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-slate-600">As funções são salvas ao adicionar ou remover. Ao concluir, você retorna à gestão da convocação para revisar e publicar o rascunho.</p>
+          <p className="min-w-0 text-xs text-slate-600">As funções são salvas ao adicionar ou remover. Ao concluir, você retorna à gestão da convocação para revisar e publicar o rascunho.</p>
           <button
             type="button"
             onClick={onClose}

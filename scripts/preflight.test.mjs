@@ -15,7 +15,7 @@ const required = {
 }
 const sha = 'a'.repeat(40)
 
-function scenario({ base = 'develop', head = 'feature/x', actualSha = sha, expectedSha = sha, changes = [], fetchFails = false, diffFails = false, omitDeclaration, output = false } = {}) {
+function scenario({ base = 'develop', head = 'feature/x', actualSha = sha, expectedSha = sha, changes = [], fetchFails = false, diffFails = false, omitDeclaration, output = false, githubEvent = null, repository = null, eventName = 'pull_request', rawEvent = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'agenda-preflight-'))
   const bin = join(dir, 'bin')
   mkdirSync(bin)
@@ -41,6 +41,8 @@ function scenario({ base = 'develop', head = 'feature/x', actualSha = sha, expec
     writeFileSync(path, declarations.filter(x => x !== omitDeclaration).join('\n'))
   }
   const outputPath = join(dir, 'github-output')
+  const eventPath = join(dir, 'github-event.json')
+  if (githubEvent || rawEvent !== null) writeFileSync(eventPath, rawEvent ?? JSON.stringify(githubEvent))
   try {
     const env = {
       ...process.env,
@@ -55,6 +57,15 @@ function scenario({ base = 'develop', head = 'feature/x', actualSha = sha, expec
       MOCK_CHANGED: changes.join('\n'),
       MOCK_HEAD: head,
     }
+    if (githubEvent || rawEvent !== null) {
+      env.GITHUB_EVENT_PATH = eventPath
+      env.GITHUB_EVENT_NAME = eventName
+    } else {
+      delete env.GITHUB_EVENT_PATH
+      delete env.GITHUB_EVENT_NAME
+    }
+    if (repository) env.GITHUB_REPOSITORY = repository
+    else delete env.GITHUB_REPOSITORY
     delete env.PREFLIGHT_BASE
     delete env.PREFLIGHT_HEAD
     delete env.GITHUB_OUTPUT
@@ -125,5 +136,97 @@ test('frontend, worker, shared and migration impact is accurate', () => {
     const r = scenario({ changes, output: true })
     assert.equal(r.status, 0, r.log)
     assert.equal(r.outputs.trim(), expected, r.outputs)
+  }
+})
+
+
+const release469Paths = [
+  'apps/web/src/components/convocacoes/ConvocacaoFuncoesModal.tsx',
+  'apps/web/src/components/eventos/EventosView.tsx',
+  'apps/web/src/components/portaria/PortariaOperadorTemporarioView.tsx',
+  'apps/worker/src/routes/agenda.ts',
+  'apps/worker/src/routes/eventos.ts',
+  'apps/worker/src/routes/portaria-operador-publica.ts',
+  'apps/worker/src/routes/vinculos_funcionais.ts',
+  'apps/worker/src/test/agenda.spec.ts',
+  'apps/worker/src/test/eventos.spec.ts',
+  'apps/worker/src/test/membros.spec.ts',
+  'apps/worker/src/test/portaria-operador-temporario.spec.ts',
+  'scripts/preflight.mjs',
+  'scripts/preflight.test.mjs',
+]
+const release469Repo = 'AlfredPennywhorth/piedade-agenda-regional'
+const release469Head = 'release/selective-fixes-pa-portaria-20261104'
+function release469Event(overrides = {}) {
+  return {
+    number: 469,
+    pull_request: {
+      number: 469,
+      base: { ref: 'main', repo: { full_name: release469Repo } },
+      head: { ref: release469Head, repo: { full_name: release469Repo } },
+    },
+    ...overrides,
+  }
+}
+function release469Scenario(overrides = {}) {
+  return scenario({
+    base: 'main',
+    head: release469Head,
+    changes: release469Paths,
+    githubEvent: release469Event(),
+    repository: release469Repo,
+    ...overrides,
+  })
+}
+test('release #469: somente PR, repositório, branch e arquivos aprovados passam', () => {
+  const r = release469Scenario({ output: true })
+  assert.equal(r.status, 0, r.log)
+  assert.match(r.outputs, /worker_changed=true/)
+  assert.match(r.outputs, /web_changed=true/)
+  assert.match(r.outputs, /migration_changed=false/)
+})
+test('release #469: qualquer arquivo extra ou substituição é bloqueado', () => {
+  for (const changes of [
+    [...release469Paths, 'apps/worker/drizzle/0053_lgpd.sql'],
+    [...release469Paths, 'apps/web/src/components/lgpd/LgpdPrimeiroAcessoGate.tsx'],
+    [...release469Paths.slice(1), 'apps/web/src/App.tsx'],
+    release469Paths.slice(1),
+  ]) {
+    const r = release469Scenario({ changes })
+    assert.equal(r.status, 1, r.log)
+    assert.match(r.log, /PR #469: escopo divergente/)
+  }
+})
+test('release #469: identidade e metadados inválidos falham pela política de branch', () => {
+  const pr = release469Event().pull_request
+  const cases = [
+    { repository: 'outro/ambiente' },
+    { githubEvent: release469Event({ number: 470 }) },
+    { githubEvent: release469Event({ pull_request: { ...pr, number: 470 } }) },
+    { githubEvent: release469Event({ pull_request: { ...pr, head: { ref: 'develop', repo: { full_name: release469Repo } } } }) },
+    { githubEvent: release469Event({ pull_request: { ...pr, head: { ref: release469Head, repo: { full_name: 'outra/conta' } } } }) },
+    { githubEvent: release469Event({ pull_request: { ...pr, base: { ref: 'main', repo: { full_name: 'outra/conta' } } } }) },
+    { githubEvent: release469Event({ pull_request: { ...pr, base: { ref: 'develop', repo: { full_name: release469Repo } } } }) },
+    { githubEvent: null },
+    { head: 'release/falsa-469' },
+    { eventName: 'workflow_dispatch' },
+    { rawEvent: '{ invalid json' },
+  ]
+  for (const options of cases) {
+    const result = release469Scenario(options)
+    assert.equal(result.status, 1, JSON.stringify(options) + '\\n' + result.log)
+    assert.match(result.log, /PR para main deve partir de develop/, JSON.stringify(options))
+  }
+})
+
+test('release #469: falha em SHA, diff ou declaração essencial continua bloqueando', () => {
+  for (const options of [
+    { expectedSha: 'b'.repeat(40) },
+    { diffFails: true },
+    { fetchFails: true },
+    { omitDeclaration: 'PIN_PEPPER' },
+  ]) {
+    const r = release469Scenario(options)
+    assert.equal(r.status, 1, JSON.stringify(options) + '\n' + r.log)
   }
 })

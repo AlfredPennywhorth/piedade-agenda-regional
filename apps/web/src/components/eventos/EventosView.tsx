@@ -2111,6 +2111,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
               <div>
                 <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Título</span>
                 <p className="text-slate-900 font-medium">{eventoDetalhe.titulo}</p>
+                <p className="mt-1 text-xs text-slate-500">Código da reunião: <span className="font-mono" title="Identificador para conferência com a Portaria">{eventoDetalhe.id.slice(0, 12)}</span></p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

@@ -35,7 +35,46 @@ try {
 } catch {
   // Falha fechada quando o evento não puder ser validado.
 }
-if (baseRef === 'main' && headRef !== 'develop' && !release430) {
+// Exceção de produção estritamente vinculada à PR seletiva #469.
+// Não libera qualquer outra branch, repositório ou evento; o diff completo
+// deve corresponder exatamente à lista fechada abaixo.
+const release469Paths = new Set([
+  'apps/web/src/components/convocacoes/ConvocacaoFuncoesModal.tsx',
+  'apps/web/src/components/eventos/EventosView.tsx',
+  'apps/web/src/components/portaria/PortariaOperadorTemporarioView.tsx',
+  'apps/worker/src/routes/agenda.ts',
+  'apps/worker/src/routes/eventos.ts',
+  'apps/worker/src/routes/portaria-operador-publica.ts',
+  'apps/worker/src/routes/vinculos_funcionais.ts',
+  'apps/worker/src/test/agenda.spec.ts',
+  'apps/worker/src/test/eventos.spec.ts',
+  'apps/worker/src/test/membros.spec.ts',
+  'apps/worker/src/test/portaria-operador-temporario.spec.ts',
+  'scripts/preflight.mjs',
+  'scripts/preflight.test.mjs',
+])
+let release469 = false
+try {
+  const event = process.env.GITHUB_EVENT_PATH
+    ? JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
+    : null
+  const pr = event?.pull_request
+  release469 = (
+    process.env.GITHUB_EVENT_NAME === 'pull_request' &&
+    Number(event?.number) === 469 &&
+    Number(pr?.number) === 469 &&
+    process.env.GITHUB_REPOSITORY === 'AlfredPennywhorth/piedade-agenda-regional' &&
+    pr?.base?.repo?.full_name === process.env.GITHUB_REPOSITORY &&
+    pr?.head?.repo?.full_name === process.env.GITHUB_REPOSITORY &&
+    pr?.base?.ref === 'main' &&
+    pr?.head?.ref === 'release/selective-fixes-pa-portaria-20261104' &&
+    baseRef === 'main' &&
+    headRef === 'release/selective-fixes-pa-portaria-20261104'
+  )
+} catch {
+  // Falha fechada para evento ausente, inválido ou origem incorreta.
+}
+if (baseRef === 'main' && headRef !== 'develop' && !release430 && !release469) {
   errors.push(`PR para main deve partir de develop; head atual: ${headRef}`)
 }
 if (!['main', 'develop'].includes(baseRef)) {
@@ -60,6 +99,15 @@ if (release430) {
   ])
   if (!diffAvailable || changed.length !== permitidos.size || changed.some(p => !permitidos.has(p))) {
     errors.push('PR #430: escopo fora dos três arquivos autorizados para release seletivo.')
+  }
+}
+
+if (release469) {
+  if (!diffAvailable || changed.length !== release469Paths.size ||
+      changed.some(path => !release469Paths.has(path)) ||
+      changed.some(path => path.startsWith('apps/worker/drizzle/') ||
+        /lgpd|privacidade|termos/i.test(path))) {
+    errors.push('PR #469: escopo divergente da lista fechada de arquivos permitidos (LGPD/migrations proibidas).')
   }
 }
 

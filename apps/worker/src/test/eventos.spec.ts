@@ -840,6 +840,49 @@ describe('Eventos API (S04)', () => {
     expect(convocacaoPersistida).toMatchObject({ status: 'PUBLICADA', ativo: true })
   })
 
+  it('23.1 retorna conflito amigável ao tentar trocar Ponto com convocação publicada', async () => {
+    const setor = sqlite.prepare('SELECT id FROM setores LIMIT 1').get() as { id: string }
+    const pontoOrigem = crypto.randomUUID()
+    const pontoDestino = crypto.randomUUID()
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(pontoOrigem, setor.id, 'Ponto Original')
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(pontoDestino, setor.id, 'Ponto Destino')
+
+    const criado = await req('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Reunião com convocação publicada',
+        modalidade: 'ONLINE',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        urlOnline: 'https://meet.google.com/teste',
+        setorId: setor.id,
+        pontoAtendimentoId: pontoOrigem,
+      })
+    })
+    expect(criado.status).toBe(201)
+    const evento = await criado.json()
+
+    sqlite.prepare("INSERT INTO convocacoes (id, evento_id, status, ativo) VALUES (?, ?, 'PUBLICADA', 1)")
+      .run(crypto.randomUUID(), evento.id)
+
+    const alterarPonto = await req(`/api/v1/eventos/${evento.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pontoAtendimentoId: pontoDestino })
+    })
+    expect(alterarPonto.status).toBe(409)
+    const resposta = await alterarPonto.json()
+    expect(resposta).toMatchObject({ code: 'EVENTO_PONTO_COM_CONVOCACAO_PUBLICADA' })
+    expect(resposta.error).toContain('convocação publicada')
+    expect(resposta.error).toContain('não são transferidas automaticamente')
+    expect(resposta.error).toContain('antes como serão tratadas as confirmações')
+    expect(resposta.error).toContain('preservando o histórico existente')
+    expect(resposta.error).not.toMatch(/D1_ERROR|SQLITE_CONSTRAINT|TRIGGER/)
+    const persistido = sqlite.prepare('SELECT ponto_atendimento_id AS ponto FROM eventos WHERE id = ?').get(evento.id)
+    expect(persistido).toMatchObject({ ponto: pontoOrigem })
+  })
+
   it('24. não permite alterar evento já encerrado', async () => {
     const regionalId = await createRegional()
     const eventoId = crypto.randomUUID()

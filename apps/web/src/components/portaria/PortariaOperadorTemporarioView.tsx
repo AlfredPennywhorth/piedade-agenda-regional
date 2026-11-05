@@ -12,6 +12,18 @@ type Sessao = {
     inicioEm: string
     fimEm: string
     modalidade: string
+    local: {
+      nome: string
+      endereco: string
+      numero: string
+      complemento: string | null
+      bairro: string | null
+      cidade: string
+      uf: string
+      cep: string | null
+    } | null
+    espacoNome: string | null
+    pontoAtendimentoNome: string | null
   }
 }
 
@@ -93,37 +105,51 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
   useEffect(() => {
     void carregar()
 
+    let acessoRevogado = false
     const sincronizar = async () => {
-      try {
-        const [participantesData, convidadosData] = await Promise.all([
-          chamadaOperador<{ participantes: Participante[] }>(token, '/participantes'),
-          chamadaOperador<{ data: Convidado[] }>(token, '/convidados'),
-        ])
-        setParticipantes(participantesData.participantes || [])
-        setConvidados(convidadosData.data || [])
-      } catch (err) {
-        const apiErr = err as ApiError<any>
-        if (
-          apiErr.body?.code === 'PORTARIA_FECHADA' ||
-          apiErr.body?.code === 'CREDENCIAL_EXPIRADA' ||
-          apiErr.status === 401 ||
-          apiErr.status === 403 ||
-          apiErr.status === 410
-        ) {
-          pararCamera()
-          setSessao(null)
-          setErro(apiErr.body?.code === 'PORTARIA_FECHADA'
-            ? 'Esta Portaria já foi encerrada.'
-            : apiErr.body?.code === 'CREDENCIAL_EXPIRADA' || apiErr.status === 410
-              ? 'Este acesso temporário expirou.'
-              : 'Este acesso temporário não está mais disponível.')
-        }
+      if (acessoRevogado) return
+      // Uma falha transitória em /sessao não pode descartar listas válidas.
+      const [resultadoSessao, resultadoParticipantes, resultadoConvidados] = await Promise.allSettled([
+        chamadaOperador<Sessao>(token, '/sessao'),
+        chamadaOperador<{ participantes: Participante[] }>(token, '/participantes'),
+        chamadaOperador<{ data: Convidado[] }>(token, '/convidados'),
+      ])
+      // Outro polling pode ter revogado a credencial enquanto este aguardava.
+      if (acessoRevogado) return
+      const falhas = [resultadoSessao, resultadoParticipantes, resultadoConvidados]
+        .filter((resultado): resultado is PromiseRejectedResult => resultado.status === 'rejected')
+      const acessoInvalido = falhas.map(resultado => resultado.reason as ApiError<any>).find(apiErr =>
+        apiErr.body?.code === 'PORTARIA_FECHADA' ||
+        apiErr.body?.code === 'CREDENCIAL_EXPIRADA' ||
+        apiErr.status === 401 ||
+        apiErr.status === 403 ||
+        apiErr.status === 410
+      )
+      if (acessoInvalido) {
+        acessoRevogado = true
+        window.clearInterval(intervalo)
+        pararCamera()
+        setSessao(null)
+        setErro(acessoInvalido.body?.code === 'PORTARIA_FECHADA'
+          ? 'Esta Portaria já foi encerrada.'
+          : acessoInvalido.body?.code === 'CREDENCIAL_EXPIRADA' || acessoInvalido.status === 410
+            ? 'Este acesso temporário expirou.'
+            : 'Este acesso temporário não está mais disponível.')
+        return
+      }
+      if (resultadoSessao.status === 'fulfilled') setSessao(resultadoSessao.value)
+      if (resultadoParticipantes.status === 'fulfilled') {
+        setParticipantes(resultadoParticipantes.value.participantes || [])
+      }
+      if (resultadoConvidados.status === 'fulfilled') {
+        setConvidados(resultadoConvidados.value.data || [])
       }
     }
 
     const intervalo = window.setInterval(() => void sincronizar(), 8000)
 
     return () => {
+      acessoRevogado = true
       window.clearInterval(intervalo)
       pararCamera()
     }
@@ -332,13 +358,34 @@ export function PortariaOperadorTemporarioView({ token }: { token: string }) {
   }
 
   const presentes = participantes.filter(item => item.checkin).length
+  const dataReuniao = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric',
+  }).format(new Date(sessao.evento.inicioEm))
+  const horaReuniao = (iso: string) => new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date(iso))
+  const local = sessao.evento.local
+  const enderecoReuniao = local ? [
+    [local.endereco, local.numero].filter(Boolean).join(', '),
+    local.complemento,
+    local.bairro,
+    [local.cidade, local.uf].filter(Boolean).join(' - '),
+    local.cep ? `CEP ${local.cep}` : null,
+  ].filter(Boolean).join(' · ') : null
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6">
       <div className="mx-auto max-w-3xl space-y-5">
         <header className="rounded-2xl bg-brand-900 p-5 text-white shadow">
           <p className="text-xs uppercase tracking-wide text-brand-200">Acesso temporário de Portaria</p>
-          <h1 className="mt-1 text-2xl font-bold">{sessao.evento.titulo}</h1><AjudaIsolada assunto="portaria-temporaria" />
+          <h1 className="mt-1 break-words text-2xl font-bold">{sessao.evento.titulo}</h1><AjudaIsolada assunto="portaria-temporaria" />
+          <div role="group" aria-label="Identificação da reunião" className="mt-4 space-y-2 rounded-xl border border-white/30 bg-white/10 p-4 text-sm">
+            <p><span className="font-semibold">Data e horário:</span> {dataReuniao}, {horaReuniao(sessao.evento.inicioEm)} às {horaReuniao(sessao.evento.fimEm)}</p>
+            <p><span className="font-semibold">Código da reunião:</span> <span className="font-mono" title="Identificador para conferência com o cadastro do evento">{sessao.evento.id.slice(0, 12)}</span></p>
+            {sessao.evento.pontoAtendimentoNome && <p className="break-words"><span className="font-semibold">Ponto de Atendimento:</span> {sessao.evento.pontoAtendimentoNome}</p>}
+            <p className="break-words"><span className="font-semibold">Local:</span> {local?.nome || 'Local não informado'}{sessao.evento.espacoNome ? ` — ${sessao.evento.espacoNome}` : ''}</p>
+            <p className="break-words"><span className="font-semibold">Endereço:</span> {enderecoReuniao || 'Endereço não informado'}</p>
+          </div>
           <p className="mt-2 text-sm text-brand-100">
             Este acesso vale somente para esta reunião e será revogado no fechamento.
           </p>

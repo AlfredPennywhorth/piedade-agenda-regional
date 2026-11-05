@@ -2,6 +2,9 @@ import { Hono } from 'hono'
 import { and, eq, sql } from 'drizzle-orm'
 import {
   checkins,
+  locais,
+  espacosLocal,
+  pontosAtendimento,
   convocacoes,
   convocacaoDestinatarios,
   membros,
@@ -38,6 +41,13 @@ portariaOperadorPublicaRouter.get('/sessao', async c => {
   const ctx = await contextoOperador(c)
   if ('response' in ctx) return ctx.response
 
+  // A identificação vem exclusivamente do evento associado à credencial.
+  const [local, espaco, ponto] = await Promise.all([
+    ctx.evento.localId ? ctx.db.select().from(locais).where(eq(locais.id, ctx.evento.localId)).get() : null,
+    ctx.evento.espacoId ? ctx.db.select().from(espacosLocal).where(eq(espacosLocal.id, ctx.evento.espacoId)).get() : null,
+    ctx.evento.pontoAtendimentoId ? ctx.db.select().from(pontosAtendimento).where(eq(pontosAtendimento.id, ctx.evento.pontoAtendimentoId)).get() : null,
+  ])
+
   return c.json({
     credencialId: ctx.id,
     expiraEm: ctx.expiraEm,
@@ -47,6 +57,18 @@ portariaOperadorPublicaRouter.get('/sessao', async c => {
       inicioEm: ctx.evento.inicioEm,
       fimEm: ctx.evento.fimEm,
       modalidade: ctx.evento.modalidade,
+      local: local ? {
+        nome: local.nome,
+        endereco: local.endereco,
+        numero: local.numero,
+        complemento: local.complemento,
+        bairro: local.bairro,
+        cidade: local.cidade,
+        uf: local.uf,
+        cep: local.cep,
+      } : null,
+      espacoNome: espaco?.nome ?? null,
+      pontoAtendimentoNome: ponto?.nome ?? null,
     },
   }, 200)
 })
