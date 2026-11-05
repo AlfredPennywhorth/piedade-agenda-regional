@@ -10,11 +10,24 @@
 - A inclusão na Microsoft Store é uma etapa **institucional**: exigem-se titularidade e autorização para nome, marca, descrição institucional, distribuição pública, política de privacidade aprovada e suporte. A revisão institucional LGPD pendente impede dar por aprovado o conteúdo de privacidade na loja.
 - Conta desenvolvedor de pessoa física não implica autorização para representar entidade religiosa; verificar se o tipo de conta e o publisher correspondem ao controlador e à entidade autorizada, conforme políticas Microsoft.
 
+## Identidade reservada no Partner Center (05/11/2026)
+
+| Campo | Valor apresentado |
+| --- | --- |
+| Nome reservado | Agenda Regional São Paulo |
+| Package/Identity/Name | `AndrWilliamdeSouza.AgendaRegionalSoPaulo` |
+| Package/Identity/Publisher | `CN=2B420EBA-3C60-4C37-9AB4-812AA425CA15` |
+| PublisherDisplayName | André William de Souza |
+| Package Family Name (PFN) | `AndrWilliamdeSouza.AgendaRegionalSoPaulo_cs1em9962vm9e` |
+| Store ID | `9NC1MK5CQQMH` |
+
+Dados de **identidade pública do produto**, sem segredos. O cadastro foi realizado como publicador individual, e **não comprova autorização institucional** para representar a Congregação; não enviar à loja enquanto essa aprovação e a política de privacidade não forem resolvidas. Conferir todos os identificadores por cópia direta no Partner Center antes de gerar ou assinar o pacote; não alterar a identidade para acompanhar mudanças de conteúdo Web.
+
 ## 2. Primeira submissão (necessariamente via Partner Center)
 
 1. [ ] Entrar no Partner Center com a conta registrada e concluir verificações cadastrais.
-2. [ ] **Apps and games → New product → MSIX or PWA app**; conferir disponibilidade e reservar `Agenda Regional São Paulo` (ou denominação institucional autorizada). Reservas não utilizadas expiram após 3 meses; anotar validade.
-3. [ ] Em **Product management → Product Identity** obter *Package ID*, *Publisher ID*, *Publisher display name*, e registrar apenas identificadores necessários; não compartilhar secrets.
+2. [x] **Apps and games → New product → MSIX or PWA app**; nome `Agenda Regional São Paulo` reservado no Partner Center, conforme captura encaminhada em 05/11/2026. Registrar e acompanhar validade da reserva.
+3. [x] Em **Product management → Product Identity**, identificadores exibidos e conferidos em captura do Partner Center (05/11/2026). Conferir a grafia novamente pela opção **Copiar** antes de preencher o PWABuilder; não compartilhar secrets.
 4. [ ] Confirmar que o titular tem direito de apresentar a Agenda e o domínio na Store e que o texto da loja não implica chancela institucional ainda não concedida.
 5. [ ] Validar a versão **main efetivamente publicada**: HTTPS, nome e ícones do manifesto, tela de login, experiência offline (sem prometer uso offline das convocações), atualização do service worker, navegação, Windows 10/11 e modo standalone. Executar workflow de pré-validação `store-pwa-readiness.yml` (build local, sem deploy).
 6. [ ] No [PWABuilder](https://www.pwabuilder.com/) usar a URL definitiva **de produção**, revisar relatório de prontidão e gerar pacote Windows com *Package ID/Publisher ID/display name* exatos. Não empacotar o build Beta nem presumir que testes locais substituem URL pública.
