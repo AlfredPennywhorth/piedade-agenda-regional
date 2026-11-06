@@ -625,6 +625,11 @@ describe('S07 - Minha Agenda e Calendário', () => {
     expect(dialogQueries.getByText('✓ Vou participar')).toBeInTheDocument()
     expect(dialogQueries.getByText('? Não sei ainda')).toBeInTheDocument()
     expect(dialogQueries.getByRole('button', { name: '✗ Não vou participar' })).toBeInTheDocument()
+    for (const nome of ['✓ Vou participar', '? Não sei ainda', '✗ Não vou participar']) {
+      const botao = dialogQueries.getByRole('button', { name: nome })
+      expect(botao).toHaveAttribute('type', 'button')
+      expect(botao).toHaveAttribute('aria-pressed')
+    }
   })
 
   it('11. Confirma participação', async () => {
@@ -710,7 +715,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     fireEvent.click(radioNaoVou)
 
     // O text-area de justificativa deve aparecer
-    expect(dialogQueries.getByPlaceholderText(/justifique sua ausência/i)).toBeInTheDocument()
+    expect(dialogQueries.getByPlaceholderText(/justifique sua ausência/i)).toHaveClass('text-base')
 
     // Mas o badge "Ausente" NÃO deve estar na tela (já que o backend não confirmou)
     expect(dialogQueries.queryByText(/ausente/i)).not.toBeInTheDocument()
