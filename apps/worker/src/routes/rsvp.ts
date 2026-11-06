@@ -95,9 +95,16 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
       return c.json({ error: 'Convocação não está publicada' }, 400)
     }
 
-    // Destinatários legados de outro PA não podem registrar novo RSVP.
-    // Não altera a convocação materializada nem o histórico de respostas.
-    if (record.pontoAtendimentoId && record.casaPontoAtendimentoId !== record.pontoAtendimentoId) {
+    // Permite apenas retirar uma confirmação anterior (PARTICIPAREI) depois
+    // da transferência da Casa. Criar/confirmar RSVP fora do PA segue vedado.
+    const existingRsvp = await db.select().from(rsvp)
+      .where(eq(rsvp.convocacaoDestinatarioId, destinatarioId)).get()
+    const liberacaoLegada = parsed.resposta === 'NAO_PARTICIPAREI' &&
+      existingRsvp?.resposta === 'PARTICIPAREI'
+
+    if (record.pontoAtendimentoId &&
+        record.casaPontoAtendimentoId !== record.pontoAtendimentoId &&
+        !liberacaoLegada) {
       return c.json({
         error: 'Esta convocação não corresponde ao Ponto de Atendimento atual da sua Casa.',
         code: 'DESTINATARIO_FORA_DO_PONTO',
@@ -136,10 +143,7 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
       }
     }
 
-    // Precisamos do ID do RSVP. Vamos buscar se existe.
-    const existingRsvp = await db.select().from(rsvp)
-      .where(eq(rsvp.convocacaoDestinatarioId, destinatarioId)).get()
-    
+    // O RSVP anterior foi consultado antes do bloqueio territorial.
     const rsvpId = existingRsvp ? existingRsvp.id : crypto.randomUUID()
 
     const { escopoTipo, escopoId } = extrairEscopoDoEvento(record)
@@ -157,7 +161,17 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
       WHERE cd.id = ${destinatarioId}
         AND cd.membro_id = ${membroId}
         AND cv.status = 'PUBLICADA'
-        AND (ev.ponto_atendimento_id IS NULL OR ca.ponto_atendimento_id = ev.ponto_atendimento_id)
+        AND (
+          ev.ponto_atendimento_id IS NULL OR ca.ponto_atendimento_id = ev.ponto_atendimento_id
+          OR (
+            ${parsed.resposta} = 'NAO_PARTICIPAREI'
+            AND EXISTS (
+              SELECT 1 FROM ${rsvp} old
+              WHERE old.convocacao_destinatario_id = cd.id
+                AND old.resposta = 'PARTICIPAREI'
+            )
+          )
+        )
     ) THEN ${parsed.resposta} ELSE 'RSVP_PONTO_INVALIDO' END`
 
     // Execute de forma atômica (D1 Batch ou Transaction local)
