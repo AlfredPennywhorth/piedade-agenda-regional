@@ -303,9 +303,9 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
                   type="button"
                   onClick={() => handleRsvp('PARTICIPAREI')}
                   disabled={isLoadingRsvp}
-                  aria-pressed={respostaLocal === 'PARTICIPAREI' || isEditingParticipacao}
+                  aria-pressed={!ausenciaSelecionada && (respostaLocal === 'PARTICIPAREI' || isEditingParticipacao)}
                   className={`min-h-11 rounded-lg py-2 px-2 text-sm font-medium leading-tight transition-colors border ${
-                    (respostaLocal === 'PARTICIPAREI' || isEditingParticipacao)
+                    (!ausenciaSelecionada && (respostaLocal === 'PARTICIPAREI' || isEditingParticipacao))
                       ? 'bg-green-50 border-green-200 text-green-700' 
                       : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
@@ -316,9 +316,9 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
                   type="button"
                   onClick={() => { setIsEditingParticipacao(false); handleRsvp('NAO_SEI') }}
                   disabled={isLoadingRsvp}
-                  aria-pressed={respostaLocal === 'NAO_SEI' && !isEditingParticipacao}
+                  aria-pressed={!ausenciaSelecionada && respostaLocal === 'NAO_SEI' && !isEditingParticipacao}
                   className={`min-h-11 rounded-lg py-2 px-2 text-sm font-medium leading-tight transition-colors border ${
-                    respostaLocal === 'NAO_SEI' && !isEditingParticipacao
+                    !ausenciaSelecionada && respostaLocal === 'NAO_SEI' && !isEditingParticipacao
                       ? 'bg-slate-100 border-slate-300 text-slate-800' 
                       : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
