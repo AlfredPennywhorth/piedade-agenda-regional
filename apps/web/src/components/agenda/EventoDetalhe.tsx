@@ -243,7 +243,6 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
       ref={dialogRef}
       onCancel={handleClose}
       className="p-0 rounded-xl shadow-2xl backdrop:bg-slate-900/50 backdrop:backdrop-blur-sm bg-white m-auto w-[calc(100%-1rem)] max-w-lg max-h-[95dvh] overflow-hidden open:flex open:flex-col border border-slate-200 open:animate-in open:fade-in open:zoom-in-95"
-      role="dialog"
       aria-modal="true"
       aria-labelledby="evento-detalhe-titulo"
     >
@@ -301,8 +300,10 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
             <div className="space-y-4">
               <div className="grid grid-cols-1 min-[360px]:grid-cols-3 gap-2">
                 <button
+                  type="button"
                   onClick={() => handleRsvp('PARTICIPAREI')}
                   disabled={isLoadingRsvp}
+                  aria-pressed={respostaLocal === 'PARTICIPAREI' || isEditingParticipacao}
                   className={`min-h-11 rounded-lg py-2 px-2 text-sm font-medium leading-tight transition-colors border ${
                     (respostaLocal === 'PARTICIPAREI' || isEditingParticipacao)
                       ? 'bg-green-50 border-green-200 text-green-700' 
@@ -312,8 +313,10 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
                   ✓ Vou participar
                 </button>
                 <button
+                  type="button"
                   onClick={() => { setIsEditingParticipacao(false); handleRsvp('NAO_SEI') }}
                   disabled={isLoadingRsvp}
+                  aria-pressed={respostaLocal === 'NAO_SEI' && !isEditingParticipacao}
                   className={`min-h-11 rounded-lg py-2 px-2 text-sm font-medium leading-tight transition-colors border ${
                     respostaLocal === 'NAO_SEI' && !isEditingParticipacao
                       ? 'bg-slate-100 border-slate-300 text-slate-800' 
@@ -401,7 +404,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
                       value={justificativa}
                       onChange={(e) => setJustificativa(e.target.value)}
                       placeholder="Por favor, justifique sua ausência..."
-                      className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                      className="w-full p-2 border border-slate-300 rounded-lg text-base focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
                       rows={2}
                       disabled={isLoadingRsvp}
                     />
