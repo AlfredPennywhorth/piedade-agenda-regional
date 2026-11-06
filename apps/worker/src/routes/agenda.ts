@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, asc, inArray } from 'drizzle-orm'
+import { eq, and, asc, inArray, or, isNotNull } from 'drizzle-orm'
 import {
   eventos,
   convocacoes,
@@ -15,6 +15,7 @@ import {
 } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { executeAtomic } from '../db/batch'
+import { condicaoMembroNoPaDoEvento } from '../services/projecao-convocacao-pa'
 
 export const agendaRouter = new Hono<{ Variables: Variables }>()
 
@@ -208,7 +209,10 @@ async function buscarRegistrosAgenda(db: any, membroId: string): Promise<Registr
         eq(convocacaoDestinatarios.membroId, membroId),
         eq(convocacoes.status, 'PUBLICADA'),
         eq(eventos.ativo, true),
-        eq(convocacoes.ativo, true)
+        eq(convocacoes.ativo, true),
+        // Agenda operacional não deve oferecer reuniões legadas de outro PA.
+        // Uma presença histórica já registrada continua consultável.
+        or(condicaoMembroNoPaDoEvento(eventos.id, convocacaoDestinatarios.membroId), isNotNull(checkins.id)),
       )
     )
     .orderBy(asc(eventos.inicioEm))

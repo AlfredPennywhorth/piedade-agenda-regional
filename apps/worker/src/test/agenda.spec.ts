@@ -841,19 +841,31 @@ describe('S07 - Minha Agenda', () => {
       expect(res.status).toBe(200)
       return await res.json() as Array<{ evento: { id: string }; conflito: { eventos: Array<{ eventoId: string }> } | null }>
     }
+    // Uma Casa enxerga apenas as convocações do PA vigente.
+    sqlite.prepare("UPDATE casas SET ponto_atendimento_id = ? WHERE id = 'casa-1'").run(paA)
+    const agendaNoPaA = await carregarAgenda()
+    expect(agendaNoPaA.some(item => item.evento.id === salaA)).toBe(true)
+    expect(agendaNoPaA.some(item => item.evento.id === salaB)).toBe(false)
+    expect(agendaNoPaA.some(item => item.evento.id === distinto)).toBe(false)
+
+    // Após transferência controlada para PA B, alternativas e conflitos
+    // voltam a ser calculados só entre eventos territorialmente elegíveis.
+    sqlite.prepare("UPDATE casas SET ponto_atendimento_id = ? WHERE id = 'casa-1'").run(paB)
     const agenda = await carregarAgenda()
-    const a = agenda.find(item => item.evento.id === salaA)!
-    const b = agenda.find(item => item.evento.id === salaB)!
-    expect(a.conflito?.eventos.some(item => item.eventoId === salaB)).toBeFalsy()
-    expect(b.conflito?.eventos.some(item => item.eventoId === salaA)).toBeFalsy()
-    expect(a.conflito?.eventos.some(item => item.eventoId === distinto)).toBe(true)
-    expect(b.conflito?.eventos.some(item => item.eventoId === distinto)).toBe(true)
+    const a = agenda.find(item => item.evento.id === salaA)
+    const b = agenda.find(item => item.evento.id === salaB)
+    const d = agenda.find(item => item.evento.id === distinto)
+    expect(a).toBeUndefined()
+    expect(b).toBeDefined()
+    expect(d).toBeDefined()
+    expect(b?.conflito?.eventos.some(item => item.eventoId === distinto)).toBe(true)
+    expect(d?.conflito?.eventos.some(item => item.eventoId === salaB)).toBe(true)
 
     sqlite.prepare(`INSERT INTO rsvp (id, convocacao_destinatario_id, resposta, respondido_em, atualizado_em)
       VALUES (?, ?, 'NAO_PARTICIPAREI', '2030-01-01T00:00:00Z', '2030-01-01T00:00:00Z')`)
       .run('rsvp-pa-agenda-distinto', `dest-${distinto}`)
     const aposRecusa = await carregarAgenda()
-    expect(aposRecusa.find(item => item.evento.id === salaA)?.conflito).toBeNull()
+    expect(aposRecusa.find(item => item.evento.id === salaA)).toBeUndefined()
     expect(aposRecusa.find(item => item.evento.id === salaB)?.conflito).toBeNull()
   })
 

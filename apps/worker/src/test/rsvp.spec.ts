@@ -366,7 +366,7 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     expect(res.status).toBe(404)
   })
 
-  it('PA-02: escolha unica entre alternativas, troca apos recusa e independencia de outros grupos', async () => {
+  it('PA-02: conflito entre alternativas em PAs distintos com transferencia controlada', async () => {
     const setor = 'set-1'
     const pontoA = crypto.randomUUID()
     const pontoB = crypto.randomUUID()
@@ -376,6 +376,7 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(pontoA, setor, 'PA RSVP A')
     sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(pontoB, setor, 'PA RSVP B')
     sqlite.prepare('INSERT INTO tipos_reuniao (id, nome, codigo) VALUES (?, ?, ?)').run(tipoId, 'Atendimento RSVP', 'ATD-RSVP-PA02')
+    sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(pontoA, 'casa-1')
     const eventos = [
       ['ev-pa-rsvp-a', pontoA, grupoId],
       ['ev-pa-rsvp-b', pontoB, grupoId],
@@ -397,15 +398,21 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
       body: JSON.stringify({ resposta, ...(resposta === 'NAO_PARTICIPAREI' ? { justificativa: 'Escolhi outra reunião alternativa' } : {}) }),
     })
     expect((await responder('ev-pa-rsvp-a', 'PARTICIPAREI')).status).toBe(200)
+    // Simula a transferencia da Casa entre eventos distintos para exercitar o trigger 409.
+    sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(pontoB, 'casa-1')
     const segunda = await responder('ev-pa-rsvp-b', 'PARTICIPAREI')
     expect(segunda.status).toBe(409)
     expect((await segunda.json() as { code: string }).code).toBe('RSVP_ALTERNATIVA_JA_CONFIRMADA')
     expect(sqlite.prepare("SELECT COUNT(*) AS n FROM rsvp WHERE convocacao_destinatario_id = ?")
       .get('dest-ev-pa-rsvp-b')).toMatchObject({ n: 0 })
     expect((await responder('ev-pa-rsvp-outro', 'PARTICIPAREI')).status).toBe(200)
+    sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(pontoA, 'casa-1')
     expect((await responder('ev-pa-rsvp-a', 'NAO_PARTICIPAREI')).status).toBe(200)
+    sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(pontoB, 'casa-1')
     expect((await responder('ev-pa-rsvp-b', 'PARTICIPAREI')).status).toBe(200)
+    sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(pontoA, 'casa-1')
     expect((await responder('ev-pa-rsvp-a', 'PARTICIPAREI')).status).toBe(409)
+    sqlite.prepare('UPDATE casas SET ponto_atendimento_id = NULL WHERE id = ?').run('casa-1')
   })
 
   it('PA-04: bloqueia reclassificacao com duas confirmacoes e troca de Ponto publicado', async () => {
@@ -444,6 +451,49 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     expect(() => sqlite.prepare('UPDATE pontos_atendimento SET setor_id=? WHERE id=?')
       .run('set-pa04-transfer', paB)).toThrow(/PONTO_COM_CASAS_VINCULADAS/)
 
+  })
+
+  it('PA-08: bloqueia RSVP de destinatário legado de outro PA sem apagar convocação ou RSVP', async () => {
+    const paDaCasa = crypto.randomUUID()
+    const paDaReuniao = crypto.randomUUID()
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(paDaCasa, 'set-1', 'PA da Casa')
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(paDaReuniao, 'set-1', 'PA de outra reunião')
+    sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(paDaCasa, 'casa-1')
+    const eventoId = crypto.randomUUID()
+    const convocacaoId = crypto.randomUUID()
+    const destinatarioId = crypto.randomUUID()
+    sqlite.prepare(`INSERT INTO eventos
+      (id, titulo, modalidade, inicio_em, fim_em, setor_id, ponto_atendimento_id, ativo)
+      VALUES (?, 'Reunião outro PA', 'PRESENCIAL', '2030-09-01T10:00:00Z',
+      '2030-09-01T11:00:00Z', 'set-1', ?, 1)`).run(eventoId, paDaReuniao)
+    sqlite.prepare("INSERT INTO convocacoes (id, evento_id, status, ativo) VALUES (?, ?, 'PUBLICADA', 1)")
+      .run(convocacaoId, eventoId)
+    sqlite.prepare('INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES (?, ?, ?)')
+      .run(destinatarioId, convocacaoId, membroId)
+
+    const responder = () => req(`/api/v1/minha-agenda/rsvp/${destinatarioId}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI' }),
+    })
+
+    try {
+      const bloqueado = await responder()
+      expect(bloqueado.status).toBe(403)
+      expect((await bloqueado.json() as { code: string }).code).toBe('DESTINATARIO_FORA_DO_PONTO')
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM rsvp WHERE convocacao_destinatario_id = ?')
+        .get(destinatarioId)).toMatchObject({ n: 0 })
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM convocacao_destinatarios WHERE id = ?')
+        .get(destinatarioId)).toMatchObject({ n: 1 })
+
+      // Um vínculo de PA compatível pode responder; não há bloqueio global de RSVP.
+      sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(paDaReuniao, 'casa-1')
+      const permitido = await responder()
+      expect(permitido.status).toBe(200)
+      expect((await permitido.json() as { resposta: string }).resposta).toBe('PARTICIPAREI')
+    } finally {
+      sqlite.prepare('UPDATE casas SET ponto_atendimento_id = NULL WHERE id = ?').run('casa-1')
+    }
   })
 
   it('30. falha no batch não deixa atualização parcial (Rollback no executeAtomic)', async () => {

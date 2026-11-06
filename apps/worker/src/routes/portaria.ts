@@ -9,6 +9,7 @@ import { gerarTokenAleatorio, hashToken } from '../security/tokens'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
 import { podeGerenciarEvento } from '../security/eventos'
 import { executeAtomic } from '../db/batch'
+import { filtroParticipantePortariaPorPa } from '../services/elegibilidade-portaria-pa'
 
 export const portariaRouter = new Hono<{ Variables: Variables }>()
 
@@ -1321,7 +1322,8 @@ portariaRouter.get('/eventos/:eventoId/participantes', async (c) => {
       and(
         eq(convocacoes.eventoId, eventoId),
         eq(convocacoes.status, 'PUBLICADA'),
-        eq(convocacoes.ativo, true)
+        eq(convocacoes.ativo, true),
+        filtroParticipantePortariaPorPa(eventoId)
       )
     )
     .all()

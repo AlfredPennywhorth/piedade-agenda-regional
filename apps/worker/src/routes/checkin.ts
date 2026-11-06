@@ -5,6 +5,7 @@ import { CheckinQrSchema, CheckinManualSchema, RetificarCheckinSchema } from '@p
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eOperadorPortariaAutorizado } from '../security/permissoes'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
+import { destinatarioElegivelNoPonto, formaCheckinComGuardaPa } from '../services/elegibilidade-portaria-pa'
 
 export const checkinRouter = new Hono<{ Variables: Variables }>()
 
@@ -55,6 +56,15 @@ checkinRouter.post('/qr', async (c) => {
     const membroId = dest.destinatario.membroId
     const eventoId = dest.evento.id
 
+    // Bloqueia QR de convocado legado fora do PA atual.
+    const elegivel = await db.select({ id: convocacaoDestinatarios.id })
+      .from(convocacaoDestinatarios)
+      .where(and(eq(convocacaoDestinatarios.id, destinatarioId),
+        destinatarioElegivelNoPonto(destinatarioId, eventoId))).get()
+    if (!elegivel) {
+      return c.json({ error: 'Convocado fora do Ponto de Atendimento desta reunião', code: 'DESTINATARIO_FORA_DO_PONTO' }, 403)
+    }
+
     // 4. Verifica unicidade por (eventoId, membroId)
     const checkinExistente = await db
       .select()
@@ -89,7 +99,7 @@ checkinRouter.post('/qr', async (c) => {
 
     await executarOperacaoComAudit(
       db,
-      (qdb) => [qdb.insert(checkins).values(newCheckin)],
+      (qdb) => [qdb.insert(checkins).values({ ...newCheckin, forma: formaCheckinComGuardaPa(dest.destinatario.id, eventoId, 'QR') })],
       {
         acao: 'CHECKIN_QR',
         atorMembroId: operadorMembroId,
@@ -114,6 +124,7 @@ checkinRouter.post('/qr', async (c) => {
       return c.json({ error: 'Payload inválido', details: err.issues }, 400)
     }
     const mensagem = err instanceof Error ? err.message : String(err)
+    if (mensagem.includes('check_checkin_forma')) return c.json({ error: 'Convocado fora do Ponto de Atendimento desta reunião', code: 'DESTINATARIO_FORA_DO_PONTO' }, 403)
     if (mensagem.includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
     if (
       mensagem.includes('UNIQUE constraint failed') ||
@@ -170,6 +181,15 @@ checkinRouter.post('/manual', async (c) => {
     const membroId = dest.destinatario.membroId
     const eventoId = dest.evento.id
 
+    // Bloqueia check-in manual de destinatário legado de outro PA.
+    const elegivel = await db.select({ id: convocacaoDestinatarios.id })
+      .from(convocacaoDestinatarios)
+      .where(and(eq(convocacaoDestinatarios.id, destinatarioId),
+        destinatarioElegivelNoPonto(destinatarioId, eventoId))).get()
+    if (!elegivel) {
+      return c.json({ error: 'Convocado fora do Ponto de Atendimento desta reunião', code: 'DESTINATARIO_FORA_DO_PONTO' }, 403)
+    }
+
     const checkinExistente = await db
       .select()
       .from(checkins)
@@ -202,7 +222,7 @@ checkinRouter.post('/manual', async (c) => {
 
     await executarOperacaoComAudit(
       db,
-      (qdb) => [qdb.insert(checkins).values(newCheckin)],
+      (qdb) => [qdb.insert(checkins).values({ ...newCheckin, forma: formaCheckinComGuardaPa(dest.destinatario.id, eventoId, 'MANUAL') })],
       {
         acao: 'CHECKIN_MANUAL',
         atorMembroId: operadorMembroId,
@@ -227,6 +247,7 @@ checkinRouter.post('/manual', async (c) => {
       return c.json({ error: 'Payload inválido', details: err.issues }, 400)
     }
     const mensagem = err instanceof Error ? err.message : String(err)
+    if (mensagem.includes('check_checkin_forma')) return c.json({ error: 'Convocado fora do Ponto de Atendimento desta reunião', code: 'DESTINATARIO_FORA_DO_PONTO' }, 403)
     if (mensagem.includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
     if (
       mensagem.includes('UNIQUE constraint failed') ||
