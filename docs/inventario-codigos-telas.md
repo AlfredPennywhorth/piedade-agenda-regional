@@ -129,3 +129,14 @@ O diálogo de espaços (`AGD-ADM-058`) contém formulário e listagem no mesmo c
 | AGD-SHR-006 | Central de Ajuda pesquisável e artigo contextual | Mais → Central de Ajuda ou Ajuda na tela atual |
 
 Preserva a tela e os formulários de origem; códigos citados nos artigos identificam as telas documentadas, sem renumerá-las.
+
+## Agenda e gestão de funções do rascunho — #247
+
+| Código | Superfície | Ação/contexto | Pai e acesso | Componente |
+|---|---|---|---|---|
+| AGD-SHR-007 | Detalhes do evento na Agenda/Calendário | Consultar evento autorizado e responder RSVP/convite; variante de evento pessoal | AGD-MOB-001/002 → abrir evento | `agenda/EventoDetalhe.tsx` |
+| AGD-ADM-062 | Gerenciar Funções do Rascunho | Adicionar/remover funções autorizadas e concluir | AGD-ADM-014 ou jornada Evento → Convocação → Funções | `convocacoes/ConvocacaoFuncoesModal.tsx` |
+
+Os códigos aparecem no início do conteúdo rolável de cada diálogo, inclusive nos estados de carregamento/erro de Funções. Preservam título acessível, foco e ações existentes. `AGD-SHR-007` não substitui `AGD-ADM-018`, que identifica os detalhes administrativos em `EventosView`.
+
+`AGD-ADM-060` (Pontos de Atendimento) e `AGD-ADM-061` (Tipos de Reunião) já estão atribuídos em `MainLayout.tsx`; não reutilizá-los. Esta fatia não conclui o inventário global: demais subtelas, CRUDs e confirmações seguem pendentes na #247.

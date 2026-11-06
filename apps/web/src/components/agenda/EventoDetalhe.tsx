@@ -269,6 +269,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-slate-800">
+        <p data-screen-code="AGD-SHR-007" className="text-right text-xs text-slate-500">Tela AGD-SHR-007</p>
         <AjudaContextual />
         {reconfirmacaoPendente && item.evento.agendaAviso && (
           <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950" role="alert">
