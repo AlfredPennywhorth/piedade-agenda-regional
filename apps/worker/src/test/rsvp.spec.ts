@@ -406,9 +406,13 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     expect(sqlite.prepare("SELECT COUNT(*) AS n FROM rsvp WHERE convocacao_destinatario_id = ?")
       .get('dest-ev-pa-rsvp-b')).toMatchObject({ n: 0 })
     expect((await responder('ev-pa-rsvp-outro', 'PARTICIPAREI')).status).toBe(200)
-    sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(pontoA, 'casa-1')
+    // A Casa permanece no PA B; a confirmação legada do PA A pode ser recusada
+    // para liberar a reunião equivalente do PA atual, sem voltar ao PA antigo.
     expect((await responder('ev-pa-rsvp-a', 'NAO_PARTICIPAREI')).status).toBe(200)
-    sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(pontoB, 'casa-1')
+    expect(sqlite.prepare("SELECT resposta FROM rsvp WHERE convocacao_destinatario_id = ?")
+      .get('dest-ev-pa-rsvp-a')).toMatchObject({ resposta: 'NAO_PARTICIPAREI' })
+    // Recusa repetida de destinatário fora do PA não habilita outras escritas.
+    expect((await responder('ev-pa-rsvp-a', 'NAO_PARTICIPAREI')).status).toBe(403)
     expect((await responder('ev-pa-rsvp-b', 'PARTICIPAREI')).status).toBe(200)
     sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(pontoA, 'casa-1')
     expect((await responder('ev-pa-rsvp-a', 'PARTICIPAREI')).status).toBe(409)
