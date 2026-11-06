@@ -446,6 +446,49 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
 
   })
 
+  it('PA-08: bloqueia RSVP de destinatário legado de outro PA sem apagar convocação ou RSVP', async () => {
+    const paDaCasa = crypto.randomUUID()
+    const paDaReuniao = crypto.randomUUID()
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(paDaCasa, 'set-1', 'PA da Casa')
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(paDaReuniao, 'set-1', 'PA de outra reunião')
+    sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(paDaCasa, 'casa-1')
+    const eventoId = crypto.randomUUID()
+    const convocacaoId = crypto.randomUUID()
+    const destinatarioId = crypto.randomUUID()
+    sqlite.prepare(`INSERT INTO eventos
+      (id, titulo, modalidade, inicio_em, fim_em, setor_id, ponto_atendimento_id, ativo)
+      VALUES (?, 'Reunião outro PA', 'PRESENCIAL', '2030-09-01T10:00:00Z',
+      '2030-09-01T11:00:00Z', 'set-1', ?, 1)`).run(eventoId, paDaReuniao)
+    sqlite.prepare("INSERT INTO convocacoes (id, evento_id, status, ativo) VALUES (?, ?, 'PUBLICADA', 1)")
+      .run(convocacaoId, eventoId)
+    sqlite.prepare('INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES (?, ?, ?)')
+      .run(destinatarioId, convocacaoId, membroId)
+
+    const responder = () => req(`/api/v1/minha-agenda/rsvp/${destinatarioId}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI' }),
+    })
+
+    try {
+      const bloqueado = await responder()
+      expect(bloqueado.status).toBe(403)
+      expect((await bloqueado.json() as { code: string }).code).toBe('DESTINATARIO_FORA_DO_PONTO')
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM rsvp WHERE convocacao_destinatario_id = ?')
+        .get(destinatarioId)).toMatchObject({ n: 0 })
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM convocacao_destinatarios WHERE id = ?')
+        .get(destinatarioId)).toMatchObject({ n: 1 })
+
+      // Um vínculo de PA compatível pode responder; não há bloqueio global de RSVP.
+      sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(paDaReuniao, 'casa-1')
+      const permitido = await responder()
+      expect(permitido.status).toBe(200)
+      expect((await permitido.json() as { resposta: string }).resposta).toBe('PARTICIPAREI')
+    } finally {
+      sqlite.prepare('UPDATE casas SET ponto_atendimento_id = NULL WHERE id = ?').run('casa-1')
+    }
+  })
+
   it('30. falha no batch não deixa atualização parcial (Rollback no executeAtomic)', async () => {
     const destId = destIdPeriodos
     await req(`/api/v1/minha-agenda/rsvp/${destId}`, {
