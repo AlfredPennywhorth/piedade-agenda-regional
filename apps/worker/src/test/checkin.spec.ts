@@ -205,6 +205,45 @@ describe('S11 - Portaria e Check-in', () => {
     }
   }
 
+  for (const forma of ['qr', 'manual'] as const) {
+    it(`PA-414: impede check-in ${forma.toUpperCase()} de destinatário legado em outro PA sem criar presença/auditoria`, async () => {
+      const ctx = await setupBaseData()
+      const paDaCasa = crypto.randomUUID()
+      const paDoEvento = crypto.randomUUID()
+      sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)')
+        .run(paDaCasa, ctx.setId, 'PA da Casa')
+      sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)')
+        .run(paDoEvento, ctx.setId, 'PA do Evento')
+      sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?')
+        .run(paDaCasa, ctx.casId)
+      sqlite.prepare('UPDATE eventos SET ponto_atendimento_id = ? WHERE id = ?')
+        .run(paDoEvento, ctx.evId)
+      const payload = forma === 'qr' ? { qrToken: ctx.dest1Id } : { convocacaoDestinatarioId: ctx.dest1Id }
+      const request = () => app.request(`/api/v1/checkin/${forma}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ctx.tokenOperador}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      const antes = sqlite.prepare("SELECT COUNT(*) AS n FROM auditoria_logs WHERE acao LIKE 'CHECKIN_%'").get() as { n: number }
+      const negado = await request()
+      expect(negado.status).toBe(403)
+      expect((await negado.json()).code).toBe('DESTINATARIO_FORA_DO_PONTO')
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM checkins WHERE convocacao_destinatario_id = ?')
+        .get(ctx.dest1Id)).toMatchObject({ n: 0 })
+      expect(sqlite.prepare("SELECT COUNT(*) AS n FROM auditoria_logs WHERE acao LIKE 'CHECKIN_%'")
+        .get()).toMatchObject({ n: antes.n })
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM convocacao_destinatarios WHERE id = ?')
+        .get(ctx.dest1Id)).toMatchObject({ n: 1 })
+
+      // Vinculação operacional ao PA do evento restaura o acesso legítimo.
+      sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?')
+        .run(paDoEvento, ctx.casId)
+      const permitido = await request()
+      expect(permitido.status).toBe(201)
+    })
+  }
+
   it('1. Deve negar acesso 401 para requisição sem token de autenticação', async () => {
     const ctx = await setupBaseData()
     const res = await app.request('/api/v1/checkin/qr', {
