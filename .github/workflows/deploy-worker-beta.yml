@@ -1,7 +1,12 @@
-name: Deploy Worker — Beta
+name: Deploy Worker — Beta (somente Worker, sem D1)
 
 on:
   workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: 'SHA completo (40 caracteres) do commit homologado em develop'
+        required: true
+        type: string
 
 concurrency:
   group: worker-beta
@@ -12,13 +17,42 @@ permissions:
 
 jobs:
   deploy:
-    name: Validate · Migrate Beta · Deploy Worker
+    name: Validar develop e SHA · Publicar somente Worker Beta
     runs-on: ubuntu-latest
     environment: beta
 
     steps:
+      - name: Impedir branch incorreta e commit inesperado
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/develop" || {
+            echo "::error::Este workflow só pode ser acionado a partir de develop."
+            exit 1
+          }
+          [[ "$EXPECTED_SHA" =~ ^[a-fA-F0-9]{40}$ ]] || {
+            echo "::error::Informe o SHA completo de 40 caracteres."
+            exit 1
+          }
+          test "${GITHUB_SHA,,}" = "${EXPECTED_SHA,,}" || {
+            echo "::error::O SHA escolhido não corresponde ao HEAD da execução."
+            exit 1
+          }
+
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Confirmar SHA do checkout
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -38,47 +72,28 @@ jobs:
         shell: bash
         env:
           D1_BETA_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_BETA_DATABASE_ID }}
-          PIN_PEPPER_BETA: ${{ secrets.PIN_PEPPER_BETA }}
-          MASTER_BOOTSTRAP_SECRET_BETA: ${{ secrets.MASTER_BOOTSTRAP_SECRET_BETA }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
+          set -euo pipefail
           test -n "$D1_BETA_DATABASE_ID"
-          test -n "$PIN_PEPPER_BETA"
-          test -n "$MASTER_BOOTSTRAP_SECRET_BETA"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test -n "$CLOUDFLARE_API_TOKEN"
 
-      - name: Materialize D1 Beta configuration
+      - name: Materializar somente a configuração local do binding D1 Beta
         shell: bash
         env:
           D1_BETA_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_BETA_DATABASE_ID }}
         run: |
+          set -euo pipefail
           sed -i "s|__D1_BETA_DATABASE_ID__|$D1_BETA_DATABASE_ID|" apps/worker/wrangler.toml
-          grep -q "$D1_BETA_DATABASE_ID" apps/worker/wrangler.toml
+          grep -Fq "$D1_BETA_DATABASE_ID" apps/worker/wrangler.toml
 
-      - name: Apply D1 Beta migrations
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: pnpm --filter @piedade/worker exec wrangler d1 migrations apply piedade-agenda-db-beta --remote --env beta
-
-      - name: Deploy Worker Beta
+      # Nenhuma etapa wrangler d1 execute/migrations apply ou secret put.
+      # O binding D1 é necessário para o Worker funcionar; este workflow
+      # não aplica migrações nem executa comandos SQL contra o banco.
+      - name: Deploy somente Worker Beta
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: pnpm --filter @piedade/worker exec wrangler deploy --env beta
-
-      - name: Configure PIN_PEPPER Beta
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          PIN_PEPPER_BETA: ${{ secrets.PIN_PEPPER_BETA }}
-        run: printf '%s' "$PIN_PEPPER_BETA" | pnpm --filter @piedade/worker exec wrangler secret put PIN_PEPPER --env beta
-
-      - name: Configure MASTER_BOOTSTRAP_SECRET Beta
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          MASTER_BOOTSTRAP_SECRET_BETA: ${{ secrets.MASTER_BOOTSTRAP_SECRET_BETA }}
-        run: printf '%s' "$MASTER_BOOTSTRAP_SECRET_BETA" | pnpm --filter @piedade/worker exec wrangler secret put MASTER_BOOTSTRAP_SECRET --env beta
