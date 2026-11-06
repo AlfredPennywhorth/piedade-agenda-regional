@@ -276,7 +276,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Reunião de Setor/i }))
 
     const dialog = within(await screen.findByRole('dialog'))
-    fireEvent.click(dialog.getByLabelText('✗ Não vou participar'))
+    fireEvent.click(dialog.getByRole('button', { name: '✗ Não vou participar' }))
     fireEvent.change(dialog.getByPlaceholderText(/justifique sua ausência/i), {
       target: { value: 'Outro compromisso' },
     })
@@ -495,7 +495,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     fireEvent.click(cardInicial)
 
     const dialog = within(await screen.findByRole('dialog'))
-    fireEvent.click(dialog.getByLabelText('✗ Não vou participar'))
+    fireEvent.click(dialog.getByRole('button', { name: '✗ Não vou participar' }))
     fireEvent.change(dialog.getByPlaceholderText(/justifique sua ausência/i), {
       target: { value: 'Outro compromisso' },
     })
@@ -621,9 +621,15 @@ describe('S07 - Minha Agenda e Calendário', () => {
     const dialogQueries = within(dialog)
 
     expect(dialogQueries.getByText('Sua Participação')).toBeInTheDocument()
+    expect(dialogQueries.getByText('Sua Participação').compareDocumentPosition(dialogQueries.getByText('Data e Hora')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(dialogQueries.getByText('✓ Vou participar')).toBeInTheDocument()
     expect(dialogQueries.getByText('? Não sei ainda')).toBeInTheDocument()
-    expect(dialogQueries.getByLabelText('✗ Não vou participar')).toBeInTheDocument()
+    expect(dialogQueries.getByRole('button', { name: '✗ Não vou participar' })).toBeInTheDocument()
+    for (const nome of ['✓ Vou participar', '? Não sei ainda', '✗ Não vou participar']) {
+      const botao = dialogQueries.getByRole('button', { name: nome })
+      expect(botao).toHaveAttribute('type', 'button')
+      expect(botao).toHaveAttribute('aria-pressed')
+    }
   })
 
   it('11. Confirma participação', async () => {
@@ -705,15 +711,40 @@ describe('S07 - Minha Agenda e Calendário', () => {
     const dialogQueries = within(dialog)
 
     // Clica no rádio mas NÃO salva
-    const radioNaoVou = dialogQueries.getByLabelText('✗ Não vou participar')
+    const radioNaoVou = dialogQueries.getByRole('button', { name: '✗ Não vou participar' })
     fireEvent.click(radioNaoVou)
 
     // O text-area de justificativa deve aparecer
-    expect(dialogQueries.getByPlaceholderText(/justifique sua ausência/i)).toBeInTheDocument()
+    expect(dialogQueries.getByPlaceholderText(/justifique sua ausência/i)).toHaveClass('text-base')
 
     // Mas o badge "Ausente" NÃO deve estar na tela (já que o backend não confirmou)
     expect(dialogQueries.queryByText(/ausente/i)).not.toBeInTheDocument()
   })
+
+  it.each(['PARTICIPAREI', 'NAO_SEI'] as const)(
+    '13b. Ao preparar ausência após %s, somente ausência é marcada sem persistir',
+    async (respostaSalva) => {
+      mockAgenda([{ ...mockEventos[0], rsvp: { resposta: respostaSalva } }])
+      render(<App />)
+
+      fireEvent.click(await screen.findByText('Reunião de Setor'))
+      const dialog = within(await screen.findByRole('dialog'))
+      const participarei = dialog.getByRole('button', { name: '✓ Vou participar' })
+      const naoSei = dialog.getByRole('button', { name: '? Não sei ainda' })
+      const ausencia = dialog.getByRole('button', { name: '✗ Não vou participar' })
+
+      expect(participarei).toHaveAttribute('aria-pressed', String(respostaSalva === 'PARTICIPAREI'))
+      expect(naoSei).toHaveAttribute('aria-pressed', String(respostaSalva === 'NAO_SEI'))
+      expect(ausencia).toHaveAttribute('aria-pressed', 'false')
+
+      fireEvent.click(ausencia)
+      expect(dialog.getByPlaceholderText(/justifique sua ausência/i)).toBeInTheDocument()
+      expect(participarei).toHaveAttribute('aria-pressed', 'false')
+      expect(naoSei).toHaveAttribute('aria-pressed', 'false')
+      expect(ausencia).toHaveAttribute('aria-pressed', 'true')
+      expect(apiClient.putWithAuth).not.toHaveBeenCalled()
+    },
+  )
 
   // ============================================================
   // S09 - Web (Períodos e Alimentação)
@@ -870,7 +901,7 @@ describe('S07 - Minha Agenda e Calendário', () => {
     fireEvent.click(dq.getByText('✓ Vou participar'))
     expect(dq.getByText(/período de participação/i)).toBeInTheDocument()
     
-    fireEvent.click(dq.getByLabelText('✗ Não vou participar'))
+    fireEvent.click(dq.getByRole('button', { name: '✗ Não vou participar' }))
     
     expect(dq.queryByText(/período de participação/i)).not.toBeInTheDocument()
     expect(dq.getByText('Alimentação Oferecida')).toBeInTheDocument()

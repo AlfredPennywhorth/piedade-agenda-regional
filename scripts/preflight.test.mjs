@@ -230,3 +230,88 @@ test('release #469: falha em SHA, diff ou declaração essencial continua bloque
     assert.equal(r.status, 1, JSON.stringify(options) + '\n' + r.log)
   }
 })
+
+const release475Repo = 'AlfredPennywhorth/piedade-agenda-regional'
+const release475Head = 'release/ux-evento-detalhe-474-20261106'
+const release475Paths = [
+  'apps/web/src/components/agenda/EventoDetalhe.tsx',
+  'apps/web/src/test/agenda.test.tsx',
+  'scripts/preflight.mjs',
+  'scripts/preflight.test.mjs',
+]
+function release475Event(overrides = {}) {
+  return {
+    number: 475,
+    pull_request: {
+      number: 475,
+      base: { ref: 'main', repo: { full_name: release475Repo } },
+      head: { ref: release475Head, repo: { full_name: release475Repo } },
+    },
+    ...overrides,
+  }
+}
+function release475Scenario(overrides = {}) {
+  return scenario({
+    base: 'main',
+    head: release475Head,
+    changes: release475Paths,
+    githubEvent: release475Event(),
+    repository: release475Repo,
+    ...overrides,
+  })
+}
+
+test('release #475: só o evento oficial, escopo fechado e integridade passam', () => {
+  const r = release475Scenario({ output: true })
+  assert.equal(r.status, 0, r.log)
+  assert.match(r.outputs, /worker_changed=false/)
+  assert.match(r.outputs, /web_changed=true/)
+  assert.match(r.outputs, /migration_changed=false/)
+})
+
+test('release #475: arquivo extra, migração, LGPD ou escopo parcial são bloqueados', () => {
+  for (const changes of [
+    [...release475Paths, 'apps/worker/drizzle/0053_lgpd_ciencias_primeiro_acesso.sql'],
+    [...release475Paths, 'apps/web/src/components/lgpd/LgpdPrimeiroAcessoGate.tsx'],
+    [...release475Paths.slice(1), 'apps/web/src/App.tsx'],
+    release475Paths.slice(1),
+  ]) {
+    const r = release475Scenario({ changes })
+    assert.equal(r.status, 1, r.log)
+    assert.match(r.log, /PR #475: escopo divergente/)
+  }
+})
+
+test('release #475: identidade, origem e evento falsos não autorizam main', () => {
+  const pr = release475Event().pull_request
+  const cases = [
+    { repository: 'outro/ambiente' },
+    { githubEvent: release475Event({ number: 476 }) },
+    { githubEvent: release475Event({ pull_request: { ...pr, number: 476 } }) },
+    { githubEvent: release475Event({ pull_request: { ...pr, base: { ref: 'main', repo: { full_name: 'outro/ambiente' } } } }) },
+    { githubEvent: release475Event({ pull_request: { ...pr, head: { ref: release475Head, repo: { full_name: 'outro/ambiente' } } } }) },
+    { githubEvent: release475Event({ pull_request: { ...pr, base: { ref: 'develop', repo: { full_name: release475Repo } } } }) },
+    { githubEvent: release475Event({ pull_request: { ...pr, head: { ref: 'develop', repo: { full_name: release475Repo } } } }) },
+    { githubEvent: null },
+    { head: 'release/falsa-475' },
+    { eventName: 'workflow_dispatch' },
+    { rawEvent: '{ invalid json' },
+  ]
+  for (const options of cases) {
+    const r = release475Scenario(options)
+    assert.equal(r.status, 1, JSON.stringify(options) + '\\n' + r.log)
+    assert.match(r.log, /PR para main deve partir de develop/, JSON.stringify(options))
+  }
+})
+
+test('release #475: SHA incorreto, diff indisponível e declarações ausentes bloqueiam', () => {
+  for (const options of [
+    { expectedSha: 'b'.repeat(40) },
+    { diffFails: true },
+    { fetchFails: true },
+    { omitDeclaration: 'PROD_API_URL' },
+  ]) {
+    const r = release475Scenario(options)
+    assert.equal(r.status, 1, JSON.stringify(options) + '\\n' + r.log)
+  }
+})
