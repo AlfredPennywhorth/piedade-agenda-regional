@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
-import { eq, and, or, gte, lt, lte, inArray, sql } from 'drizzle-orm'
+import { eq, and, or, gte, lt, lte, inArray, sql, isNotNull } from 'drizzle-orm'
 import { eventos, convocacoes, convocacaoDestinatarios, rsvp, checkins, eventosParticipantesExternos, membros, casas, locais, espacosLocal, vinculosFuncionais, funcoes, portariaFechamentos, portariaFechamentoItens, setores, pontosAtendimento, administracoes, gruposTrabalho, convocacaoDestinatarioEvidencias, auditoriaLogs, listaPresencaPdfAtas } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { eGestorRelatoriosAutorizadoParaEvento, eGestorRelatoriosAutorizadoParaEscopo, eMasterSistema } from '../security/permissoes'
 import { condicaoEscopo, condicaoEventosVisiveis } from '../security/eventos'
 import { montarSnapshotFechamentoPortaria } from '../services/portaria-fechamento'
+import { condicaoMembroNoPaDoEvento } from '../services/projecao-convocacao-pa'
 import { gerarListaPresencaPdf } from '../services/lista-presenca-pdf'
 import { dataValidaRelatorio, inicioDiaSaoPauloUtc, limiteFinalExclusivoSaoPauloUtc } from './relatorios-periodo'
 import { consolidarUtilizacao, type OcorrenciaUtilizacao, type CadastroUtilizacao } from './relatorios-utilizacao'
@@ -850,7 +851,11 @@ relatoriosRouter.get('/eventos/:eventoId/presencas', async (c) => {
   .leftJoin(casas, eq(membros.casaId, casas.id))
   .leftJoin(rsvp, eq(rsvp.convocacaoDestinatarioId, convocacaoDestinatarios.id))
   .leftJoin(checkins, and(eq(checkins.eventoId, eventoId), eq(checkins.membroId, membros.id), eq(checkins.status, 'ATIVO')))
-  .where(inArray(convocacaoDestinatarios.convocacaoId, convocacaoIds))
+  .where(and(
+    inArray(convocacaoDestinatarios.convocacaoId, convocacaoIds),
+    // Somente participantes atuais ou presenças históricas efetivas.
+    or(condicaoMembroNoPaDoEvento(eventoId, membros.id), isNotNull(checkins.id)),
+  ))
   .all()
 
   const linhaPorMembro = new Map<string, any>()

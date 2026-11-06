@@ -18,6 +18,7 @@ import {
 import { ConvocacaoCreate, ConvocacaoUpdate, ConvocacaoFuncaoCreate, AcompanhamentoRsvpQuerySchema } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
 import { queriesSincronizacaoDcoAtual } from '../services/sincronizacao-dco'
+import { condicaoMembroNoPaDoEvento } from '../services/projecao-convocacao-pa'
 import {
   criarAuditQuery,
   extrairEscopoDoEvento,
@@ -806,7 +807,12 @@ convocacoesRouter.get('/:id/acompanhamento-rsvp', async c => {
   const { page, limit, statusRsvp } = parsedQuery.data
   const offset = (page - 1) * limit
 
-  const conditions = [eq(convocacaoDestinatarios.convocacaoId, id)]
+  // O acompanhamento operacional exibe somente destinatários atualmente
+  // elegíveis no PA. Registros legados continuam intactos no banco e na auditoria.
+  const conditions = [
+    eq(convocacaoDestinatarios.convocacaoId, id),
+    condicaoMembroNoPaDoEvento(evento.id, convocacaoDestinatarios.membroId),
+  ]
   if (statusRsvp) {
     if (statusRsvp === 'SEM_RESPOSTA') {
       conditions.push(sql`${rsvp.resposta} IS NULL`)

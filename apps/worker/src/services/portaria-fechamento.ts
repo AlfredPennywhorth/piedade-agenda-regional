@@ -1,4 +1,5 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, or, isNotNull } from 'drizzle-orm'
+import { condicaoMembroNoPaDoEvento } from './projecao-convocacao-pa'
 import * as schema from '../db/schema'
 
 export interface ItemFechamentoPortaria {
@@ -58,7 +59,13 @@ export async function montarSnapshotFechamentoPortaria(
       and(
         eq(schema.convocacoes.eventoId, eventoId),
         eq(schema.convocacoes.status, 'PUBLICADA'),
-        eq(schema.convocacoes.ativo, true)
+        eq(schema.convocacoes.ativo, true),
+        // Prévia operacional: não contar legado indevido como AUSENTE.
+        // Presenças já registradas continuam exibidas para reconciliação.
+        or(
+          condicaoMembroNoPaDoEvento(eventoId, schema.membros.id),
+          isNotNull(schema.checkins.id),
+        ),
       )
     )
     .all()
