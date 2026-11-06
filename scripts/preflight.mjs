@@ -74,7 +74,37 @@ try {
 } catch {
   // Falha fechada para evento ausente, inválido ou origem incorreta.
 }
-if (baseRef === 'main' && headRef !== 'develop' && !release430 && !release469) {
+// Exceção pontual de UX para a PR #475 (origem Beta #474).
+// Valida identidade fornecida pelo evento do GitHub e exige diff exato,
+// incluindo os arquivos que mantêm este gate; nenhuma migração/LGPD é liberada.
+const release475Paths = new Set([
+  'apps/web/src/components/agenda/EventoDetalhe.tsx',
+  'apps/web/src/test/agenda.test.tsx',
+  'scripts/preflight.mjs',
+  'scripts/preflight.test.mjs',
+])
+let release475 = false
+try {
+  const event = process.env.GITHUB_EVENT_PATH
+    ? JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
+    : null
+  const pr = event?.pull_request
+  release475 = (
+    process.env.GITHUB_EVENT_NAME === 'pull_request' &&
+    Number(event?.number) === 475 &&
+    Number(pr?.number) === 475 &&
+    process.env.GITHUB_REPOSITORY === 'AlfredPennywhorth/piedade-agenda-regional' &&
+    pr?.base?.repo?.full_name === process.env.GITHUB_REPOSITORY &&
+    pr?.head?.repo?.full_name === process.env.GITHUB_REPOSITORY &&
+    pr?.base?.ref === 'main' &&
+    pr?.head?.ref === 'release/ux-evento-detalhe-474-20261106' &&
+    baseRef === 'main' &&
+    headRef === 'release/ux-evento-detalhe-474-20261106'
+  )
+} catch {
+  // Falha fechada em evento ausente, inválido ou adulterado.
+}
+if (baseRef === 'main' && headRef !== 'develop' && !release430 && !release469 && !release475) {
   errors.push(`PR para main deve partir de develop; head atual: ${headRef}`)
 }
 if (!['main', 'develop'].includes(baseRef)) {
@@ -108,6 +138,15 @@ if (release469) {
       changed.some(path => path.startsWith('apps/worker/drizzle/') ||
         /lgpd|privacidade|termos/i.test(path))) {
     errors.push('PR #469: escopo divergente da lista fechada de arquivos permitidos (LGPD/migrations proibidas).')
+  }
+}
+
+if (release475) {
+  if (!diffAvailable || changed.length !== release475Paths.size ||
+      changed.some(path => !release475Paths.has(path)) ||
+      changed.some(path => path.startsWith('apps/worker/drizzle/') ||
+        /lgpd|privacidade|termos/i.test(path))) {
+    errors.push('PR #475: escopo divergente da lista fechada de arquivos permitidos (LGPD/migrations proibidas).')
   }
 }
 
