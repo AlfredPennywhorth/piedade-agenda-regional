@@ -87,7 +87,7 @@ checkinRouter.post('/qr', async (c) => {
       convocacaoDestinatarioId: dest.destinatario.id,
       eventoId,
       membroId,
-      forma: formaCheckinComGuardaPa(dest.destinatario.id, eventoId, 'QR'),
+      forma: 'QR',
       status: 'ATIVO',
       operadorMembroId,
       dataHoraCheckin: nowIso,
@@ -99,7 +99,7 @@ checkinRouter.post('/qr', async (c) => {
 
     await executarOperacaoComAudit(
       db,
-      (qdb) => [qdb.insert(checkins).values(newCheckin)],
+      (qdb) => [qdb.insert(checkins).values({ ...newCheckin, forma: formaCheckinComGuardaPa(dest.destinatario.id, eventoId, 'QR') })],
       {
         acao: 'CHECKIN_QR',
         atorMembroId: operadorMembroId,
@@ -210,7 +210,7 @@ checkinRouter.post('/manual', async (c) => {
       convocacaoDestinatarioId: dest.destinatario.id,
       eventoId,
       membroId,
-      forma: formaCheckinComGuardaPa(dest.destinatario.id, eventoId, 'MANUAL'),
+      forma: 'MANUAL',
       status: 'ATIVO',
       operadorMembroId,
       dataHoraCheckin: nowIso,
@@ -222,7 +222,7 @@ checkinRouter.post('/manual', async (c) => {
 
     await executarOperacaoComAudit(
       db,
-      (qdb) => [qdb.insert(checkins).values(newCheckin)],
+      (qdb) => [qdb.insert(checkins).values({ ...newCheckin, forma: formaCheckinComGuardaPa(dest.destinatario.id, eventoId, 'MANUAL') })],
       {
         acao: 'CHECKIN_MANUAL',
         atorMembroId: operadorMembroId,
