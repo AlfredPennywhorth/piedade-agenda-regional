@@ -192,6 +192,7 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose, returnFocusRef }
         </div>
 
         <div className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6">
+          <p data-screen-code="AGD-ADM-062" className="mb-3 text-right text-xs text-slate-500">Tela AGD-ADM-062</p>
           {erro && (
             <div role="alert" className="mb-4 bg-red-50 text-red-700 p-3 rounded-lg border border-red-200 text-sm">
               {erro}
