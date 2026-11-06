@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and, sql } from 'drizzle-orm'
-import { rsvp, convocacoes, convocacaoDestinatarios, eventos, agendaPrioridadesConflito } from '../db/schema'
+import { rsvp, convocacoes, convocacaoDestinatarios, eventos, membros, casas, agendaPrioridadesConflito } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { RsvpUpsert } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
@@ -65,6 +65,8 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
       convocacaoStatus: convocacoes.status,
       eventoId: eventos.id,
       eventoInicio: eventos.inicioEm,
+      pontoAtendimentoId: eventos.pontoAtendimentoId,
+      casaPontoAtendimentoId: casas.pontoAtendimentoId,
       possuiManha: eventos.possuiManha,
       possuiTarde: eventos.possuiTarde,
       possuiNoite: eventos.possuiNoite,
@@ -77,6 +79,8 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
     .from(convocacaoDestinatarios)
     .innerJoin(convocacoes, eq(convocacaoDestinatarios.convocacaoId, convocacoes.id))
     .innerJoin(eventos, eq(convocacoes.eventoId, eventos.id))
+    .innerJoin(membros, eq(membros.id, convocacaoDestinatarios.membroId))
+    .innerJoin(casas, eq(casas.id, membros.casaId))
     .where(and(
       eq(convocacaoDestinatarios.id, destinatarioId),
       eq(convocacaoDestinatarios.membroId, membroId)
@@ -89,6 +93,15 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
 
     if (record.convocacaoStatus !== 'PUBLICADA') {
       return c.json({ error: 'Convocação não está publicada' }, 400)
+    }
+
+    // Destinatários legados de outro PA não podem registrar novo RSVP.
+    // Não altera a convocação materializada nem o histórico de respostas.
+    if (record.pontoAtendimentoId && record.casaPontoAtendimentoId !== record.pontoAtendimentoId) {
+      return c.json({
+        error: 'Esta convocação não corresponde ao Ponto de Atendimento atual da sua Casa.',
+        code: 'DESTINATARIO_FORA_DO_PONTO',
+      }, 403)
     }
 
     const nowIso = new Date().toISOString()
