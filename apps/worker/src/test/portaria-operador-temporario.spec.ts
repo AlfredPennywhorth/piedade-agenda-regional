@@ -147,7 +147,7 @@ describe('PORT — credencial temporária do operador', () => {
       INSERT INTO casas (id, setor_id, nome, ponto_atendimento_id)
       VALUES ('casa-outro', 'setor-1', 'Casa Outro', 'pa-outro');
       UPDATE casas SET ponto_atendimento_id = 'pa-correto' WHERE id = 'casa-1';
-      UPDATE eventos SET ponto_atendimento_id = 'pa-correto' WHERE id = 'evento-1';
+      UPDATE eventos SET casa_id = NULL, setor_id = 'setor-1', ponto_atendimento_id = 'pa-correto' WHERE id = 'evento-1';
       INSERT INTO membros (id, nome, casa_id, ativo)
       VALUES ('membro-correto', 'Membro Correto', 'casa-1', 1),
              ('membro-legado', 'Membro Legado', 'casa-outro', 1);
