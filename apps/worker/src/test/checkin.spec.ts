@@ -216,9 +216,19 @@ describe('S11 - Portaria e Check-in', () => {
         .run(paDoEvento, ctx.setId, 'PA do Evento')
       sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?')
         .run(paDaCasa, ctx.casId)
-      sqlite.prepare('UPDATE eventos SET ponto_atendimento_id = ? WHERE id = ?')
-        .run(paDoEvento, ctx.evId)
-      const payload = forma === 'qr' ? { qrToken: ctx.dest1Id } : { convocacaoDestinatarioId: ctx.dest1Id }
+      const eventoId = crypto.randomUUID()
+      const convocacaoId = crypto.randomUUID()
+      const destinatarioId = crypto.randomUUID()
+      sqlite.prepare(`INSERT INTO eventos
+        (id, titulo, modalidade, inicio_em, fim_em, setor_id, ponto_atendimento_id, ativo)
+        VALUES (?, 'Evento PA-414', 'PRESENCIAL', '2099-01-01T09:00:00Z',
+                '2099-01-01T17:00:00Z', ?, ?, 1)`)
+        .run(eventoId, ctx.setId, paDoEvento)
+      sqlite.prepare("INSERT INTO convocacoes (id, evento_id, status, ativo) VALUES (?, ?, 'PUBLICADA', 1)")
+        .run(convocacaoId, eventoId)
+      sqlite.prepare('INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES (?, ?, ?)')
+        .run(destinatarioId, convocacaoId, ctx.mem1Id)
+      const payload = forma === 'qr' ? { qrToken: destinatarioId } : { convocacaoDestinatarioId: destinatarioId }
       const request = () => app.request(`/api/v1/checkin/${forma}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${ctx.tokenOperador}`, 'Content-Type': 'application/json' },
@@ -230,11 +240,11 @@ describe('S11 - Portaria e Check-in', () => {
       expect(negado.status).toBe(403)
       expect((await negado.json()).code).toBe('DESTINATARIO_FORA_DO_PONTO')
       expect(sqlite.prepare('SELECT COUNT(*) AS n FROM checkins WHERE convocacao_destinatario_id = ?')
-        .get(ctx.dest1Id)).toMatchObject({ n: 0 })
+        .get(destinatarioId)).toMatchObject({ n: 0 })
       expect(sqlite.prepare("SELECT COUNT(*) AS n FROM auditoria_logs WHERE acao LIKE 'CHECKIN_%'")
         .get()).toMatchObject({ n: antes.n })
       expect(sqlite.prepare('SELECT COUNT(*) AS n FROM convocacao_destinatarios WHERE id = ?')
-        .get(ctx.dest1Id)).toMatchObject({ n: 1 })
+        .get(destinatarioId)).toMatchObject({ n: 1 })
 
       // Vinculação operacional ao PA do evento restaura o acesso legítimo.
       sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?')
