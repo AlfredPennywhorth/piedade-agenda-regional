@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { eq, and, sql } from 'drizzle-orm'
-import { rsvp, convocacoes, convocacaoDestinatarios, eventos, agendaPrioridadesConflito } from '../db/schema'
+import { rsvp, convocacoes, convocacaoDestinatarios, eventos, membros, casas, agendaPrioridadesConflito } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { RsvpUpsert } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
@@ -65,6 +65,8 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
       convocacaoStatus: convocacoes.status,
       eventoId: eventos.id,
       eventoInicio: eventos.inicioEm,
+      pontoAtendimentoId: eventos.pontoAtendimentoId,
+      casaPontoAtendimentoId: casas.pontoAtendimentoId,
       possuiManha: eventos.possuiManha,
       possuiTarde: eventos.possuiTarde,
       possuiNoite: eventos.possuiNoite,
@@ -77,6 +79,8 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
     .from(convocacaoDestinatarios)
     .innerJoin(convocacoes, eq(convocacaoDestinatarios.convocacaoId, convocacoes.id))
     .innerJoin(eventos, eq(convocacoes.eventoId, eventos.id))
+    .innerJoin(membros, eq(membros.id, convocacaoDestinatarios.membroId))
+    .innerJoin(casas, eq(casas.id, membros.casaId))
     .where(and(
       eq(convocacaoDestinatarios.id, destinatarioId),
       eq(convocacaoDestinatarios.membroId, membroId)
@@ -89,6 +93,15 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
 
     if (record.convocacaoStatus !== 'PUBLICADA') {
       return c.json({ error: 'Convocação não está publicada' }, 400)
+    }
+
+    // Destinatários legados de outro PA não podem registrar novo RSVP.
+    // Não altera a convocação materializada nem o histórico de respostas.
+    if (record.pontoAtendimentoId && record.casaPontoAtendimentoId !== record.pontoAtendimentoId) {
+      return c.json({
+        error: 'Esta convocação não corresponde ao Ponto de Atendimento atual da sua Casa.',
+        code: 'DESTINATARIO_FORA_DO_PONTO',
+      }, 403)
     }
 
     const nowIso = new Date().toISOString()
@@ -130,7 +143,23 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
     const rsvpId = existingRsvp ? existingRsvp.id : crypto.randomUUID()
 
     const { escopoTipo, escopoId } = extrairEscopoDoEvento(record)
-    
+
+    // A elegibilidade do PA é conferida novamente NO PRÓPRIO INSERT/UPDATE do RSVP.
+    // Se a Casa for transferida entre a leitura preliminar e a transação, o valor
+    // sentinela viola o CHECK de resposta e todo o batch (inclusive auditoria) reverte.
+    const respostaComGuardaTerritorial = sql`CASE WHEN EXISTS (
+      SELECT 1
+      FROM ${convocacaoDestinatarios} cd
+      JOIN ${convocacoes} cv ON cv.id = cd.convocacao_id
+      JOIN ${eventos} ev ON ev.id = cv.evento_id
+      JOIN ${membros} m ON m.id = cd.membro_id
+      JOIN ${casas} ca ON ca.id = m.casa_id
+      WHERE cd.id = ${destinatarioId}
+        AND cd.membro_id = ${membroId}
+        AND cv.status = 'PUBLICADA'
+        AND (ev.ponto_atendimento_id IS NULL OR ca.ponto_atendimento_id = ev.ponto_atendimento_id)
+    ) THEN ${parsed.resposta} ELSE 'RSVP_PONTO_INVALIDO' END`
+
     // Execute de forma atômica (D1 Batch ou Transaction local)
     await executeAtomic(db, (tx) => {
       const txQueries = []
@@ -139,7 +168,7 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
         .values({
           id: rsvpId,
           convocacaoDestinatarioId: destinatarioId,
-          resposta: parsed.resposta,
+          resposta: respostaComGuardaTerritorial,
           justificativa: parsed.justificativa,
           periodosParticipacao: finalPeriodos,
           respondidoEm: existingRsvp ? existingRsvp.respondidoEm : nowIso,
@@ -150,7 +179,7 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
         .onConflictDoUpdate({
           target: rsvp.convocacaoDestinatarioId,
           set: {
-            resposta: parsed.resposta,
+            resposta: respostaComGuardaTerritorial,
             justificativa: parsed.justificativa,
             periodosParticipacao: finalPeriodos,
             atualizadoEm: nowIso,
@@ -201,6 +230,12 @@ rsvpRouter.put('/:destinatarioId', async (c) => {
     return c.json(updated, 200)
 
   } catch (err: any) {
+    if (String(err?.message).includes('check_rsvp_resposta')) {
+      return c.json({
+        error: 'Esta convocação não corresponde ao Ponto de Atendimento atual da sua Casa.',
+        code: 'DESTINATARIO_FORA_DO_PONTO',
+      }, 403)
+    }
     if (String(err?.message).includes('RSVP_ALTERNATIVA_JA_CONFIRMADA')) {
       return c.json({ error: 'Você já confirmou participação em outra reunião alternativa deste grupo. Recuse a anterior antes de escolher esta.', code: 'RSVP_ALTERNATIVA_JA_CONFIRMADA' }, 409)
     }
