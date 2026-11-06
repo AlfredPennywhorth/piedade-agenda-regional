@@ -721,6 +721,31 @@ describe('S07 - Minha Agenda e Calendário', () => {
     expect(dialogQueries.queryByText(/ausente/i)).not.toBeInTheDocument()
   })
 
+  it.each(['PARTICIPAREI', 'NAO_SEI'] as const)(
+    '13b. Ao preparar ausência após %s, somente ausência é marcada sem persistir',
+    async (respostaSalva) => {
+      mockAgenda([{ ...mockEventos[0], rsvp: { resposta: respostaSalva } }])
+      render(<App />)
+
+      fireEvent.click(await screen.findByText('Reunião de Setor'))
+      const dialog = within(await screen.findByRole('dialog'))
+      const participarei = dialog.getByRole('button', { name: '✓ Vou participar' })
+      const naoSei = dialog.getByRole('button', { name: '? Não sei ainda' })
+      const ausencia = dialog.getByRole('button', { name: '✗ Não vou participar' })
+
+      expect(participarei).toHaveAttribute('aria-pressed', String(respostaSalva === 'PARTICIPAREI'))
+      expect(naoSei).toHaveAttribute('aria-pressed', String(respostaSalva === 'NAO_SEI'))
+      expect(ausencia).toHaveAttribute('aria-pressed', 'false')
+
+      fireEvent.click(ausencia)
+      expect(dialog.getByPlaceholderText(/justifique sua ausência/i)).toBeInTheDocument()
+      expect(participarei).toHaveAttribute('aria-pressed', 'false')
+      expect(naoSei).toHaveAttribute('aria-pressed', 'false')
+      expect(ausencia).toHaveAttribute('aria-pressed', 'true')
+      expect(apiClient.putWithAuth).not.toHaveBeenCalled()
+    },
+  )
+
   // ============================================================
   // S09 - Web (Períodos e Alimentação)
   // ============================================================
