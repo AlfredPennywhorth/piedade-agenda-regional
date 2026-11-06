@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, asc, inArray, or, isNotNull } from 'drizzle-orm'
+import { eq, and, asc, inArray, or, isNotNull, sql } from 'drizzle-orm'
 import {
   eventos,
   convocacoes,
@@ -86,6 +86,7 @@ type RegistroAgenda = {
   rsvp: any
   checkin: any
   participacao?: { status: string; membroId: string } | null
+  foraDoPa?: number
 }
 
 function tipoConflito(a: RegistroAgenda, b: RegistroAgenda): 'SOBREPOSICAO' | 'PROXIMIDADE' | null {
@@ -111,7 +112,13 @@ function tipoConflito(a: RegistroAgenda, b: RegistroAgenda): 'SOBREPOSICAO' | 'P
 }
 
 function montarMapaConflitos(records: RegistroAgenda[]) {
-  const ativos = records.filter(record => record.rsvp?.resposta !== 'NAO_PARTICIPAREI' && record.participacao?.status !== 'RECUSADO')
+  // A confirmação legada aparece apenas para permitir a recusa; não
+  // constitui compromisso elegível nem deve contaminar conflitos atuais.
+  const ativos = records.filter(record =>
+    record.rsvp?.resposta !== 'NAO_PARTICIPAREI' &&
+    record.participacao?.status !== 'RECUSADO' &&
+    !record.foraDoPa
+  )
   const mapa = new Map<string, Array<{ eventoId: string; tipo: 'SOBREPOSICAO' | 'PROXIMIDADE' }>>()
 
   for (let i = 0; i < ativos.length; i++) {
@@ -189,6 +196,8 @@ async function buscarRegistrosAgenda(db: any, membroId: string): Promise<Registr
     destinatario: convocacaoDestinatarios,
     rsvp,
     checkin: checkins,
+    foraDoPa: sql<number>`CASE WHEN ${condicaoMembroNoPaDoEvento(eventos.id, convocacaoDestinatarios.membroId)}
+      THEN 0 ELSE 1 END`,
   })
     .from(eventos)
     .innerJoin(convocacoes, eq(eventos.id, convocacoes.eventoId))
@@ -212,7 +221,14 @@ async function buscarRegistrosAgenda(db: any, membroId: string): Promise<Registr
         eq(convocacoes.ativo, true),
         // Agenda operacional não deve oferecer reuniões legadas de outro PA.
         // Uma presença histórica já registrada continua consultável.
-        or(condicaoMembroNoPaDoEvento(eventos.id, convocacaoDestinatarios.membroId), isNotNull(checkins.id)),
+        // Preserva exclusivamente a confirmação antiga, ainda não recusada,
+        // para que o membro consiga acessar "Não vou participar" na interface.
+        // Após a recusa a reunião fora do PA deixa de constar na agenda.
+        or(
+          condicaoMembroNoPaDoEvento(eventos.id, convocacaoDestinatarios.membroId),
+          isNotNull(checkins.id),
+          eq(rsvp.resposta, 'PARTICIPAREI'),
+        ),
       )
     )
     .orderBy(asc(eventos.inicioEm))
