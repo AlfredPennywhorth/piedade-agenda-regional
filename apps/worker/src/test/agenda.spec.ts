@@ -848,6 +848,11 @@ describe('S07 - Minha Agenda', () => {
     expect(agendaNoPaA.some(item => item.evento.id === salaB)).toBe(false)
     expect(agendaNoPaA.some(item => item.evento.id === distinto)).toBe(false)
 
+    // Confirmação legítima feita no PA A antes da transferência.
+    sqlite.prepare(`INSERT INTO rsvp (id, convocacao_destinatario_id, resposta, respondido_em, atualizado_em)
+      VALUES (?, ?, 'PARTICIPAREI', '2030-01-01T00:00:00Z', '2030-01-01T00:00:00Z')`)
+      .run('rsvp-pa-agenda-legado', `dest-${salaA}`)
+
     // Após transferência controlada para PA B, alternativas e conflitos
     // voltam a ser calculados só entre eventos territorialmente elegíveis.
     sqlite.prepare("UPDATE casas SET ponto_atendimento_id = ? WHERE id = 'casa-1'").run(paB)
@@ -855,11 +860,30 @@ describe('S07 - Minha Agenda', () => {
     const a = agenda.find(item => item.evento.id === salaA)
     const b = agenda.find(item => item.evento.id === salaB)
     const d = agenda.find(item => item.evento.id === distinto)
-    expect(a).toBeUndefined()
+    // A confirmação antiga permanece acessível apenas para a recusa;
+    // não contamina conflitos entre compromissos do PA atual.
+    expect(a).toBeDefined()
+    expect(a?.conflito).toBeNull()
     expect(b).toBeDefined()
     expect(d).toBeDefined()
     expect(b?.conflito?.eventos.some(item => item.eventoId === distinto)).toBe(true)
     expect(d?.conflito?.eventos.some(item => item.eventoId === salaB)).toBe(true)
+
+    // A própria API usada pela interface permite liberar a confirmação histórica.
+    const recusa = await req(`/api/v1/minha-agenda/rsvp/dest-${salaA}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'NAO_PARTICIPAREI', justificativa: 'Transferência de Ponto de Atendimento' }),
+    })
+    expect(recusa.status).toBe(200)
+    const aposLiberacao = await carregarAgenda()
+    expect(aposLiberacao.find(item => item.evento.id === salaA)).toBeUndefined()
+    const revalidacao = await req(`/api/v1/minha-agenda/rsvp/dest-${salaA}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${sessionToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resposta: 'PARTICIPAREI' }),
+    })
+    expect(revalidacao.status).toBe(403)
 
     sqlite.prepare(`INSERT INTO rsvp (id, convocacao_destinatario_id, resposta, respondido_em, atualizado_em)
       VALUES (?, ?, 'NAO_PARTICIPAREI', '2030-01-01T00:00:00Z', '2030-01-01T00:00:00Z')`)
