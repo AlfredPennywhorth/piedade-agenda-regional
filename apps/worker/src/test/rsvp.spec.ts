@@ -366,19 +366,21 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     expect(res.status).toBe(404)
   })
 
-  it('PA-02: escolha unica de equivalentes elegiveis no mesmo PA e independencia de grupos', async () => {
+  it('PA-02: conflito entre alternativas em PAs distintos com transferencia controlada', async () => {
     const setor = 'set-1'
     const pontoA = crypto.randomUUID()
+    const pontoB = crypto.randomUUID()
     const tipoId = crypto.randomUUID()
     const grupoId = crypto.randomUUID()
     const outroGrupoId = crypto.randomUUID()
     sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(pontoA, setor, 'PA RSVP A')
+    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(pontoB, setor, 'PA RSVP B')
     sqlite.prepare('INSERT INTO tipos_reuniao (id, nome, codigo) VALUES (?, ?, ?)').run(tipoId, 'Atendimento RSVP', 'ATD-RSVP-PA02')
     sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(pontoA, 'casa-1')
     const eventos = [
       ['ev-pa-rsvp-a', pontoA, grupoId],
-      ['ev-pa-rsvp-b', pontoA, grupoId],
-      ['ev-pa-rsvp-outro', pontoA, outroGrupoId],
+      ['ev-pa-rsvp-b', pontoB, grupoId],
+      ['ev-pa-rsvp-outro', pontoB, outroGrupoId],
     ] as const
     for (const [id, ponto, grupo] of eventos) {
       sqlite.prepare(`INSERT INTO eventos
@@ -396,14 +398,19 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
       body: JSON.stringify({ resposta, ...(resposta === 'NAO_PARTICIPAREI' ? { justificativa: 'Escolhi outra reunião alternativa' } : {}) }),
     })
     expect((await responder('ev-pa-rsvp-a', 'PARTICIPAREI')).status).toBe(200)
+    // Simula a transferencia da Casa entre eventos distintos para exercitar o trigger 409.
+    sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(pontoB, 'casa-1')
     const segunda = await responder('ev-pa-rsvp-b', 'PARTICIPAREI')
     expect(segunda.status).toBe(409)
     expect((await segunda.json() as { code: string }).code).toBe('RSVP_ALTERNATIVA_JA_CONFIRMADA')
     expect(sqlite.prepare("SELECT COUNT(*) AS n FROM rsvp WHERE convocacao_destinatario_id = ?")
       .get('dest-ev-pa-rsvp-b')).toMatchObject({ n: 0 })
     expect((await responder('ev-pa-rsvp-outro', 'PARTICIPAREI')).status).toBe(200)
+    sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(pontoA, 'casa-1')
     expect((await responder('ev-pa-rsvp-a', 'NAO_PARTICIPAREI')).status).toBe(200)
+    sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(pontoB, 'casa-1')
     expect((await responder('ev-pa-rsvp-b', 'PARTICIPAREI')).status).toBe(200)
+    sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(pontoA, 'casa-1')
     expect((await responder('ev-pa-rsvp-a', 'PARTICIPAREI')).status).toBe(409)
     sqlite.prepare('UPDATE casas SET ponto_atendimento_id = NULL WHERE id = ?').run('casa-1')
   })
