@@ -366,20 +366,19 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     expect(res.status).toBe(404)
   })
 
-  it('PA-02: escolha unica entre alternativas, troca apos recusa e independencia de outros grupos', async () => {
+  it('PA-02: escolha unica de equivalentes elegiveis no mesmo PA e independencia de grupos', async () => {
     const setor = 'set-1'
     const pontoA = crypto.randomUUID()
-    const pontoB = crypto.randomUUID()
     const tipoId = crypto.randomUUID()
     const grupoId = crypto.randomUUID()
     const outroGrupoId = crypto.randomUUID()
     sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(pontoA, setor, 'PA RSVP A')
-    sqlite.prepare('INSERT INTO pontos_atendimento (id, setor_id, nome) VALUES (?, ?, ?)').run(pontoB, setor, 'PA RSVP B')
     sqlite.prepare('INSERT INTO tipos_reuniao (id, nome, codigo) VALUES (?, ?, ?)').run(tipoId, 'Atendimento RSVP', 'ATD-RSVP-PA02')
+    sqlite.prepare('UPDATE casas SET ponto_atendimento_id = ? WHERE id = ?').run(pontoA, 'casa-1')
     const eventos = [
       ['ev-pa-rsvp-a', pontoA, grupoId],
-      ['ev-pa-rsvp-b', pontoB, grupoId],
-      ['ev-pa-rsvp-outro', pontoB, outroGrupoId],
+      ['ev-pa-rsvp-b', pontoA, grupoId],
+      ['ev-pa-rsvp-outro', pontoA, outroGrupoId],
     ] as const
     for (const [id, ponto, grupo] of eventos) {
       sqlite.prepare(`INSERT INTO eventos
@@ -406,6 +405,7 @@ describe('S08 e S09 - RSVP (Periodos e Alimentacao)', () => {
     expect((await responder('ev-pa-rsvp-a', 'NAO_PARTICIPAREI')).status).toBe(200)
     expect((await responder('ev-pa-rsvp-b', 'PARTICIPAREI')).status).toBe(200)
     expect((await responder('ev-pa-rsvp-a', 'PARTICIPAREI')).status).toBe(409)
+    sqlite.prepare('UPDATE casas SET ponto_atendimento_id = NULL WHERE id = ?').run('casa-1')
   })
 
   it('PA-04: bloqueia reclassificacao com duas confirmacoes e troca de Ponto publicado', async () => {
