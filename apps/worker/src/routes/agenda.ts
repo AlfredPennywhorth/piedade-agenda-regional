@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, asc, inArray, or, isNotNull, sql } from 'drizzle-orm'
+import { eq, and, asc, inArray, or, isNotNull } from 'drizzle-orm'
 import {
   eventos,
   membros,
