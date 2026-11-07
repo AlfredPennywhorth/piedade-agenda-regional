@@ -2,6 +2,8 @@ import { Hono } from 'hono'
 import { eq, and, asc, inArray, or, isNotNull, sql } from 'drizzle-orm'
 import {
   eventos,
+  membros,
+  casas,
   convocacoes,
   convocacaoDestinatarios,
   locais,
@@ -188,7 +190,15 @@ function chaveConflitoPar(
 }
 
 async function buscarRegistrosAgenda(db: any, membroId: string): Promise<RegistroAgenda[]> {
-  const convocados: RegistroAgenda[] = await db.select({
+  // O SELECT principal já tem muitas colunas (evento, convocação, local etc.).
+  // A coluna calculada foraDoPa excedia o limite de colunas do D1.
+  // Buscar o PA atual da Casa em consulta separada, de apenas uma coluna.
+  const casaAtual = await db.select({ pontoAtendimentoId: casas.pontoAtendimentoId })
+    .from(membros)
+    .innerJoin(casas, eq(casas.id, membros.casaId))
+    .where(eq(membros.id, membroId))
+    .get()
+  const convocadosBase = await db.select({
     evento: eventos,
     convocacao: convocacoes,
     local: locais,
@@ -196,8 +206,6 @@ async function buscarRegistrosAgenda(db: any, membroId: string): Promise<Registr
     destinatario: convocacaoDestinatarios,
     rsvp,
     checkin: checkins,
-    foraDoPa: sql<number>`CASE WHEN ${condicaoMembroNoPaDoEvento(eventos.id, convocacaoDestinatarios.membroId)}
-      THEN 0 ELSE 1 END`,
   })
     .from(eventos)
     .innerJoin(convocacoes, eq(eventos.id, convocacoes.eventoId))
@@ -233,6 +241,12 @@ async function buscarRegistrosAgenda(db: any, membroId: string): Promise<Registr
     )
     .orderBy(asc(eventos.inicioEm))
     .all()
+  // Classificação em memória, sem ampliar a projeção SQL para o D1.
+  const convocados: RegistroAgenda[] = convocadosBase.map((registro: typeof convocadosBase[number]) => ({
+    ...registro,
+    foraDoPa: registro.evento.pontoAtendimentoId != null &&
+      registro.evento.pontoAtendimentoId !== casaAtual?.pontoAtendimentoId ? 1 : 0,
+  }))
   const pessoais = await db.select({ evento: eventos, local: locais, espaco: espacosLocal })
     .from(eventos)
     .leftJoin(locais, eq(eventos.localId, locais.id))
