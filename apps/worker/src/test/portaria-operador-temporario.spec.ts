@@ -138,6 +138,53 @@ describe('PORT — credencial temporária do operador', () => {
     expect(b.participantes.participantes.map(x => [x.membro.id, x.convocacaoDestinatarioId])).toEqual([['participante-b', 'dest-b']])
   })
 
+  it('PA-414: credencial temporária filtra outro PA e impede check-in QR/manual legado', async () => {
+    const destinatarioCorreto = crypto.randomUUID()
+    const destinatarioLegado = crypto.randomUUID()
+    sqlite.exec(`
+      INSERT INTO pontos_atendimento (id, setor_id, nome)
+      VALUES ('pa-correto', 'setor-1', 'PA Correto'), ('pa-outro', 'setor-1', 'PA Outro');
+      INSERT INTO casas (id, setor_id, nome, ponto_atendimento_id)
+      VALUES ('casa-outro', 'setor-1', 'Casa Outro', 'pa-outro');
+      UPDATE casas SET ponto_atendimento_id = 'pa-correto' WHERE id = 'casa-1';
+      UPDATE eventos SET casa_id = NULL, setor_id = 'setor-1', ponto_atendimento_id = 'pa-correto' WHERE id = 'evento-1';
+      INSERT INTO membros (id, nome, casa_id, ativo)
+      VALUES ('membro-correto', 'Membro Correto', 'casa-1', 1),
+             ('membro-legado', 'Membro Legado', 'casa-outro', 1);
+      INSERT INTO convocacoes (id, evento_id, status, ativo)
+      VALUES ('conv-pa', 'evento-1', 'PUBLICADA', 1);
+    `)
+    sqlite.prepare('INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES (?, ?, ?)')
+      .run(destinatarioCorreto, 'conv-pa', 'membro-correto')
+    sqlite.prepare('INSERT INTO convocacao_destinatarios (id, convocacao_id, membro_id) VALUES (?, ?, ?)')
+      .run(destinatarioLegado, 'conv-pa', 'membro-legado')
+    const headers = { Authorization: 'Bearer token-operador-valido', 'Content-Type': 'application/json' }
+    const participantes = await app.request('/api/v1/portaria-operador-publica/participantes', { headers })
+    expect(participantes.status).toBe(200)
+    const listagem = await participantes.json() as { participantes: Array<{ convocacaoDestinatarioId: string }> }
+    expect(listagem.participantes.map(p => p.convocacaoDestinatarioId)).toEqual([destinatarioCorreto])
+
+    for (const forma of ['qr', 'manual'] as const) {
+      const body = forma === 'qr'
+        ? { qrToken: destinatarioLegado }
+        : { convocacaoDestinatarioId: destinatarioLegado }
+      const negado = await app.request(`/api/v1/portaria-operador-publica/checkin/${forma}`, {
+        method: 'POST', headers, body: JSON.stringify(body),
+      })
+      expect(negado.status).toBe(403)
+      expect((await negado.json() as { code: string }).code).toBe('DESTINATARIO_FORA_DO_PONTO')
+    }
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM checkins WHERE convocacao_destinatario_id = ?')
+      .get(destinatarioLegado)).toMatchObject({ n: 0 })
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM convocacao_destinatarios WHERE id = ?')
+      .get(destinatarioLegado)).toMatchObject({ n: 1 })
+
+    const permitido = await app.request('/api/v1/portaria-operador-publica/checkin/manual', {
+      method: 'POST', headers, body: JSON.stringify({ convocacaoDestinatarioId: destinatarioCorreto }),
+    })
+    expect(permitido.status).toBe(201)
+  })
+
   it('rejeita token desconhecido', async () => {
     const resultado = await validarCredencialOperadorPortaria(db, 'token-inexistente')
 

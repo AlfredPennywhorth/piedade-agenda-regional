@@ -315,3 +315,96 @@ test('release #475: SHA incorreto, diff indisponível e declarações ausentes b
     assert.equal(r.status, 1, JSON.stringify(options) + '\\n' + r.log)
   }
 })
+
+
+const release482Repo = 'AlfredPennywhorth/piedade-agenda-regional'
+const release482Head = 'release/414-pa-operacional-sem-lgpd-20261106'
+const release482Paths = [
+  '.github/workflows/deploy-worker-production-code-only.yml',
+  'apps/worker/src/routes/agenda.ts',
+  'apps/worker/src/routes/checkin.ts',
+  'apps/worker/src/routes/convocacoes.ts',
+  'apps/worker/src/routes/portaria-operador-publica.ts',
+  'apps/worker/src/routes/portaria.ts',
+  'apps/worker/src/routes/relatorios.ts',
+  'apps/worker/src/routes/rsvp.ts',
+  'apps/worker/src/services/elegibilidade-portaria-pa.ts',
+  'apps/worker/src/services/portaria-fechamento.ts',
+  'apps/worker/src/services/projecao-convocacao-pa.ts',
+  'apps/worker/src/test/agenda.spec.ts',
+  'apps/worker/src/test/checkin.spec.ts',
+  'apps/worker/src/test/portaria-operador-temporario.spec.ts',
+  'apps/worker/src/test/projecoes-pa-legado.spec.ts',
+  'apps/worker/src/test/rsvp.spec.ts',
+  'scripts/preflight.mjs',
+  'scripts/preflight.test.mjs',
+]
+function release482Event(overrides = {}) {
+  return {
+    number: 482,
+    pull_request: {
+      number: 482,
+      base: { ref: 'main', repo: { full_name: release482Repo } },
+      head: { ref: release482Head, repo: { full_name: release482Repo } },
+    },
+    ...overrides,
+  }
+}
+function release482Scenario(overrides = {}) {
+  return scenario({
+    base: 'main',
+    head: release482Head,
+    changes: release482Paths,
+    githubEvent: release482Event(),
+    repository: release482Repo,
+    ...overrides,
+  })
+}
+test('release #482: apenas identidade oficial e escopo fechado do Worker são aceitos', () => {
+  const r = release482Scenario({ output: true })
+  assert.equal(r.status, 0, r.log)
+  assert.match(r.outputs, /worker_changed=true/)
+  assert.match(r.outputs, /web_changed=false/)
+  assert.match(r.outputs, /migration_changed=false/)
+})
+test('release #482: LGPD, migration, arquivo extra, substituição ou ausência são bloqueados', () => {
+  for (const changes of [
+    [...release482Paths, 'apps/worker/drizzle/0053_lgpd_ciencias_primeiro_acesso.sql'],
+    [...release482Paths, 'apps/web/src/components/lgpd/LgpdPrimeiroAcessoGate.tsx'],
+    [...release482Paths.slice(1), 'apps/web/src/App.tsx'],
+    release482Paths.slice(1),
+  ]) {
+    const r = release482Scenario({ changes })
+    assert.equal(r.status, 1, r.log)
+    assert.match(r.log, /PR #482: escopo divergente/)
+  }
+})
+test('release #482: identidade, origem e evento não podem falsificar autorização', () => {
+  const pr = release482Event().pull_request
+  for (const options of [
+    { repository: 'outro/ambiente' },
+    { githubEvent: release482Event({ number: 483 }) },
+    { githubEvent: release482Event({ pull_request: { ...pr, number: 483 } }) },
+    { githubEvent: release482Event({ pull_request: { ...pr, head: { ref: release482Head, repo: { full_name: 'outro/ambiente' } } } }) },
+    { githubEvent: release482Event({ pull_request: { ...pr, base: { ref: 'develop', repo: { full_name: release482Repo } } } }) },
+    { githubEvent: null },
+    { eventName: 'workflow_dispatch' },
+    { rawEvent: '{ invalid json' },
+    { head: 'release/falsa-482' },
+  ]) {
+    const r = release482Scenario(options)
+    assert.equal(r.status, 1, JSON.stringify(options) + '\\n' + r.log)
+    assert.match(r.log, /PR para main deve partir de develop/)
+  }
+})
+test('release #482: SHA, leitura do diff e declarações indispensáveis falham fechados', () => {
+  for (const options of [
+    { expectedSha: 'b'.repeat(40) },
+    { diffFails: true },
+    { fetchFails: true },
+    { omitDeclaration: 'PIN_PEPPER' },
+  ]) {
+    const r = release482Scenario(options)
+    assert.equal(r.status, 1, JSON.stringify(options) + '\\n' + r.log)
+  }
+})

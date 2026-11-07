@@ -1,7 +1,9 @@
 import { Hono } from 'hono'
-import { eq, and, asc, inArray } from 'drizzle-orm'
+import { eq, and, asc, inArray, or, isNotNull } from 'drizzle-orm'
 import {
   eventos,
+  membros,
+  casas,
   convocacoes,
   convocacaoDestinatarios,
   locais,
@@ -15,6 +17,7 @@ import {
 } from '../db/schema'
 import { authMiddleware, Variables } from '../middleware/auth'
 import { executeAtomic } from '../db/batch'
+import { condicaoMembroNoPaDoEvento } from '../services/projecao-convocacao-pa'
 
 export const agendaRouter = new Hono<{ Variables: Variables }>()
 
@@ -85,6 +88,7 @@ type RegistroAgenda = {
   rsvp: any
   checkin: any
   participacao?: { status: string; membroId: string } | null
+  foraDoPa?: number
 }
 
 function tipoConflito(a: RegistroAgenda, b: RegistroAgenda): 'SOBREPOSICAO' | 'PROXIMIDADE' | null {
@@ -110,7 +114,13 @@ function tipoConflito(a: RegistroAgenda, b: RegistroAgenda): 'SOBREPOSICAO' | 'P
 }
 
 function montarMapaConflitos(records: RegistroAgenda[]) {
-  const ativos = records.filter(record => record.rsvp?.resposta !== 'NAO_PARTICIPAREI' && record.participacao?.status !== 'RECUSADO')
+  // A confirmação legada aparece apenas para permitir a recusa; não
+  // constitui compromisso elegível nem deve contaminar conflitos atuais.
+  const ativos = records.filter(record =>
+    record.rsvp?.resposta !== 'NAO_PARTICIPAREI' &&
+    record.participacao?.status !== 'RECUSADO' &&
+    !record.foraDoPa
+  )
   const mapa = new Map<string, Array<{ eventoId: string; tipo: 'SOBREPOSICAO' | 'PROXIMIDADE' }>>()
 
   for (let i = 0; i < ativos.length; i++) {
@@ -180,7 +190,15 @@ function chaveConflitoPar(
 }
 
 async function buscarRegistrosAgenda(db: any, membroId: string): Promise<RegistroAgenda[]> {
-  const convocados: RegistroAgenda[] = await db.select({
+  // O SELECT principal já tem muitas colunas (evento, convocação, local etc.).
+  // A coluna calculada foraDoPa excedia o limite de colunas do D1.
+  // Buscar o PA atual da Casa em consulta separada, de apenas uma coluna.
+  const casaAtual = await db.select({ pontoAtendimentoId: casas.pontoAtendimentoId })
+    .from(membros)
+    .innerJoin(casas, eq(casas.id, membros.casaId))
+    .where(eq(membros.id, membroId))
+    .get()
+  const convocadosBase = await db.select({
     evento: eventos,
     convocacao: convocacoes,
     local: locais,
@@ -208,11 +226,27 @@ async function buscarRegistrosAgenda(db: any, membroId: string): Promise<Registr
         eq(convocacaoDestinatarios.membroId, membroId),
         eq(convocacoes.status, 'PUBLICADA'),
         eq(eventos.ativo, true),
-        eq(convocacoes.ativo, true)
+        eq(convocacoes.ativo, true),
+        // Agenda operacional não deve oferecer reuniões legadas de outro PA.
+        // Uma presença histórica já registrada continua consultável.
+        // Preserva exclusivamente a confirmação antiga, ainda não recusada,
+        // para que o membro consiga acessar "Não vou participar" na interface.
+        // Após a recusa a reunião fora do PA deixa de constar na agenda.
+        or(
+          condicaoMembroNoPaDoEvento(eventos.id, convocacaoDestinatarios.membroId),
+          isNotNull(checkins.id),
+          eq(rsvp.resposta, 'PARTICIPAREI'),
+        ),
       )
     )
     .orderBy(asc(eventos.inicioEm))
     .all()
+  // Classificação em memória, sem ampliar a projeção SQL para o D1.
+  const convocados: RegistroAgenda[] = convocadosBase.map((registro: typeof convocadosBase[number]) => ({
+    ...registro,
+    foraDoPa: registro.evento.pontoAtendimentoId != null &&
+      registro.evento.pontoAtendimentoId !== casaAtual?.pontoAtendimentoId ? 1 : 0,
+  }))
   const pessoais = await db.select({ evento: eventos, local: locais, espaco: espacosLocal })
     .from(eventos)
     .leftJoin(locais, eq(eventos.localId, locais.id))

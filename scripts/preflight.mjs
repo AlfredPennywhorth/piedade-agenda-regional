@@ -104,7 +104,52 @@ try {
 } catch {
   // Falha fechada em evento ausente, inválido ou adulterado.
 }
-if (baseRef === 'main' && headRef !== 'develop' && !release430 && !release469 && !release475) {
+
+// Exceção de emergência estritamente vinculada à PR #482.
+// Release seletiva PA-414: apenas código Worker/QA e workflow code-only.
+// Não aceita novas migrações, LGPD, outros repositórios/branches ou diff parcial.
+const release482Paths = new Set([
+  '.github/workflows/deploy-worker-production-code-only.yml',
+  'apps/worker/src/routes/agenda.ts',
+  'apps/worker/src/routes/checkin.ts',
+  'apps/worker/src/routes/convocacoes.ts',
+  'apps/worker/src/routes/portaria-operador-publica.ts',
+  'apps/worker/src/routes/portaria.ts',
+  'apps/worker/src/routes/relatorios.ts',
+  'apps/worker/src/routes/rsvp.ts',
+  'apps/worker/src/services/elegibilidade-portaria-pa.ts',
+  'apps/worker/src/services/portaria-fechamento.ts',
+  'apps/worker/src/services/projecao-convocacao-pa.ts',
+  'apps/worker/src/test/agenda.spec.ts',
+  'apps/worker/src/test/checkin.spec.ts',
+  'apps/worker/src/test/portaria-operador-temporario.spec.ts',
+  'apps/worker/src/test/projecoes-pa-legado.spec.ts',
+  'apps/worker/src/test/rsvp.spec.ts',
+  'scripts/preflight.mjs',
+  'scripts/preflight.test.mjs',
+])
+let release482 = false
+try {
+  const event = process.env.GITHUB_EVENT_PATH
+    ? JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')) : null
+  const pr = event?.pull_request
+  release482 = (
+    process.env.GITHUB_EVENT_NAME === 'pull_request' &&
+    Number(event?.number) === 482 &&
+    Number(pr?.number) === 482 &&
+    process.env.GITHUB_REPOSITORY === 'AlfredPennywhorth/piedade-agenda-regional' &&
+    pr?.base?.repo?.full_name === process.env.GITHUB_REPOSITORY &&
+    pr?.head?.repo?.full_name === process.env.GITHUB_REPOSITORY &&
+    pr?.base?.ref === 'main' &&
+    pr?.head?.ref === 'release/414-pa-operacional-sem-lgpd-20261106' &&
+    baseRef === 'main' &&
+    headRef === 'release/414-pa-operacional-sem-lgpd-20261106'
+  )
+} catch {
+  // Falha fechada quando identidade ou evento não puderem ser validados.
+}
+
+if (baseRef === 'main' && headRef !== 'develop' && !release430 && !release469 && !release475 && !release482) {
   errors.push(`PR para main deve partir de develop; head atual: ${headRef}`)
 }
 if (!['main', 'develop'].includes(baseRef)) {
@@ -147,6 +192,15 @@ if (release475) {
       changed.some(path => path.startsWith('apps/worker/drizzle/') ||
         /lgpd|privacidade|termos/i.test(path))) {
     errors.push('PR #475: escopo divergente da lista fechada de arquivos permitidos (LGPD/migrations proibidas).')
+  }
+}
+
+if (release482) {
+  if (!diffAvailable || changed.length !== release482Paths.size ||
+      changed.some(path => !release482Paths.has(path)) ||
+      changed.some(path => path.startsWith('apps/worker/drizzle/') ||
+        /lgpd|privacidade|termos/i.test(path))) {
+    errors.push('PR #482: escopo divergente da lista fechada PA-414 (LGPD/migrations proibidas).')
   }
 }
 

@@ -1,0 +1,106 @@
+name: Deploy Worker — Produção (somente código, sem D1)
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: 'SHA completo de 40 caracteres do commit autorizado em main'
+        type: string
+        required: true
+      confirm_release:
+        description: 'Confirmo autorização institucional e homologação desta release em produção'
+        type: boolean
+        required: true
+        default: false
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Validar release main · Publicar exclusivamente Worker de produção
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Validar branch, SHA e autorização
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          CONFIRM_RELEASE: ${{ inputs.confirm_release }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main" || {
+            echo "::error::Este workflow exige main."
+            exit 1
+          }
+          test "$CONFIRM_RELEASE" = "true" || {
+            echo "::error::Release não autorizada."
+            exit 1
+          }
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || {
+            echo "::error::SHA completo inválido."
+            exit 1
+          }
+          test "${GITHUB_SHA,,}" = "${EXPECTED_SHA,,}" || {
+            echo "::error::O SHA não corresponde ao commit em main."
+            exit 1
+          }
+
+      - name: Checkout do SHA aprovado
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Conferir SHA do checkout
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate production configuration
+        shell: bash
+        env:
+          D1_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_DATABASE_ID }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$D1_DATABASE_ID"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+
+      - name: Materializar binding D1 apenas no arquivo local
+        shell: bash
+        env:
+          D1_DATABASE_ID: ${{ secrets.CLOUDFLARE_D1_DATABASE_ID }}
+        run: |
+          set -euo pipefail
+          sed -i "s|__D1_DATABASE_ID__|$D1_DATABASE_ID|" apps/worker/wrangler.toml
+          grep -Fq "$D1_DATABASE_ID" apps/worker/wrangler.toml
+
+      # Este workflow NÃO executa SQL remoto, migrations apply ou secret put.
+      - name: Publicar exclusivamente Worker em produção
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm --filter @piedade/worker exec wrangler deploy --env production

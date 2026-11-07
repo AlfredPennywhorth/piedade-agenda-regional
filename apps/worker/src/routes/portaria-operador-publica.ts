@@ -19,6 +19,7 @@ import { CheckinManualSchema, CheckinQrSchema, getSaoPauloEndOfDayIso } from '@p
 import { gerarTokenAleatorio, hashToken } from '../security/tokens'
 import { executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
 import { validarCredencialOperadorPortaria } from '../services/portaria-operador-temporario'
+import { destinatarioElegivelNoPonto, formaCheckinComGuardaPa, filtroParticipantePortariaPorPa } from '../services/elegibilidade-portaria-pa'
 
 export const portariaOperadorPublicaRouter = new Hono<any>()
 
@@ -103,7 +104,8 @@ portariaOperadorPublicaRouter.get('/participantes', async c => {
       and(
         eq(convocacoes.eventoId, ctx.eventoId),
         eq(convocacoes.status, 'PUBLICADA'),
-        eq(convocacoes.ativo, true)
+        eq(convocacoes.ativo, true),
+        filtroParticipantePortariaPorPa(ctx.eventoId)
       )
     )
     .all()
@@ -183,6 +185,14 @@ async function registrarCheckin(c: any, forma: 'QR' | 'MANUAL') {
     return c.json({ error: 'Convocação não está publicada', code: 'BAD_REQUEST' }, 400)
   }
 
+  const elegivel = await ctx.db.select({ id: convocacaoDestinatarios.id })
+    .from(convocacaoDestinatarios)
+    .where(and(eq(convocacaoDestinatarios.id, destinatarioId),
+      destinatarioElegivelNoPonto(destinatarioId, ctx.eventoId))).get()
+  if (!elegivel) {
+    return c.json({ error: 'Convocado fora do Ponto de Atendimento desta reunião', code: 'DESTINATARIO_FORA_DO_PONTO' }, 403)
+  }
+
   const existente = await ctx.db
     .select()
     .from(checkins)
@@ -209,7 +219,7 @@ async function registrarCheckin(c: any, forma: 'QR' | 'MANUAL') {
         convocacaoDestinatarioId: dest.destinatario.id,
         eventoId: ctx.eventoId,
         membroId: dest.destinatario.membroId,
-        forma,
+        forma: formaCheckinComGuardaPa(dest.destinatario.id, ctx.eventoId, forma),
         status: 'ATIVO',
         operadorMembroId: null,
         dataHoraCheckin: agora,
@@ -231,6 +241,7 @@ async function registrarCheckin(c: any, forma: 'QR' | 'MANUAL') {
       }
     )
   } catch (err: unknown) {
+    if (String(err).includes('check_checkin_forma')) return c.json({ error: 'Convocado fora do Ponto de Atendimento desta reunião', code: 'DESTINATARIO_FORA_DO_PONTO' }, 403)
     if (String(err).includes('PORTARIA_EVENTO_INCOMPATIVEL')) return c.json({ error: 'Portaria indisponível para este evento', code: 'PORTARIA_INDISPONIVEL' }, 409)
     throw err
   }
