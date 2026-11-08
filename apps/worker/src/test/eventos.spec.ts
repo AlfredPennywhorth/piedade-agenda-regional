@@ -111,7 +111,10 @@ describe('Eventos API (S04)', () => {
     expect((await detalhe()).possuiConvocacaoPublicada).toBe(false)
     await db.update(convocacoes).set({ status: 'PUBLICADA' }).where(eq(convocacoes.id, convocacaoId))
     expect((await detalhe()).possuiConvocacaoPublicada).toBe(true)
+    // A trigger de integridade continua bloqueando mesmo PUBLICADA inativa.
     await db.update(convocacoes).set({ ativo: false }).where(eq(convocacoes.id, convocacaoId))
+    expect((await detalhe()).possuiConvocacaoPublicada).toBe(true)
+    await db.update(convocacoes).set({ status: 'RASCUNHO' }).where(eq(convocacoes.id, convocacaoId))
     expect((await detalhe()).possuiConvocacaoPublicada).toBe(false)
   })
 
