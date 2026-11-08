@@ -77,6 +77,7 @@ type EventoFormData = Omit<Partial<EventoCreateInput>, 'destinoUf'> & {
 export interface Evento {
   pessoal?: boolean
   podeGerenciar?: boolean
+  possuiConvocacaoPublicada?: boolean
   criadorMembroId?: string | null
   id: string
   titulo: string
@@ -150,6 +151,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
   const [formOpen, setFormOpen] = useState(false)
   const [eventoEditandoId, setEventoEditandoId] = useState<string | null>(null)
   const [eventoEditandoSerieId, setEventoEditandoSerieId] = useState<string | null>(null)
+  const [paBloqueadoPorConvocacao, setPaBloqueadoPorConvocacao] = useState(false)
+  const [paOriginalEditado, setPaOriginalEditado] = useState<string | null>(null)
+  const [setorOriginalEditado, setSetorOriginalEditado] = useState<string | null>(null)
   const [carregandoDetalhes, setCarregandoDetalhes] = useState<boolean>(false)
   const [salvando, setSalvando] = useState<boolean>(false)
   const envioEventoEmAndamento = useRef(false)
@@ -544,9 +548,15 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
     eventoFormConsultaSeq.current += 1
     setFormOpen(false)
     setCarregandoDetalhes(false)
+    setPaBloqueadoPorConvocacao(false)
+    setPaOriginalEditado(null)
+    setSetorOriginalEditado(null)
   }
 
   const abrirFormCriar = () => {
+    setPaBloqueadoPorConvocacao(false)
+    setPaOriginalEditado(null)
+    setSetorOriginalEditado(null)
     eventoFormConsultaSeq.current += 1
     setEventoEditandoId(null)
     setEventoEditandoSerieId(null)
@@ -713,6 +723,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
   }
 
   const abrirFormEditar = async (id: string, serieId: string | null) => {
+    setPaBloqueadoPorConvocacao(false)
+    setPaOriginalEditado(null)
+    setSetorOriginalEditado(null)
     const consultaAtual = ++eventoFormConsultaSeq.current
     setEventoEditandoId(id)
     setEventoEditandoSerieId(serieId)
@@ -740,7 +753,10 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
       }
 
       if (consultaAtual !== eventoFormConsultaSeq.current) return
-      
+      setPaBloqueadoPorConvocacao(item.podeGerenciar === true && item.possuiConvocacaoPublicada === true && !!item.pontoAtendimentoId)
+      setPaOriginalEditado(item.pontoAtendimentoId ?? null)
+      setSetorOriginalEditado(item.setorId ?? null)
+
       let tipo: any = ''
       if (item.abrangencia === 'NACIONAL') tipo = 'nacional'
       else if (item.abrangencia === 'INTERNACIONAL') tipo = 'internacional'
@@ -856,6 +872,11 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (envioEventoEmAndamento.current) return
+    if (eventoEditandoId && paBloqueadoPorConvocacao &&
+      ((formData.pontoAtendimentoId ?? null) !== paOriginalEditado || (formData.setorId ?? null) !== setorOriginalEditado || tipoEscopo !== 'setor')) {
+      setErro('O Ponto de Atendimento e o Setor não podem ser alterados após a publicação da convocação. Para outro Ponto, siga o procedimento institucional de cancelamento e nova reunião.')
+      return
+    }
     setErrosForm({})
 
     // O calendário mobile permite preencher a data e o horário em qualquer ordem.
@@ -1710,7 +1731,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                           <select
                             id="tipoEscopo"
                             value={tipoEscopo}
-                            disabled={!!eventoEditandoId && !!formData.pessoal}
+                            disabled={(!!eventoEditandoId && !!formData.pessoal) || paBloqueadoPorConvocacao}
                             onChange={e => handleTipoEscopoChange(e.target.value as any)}
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
                           >
@@ -1759,6 +1780,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                               <label htmlFor="setorId" className="block text-xs font-medium text-slate-700 mb-1">Setor *</label>
                               <select
                                 id="setorId"
+                                disabled={paBloqueadoPorConvocacao}
                                 value={formData.setorId || ''}
                                 onChange={e => setFormData({ ...formData, setorId: e.target.value, pontoAtendimentoId: null, grupoEquivalenciaId: null })}
                                 className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
@@ -1771,10 +1793,15 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                           {tipoEscopo === 'setor' && formData.setorId && (
                             <div className="mt-3">
                               <label htmlFor="pontoAtendimentoId" className="mb-1 block text-xs font-medium text-slate-700">Ponto de Atendimento</label>
-                              <select id="pontoAtendimentoId" value={formData.pontoAtendimentoId || ''} onChange={e => setFormData({ ...formData, pontoAtendimentoId: e.target.value || null, grupoEquivalenciaId: null })} className="w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-sm">
+                              <select id="pontoAtendimentoId" disabled={paBloqueadoPorConvocacao} aria-describedby={paBloqueadoPorConvocacao ? 'aviso-pa-convocacao-publicada' : undefined} value={formData.pontoAtendimentoId || ''} onChange={e => setFormData({ ...formData, pontoAtendimentoId: e.target.value || null, grupoEquivalenciaId: null })} className="w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-sm">
                                 <option value="">Reunião de todo o Setor (sem Ponto)</option>
                                 {pontosAtendimento.filter(p => p.setorId === formData.setorId && (p.ativo || p.id === formData.pontoAtendimentoId)).map(p => <option key={p.id} value={p.id}>{p.nome}{p.ativo ? '' : ' (inativo)'}</option>)}
                               </select>
+                              {paBloqueadoPorConvocacao && (
+                                <p id="aviso-pa-convocacao-publicada" role="status" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                                  Este Ponto de Atendimento não pode ser alterado porque a reunião já possui convocação publicada. Você pode editar o Local e o Espaço quando permitido. Para convocar outro Ponto, siga o procedimento institucional de cancelamento e criação de nova reunião; as confirmações de participação (RSVP) não são transferidas automaticamente.
+                                </p>
+                              )}
                             </div>
                           )}
                           {podeVisualizarGruposAlternativos && tipoEscopo === 'setor' && formData.pontoAtendimentoId && formData.tipoReuniaoId && (
