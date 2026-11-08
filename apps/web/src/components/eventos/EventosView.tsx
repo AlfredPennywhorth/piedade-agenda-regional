@@ -753,7 +753,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
       }
 
       if (consultaAtual !== eventoFormConsultaSeq.current) return
-      setPaBloqueadoPorConvocacao(item.podeGerenciar === true && item.possuiConvocacaoPublicada === true && !!item.pontoAtendimentoId)
+      setPaBloqueadoPorConvocacao(item.podeGerenciar === true && item.possuiConvocacaoPublicada === true && !!item.setorId)
       setPaOriginalEditado(item.pontoAtendimentoId ?? null)
       setSetorOriginalEditado(item.setorId ?? null)
 
@@ -808,6 +808,9 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
 
   const abrirFormEditarThisAndFuture = async (evento: Evento) => {
     if (!evento.serieRecorrenciaId) return;
+    setPaBloqueadoPorConvocacao(false)
+    setPaOriginalEditado(null)
+    setSetorOriginalEditado(null)
     setEventoEditandoId(evento.id)
     setEventoEditandoSerieId(evento.serieRecorrenciaId)
     setCarregandoDetalhes(true)
