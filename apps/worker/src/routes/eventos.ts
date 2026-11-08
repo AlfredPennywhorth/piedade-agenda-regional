@@ -250,7 +250,14 @@ eventosRouter.get('/:id', async (c) => {
     return c.json({ error: 'Acesso não autorizado para este evento', code: 'FORBIDDEN' }, 403)
   }
 
-  return c.json({ ...data, podeGerenciar: await podeGerenciarEvento(db, c.get('membroId'), data) })
+  const podeGerenciar = await podeGerenciarEvento(db, c.get('membroId'), data)
+  if (!podeGerenciar) return c.json({ ...data, podeGerenciar })
+  // Consulta mínima e restrita ao gestor: não expor estado administrativo a leitores.
+  const convocacaoPublicada = await db.select({ id: convocacoes.id })
+    .from(convocacoes)
+    .where(and(eq(convocacoes.eventoId, id), eq(convocacoes.status, 'PUBLICADA'), eq(convocacoes.ativo, true)))
+    .limit(1).get()
+  return c.json({ ...data, podeGerenciar, possuiConvocacaoPublicada: !!convocacaoPublicada })
 })
 
 eventosRouter.post('/', async (c) => {
