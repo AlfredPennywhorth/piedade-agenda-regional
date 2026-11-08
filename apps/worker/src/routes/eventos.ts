@@ -255,7 +255,7 @@ eventosRouter.get('/:id', async (c) => {
   // Consulta mínima e restrita ao gestor: não expor estado administrativo a leitores.
   const convocacaoPublicada = await db.select({ id: convocacoes.id })
     .from(convocacoes)
-    .where(and(eq(convocacoes.eventoId, id), eq(convocacoes.status, 'PUBLICADA'), eq(convocacoes.ativo, true)))
+    .where(and(eq(convocacoes.eventoId, id), eq(convocacoes.status, 'PUBLICADA')))
     .limit(1).get()
   return c.json({ ...data, podeGerenciar, possuiConvocacaoPublicada: !!convocacaoPublicada })
 })
