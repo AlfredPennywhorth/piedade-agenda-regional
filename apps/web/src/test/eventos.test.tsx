@@ -833,6 +833,68 @@ describe('EventosView', () => {
     expect(within(casaSelect).queryByRole('option', { name: 'Casa B' })).not.toBeInTheDocument()
   })
 
+  it('426: impede troca de PA e Setor com convocação publicada, mas permite editar Local e Espaço', async () => {
+    const setorId = '88888888-8888-4888-8888-888888888888'
+    const pontoId = '99999999-9999-4999-8999-999999999999'
+    const evento = {
+      ...mockEventos[0], regionalId: null, setorId, pontoAtendimentoId: pontoId,
+      podeGerenciar: true, possuiConvocacaoPublicada: true,
+    }
+    const fetchOriginal = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos') return [evento]
+      if (url === `/eventos/${EVENTO_ID}`) return evento
+      if (url === '/setores') return [{ id: setorId, nome: 'Setor Centro', ativo: true }]
+      if (url === '/pontos-atendimento') return [{ id: pontoId, setorId, nome: 'Bom Retiro', ativo: true }]
+      return fetchOriginal(url)
+    })
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({})
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
+    const dialog = await screen.findByRole('dialog', { name: /editar evento/i })
+    const ponto = await within(dialog).findByLabelText('Ponto de Atendimento')
+    expect(ponto).toBeDisabled()
+    expect(ponto).toHaveValue(pontoId)
+    expect(within(dialog).getByLabelText(/setor \*/i)).toBeDisabled()
+    expect(within(dialog).getByLabelText('Tipo de Escopo')).toBeDisabled()
+    expect(within(dialog).getByRole('status')).toHaveTextContent(/convocação publicada/i)
+    expect(ponto).toHaveAttribute('aria-describedby', 'aviso-pa-convocacao-publicada')
+    expect(within(dialog).getByLabelText(/local \*/i)).not.toBeDisabled()
+    fireEvent.change(within(dialog).getByLabelText(/título/i), { target: { value: 'Reunião corrigida' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar/i }))
+    await waitFor(() => expect(apiClient.patchWithAuth).toHaveBeenCalledWith(
+      `/eventos/${EVENTO_ID}`, expect.objectContaining({
+        titulo: 'Reunião corrigida', setorId, pontoAtendimentoId: pontoId,
+      })
+    ))
+  })
+
+  it('426: rascunho permite escolher PA sem o bloqueio preventivo', async () => {
+    const setorId = '88888888-8888-4888-8888-888888888888'
+    const pontoId = '99999999-9999-4999-8999-999999999999'
+    const evento = {
+      ...mockEventos[0], regionalId: null, setorId, pontoAtendimentoId: pontoId,
+      podeGerenciar: true, possuiConvocacaoPublicada: false,
+    }
+    const fetchOriginal = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos') return [evento]
+      if (url === `/eventos/${EVENTO_ID}`) return evento
+      if (url === '/setores') return [{ id: setorId, nome: 'Setor Centro', ativo: true }]
+      if (url === '/pontos-atendimento') return [{ id: pontoId, setorId, nome: 'Bom Retiro', ativo: true }]
+      return fetchOriginal(url)
+    })
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
+    const dialog = await screen.findByRole('dialog', { name: /editar evento/i })
+    const ponto = await within(dialog).findByLabelText('Ponto de Atendimento')
+    expect(ponto).not.toBeDisabled()
+    expect(within(dialog).getByLabelText(/setor \*/i)).not.toBeDisabled()
+    expect(within(dialog).queryByText(/não pode ser alterado porque a reunião/i)).not.toBeInTheDocument()
+  })
+
   it('deve editar um evento existente via PATCH e limpar scopes cruzados', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url.startsWith(`/eventos/${EVENTO_ID}`)) return mockEventos[0]
