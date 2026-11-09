@@ -149,6 +149,39 @@ describe('Series Recorrencia API (S05)', () => {
     expect(persistida.organizadorMembroId).toBe(membro.id)
   })
 
+  it('258: gestor de Casa A não delega organizador ao mover série para sua Casa B sem gestão', async () => {
+    const membro = await db.select({ id: membros.id, casaId: membros.casaId }).from(membros).get()
+    const casaA = crypto.randomUUID()
+    const casaB = membro.casaId
+    const casaOrigem = await db.select({ setorId: casas.setorId }).from(casas).where(eq(casas.id, casaB)).get()
+    await db.insert(casas).values({ id: casaA, nome: 'Casa A', setorId: casaOrigem.setorId })
+    const conta = sqlite.prepare('SELECT conta_acesso_id FROM acessos_conta LIMIT 1').get() as any
+    sqlite.prepare('UPDATE acessos_conta SET ativo = 0 WHERE conta_acesso_id = ?').run(conta.conta_acesso_id)
+    sqlite.prepare(
+      "INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, 'GESTOR_AGENDA', 'CASA', ?)"
+    ).run(crypto.randomUUID(), conta.conta_acesso_id, casaA)
+    const delegadoId = crypto.randomUUID()
+    await db.insert(membros).values({ id: delegadoId, nome: 'Outro organizador', casaId: casaB, ativo: true })
+    const criado = await req('/api/v1/series-recorrencia', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...basePayload, casaId: casaA })
+    })
+    expect(criado.status).toBe(201)
+    const serie = await criado.json()
+    const tentativa = await req(`/api/v1/series-recorrencia/${serie.serie.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'ALL',
+        changes: { casaId: casaB, organizadorMembroId: delegadoId },
+      })
+    })
+    expect(tentativa.status).toBe(403)
+    expect(await tentativa.json()).toMatchObject({ code: 'ORGANIZADOR_DELEGACAO_NEGADA' })
+    const persistida = await db.select().from(seriesRecorrencia).where(eq(seriesRecorrencia.id, serie.serie.id)).get()
+    expect(persistida.casaId).toBe(casaA)
+    expect(persistida.organizadorMembroId).toBe(membro.id)
+  })
+
   it('258: gestor MASTER pode indicar organizador delegado em série', async () => {
     const regId = await createRegional()
     const membro = await db.select({ id: membros.id, casaId: membros.casaId }).from(membros).get()
