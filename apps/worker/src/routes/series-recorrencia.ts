@@ -788,6 +788,10 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
             .set({
               inicioEm: item.inicioEm,
               fimEm: item.fimEm,
+              // Ocorrências normais acompanham o novo slot; exceções preservam sua origem.
+              recorrenciaOrigemInicioEm: item.anterior.recorrenciaExcecao
+                ? (item.anterior.recorrenciaOrigemInicioEm ?? item.anterior.inicioEm)
+                : item.inicioEm,
               agendaRevisao: nowIso,
               agendaAviso: `Atenção! O horário da reunião foi alterado para ${mergedSerieData.horarioInicio}–${mergedSerieData.horarioFim}. Favor reconfirmar sua presença.`,
               updatedAt: nowIso,
