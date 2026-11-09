@@ -895,6 +895,73 @@ describe('EventosView', () => {
     expect(within(dialog).queryByText(/não pode ser alterado porque a reunião/i)).not.toBeInTheDocument()
   })
 
+  it('426-04: Local e Espaço mudam sem liberar PA de convocação publicada', async () => {
+    const setorId = '88888888-8888-4888-8888-888888888888'
+    const pontoId = '99999999-9999-4999-8999-999999999999'
+    const novoLocalId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    const evento = {
+      ...mockEventos[0], regionalId: null, setorId, pontoAtendimentoId: pontoId,
+      podeGerenciar: true, possuiConvocacaoPublicada: true,
+    }
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos') return [evento]
+      if (url === `/eventos/${EVENTO_ID}`) return evento
+      if (url === '/setores') return [{ id: setorId, nome: 'Setor Centro' }]
+      if (url === '/pontos-atendimento') return [{ id: pontoId, setorId, nome: 'Bom Retiro', ativo: true }]
+      if (url === '/locais') return [{ id: LOCAL_ID, nome: 'Sede' }, { id: novoLocalId, nome: 'Outro Local' }]
+      if (url === '/espacos-locais?ativo=true') return [{ id: ESPACO_ATIVO_ID, localId: novoLocalId, nome: 'Salão', ativo: true }]
+      return original(url)
+    })
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({})
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
+    const dialog = await screen.findByRole('dialog', { name: /editar evento/i })
+    const local = await within(dialog).findByLabelText(/local \*/i)
+    expect(local).not.toBeDisabled()
+    expect(within(dialog).getByLabelText('Ponto de Atendimento')).toBeDisabled()
+    fireEvent.change(local, { target: { value: novoLocalId } })
+    const espaco = within(dialog).getByLabelText('Espaço')
+    expect(espaco).not.toBeDisabled()
+    fireEvent.change(espaco, { target: { value: ESPACO_ATIVO_ID } })
+    fireEvent.click(within(dialog).getByRole('button', { name: /salvar/i }))
+    await waitFor(() => expect(apiClient.patchWithAuth).toHaveBeenCalledWith(
+      `/eventos/${EVENTO_ID}`, expect.objectContaining({
+        localId: novoLocalId, espacoId: ESPACO_ATIVO_ID, setorId, pontoAtendimentoId: pontoId,
+      })
+    ))
+  })
+
+  it('426-02: PA muda em formulário com apenas rascunho', async () => {
+    const setorId = '88888888-8888-4888-8888-888888888888'
+    const pontoId = '99999999-9999-4999-8999-999999999999'
+    const novoPontoId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    const evento = {
+      ...mockEventos[0], regionalId: null, setorId, pontoAtendimentoId: pontoId,
+      podeGerenciar: true, possuiConvocacaoPublicada: false,
+    }
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/eventos') return [evento]
+      if (url === `/eventos/${EVENTO_ID}`) return evento
+      if (url === '/setores') return [{ id: setorId, nome: 'Setor Centro' }]
+      if (url === '/pontos-atendimento') return [
+        { id: pontoId, setorId, nome: 'Bom Retiro', ativo: true },
+        { id: novoPontoId, setorId, nome: 'Outro PA', ativo: true },
+      ]
+      return original(url)
+    })
+    render(<EventosView />)
+    await screen.findByText('Reunião Presencial')
+    fireEvent.click(screen.getAllByRole('button', { name: /editar/i })[0])
+    const dialog = await screen.findByRole('dialog', { name: /editar evento/i })
+    const seletor = await within(dialog).findByLabelText('Ponto de Atendimento')
+    expect(seletor).not.toBeDisabled()
+    fireEvent.change(seletor, { target: { value: novoPontoId } })
+    expect(seletor).toHaveValue(novoPontoId)
+  })
+
   it('deve editar um evento existente via PATCH e limpar scopes cruzados', async () => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
       if (url.startsWith(`/eventos/${EVENTO_ID}`)) return mockEventos[0]
