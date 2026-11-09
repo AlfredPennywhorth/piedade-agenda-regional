@@ -599,7 +599,8 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       const mergedEvent = { ...existingEvent, ...parsed.changes }
       if (parsed.changes.organizadorMembroId !== undefined &&
           parsed.changes.organizadorMembroId !== existingEvent.organizadorMembroId &&
-          !(await podeDelegarOrganizadorNoEscopo(c, existingEvent))) {
+          (!(await podeDelegarOrganizadorNoEscopo(c, existingEvent)) ||
+           !(await podeDelegarOrganizadorNoEscopo(c, mergedEvent)))) {
         return c.json({ error: 'Alteração do organizador exige perfil de gestão autorizado', code: 'ORGANIZADOR_DELEGACAO_NEGADA' }, 403)
       }
       EventoCreate.parse(mergedEvent) // Valida regras S04
@@ -668,7 +669,8 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       const mergedSerieData = { ...existingSerie, ...parsed.changes }
       if (parsed.changes.organizadorMembroId !== undefined &&
           parsed.changes.organizadorMembroId !== existingSerie.organizadorMembroId &&
-          !(await podeDelegarOrganizadorNoEscopo(c, existingSerie))) {
+          (!(await podeDelegarOrganizadorNoEscopo(c, existingSerie)) ||
+           !(await podeDelegarOrganizadorNoEscopo(c, mergedSerieData)))) {
         return c.json({ error: 'Alteração do organizador exige perfil de gestão autorizado', code: 'ORGANIZADOR_DELEGACAO_NEGADA' }, 403)
       }
       const apenasDesativacao =
@@ -892,7 +894,8 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
 
       if (parsed.changes.organizadorMembroId !== undefined &&
           parsed.changes.organizadorMembroId !== existingSerie.organizadorMembroId &&
-          !(await podeDelegarOrganizadorNoEscopo(c, existingSerie))) {
+          (!(await podeDelegarOrganizadorNoEscopo(c, existingSerie)) ||
+           !(await podeDelegarOrganizadorNoEscopo(c, { ...existingSerie, ...parsed.changes })))) {
         return c.json({ error: 'Alteração do organizador exige perfil de gestão autorizado', code: 'ORGANIZADOR_DELEGACAO_NEGADA' }, 403)
       }
       const pivotDateIso = existingEvent.recorrenciaOrigemInicioEm ?? existingEvent.inicioEm
