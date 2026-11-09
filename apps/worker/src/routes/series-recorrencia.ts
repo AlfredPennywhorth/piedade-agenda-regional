@@ -5,7 +5,7 @@ import { SerieCreate, SerieUpdatePayload, generateOccurrences, getLocalDateFromU
 import { EventoCreate } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
 import { authMiddleware } from '../middleware/auth'
-import { eMasterSistema, podeGerenciarAgendaNoEscopo, regionaisAdministradas } from '../security/permissoes'
+import { eMasterSistema, podeDelegarOrganizadorSerie, podeGerenciarAgendaNoEscopo, regionaisAdministradas } from '../security/permissoes'
 import { podeGerenciarEvento } from '../security/eventos'
 import { criarAuditQuery, executarOperacaoComAudit, extrairEscopoDoEvento } from '../services/auditoria'
 import { validarClassificacaoEvento } from '../services/validacao-classificacao-evento'
@@ -383,6 +383,12 @@ async function podeGerenciarEntidade(
   )
 }
 
+async function podeDelegarOrganizadorNoEscopo(c: any, entidade: any): Promise<boolean> {
+  if (!podeDelegarOrganizadorSerie(c.get('contextoPermissoes'))) return false
+  const escopos = await carregarEscoposAgendaAutorizados(c)
+  return serieAutorizadaNoEscopo(entidade, escopos)
+}
+
 function atorEhAutorOuOrganizador(
   membroId: string | null,
   criadorMembroId: string | null | undefined,
@@ -463,6 +469,13 @@ seriesRecorrenciaRouter.post('/', async (c) => {
   try {
     const body = await c.req.json()
     const parsed = SerieCreate.parse(body)
+    const ator = c.get('membroId') as string | null
+    if (!ator) return c.json({ error: 'Sessão sem membro autenticado', code: 'FORBIDDEN' }, 403)
+    if (parsed.organizadorMembroId && parsed.organizadorMembroId !== ator &&
+        !(await podeDelegarOrganizadorNoEscopo(c, parsed))) {
+      return c.json({ error: 'A delegação do organizador exige perfil de gestão autorizado neste escopo', code: 'ORGANIZADOR_DELEGACAO_NEGADA' }, 403)
+    }
+    parsed.organizadorMembroId = parsed.organizadorMembroId || ator
 
     if (!(await espacoAtivoPertenceAoLocal(db, parsed.localId, parsed.espacoId))) {
       if (await espacoPertenceAoLocal(db, parsed.localId, parsed.espacoId)) {
@@ -584,6 +597,12 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
       }
 
       const mergedEvent = { ...existingEvent, ...parsed.changes }
+      if (parsed.changes.organizadorMembroId !== undefined &&
+          parsed.changes.organizadorMembroId !== existingEvent.organizadorMembroId &&
+          (!(await podeDelegarOrganizadorNoEscopo(c, existingEvent)) ||
+           !(await podeDelegarOrganizadorNoEscopo(c, mergedEvent)))) {
+        return c.json({ error: 'Alteração do organizador exige perfil de gestão autorizado', code: 'ORGANIZADOR_DELEGACAO_NEGADA' }, 403)
+      }
       EventoCreate.parse(mergedEvent) // Valida regras S04
       const erroClassificacao = await validarClassificacaoEvento(db, mergedEvent, existingEvent)
       if (erroClassificacao) return c.json(erroClassificacao, 400)
@@ -648,6 +667,12 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
     
     if (parsed.updateMode === 'ALL') {
       const mergedSerieData = { ...existingSerie, ...parsed.changes }
+      if (parsed.changes.organizadorMembroId !== undefined &&
+          parsed.changes.organizadorMembroId !== existingSerie.organizadorMembroId &&
+          (!(await podeDelegarOrganizadorNoEscopo(c, existingSerie)) ||
+           !(await podeDelegarOrganizadorNoEscopo(c, mergedSerieData)))) {
+        return c.json({ error: 'Alteração do organizador exige perfil de gestão autorizado', code: 'ORGANIZADOR_DELEGACAO_NEGADA' }, 403)
+      }
       const apenasDesativacao =
         parsed.changes.ativo === false &&
         Object.keys(parsed.changes).every((chave) => chave === 'ativo')
@@ -867,6 +892,12 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         return c.json({ error: 'Acesso não autorizado para gerir este evento', code: 'FORBIDDEN' }, 403)
       }
 
+      if (parsed.changes.organizadorMembroId !== undefined &&
+          parsed.changes.organizadorMembroId !== existingSerie.organizadorMembroId &&
+          (!(await podeDelegarOrganizadorNoEscopo(c, existingSerie)) ||
+           !(await podeDelegarOrganizadorNoEscopo(c, { ...existingSerie, ...parsed.changes })))) {
+        return c.json({ error: 'Alteração do organizador exige perfil de gestão autorizado', code: 'ORGANIZADOR_DELEGACAO_NEGADA' }, 403)
+      }
       const pivotDateIso = existingEvent.recorrenciaOrigemInicioEm ?? existingEvent.inicioEm
 
       const newSerieId = crypto.randomUUID()
