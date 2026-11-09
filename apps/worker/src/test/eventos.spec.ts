@@ -83,6 +83,41 @@ describe('Eventos API (S04)', () => {
   const validDate2 = `${dataTesteIso}T12:00:00Z`
   const validDateNextDay = `${dataTesteSeguinte.toISOString().slice(0, 10)}T10:00:00Z`
 
+  it('426: informa convocação publicada somente no detalhe gerenciável e ignora rascunhos/inativas', async () => {
+    const regionalId = await createRegional()
+    const localId = await createLocal()
+    const criado = await req('/api/v1/eventos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Reunião para testar indicador de publicação',
+        modalidade: 'PRESENCIAL',
+        inicioEm: validDate1,
+        fimEm: validDate2,
+        localId,
+        regionalId,
+      }),
+    })
+    expect(criado.status).toBe(201)
+    const evento = await criado.json()
+    const detalhe = async () => {
+      const resposta = await req(`/api/v1/eventos/${evento.id}`)
+      expect(resposta.status).toBe(200)
+      return resposta.json()
+    }
+    expect(await detalhe()).toMatchObject({ podeGerenciar: true, possuiConvocacaoPublicada: false })
+    const convocacaoId = crypto.randomUUID()
+    await db.insert(convocacoes).values({ id: convocacaoId, eventoId: evento.id, status: 'RASCUNHO', ativo: true })
+    expect((await detalhe()).possuiConvocacaoPublicada).toBe(false)
+    await db.update(convocacoes).set({ status: 'PUBLICADA' }).where(eq(convocacoes.id, convocacaoId))
+    expect((await detalhe()).possuiConvocacaoPublicada).toBe(true)
+    // A trigger de integridade continua bloqueando mesmo PUBLICADA inativa.
+    await db.update(convocacoes).set({ ativo: false }).where(eq(convocacoes.id, convocacaoId))
+    expect((await detalhe()).possuiConvocacaoPublicada).toBe(true)
+    await db.update(convocacoes).set({ status: 'RASCUNHO' }).where(eq(convocacoes.id, convocacaoId))
+    expect((await detalhe()).possuiConvocacaoPublicada).toBe(false)
+  })
+
   it('6. criar PRESENCIAL com local', async () => {
     const regionalId = await createRegional()
     const localId = await createLocal()
