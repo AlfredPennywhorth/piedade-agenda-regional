@@ -42,6 +42,7 @@ export function SerieFormModal({
 }: SerieFormModalProps) {
   const [formData, setFormData] = useState<Partial<SerieCreateInput>>(initialData)
   const [tipoEscopo, setTipoEscopo] = useState<TipoEscopo>(initialTipoEscopo)
+  const [identidade, setIdentidade] = useState<{ id: string; nome: string; capacidades?: { podeDelegarOrganizadorSerie?: boolean } } | null>(null)
   const [casaSetorFiltro, setCasaSetorFiltro] = useState('')
   const [errosForm, setErrosForm] = useState<Record<string, string>>({})
   const [erro, setErro] = useState<string | null>(null)
@@ -78,6 +79,16 @@ export function SerieFormModal({
   const locaisDisponiveis = [...locais, ...locaisRapidos.filter(item => !locais.some(local => local.id === item.id))]
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   const espacosDisponiveis = [...espacos, ...espacosRapidos.filter(item => !espacos.some(espaco => espaco.id === item.id))]
+
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelado = false
+    setIdentidade(null)
+    void fetchWithAuth<{ id: string; nome: string; capacidades?: { podeDelegarOrganizadorSerie?: boolean } }>('/auth/me')
+      .then(usuario => { if (!cancelado) setIdentidade(usuario) })
+      .catch(() => { if (!cancelado) setErro('Não foi possível verificar o usuário autenticado. Reabra o formulário.') })
+    return () => { cancelado = true }
+  }, [isOpen])
 
   useEffect(() => {
     if (isOpen) {
@@ -393,6 +404,10 @@ export function SerieFormModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!identidade) {
+      setErro('Aguarde a identificação do usuário autenticado antes de salvar.')
+      return
+    }
     setErrosForm({})
     setErro(null)
     
@@ -415,7 +430,9 @@ export function SerieFormModal({
       localId: formData.modalidade === 'ONLINE' ? null : (formData.localId || null),
       espacoId: formData.modalidade === 'ONLINE' ? null : (formData.espacoId || null),
       urlOnline: formData.modalidade === 'PRESENCIAL' ? null : (formData.urlOnline || null),
-      organizadorMembroId: formData.organizadorMembroId || null,
+      organizadorMembroId: operation === 'criar' && !identidade.capacidades?.podeDelegarOrganizadorSerie
+        ? identidade.id
+        : (formData.organizadorMembroId || (operation === 'criar' ? identidade.id : null)),
       regionalId: formData.regionalId || null,
       administracaoId: formData.administracaoId || null,
       setorId: formData.setorId || null,
@@ -869,15 +886,28 @@ export function SerieFormModal({
 
                 <div className="border-t pt-4">
                   <label htmlFor="organizadorMembroId" className="block text-sm font-medium text-slate-700 mb-1">Organizador (Membro)</label>
-                  <select
-                    id="organizadorMembroId"
-                    value={formData.organizadorMembroId || ''}
-                    onChange={e => setFormData({ ...formData, organizadorMembroId: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
-                  >
-                    <option value="">Selecione...</option>
-                    {membros.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-                  </select>
+                  {identidade?.capacidades?.podeDelegarOrganizadorSerie ? (
+                    <select
+                      id="organizadorMembroId"
+                      value={formData.organizadorMembroId || (operation === 'criar' ? identidade.id : '')}
+                      onChange={e => setFormData({ ...formData, organizadorMembroId: e.target.value })}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"
+                    >
+                      {operation === 'editar' && <option value="">Sem organizador registrado</option>}
+                      {!membros.some(m => m.id === identidade.id) && <option value={identidade.id}>{identidade.nome}</option>}
+                      {membros.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                    </select>
+                  ) : (
+                    <p id="organizadorMembroId" aria-label="Organizador (Membro)" className="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-lg text-sm">
+                      {operation === 'criar'
+                        ? (identidade?.nome || 'Identificando usuário...')
+                        : (membros.find(m => m.id === formData.organizadorMembroId)?.nome ||
+                          (identidade?.id === formData.organizadorMembroId ? identidade.nome : 'Organizador não informado'))}
+                    </p>
+                  )}
+                  {!identidade?.capacidades?.podeDelegarOrganizadorSerie && (
+                    <p className="mt-1 text-xs text-slate-500">Somente gestores autorizados podem delegar a organização.</p>
+                  )}
                   {errosForm.organizadorMembroId && <p role="alert" className="text-red-500 text-xs mt-1">{errosForm.organizadorMembroId}</p>}
                 </div>
 
