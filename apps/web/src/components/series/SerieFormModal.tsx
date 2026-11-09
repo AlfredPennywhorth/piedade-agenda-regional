@@ -902,7 +902,7 @@ export function SerieFormModal({
                       {operation === 'criar'
                         ? (identidade?.nome || 'Identificando usuário...')
                         : (membros.find(m => m.id === formData.organizadorMembroId)?.nome ||
-                          (identidade?.id === formData.organizadorMembroId ? identidade.nome : 'Organizador não informado'))}
+                          (identidade?.id === formData.organizadorMembroId ? identidade?.nome : 'Organizador não informado'))}
                     </p>
                   )}
                   {!identidade?.capacidades?.podeDelegarOrganizadorSerie && (
