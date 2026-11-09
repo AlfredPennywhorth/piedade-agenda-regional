@@ -3,7 +3,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm'
 import { alterarPinSchema, atualizarPerfilSchema } from '@piedade/shared'
 import * as schema from '../../db/schema'
 import { authMiddleware, Variables } from '../../middleware/auth'
-import { obterCapacidadesMembro } from '../../security/permissoes'
+import { obterCapacidadesMembro, podeDelegarOrganizadorSerie } from '../../security/permissoes'
 import { gerarSalt, hashPin, verifyPin } from '../../security/pin'
 import { executeAtomic } from '../../db/batch'
 import { obterPinPepper } from '../../security/pin-pepper'
@@ -136,7 +136,7 @@ meApp.get('/', async c => {
         id: conta.id,
         status: conta.status,
       },
-      capacidades,
+      capacidades: { ...capacidades, podeDelegarOrganizadorSerie: podeDelegarOrganizadorSerie(c.get('contextoPermissoes')) },
     },
     200
   )
