@@ -140,6 +140,7 @@ describe('SeriesView', () => {
 
     await waitFor(() => screen.getByText('+ Nova Série'))
     fireEvent.click(screen.getByText('+ Nova Série'))
+    await screen.findByRole('combobox', { name: 'Organizador (Membro)' })
 
     // Seleciona modalidade HIBRIDO
     const modalidadeSelect = screen.getByLabelText(/Modalidade \*/i)
@@ -247,6 +248,7 @@ describe('SeriesView', () => {
 
     await waitFor(() => screen.getByText('+ Nova Série'))
     fireEvent.click(screen.getByText('+ Nova Série'))
+    await screen.findByRole('combobox', { name: 'Organizador (Membro)' })
 
     fireEvent.change(screen.getByLabelText(/Título \*/i), { target: { value: 'Série Integrada' } })
     fireEvent.change(screen.getByLabelText(/Data Início \*/i), { target: { value: '2026-03-01' } })
@@ -293,6 +295,7 @@ describe('SeriesView', () => {
 
     // Formulario de edição aberto
     const form = screen.getByRole('dialog', { name: 'Editar Série de Recorrência' })
+    await screen.findByRole('combobox', { name: 'Organizador (Membro)' })
     expect(form).toBeInTheDocument()
 
     // Altera titulo
