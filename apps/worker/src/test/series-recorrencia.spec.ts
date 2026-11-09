@@ -916,6 +916,60 @@ describe('Series Recorrencia API (S05)', () => {
     expect(persistida.horarioFim).toBe('12:00')
   })
 
+  it('487: ALL antecipado seguido de THIS_AND_FUTURE não duplica o pivô', async () => {
+    const regionalId = await createRegional()
+    const criado = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        regionalId,
+        dataInicio: '2099-09-20',
+        dataFim: '2099-09-22',
+      }),
+    })
+    expect(criado.status).toBe(201)
+    const { serie } = await criado.json()
+    const originais = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id)).all()
+      .sort((a: any, b: any) => a.inicioEm.localeCompare(b.inicioEm))
+    const pivôId = originais[1].id
+
+    const antecipar = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'ALL',
+        changes: { horarioInicio: '08:00', horarioFim: '09:00' },
+      }),
+    })
+    expect(antecipar.status).toBe(200)
+    const aposAntecipacao = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id)).all()
+    for (const evento of aposAntecipacao) {
+      expect(evento.recorrenciaExcecao).toBe(false)
+      expect(evento.recorrenciaOrigemInicioEm).toBe(evento.inicioEm)
+    }
+
+    const dividir = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'THIS_AND_FUTURE',
+        fromEventId: pivôId,
+        changes: { titulo: 'Título após antecipação' },
+      }),
+    })
+    expect(dividir.status).toBe(200)
+
+    const eventosAtivos = db.select().from(eventos).all()
+      .filter((evento: any) => evento.ativo)
+    const datas = eventosAtivos.map((evento: any) => getLocalDateFromUtc(evento.inicioEm))
+    expect(datas.filter((data: string) => data === '2099-09-21')).toHaveLength(1)
+    expect(datas.filter((data: string) => data === '2099-09-22')).toHaveLength(1)
+    expect(eventosAtivos).toHaveLength(3)
+  })
+
   it('486: ALL de horário não altera ocorrências passadas nem inativas', async () => {
     const regionalId = await createRegional()
     const criado = await req('/api/v1/series-recorrencia', {
