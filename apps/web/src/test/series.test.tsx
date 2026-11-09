@@ -63,6 +63,7 @@ const MOCK_LOOKUPS = {
 describe('SeriesView', () => {
   beforeEach(() => {
     vi.mocked(apiClient.fetchWithAuth).mockImplementation(async (url) => {
+      if (url === '/auth/me') return { id: MOCK_LOOKUPS.membros[0].id, nome: 'João', capacidades: { podeDelegarOrganizadorSerie: true } }
       if (url === '/series-recorrencia') return MOCK_SERIES
       if (url === '/locais') return MOCK_LOOKUPS.locais
       if (url === '/membros') return MOCK_LOOKUPS.membros
@@ -78,6 +79,32 @@ describe('SeriesView', () => {
   afterEach(() => {
     vi.resetAllMocks()
     vi.unstubAllGlobals()
+  })
+
+  it('258: usuário comum inicia série com Organizador autenticado e sem seletor de delegação', async () => {
+    const id = MOCK_LOOKUPS.membros[0].id
+    const original = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/auth/me') return { id, nome: 'João', capacidades: { podeDelegarOrganizadorSerie: false } }
+      return original(url)
+    })
+    render(<SeriesView />)
+    await screen.findByText('Reunião Semanal')
+    fireEvent.click(screen.getByRole('button', { name: /nova série/i }))
+    const dialog = await screen.findByRole('dialog', { name: /nova série de recorrência/i })
+    expect(await within(dialog).findByText('João', { selector: '#organizadorMembroId' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('combobox', { name: 'Organizador (Membro)' })).not.toBeInTheDocument()
+    expect(within(dialog).getByText(/somente gestores autorizados/i)).toBeInTheDocument()
+  })
+
+  it('258: gestor pode escolher organizador delegado em criação de série', async () => {
+    render(<SeriesView />)
+    await screen.findByText('Reunião Semanal')
+    fireEvent.click(screen.getByRole('button', { name: /nova série/i }))
+    const dialog = await screen.findByRole('dialog', { name: /nova série de recorrência/i })
+    const seletor = await within(dialog).findByRole('combobox', { name: 'Organizador (Membro)' })
+    expect(seletor).toHaveValue(MOCK_LOOKUPS.membros[0].id)
+    expect(seletor).not.toBeDisabled()
   })
 
   it('deve listar as séries e permitir visualizar os detalhes num diálogo acessível', async () => {
