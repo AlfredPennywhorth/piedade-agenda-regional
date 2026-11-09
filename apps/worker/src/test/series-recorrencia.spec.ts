@@ -106,6 +106,62 @@ describe('Series Recorrencia API (S05)', () => {
     expect(response.status).toBe(401)
   })
 
+  it('258: criação sem organizador usa membro da sessão e propaga para ocorrências', async () => {
+    const regId = await createRegional()
+    const membro = await db.select({ id: membros.id }).from(membros).get()
+    const response = await req('/api/v1/series-recorrencia', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...basePayload, regionalId: regId })
+    })
+    expect(response.status).toBe(201)
+    const data = await response.json()
+    expect(data.serie.organizadorMembroId).toBe(membro.id)
+    const ocorrencias = await db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, data.serie.id)).all()
+    expect(ocorrencias.length).toBeGreaterThan(0)
+    expect(ocorrencias.every((evento: any) => evento.organizadorMembroId === membro.id)).toBe(true)
+  })
+
+  it('258: usuário comum não pode delegar organizador na criação nem na edição', async () => {
+    const membro = await db.select({ id: membros.id, casaId: membros.casaId }).from(membros).get()
+    const outroId = crypto.randomUUID()
+    await db.insert(membros).values({ id: outroId, nome: 'Delegado', casaId: membro.casaId, ativo: true })
+    const conta = sqlite.prepare('SELECT conta_acesso_id FROM acessos_conta LIMIT 1').get() as any
+    sqlite.prepare('UPDATE acessos_conta SET ativo = 0 WHERE conta_acesso_id = ?').run(conta.conta_acesso_id)
+    const payload = { ...basePayload, casaId: membro.casaId }
+    const negado = await req('/api/v1/series-recorrencia', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, organizadorMembroId: outroId })
+    })
+    expect(negado.status).toBe(403)
+    expect(await negado.json()).toMatchObject({ code: 'ORGANIZADOR_DELEGACAO_NEGADA' })
+    const criado = await req('/api/v1/series-recorrencia', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    expect(criado.status).toBe(201)
+    const serie = await criado.json()
+    const tentativa = await req(`/api/v1/series-recorrencia/${serie.serie.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updateMode: 'ALL', changes: { organizadorMembroId: outroId } })
+    })
+    expect(tentativa.status).toBe(403)
+    const persistida = await db.select().from(seriesRecorrencia).where(eq(seriesRecorrencia.id, serie.serie.id)).get()
+    expect(persistida.organizadorMembroId).toBe(membro.id)
+  })
+
+  it('258: gestor MASTER pode indicar organizador delegado em série', async () => {
+    const regId = await createRegional()
+    const membro = await db.select({ id: membros.id, casaId: membros.casaId }).from(membros).get()
+    const delegadoId = crypto.randomUUID()
+    await db.insert(membros).values({ id: delegadoId, nome: 'Delegado', casaId: membro.casaId, ativo: true })
+    const response = await req('/api/v1/series-recorrencia', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...basePayload, regionalId: regId, organizadorMembroId: delegadoId })
+    })
+    expect(response.status).toBe(201)
+    expect((await response.json()).serie.organizadorMembroId).toBe(delegadoId)
+  })
+
   it('1. criar série diária', async () => {
     const regionalId = await createRegional()
     const res = await req('/api/v1/series-recorrencia', {
