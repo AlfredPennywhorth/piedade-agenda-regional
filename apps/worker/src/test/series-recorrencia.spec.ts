@@ -838,6 +838,128 @@ describe('Series Recorrencia API (S05)', () => {
   })
 
 
+  it('486: ALL de horário atualiza normais e exceção movida sem alterar IDs, data ou convocações', async () => {
+    const regionalId = await createRegional()
+    const criado = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        regionalId,
+        dataInicio: '2099-09-01',
+        dataFim: '2099-09-03',
+      }),
+    })
+    expect(criado.status).toBe(201)
+    const { serie } = await criado.json()
+    const anteriores = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id)).all()
+      .sort((a: any, b: any) => a.inicioEm.localeCompare(b.inicioEm))
+    const excecaoId = anteriores[1].id
+    const dataMovida = '2099-09-10'
+    const movida = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'THIS',
+        fromEventId: excecaoId,
+        changes: {
+          inicioEm: createUtcDateFromSaoPaulo(dataMovida, '14:00'),
+          fimEm: createUtcDateFromSaoPaulo(dataMovida, '15:00'),
+        },
+      }),
+    })
+    expect(movida.status).toBe(200)
+
+    const convocatoriaId = crypto.randomUUID()
+    await db.insert(convocacoes).values({
+      id: convocatoriaId,
+      eventoId: anteriores[0].id,
+      status: 'PUBLICADA',
+      publicadaEm: new Date().toISOString(),
+      ativo: true,
+    })
+
+    const atualizacao = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'ALL',
+        changes: { horarioInicio: '11:00', horarioFim: '12:00' },
+      }),
+    })
+    expect(atualizacao.status).toBe(200)
+    expect(await atualizacao.json()).toMatchObject({
+      ocorrenciasAtualizadas: 3,
+      reconfirmacaoSolicitada: true,
+    })
+
+    const posteriores = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id)).all()
+    expect(posteriores).toHaveLength(3)
+    expect(posteriores.map((e: any) => e.id).sort())
+      .toEqual(anteriores.map((e: any) => e.id).sort())
+    expect(posteriores.every((e: any) => e.ativo)).toBe(true)
+    for (const evento of posteriores) {
+      const dataLocal = evento.id === excecaoId
+        ? dataMovida
+        : getLocalDateFromUtc(anteriores.find((e: any) => e.id === evento.id).inicioEm)
+      expect(evento.inicioEm).toBe(createUtcDateFromSaoPaulo(dataLocal, '11:00'))
+      expect(evento.fimEm).toBe(createUtcDateFromSaoPaulo(dataLocal, '12:00'))
+      expect(evento.agendaAviso).toContain('11:00')
+    }
+    expect(posteriores.find((e: any) => e.id === excecaoId).recorrenciaExcecao).toBe(true)
+    expect(db.select().from(convocacoes).where(eq(convocacoes.id, convocatoriaId)).get().eventoId)
+      .toBe(anteriores[0].id)
+    const persistida = db.select().from(seriesRecorrencia).where(eq(seriesRecorrencia.id, serie.id)).get()
+    expect(persistida.horarioInicio).toBe('11:00')
+    expect(persistida.horarioFim).toBe('12:00')
+  })
+
+  it('486: ALL de horário não altera ocorrências passadas nem inativas', async () => {
+    const regionalId = await createRegional()
+    const criado = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...basePayload,
+        regionalId,
+        dataInicio: '2099-10-01',
+        dataFim: '2099-10-03',
+      }),
+    })
+    expect(criado.status).toBe(201)
+    const { serie } = await criado.json()
+    const anteriores = db.select().from(eventos)
+      .where(eq(eventos.serieRecorrenciaId, serie.id)).all()
+      .sort((a: any, b: any) => a.inicioEm.localeCompare(b.inicioEm))
+    // Simula ocorrência histórica e registro inativo, sem apagar o histórico.
+    db.update(eventos)
+      .set({
+        inicioEm: '2020-10-01T12:00:00.000Z',
+        fimEm: '2020-10-01T13:00:00.000Z',
+      }).where(eq(eventos.id, anteriores[0].id)).run()
+    db.update(eventos).set({ ativo: false }).where(eq(eventos.id, anteriores[1].id)).run()
+
+    const resposta = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updateMode: 'ALL',
+        changes: { horarioInicio: '13:00', horarioFim: '14:00' },
+      }),
+    })
+    expect(resposta.status).toBe(200)
+    expect((await resposta.json()).ocorrenciasAtualizadas).toBe(1)
+
+    const historico = db.select().from(eventos).where(eq(eventos.id, anteriores[0].id)).get()
+    const inativo = db.select().from(eventos).where(eq(eventos.id, anteriores[1].id)).get()
+    const futuro = db.select().from(eventos).where(eq(eventos.id, anteriores[2].id)).get()
+    expect(historico.inicioEm).toBe('2020-10-01T12:00:00.000Z')
+    expect(inativo.inicioEm).toBe(anteriores[1].inicioEm)
+    expect(futuro.inicioEm).toBe(createUtcDateFromSaoPaulo('2099-10-03', '13:00'))
+  })
+
   it('24.5 ALL rejeita regeneração quando ocorrência futura possui convocação ativa', async () => {
     const regionalId = await createRegional()
     const createRes = await req('/api/v1/series-recorrencia', {
