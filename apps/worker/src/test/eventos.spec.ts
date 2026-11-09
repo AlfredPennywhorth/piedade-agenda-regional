@@ -4,7 +4,7 @@ import { setupDb } from './setup'
 import { createApp } from '../index'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import BetterSqlite3 from 'better-sqlite3'
-import { regionais, locais, eventos, administracoes, setores, casas, gruposTrabalho, membros, sessoes, auditoriaLogs, convocacoes, convocacaoFuncoes, funcoes } from '../db/schema'
+import { regionais, locais, eventos, administracoes, setores, casas, gruposTrabalho, membros, sessoes, auditoriaLogs, convocacoes, convocacaoFuncoes, funcoes, pontosAtendimento } from '../db/schema'
 import { hashToken } from '../security/tokens'
 import { eq } from 'drizzle-orm'
 
@@ -116,6 +116,54 @@ describe('Eventos API (S04)', () => {
     expect((await detalhe()).possuiConvocacaoPublicada).toBe(true)
     await db.update(convocacoes).set({ status: 'RASCUNHO' }).where(eq(convocacoes.id, convocacaoId))
     expect((await detalhe()).possuiConvocacaoPublicada).toBe(false)
+  })
+
+  it('426-06: publicação concorrente retorna 409 preservando PA e permite Local sem alterar convocação', async () => {
+    const regionalId = await createRegional()
+    const administracaoId = crypto.randomUUID()
+    const setorId = crypto.randomUUID()
+    const pontoOriginal = crypto.randomUUID()
+    const outroPonto = crypto.randomUUID()
+    const localOriginal = await createLocal()
+    const localNovo = await createLocal()
+    await db.insert(administracoes).values({ id: administracaoId, nome: 'Administração 426', regionalId })
+    await db.insert(setores).values({ id: setorId, nome: 'Setor 426', administracaoId })
+    await db.insert(pontosAtendimento).values([
+      { id: pontoOriginal, nome: 'PA original', setorId },
+      { id: outroPonto, nome: 'PA outro', setorId },
+    ])
+    const criado = await req('/api/v1/eventos', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        titulo: 'Evento de corrida de publicação',
+        modalidade: 'PRESENCIAL', inicioEm: validDate1, fimEm: validDate2,
+        setorId, localId: localOriginal, pontoAtendimentoId: pontoOriginal,
+      }),
+    })
+    expect(criado.status).toBe(201)
+    const evento = await criado.json()
+    const detalheAntes = await req(`/api/v1/eventos/${evento.id}`)
+    expect((await detalheAntes.json()).possuiConvocacaoPublicada).toBe(false)
+
+    const convocacaoId = crypto.randomUUID()
+    await db.insert(convocacoes).values({ id: convocacaoId, eventoId: evento.id, status: 'PUBLICADA', ativo: true })
+    const tentativa = await req(`/api/v1/eventos/${evento.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pontoAtendimentoId: outroPonto }),
+    })
+    expect(tentativa.status).toBe(409)
+    expect(await tentativa.json()).toMatchObject({ code: 'EVENTO_PONTO_COM_CONVOCACAO_PUBLICADA' })
+    const preservado = await db.select().from(eventos).where(eq(eventos.id, evento.id)).get()
+    expect(preservado.pontoAtendimentoId).toBe(pontoOriginal)
+    expect(preservado.localId).toBe(localOriginal)
+    expect((await db.select().from(convocacoes).where(eq(convocacoes.id, convocacaoId)).get()).status).toBe('PUBLICADA')
+
+    const localPermitido = await req(`/api/v1/eventos/${evento.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ localId: localNovo }),
+    })
+    expect(localPermitido.status).toBe(200)
+    expect(await localPermitido.json()).toMatchObject({ localId: localNovo, pontoAtendimentoId: pontoOriginal })
   })
 
   it('6. criar PRESENCIAL com local', async () => {
