@@ -978,6 +978,14 @@ export async function eAuditorSistemaAutorizado(db: any, membroId: string): Prom
   return vinculosAuditor.some(({ v }: any) => v.regionalId !== null || v.administracaoId !== null)
 }
 
+// Delegação de organização exige papel técnico. A autorização sobre o escopo
+// específico continua sendo validada na rota de séries.
+export function podeDelegarOrganizadorSerie(contexto: ContextoPermissoes): boolean {
+  return eMasterSistema(contexto) ||
+    regionaisAdministradas(contexto).size > 0 ||
+    contexto.acessosAtivos.some(acesso => acesso.perfilCodigo === 'GESTOR_AGENDA')
+}
+
 export interface CapacidadesMembro {
   podeVisualizarRelatorios: boolean
   podeVisualizarAuditoria: boolean
