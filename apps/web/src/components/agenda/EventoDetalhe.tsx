@@ -583,7 +583,8 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
           </div>
         )}
 
-        {item.evento.pessoal && <p className="rounded-lg bg-brand-50 p-4 text-sm text-brand-800">Evento Próprio — já incluído na sua agenda.</p>}
+        {item.emPreparacao && <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700" role="status">Em preparação — evento criado, mas ainda sem convocação publicada. Esta visualização não representa convocação nem confirmação de presença.</p>}
+      {item.evento.pessoal && <p className="rounded-lg bg-brand-50 p-4 text-sm text-brand-800">Evento Próprio — já incluído na sua agenda.</p>}
 
         {item.evento.refeicoesOferecidas && item.evento.refeicoesOferecidas.length > 0 && (
           <div className="border-t border-slate-100 pt-4">
