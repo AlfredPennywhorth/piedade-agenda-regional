@@ -777,14 +777,14 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
           return { id: evento.id, inicioEm, fimEm, anterior: evento }
         })
 
-        const alteradas = horarios.filter(item =>
+        const alteradas = horarios.filter((item: { inicioEm: string; fimEm: string; anterior: any }) =>
           item.inicioEm !== item.anterior.inicioEm || item.fimEm !== item.anterior.fimEm
         )
         await executeAtomic(db, (qdb) => [
           qdb.update(seriesRecorrencia)
             .set({ ...parsed.changes, updatedAt: nowIso })
             .where(eq(seriesRecorrencia.id, serieId)),
-          ...alteradas.map(item => qdb.update(eventos)
+          ...alteradas.map((item: { id: string; inicioEm: string; fimEm: string; anterior: any }) => qdb.update(eventos)
             .set({
               inicioEm: item.inicioEm,
               fimEm: item.fimEm,
