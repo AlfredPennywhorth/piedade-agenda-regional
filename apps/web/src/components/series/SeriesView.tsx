@@ -260,7 +260,8 @@ export function SeriesView() {
       pauta: serie.pauta || '',
       modalidade: serie.modalidade,
       frequencia: serie.frequencia,
-      intervalo: 1,
+      // Preservar cadência original: alterar só o horário não pode acionar regeneração.
+      intervalo: serie.intervalo,
       dataInicio: serie.dataInicio,
       dataFim: serie.dataFim,
       horarioInicio: serie.horarioInicio,
