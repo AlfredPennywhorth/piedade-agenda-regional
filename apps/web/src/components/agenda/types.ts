@@ -1,4 +1,5 @@
 export interface AgendaItem {
+  emPreparacao?: boolean
   evento: {
     id: string
     pessoal?: boolean
