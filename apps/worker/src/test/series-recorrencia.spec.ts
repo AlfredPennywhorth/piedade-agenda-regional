@@ -1117,7 +1117,10 @@ describe('Series Recorrencia API (S05)', () => {
     const { serie } = await criado.json()
     const anteriores = db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serie.id)).all()
     const outroId = crypto.randomUUID()
-    await db.insert(membros).values({ id: outroId, nome: 'Visitante sem escopo', ativo: true, autenticacaoAtiva: true })
+    const casaBase = db.select().from(casas).get()
+    const casaOutroId = crypto.randomUUID()
+    await db.insert(casas).values({ id: casaOutroId, nome: 'Casa sem escopo', setorId: casaBase.setorId })
+    await db.insert(membros).values({ id: outroId, nome: 'Visitante sem escopo', casaId: casaOutroId, ativo: true, autenticacaoAtiva: true })
     const outroToken = crypto.randomUUID()
     await db.insert(sessoes).values({
       id: crypto.randomUUID(),
