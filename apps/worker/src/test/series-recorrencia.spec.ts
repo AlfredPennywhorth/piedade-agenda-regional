@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { Database } from 'better-sqlite3'
 import { setupDb } from './setup'
 import { createApp } from '../index'
@@ -1071,7 +1071,6 @@ describe('Series Recorrencia API (S05)', () => {
 
   it('487: ALL não move reunião ainda futura para início já passado', async () => {
     const regionalId = await createRegional()
-    const hojeLocal = getLocalDateFromUtc(new Date().toISOString())
     const criado = await req('/api/v1/series-recorrencia', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1079,38 +1078,32 @@ describe('Series Recorrencia API (S05)', () => {
     })
     const { serie } = await criado.json()
     const futuro = db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serie.id)).all()[0]
-    // Monta uma ocorrência de hoje para o cenário, garantindo início original futuro,
-    // sem depender da hora em que o workflow GitHub Actions execute o teste.
-    const amanha = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-    const agora = new Date()
-    const inicioOriginal = new Date(agora.getTime() + 60 * 60 * 1000).toISOString()
-    const fimOriginal = new Date(agora.getTime() + 2 * 60 * 60 * 1000).toISOString()
-    const novaDataLocal = getLocalDateFromUtc(inicioOriginal)
+    const dataLocal = getLocalDateFromUtc(new Date().toISOString())
+    // Hora local atual simulada: 12h de hoje, sem depender do relógio do CI.
+    const agoraFixo = createUtcDateFromSaoPaulo(dataLocal, '12:00')
+    const inicioOriginal = createUtcDateFromSaoPaulo(dataLocal, '18:00')
+    const fimOriginal = createUtcDateFromSaoPaulo(dataLocal, '19:00')
     db.update(eventos).set({
       inicioEm: inicioOriginal,
       fimEm: fimOriginal,
       recorrenciaOrigemInicioEm: inicioOriginal,
     }).where(eq(eventos.id, futuro.id)).run()
-    const inicioDia = createUtcDateFromSaoPaulo(novaDataLocal, '00:00')
-    // Se o início original caiu no dia seguinte, 00:00 ainda pode ser futuro;
-    // nesse caso a data local escolhida é o dia anterior, via hora fixa do passado.
-    const inicioPassado = new Date(inicioDia).getTime() <= Date.now()
-    if (!inicioPassado) {
-      db.update(eventos).set({
-        inicioEm: amanha,
-        fimEm: new Date(Date.parse(amanha) + 3600000).toISOString(),
-      }).where(eq(eventos.id, futuro.id)).run()
-    }
     const antes = db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serie.id)).all()
-    const resposta = await req(`/api/v1/series-recorrencia/${serie.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ updateMode: 'ALL', changes: { horarioInicio: '00:00', horarioFim: '01:00' } }),
-    })
-    // O cenário só é aplicável quando o novo horário resulta no passado.
-    if (inicioPassado) {
+    // Controla apenas o relógio usado pelo handler, preservando o restante do fixture.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(agoraFixo))
+    try {
+      const resposta = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updateMode: 'ALL', changes: { horarioInicio: '08:00', horarioFim: '09:00' } }),
+      })
       expect(resposta.status).toBe(409)
       expect(await resposta.json()).toMatchObject({ code: 'HORARIO_REAGENDADO_PASSADO' })
       expect(db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serie.id)).all()).toEqual(antes)
+      expect(db.select().from(seriesRecorrencia).where(eq(seriesRecorrencia.id, serie.id)).get().horarioInicio)
+        .toBe(basePayload.horarioInicio)
+    } finally {
+      vi.useRealTimers()
     }
   })
 
