@@ -777,9 +777,19 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
           return { id: evento.id, inicioEm, fimEm, anterior: evento }
         })
 
+        // Compara instantes reais: uma mudança somente de formato ISO não exige reconfirmação.
         const alteradas = horarios.filter((item: { inicioEm: string; fimEm: string; anterior: any }) =>
-          item.inicioEm !== item.anterior.inicioEm || item.fimEm !== item.anterior.fimEm
+          !mesmoInstante(item.inicioEm, item.anterior.inicioEm) ||
+          !mesmoInstante(item.fimEm, item.anterior.fimEm)
         )
+        // Rejeita a operação inteira: atualizar apenas parte da série criaria divergência
+        // entre a regra recorrente e a ocorrência ainda não iniciada no horário antigo.
+        if (alteradas.some(item => new Date(item.inicioEm).getTime() < new Date(nowIso).getTime())) {
+          return c.json({
+            error: 'A alteração colocaria uma reunião futura em horário já passado. Ajuste o horário ou edite as próximas ocorrências.',
+            code: 'HORARIO_REAGENDADO_PASSADO',
+          }, 409)
+        }
         await executeAtomic(db, (qdb) => [
           qdb.update(seriesRecorrencia)
             .set({ ...parsed.changes, updatedAt: nowIso })
