@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { eq, and, gte, sql, inArray, isNotNull } from 'drizzle-orm'
 import { auditoriaLogs, administracoes, casas, eventos, gruposTrabalho, membros, seriesRecorrencia, setores, locais, espacosLocal } from '../db/schema'
-import { SerieCreate, SerieUpdatePayload, generateOccurrences, getLocalDateFromUtc } from '@piedade/shared'
+import { SerieCreate, SerieUpdatePayload, generateOccurrences, getLocalDateFromUtc, createUtcDateFromSaoPaulo } from '@piedade/shared'
 import { EventoCreate } from '@piedade/shared'
 import { executeAtomic } from '../db/batch'
 import { authMiddleware } from '../middleware/auth'
@@ -750,6 +750,85 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
             ? 'Série atualizada sem regenerar ocorrências; reconfirmação solicitada.'
             : 'Série atualizada sem regenerar ocorrências.',
           reconfirmacaoSolicitada: Boolean(agendaAviso),
+        })
+      }
+
+      // Horário da série altera a hora das ocorrências futuras no próprio registro.
+      // Não regenerar eventos: preservar IDs, convocações, RSVPs e datas de exceções movidas.
+      const camposDeHorario = Object.keys(parsed.changes)
+      if (
+        camposDeHorario.length > 0 &&
+        camposDeHorario.every(campo => campo === 'horarioInicio' || campo === 'horarioFim')
+      ) {
+        const futuros = await db.select().from(eventos).where(and(
+          eq(eventos.serieRecorrenciaId, serieId),
+          gte(eventos.inicioEm, nowIso),
+          eq(eventos.ativo, true)
+        )).all()
+
+        const horarios = futuros.map((evento: any) => {
+          // Para exceções reagendadas, manter o dia efetivo do evento (não o slot original).
+          const dataLocal = getLocalDateFromUtc(evento.inicioEm)
+          const inicioEm = createUtcDateFromSaoPaulo(dataLocal, mergedSerieData.horarioInicio)
+          const fimEm = createUtcDateFromSaoPaulo(dataLocal, mergedSerieData.horarioFim)
+          if (new Date(fimEm).getTime() <= new Date(inicioEm).getTime()) {
+            throw new Error('O horário de término deve ser posterior ao início da reunião.')
+          }
+          return { id: evento.id, inicioEm, fimEm, anterior: evento }
+        })
+
+        // Compara instantes reais: uma mudança somente de formato ISO não exige reconfirmação.
+        const alteradas = horarios.filter((item: { inicioEm: string; fimEm: string; anterior: any }) =>
+          !mesmoInstante(item.inicioEm, item.anterior.inicioEm) ||
+          !mesmoInstante(item.fimEm, item.anterior.fimEm)
+        )
+        // Rejeita a operação inteira: atualizar apenas parte da série criaria divergência
+        // entre a regra recorrente e a ocorrência ainda não iniciada no horário antigo.
+        if (alteradas.some((item: { inicioEm: string }) => new Date(item.inicioEm).getTime() < new Date(nowIso).getTime())) {
+          return c.json({
+            error: 'A alteração colocaria uma reunião futura em horário já passado. Ajuste o horário ou edite as próximas ocorrências.',
+            code: 'HORARIO_REAGENDADO_PASSADO',
+          }, 409)
+        }
+        await executeAtomic(db, (qdb) => [
+          qdb.update(seriesRecorrencia)
+            .set({ ...parsed.changes, updatedAt: nowIso })
+            .where(eq(seriesRecorrencia.id, serieId)),
+          ...alteradas.map((item: { id: string; inicioEm: string; fimEm: string; anterior: any }) => qdb.update(eventos)
+            .set({
+              inicioEm: item.inicioEm,
+              fimEm: item.fimEm,
+              // Ocorrências normais acompanham o novo slot; exceções preservam sua origem.
+              recorrenciaOrigemInicioEm: item.anterior.recorrenciaExcecao
+                ? (item.anterior.recorrenciaOrigemInicioEm ?? item.anterior.inicioEm)
+                : item.inicioEm,
+              agendaRevisao: nowIso,
+              agendaAviso: `Atenção! O horário da reunião foi alterado para ${mergedSerieData.horarioInicio}–${mergedSerieData.horarioFim}. Favor reconfirmar sua presença.`,
+              updatedAt: nowIso,
+            })
+            .where(eq(eventos.id, item.id))),
+          criarAuditQuery(qdb, {
+            acao: 'SERIE_RECORRENCIA_ATUALIZADA',
+            atorMembroId: c.get('membroId') || null,
+            recursoTipo: 'SERIE_RECORRENCIA',
+            recursoId: serieId,
+            ...(() => {
+              const escopo = extrairEscopoDoEvento(existingSerie)
+              return { escopoTipo: escopo.escopoTipo, escopoId: escopo.escopoId }
+            })(),
+            contexto: {
+              updateMode: 'ALL',
+              camposAlterados: camposDeHorario,
+              semRegeneracao: true,
+              ocorrenciasAtualizadas: alteradas.length,
+              reconfirmacaoSolicitada: alteradas.length > 0,
+            },
+          }),
+        ])
+        return c.json({
+          message: 'Horários futuros da série atualizados sem recriar ocorrências',
+          ocorrenciasAtualizadas: alteradas.length,
+          reconfirmacaoSolicitada: alteradas.length > 0,
         })
       }
 
