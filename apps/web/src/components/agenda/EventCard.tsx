@@ -8,6 +8,7 @@ interface EventCardProps {
 }
 
 function statusParticipacao(item: AgendaItem) {
+  if (item.emPreparacao) return { label: 'Em preparação — sem convocação', className: 'bg-slate-50 text-slate-700 border-slate-300' }
   if (item.evento.pessoal) return { label: 'Próprio', className: 'bg-brand-50 text-brand-700 border-brand-200' }
   if (item.rsvp?.reconfirmacaoPendente) {
     return { label: 'Reconfirmar presença', className: 'bg-amber-50 text-amber-800 border-amber-300' }
