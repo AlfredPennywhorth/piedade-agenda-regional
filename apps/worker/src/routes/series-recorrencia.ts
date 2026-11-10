@@ -784,7 +784,7 @@ seriesRecorrenciaRouter.patch('/:id', async (c) => {
         )
         // Rejeita a operação inteira: atualizar apenas parte da série criaria divergência
         // entre a regra recorrente e a ocorrência ainda não iniciada no horário antigo.
-        if (alteradas.some(item => new Date(item.inicioEm).getTime() < new Date(nowIso).getTime())) {
+        if (alteradas.some((item: { inicioEm: string }) => new Date(item.inicioEm).getTime() < new Date(nowIso).getTime())) {
           return c.json({
             error: 'A alteração colocaria uma reunião futura em horário já passado. Ajuste o horário ou edite as próximas ocorrências.',
             code: 'HORARIO_REAGENDADO_PASSADO',
