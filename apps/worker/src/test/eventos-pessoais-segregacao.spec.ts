@@ -579,7 +579,7 @@ describe('Eventos pessoais e segregação', () => {
   it('488: prévia não expõe eventos de outra Casa, nem eventos externos', async () => {
     const outraCasa = await usuario(irma)
     await evento({ casaId: irma }, { criadorMembroId: autor.id })
-    await evento({ casaId: casa }, {
+    await evento({ regionalId: reg }, {
       criadorMembroId: autor.id,
       abrangencia: 'NACIONAL', regionalGestaoId: reg,
       destinoUf: 'RJ', destinoCidadeLocal: 'Rio de Janeiro',
