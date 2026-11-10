@@ -539,6 +539,19 @@ describe('Eventos pessoais e segregação', () => {
     expect((await (await req(master, '/minha-agenda')).json()) as any[]).toEqual([])
   })
 
+  it('488: prévia de membro ativo não exibe eventos de Casa inativa', async () => {
+    const id = await evento({ casaId: casa }, { criadorMembroId: autor.id })
+    expect((await (await req(autor, '/minha-agenda')).json() as any[])
+      .map(item => item.evento.id)).toContain(id)
+
+    // Inativar a Casa não inativa automaticamente o membro.
+    await db.update(s.casas).set({ ativo: false }).where(eq(s.casas.id, casa))
+    const membro = await db.select({ ativo: s.membros.ativo })
+      .from(s.membros).where(eq(s.membros.id, autor.id)).get()
+    expect(membro?.ativo).toBe(true)
+    expect(await (await req(autor, '/minha-agenda')).json()).toEqual([])
+  })
+
   it('488: prévia de série própria não equivale a convocação e desaparece para não destinatário após publicação', async () => {
     const criado = await req(autor, '/series-recorrencia', 'POST', {
       titulo: 'Ensaio da Casa', modalidade: 'ONLINE', urlOnline: 'https://example.org',
