@@ -322,6 +322,34 @@ describe('SeriesView', () => {
     })
   })
 
+  it('258: alteração apenas de horário preserva intervalo legado e envia ALL sem regeneração', async () => {
+    const originalFetch = vi.mocked(apiClient.fetchWithAuth).getMockImplementation()!
+    vi.mocked(apiClient.fetchWithAuth).mockImplementation(async url => {
+      if (url === '/series-recorrencia') return [{ ...MOCK_SERIES[0], intervalo: 2 }]
+      return originalFetch(url)
+    })
+
+    render(<SeriesView />)
+    await screen.findByText('Reunião Semanal')
+    fireEvent.click(screen.getByText('Editar'))
+    await screen.findByRole('dialog', { name: 'Editar Série de Recorrência' })
+    await screen.findByRole('combobox', { name: 'Organizador (Membro)' })
+
+    fireEvent.change(screen.getByLabelText(/Horário Início \*/i), { target: { value: '19:00' } })
+    fireEvent.change(screen.getByLabelText(/Horário Fim \*/i), { target: { value: '20:00' } })
+    fireEvent.click(screen.getByText('Salvar Série'))
+    await screen.findByRole('dialog', { name: 'Confirmar Edição de Série' })
+    vi.mocked(apiClient.patchWithAuth).mockResolvedValueOnce({})
+    fireEvent.click(screen.getByText('Confirmar alterações'))
+
+    await waitFor(() => {
+      expect(apiClient.patchWithAuth).toHaveBeenCalledWith(
+        '/series-recorrencia/f47ac10b-58cc-4372-a567-0e02b2c3d479',
+        { updateMode: 'ALL', changes: { horarioInicio: '19:00', horarioFim: '20:00' } }
+      )
+    })
+  })
+
   it('deve oferecer cadastro rápido de Local e Espaço ao editar série presencial', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

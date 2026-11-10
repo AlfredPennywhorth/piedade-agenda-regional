@@ -260,6 +260,7 @@ export function SeriesView() {
       pauta: serie.pauta || '',
       modalidade: serie.modalidade,
       frequencia: serie.frequencia,
+      // O contrato do formulário só permite 1; não alterar intervalo legado em edições.
       intervalo: 1,
       dataInicio: serie.dataInicio,
       dataFim: serie.dataFim,
@@ -490,6 +491,9 @@ export function SeriesView() {
             const normalizar = (valor: unknown) => valor === '' || valor === undefined ? null : valor
             const changes = Object.fromEntries(
               Object.entries(data).filter(([campo, valor]) =>
+                // O intervalo não é editável neste formulário. Evita que a normalização
+                // para 1 modifique inadvertidamente a cadência de uma série legada.
+                campo !== 'intervalo' &&
                 normalizar(valor) !== normalizar(original[campo as keyof SerieRecorrencia])
               )
             ) as Partial<SerieCreateInput>
