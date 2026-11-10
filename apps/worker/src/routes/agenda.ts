@@ -195,7 +195,7 @@ async function buscarRegistrosAgenda(db: any, membroId: string): Promise<Registr
   // O SELECT principal já tem muitas colunas (evento, convocação, local etc.).
   // A coluna calculada foraDoPa excedia o limite de colunas do D1.
   // Buscar o PA atual da Casa em consulta separada, de apenas uma coluna.
-  const casaAtual = await db.select({ casaId: membros.casaId, ativo: membros.ativo, pontoAtendimentoId: casas.pontoAtendimentoId })
+  const casaAtual = await db.select({ casaId: membros.casaId, membroAtivo: membros.ativo, casaAtiva: casas.ativo, pontoAtendimentoId: casas.pontoAtendimentoId })
     .from(membros)
     .innerJoin(casas, eq(casas.id, membros.casaId))
     .where(eq(membros.id, membroId))
@@ -258,7 +258,7 @@ async function buscarRegistrosAgenda(db: any, membroId: string): Promise<Registr
   // Prévia estritamente pessoal ao autor/organizador da própria Casa:
   // não concede convocação, RSVP ou visibilidade a outros membros.
   // Se houver convocação publicada, apenas o fluxo de destinatários decide a agenda.
-  const emPreparacao = casaAtual?.ativo && casaAtual?.casaId
+  const emPreparacao = casaAtual?.membroAtivo && casaAtual?.casaAtiva && casaAtual?.casaId
     ? await db.select({ evento: eventos, local: locais, espaco: espacosLocal })
       .from(eventos)
       .leftJoin(locais, eq(eventos.localId, locais.id))
