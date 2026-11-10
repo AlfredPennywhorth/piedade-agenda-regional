@@ -527,9 +527,66 @@ describe('Eventos pessoais e segregação', () => {
       expect((await req(autor, `/eventos/${e.id}`, 'PATCH', { titulo: 'Autor preservado' })).status).toBe(200)
     }
   })
-  it('evento institucional não entra na agenda sem convocação publicada', async () => {
-    await evento({ casaId: casa }, { criadorMembroId: autor.id })
-    expect(await (await req(autor, '/minha-agenda')).json()).toEqual([])
+  it('488: autor vê evento territorial próprio em preparação sem convocação ou RSVP', async () => {
+    const id = await evento({ casaId: casa }, { criadorMembroId: autor.id })
+    const agendaAutor = (await (await req(autor, '/minha-agenda')).json()) as any[]
+    expect(agendaAutor).toHaveLength(1)
+    expect(agendaAutor[0]).toMatchObject({
+      evento: { id }, emPreparacao: true,
+      convocacao: null, destinatarioId: null, rsvp: null, checkin: null,
+    })
+    expect((await (await req(colega, '/minha-agenda')).json()) as any[]).toEqual([])
+    expect((await (await req(master, '/minha-agenda')).json()) as any[]).toEqual([])
+  })
+
+  it('488: prévia de série própria não equivale a convocação e desaparece para não destinatário após publicação', async () => {
+    const criado = await req(autor, '/series-recorrencia', 'POST', {
+      titulo: 'Ensaio da Casa', modalidade: 'ONLINE', urlOnline: 'https://example.org',
+      casaId: casa, dataInicio: '2099-10-10', dataFim: '2099-10-11',
+      horarioInicio: '09:00', horarioFim: '10:00', frequencia: 'DIARIA', intervalo: 1,
+    })
+    expect(criado.status).toBe(201)
+    const { serie } = await criado.json() as any
+    const ocorrencias = sqlite.prepare('SELECT id FROM eventos WHERE serie_recorrencia_id = ?').all(serie.id) as Array<{ id: string }>
+    expect(ocorrencias).toHaveLength(2)
+    const antes = (await (await req(autor, '/minha-agenda')).json()) as any[]
+    expect(antes.map(item => item.evento.id).sort()).toEqual(ocorrencias.map(e => e.id).sort())
+    expect(antes.every(item => item.emPreparacao === true && item.destinatarioId === null)).toBe(true)
+    expect(await (await req(colega, '/minha-agenda')).json()).toEqual([])
+
+    const convocacaoId = uuid()
+    await db.insert(s.convocacoes).values({ id: convocacaoId, eventoId: ocorrencias[0].id, status: 'RASCUNHO' })
+    const comRascunho = (await (await req(autor, '/minha-agenda')).json()) as any[]
+    expect(comRascunho.find(item => item.evento.id === ocorrencias[0].id)).toMatchObject({
+      emPreparacao: true, convocacao: null, destinatarioId: null, rsvp: null,
+    })
+
+    await db.insert(s.convocacaoDestinatarios).values({ id: uuid(), convocacaoId, membroId: colega.id })
+    await db.update(s.convocacoes).set({ status: 'PUBLICADA', publicadaEm: new Date().toISOString() })
+      .where(eq(s.convocacoes.id, convocacaoId))
+    const aposAutor = (await (await req(autor, '/minha-agenda')).json()) as any[]
+    expect(aposAutor.map(item => item.evento.id)).not.toContain(ocorrencias[0].id)
+    expect(aposAutor).toHaveLength(1)
+    const aposColega = (await (await req(colega, '/minha-agenda')).json()) as any[]
+    expect(aposColega).toHaveLength(1)
+    expect(aposColega[0]).toMatchObject({
+      evento: { id: ocorrencias[0].id }, emPreparacao: false,
+      convocacao: { id: convocacaoId }, rsvp: null,
+    })
+    expect(aposColega[0].destinatarioId).not.toBeNull()
+  })
+
+  it('488: prévia não expõe eventos de outra Casa, nem eventos externos', async () => {
+    const outraCasa = await usuario(irma)
+    await evento({ casaId: irma }, { criadorMembroId: autor.id })
+    await evento({ casaId: casa }, {
+      criadorMembroId: autor.id,
+      abrangencia: 'NACIONAL', regionalGestaoId: reg,
+      destinoUf: 'RJ', destinoCidadeLocal: 'Rio de Janeiro',
+    })
+    const agenda = (await (await req(autor, '/minha-agenda')).json()) as any[]
+    expect(agenda).toEqual([])
+    expect(await (await req(outraCasa, '/minha-agenda')).json()).toEqual([])
   })
   it('pessoal só é acessível ao autor e Master, inclusive recursos auxiliares', async () => {
     const id = await evento(
