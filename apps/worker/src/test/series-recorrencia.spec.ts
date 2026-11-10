@@ -1011,7 +1011,138 @@ describe('Series Recorrencia API (S05)', () => {
     const futuro = db.select().from(eventos).where(eq(eventos.id, anteriores[2].id)).get()
     expect(historico.inicioEm).toBe('2020-10-01T12:00:00.000Z')
     expect(inativo.inicioEm).toBe(anteriores[1].inicioEm)
-    expect(futuro.inicioEm).toBe(createUtcDateFromSaoPaulo('2099-10-03', '13:00'))
+    expect(futuro.inicioEm).toBe('2099-10-03T16:00:00.000Z')
+  })
+
+  it('487: ALL de horário repetido é idempotente e não renova avisos', async () => {
+    const regionalId = await createRegional()
+    const criado = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2099-11-01', dataFim: '2099-11-02' }),
+    })
+    const { serie } = await criado.json()
+    const payload = {
+      updateMode: 'ALL',
+      changes: { horarioInicio: '11:00', horarioFim: '12:00' },
+    }
+    const primeiro = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    expect(primeiro.status).toBe(200)
+    expect((await primeiro.json()).ocorrenciasAtualizadas).toBe(2)
+    const antes = db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serie.id)).all()
+      .map((evento: any) => ({ id: evento.id, revisao: evento.agendaRevisao, aviso: evento.agendaAviso }))
+
+    const segundo = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    expect(segundo.status).toBe(200)
+    expect(await segundo.json()).toMatchObject({
+      ocorrenciasAtualizadas: 0,
+      reconfirmacaoSolicitada: false,
+    })
+    const depois = db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serie.id)).all()
+      .map((evento: any) => ({ id: evento.id, revisao: evento.agendaRevisao, aviso: evento.agendaAviso }))
+    expect(depois).toEqual(antes)
+  })
+
+  it('487: ALL com horário final inválido retorna 400 e preserva série e eventos', async () => {
+    const regionalId = await createRegional()
+    const criado = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2099-11-04', dataFim: '2099-11-05' }),
+    })
+    const { serie } = await criado.json()
+    const antes = db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serie.id)).all()
+    const resposta = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updateMode: 'ALL', changes: { horarioInicio: '15:00', horarioFim: '14:00' } }),
+    })
+    expect(resposta.status).toBe(400)
+    const depois = db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serie.id)).all()
+    expect(depois).toEqual(antes)
+    expect(db.select().from(seriesRecorrencia).where(eq(seriesRecorrencia.id, serie.id)).get().horarioInicio)
+      .toBe(basePayload.horarioInicio)
+  })
+
+  it('487: ALL não move reunião ainda futura para início já passado', async () => {
+    const regionalId = await createRegional()
+    const hojeLocal = getLocalDateFromUtc(new Date().toISOString())
+    const criado = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2099-11-06', dataFim: '2099-11-07' }),
+    })
+    const { serie } = await criado.json()
+    const futuro = db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serie.id)).all()[0]
+    // Monta uma ocorrência de hoje para o cenário, garantindo início original futuro,
+    // sem depender da hora em que o workflow GitHub Actions execute o teste.
+    const amanha = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const agora = new Date()
+    const inicioOriginal = new Date(agora.getTime() + 60 * 60 * 1000).toISOString()
+    const fimOriginal = new Date(agora.getTime() + 2 * 60 * 60 * 1000).toISOString()
+    const novaDataLocal = getLocalDateFromUtc(inicioOriginal)
+    db.update(eventos).set({
+      inicioEm: inicioOriginal,
+      fimEm: fimOriginal,
+      recorrenciaOrigemInicioEm: inicioOriginal,
+    }).where(eq(eventos.id, futuro.id)).run()
+    const inicioDia = createUtcDateFromSaoPaulo(novaDataLocal, '00:00')
+    // Se o início original caiu no dia seguinte, 00:00 ainda pode ser futuro;
+    // nesse caso a data local escolhida é o dia anterior, via hora fixa do passado.
+    const inicioPassado = new Date(inicioDia).getTime() <= Date.now()
+    if (!inicioPassado) {
+      db.update(eventos).set({
+        inicioEm: amanha,
+        fimEm: new Date(Date.parse(amanha) + 3600000).toISOString(),
+      }).where(eq(eventos.id, futuro.id)).run()
+    }
+    const antes = db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serie.id)).all()
+    const resposta = await req(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updateMode: 'ALL', changes: { horarioInicio: '00:00', horarioFim: '01:00' } }),
+    })
+    // O cenário só é aplicável quando o novo horário resulta no passado.
+    if (inicioPassado) {
+      expect(resposta.status).toBe(409)
+      expect(await resposta.json()).toMatchObject({ code: 'HORARIO_REAGENDADO_PASSADO' })
+      expect(db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serie.id)).all()).toEqual(antes)
+    }
+  })
+
+  it('487: ator sem acesso ao escopo não altera horário da série', async () => {
+    const regionalId = await createRegional()
+    const criado = await req('/api/v1/series-recorrencia', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...basePayload, regionalId, dataInicio: '2099-11-08', dataFim: '2099-11-09' }),
+    })
+    const { serie } = await criado.json()
+    const anteriores = db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serie.id)).all()
+    const outroId = crypto.randomUUID()
+    await db.insert(membros).values({ id: outroId, nome: 'Visitante sem escopo', ativo: true, autenticacaoAtiva: true })
+    const outroToken = crypto.randomUUID()
+    await db.insert(sessoes).values({
+      id: crypto.randomUUID(),
+      membroId: outroId,
+      tokenHash: await hashToken(outroToken),
+      expiraEm: new Date(Date.now() + 86400000).toISOString(),
+      createdAt: new Date().toISOString(),
+    })
+    const resposta = await app.request(`/api/v1/series-recorrencia/${serie.id}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${outroToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ updateMode: 'ALL', changes: { horarioInicio: '12:00', horarioFim: '13:00' } }),
+    })
+    expect(resposta.status).toBe(403)
+    expect(db.select().from(eventos).where(eq(eventos.serieRecorrenciaId, serie.id)).all()).toEqual(anteriores)
   })
 
   it('24.5 ALL rejeita regeneração quando ocorrência futura possui convocação ativa', async () => {
