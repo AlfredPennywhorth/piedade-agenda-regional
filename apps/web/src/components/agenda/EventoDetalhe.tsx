@@ -233,7 +233,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
   const isPresentialOrHybrid = item.evento.modalidade === 'PRESENCIAL' || item.evento.modalidade === 'HIBRIDO'
 
   const handleShareWhatsApp = () => {
-    const texto = `*[Agenda Regional]* ${item.evento.titulo}\nData: ${dateStr} às ${timeInicio}${destinoExterno ? `\nDestino: ${destinoExterno}` : item.local?.nome ? `\nLocal: ${item.local.nome}` : ''}${item.espaco?.nome ? `\nEspaço: ${item.espaco.nome}` : ''}\n\nAcesse a agenda para confirmar sua presença.`
+    const texto = `*[Agenda Regional]* ${item.evento.titulo}\nData: ${dateStr} às ${timeInicio}${destinoExterno ? `\nDestino: ${destinoExterno}` : item.local?.nome ? `\nLocal: ${item.local.nome}` : ''}${item.espaco?.nome ? `\nEspaço: ${item.espaco.nome}` : ''}\n\n${item.emPreparacao ? 'Evento em preparação, ainda sem convocação publicada. Esta informação não constitui convite nem permite confirmar presença.' : 'Acesse a agenda para confirmar sua presença.'}`
     const url = `https://wa.me/?text=${encodeURIComponent(texto)}`
     window.open(url, '_blank', 'noopener,noreferrer')
   }
