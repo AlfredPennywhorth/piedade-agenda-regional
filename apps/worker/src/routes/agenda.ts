@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { eq, and, asc, inArray, or, isNotNull } from 'drizzle-orm'
+import { eq, and, asc, inArray, or, isNotNull, sql } from 'drizzle-orm'
 import {
   eventos,
   membros,
@@ -89,6 +89,7 @@ type RegistroAgenda = {
   checkin: any
   participacao?: { status: string; membroId: string } | null
   foraDoPa?: number
+  emPreparacao?: boolean
 }
 
 function tipoConflito(a: RegistroAgenda, b: RegistroAgenda): 'SOBREPOSICAO' | 'PROXIMIDADE' | null {
@@ -119,7 +120,8 @@ function montarMapaConflitos(records: RegistroAgenda[]) {
   const ativos = records.filter(record =>
     record.rsvp?.resposta !== 'NAO_PARTICIPAREI' &&
     record.participacao?.status !== 'RECUSADO' &&
-    !record.foraDoPa
+    !record.foraDoPa &&
+    !record.emPreparacao
   )
   const mapa = new Map<string, Array<{ eventoId: string; tipo: 'SOBREPOSICAO' | 'PROXIMIDADE' }>>()
 
@@ -193,7 +195,7 @@ async function buscarRegistrosAgenda(db: any, membroId: string): Promise<Registr
   // O SELECT principal já tem muitas colunas (evento, convocação, local etc.).
   // A coluna calculada foraDoPa excedia o limite de colunas do D1.
   // Buscar o PA atual da Casa em consulta separada, de apenas uma coluna.
-  const casaAtual = await db.select({ pontoAtendimentoId: casas.pontoAtendimentoId })
+  const casaAtual = await db.select({ casaId: membros.casaId, membroAtivo: membros.ativo, casaAtiva: casas.ativo, pontoAtendimentoId: casas.pontoAtendimentoId })
     .from(membros)
     .innerJoin(casas, eq(casas.id, membros.casaId))
     .where(eq(membros.id, membroId))
@@ -253,6 +255,26 @@ async function buscarRegistrosAgenda(db: any, membroId: string): Promise<Registr
     .leftJoin(espacosLocal, eq(eventos.espacoId, espacosLocal.id))
     .where(and(eq(eventos.pessoal, true), eq(eventos.criadorMembroId, membroId), eq(eventos.ativo, true)))
     .all()
+  // Prévia estritamente pessoal ao autor/organizador da própria Casa:
+  // não concede convocação, RSVP ou visibilidade a outros membros.
+  // Se houver convocação publicada, apenas o fluxo de destinatários decide a agenda.
+  const emPreparacao = casaAtual?.membroAtivo && casaAtual?.casaAtiva && casaAtual?.casaId
+    ? await db.select({ evento: eventos, local: locais, espaco: espacosLocal })
+      .from(eventos)
+      .leftJoin(locais, eq(eventos.localId, locais.id))
+      .leftJoin(espacosLocal, eq(eventos.espacoId, espacosLocal.id))
+      .where(and(
+        eq(eventos.ativo, true),
+        eq(eventos.pessoal, false),
+        eq(eventos.abrangencia, 'TERRITORIAL'),
+        eq(eventos.casaId, casaAtual.casaId),
+        or(eq(eventos.criadorMembroId, membroId), eq(eventos.organizadorMembroId, membroId)),
+        sql`NOT EXISTS (
+          SELECT 1 FROM convocacoes cp
+          WHERE cp.evento_id = ${eventos.id} AND cp.status = 'PUBLICADA' AND cp.ativo = 1
+        )`,
+      )).all()
+    : []
   const participacoesExternas = await db.select({
     evento: eventos, local: locais, espaco: espacosLocal,
     participacao: eventosParticipantesExternos,
@@ -263,7 +285,10 @@ async function buscarRegistrosAgenda(db: any, membroId: string): Promise<Registr
     .leftJoin(espacosLocal, eq(eventos.espacoId, espacosLocal.id))
     .where(and(eq(eventosParticipantesExternos.membroId, membroId), eq(eventos.ativo, true), inArray(eventos.abrangencia, ['NACIONAL', 'INTERNACIONAL'])))
     .all()
-  const registros = [...convocados, ...pessoais.map((record: any) => ({
+  const registros = [...convocados, ...emPreparacao.map((record: any) => ({
+    ...record, convocacao: null, destinatario: null, rsvp: null, checkin: null,
+    emPreparacao: true,
+  })), ...pessoais.map((record: any) => ({
     ...record, convocacao: null, destinatario: null, rsvp: null, checkin: null,
   })), ...participacoesExternas.map((record: any) => ({
     ...record, convocacao: null, destinatario: null,
@@ -388,6 +413,7 @@ agendaRouter.get('/', async (c) => {
           refeicoesOferecidas: eventoMeals,
         },
         convocacao: record.convocacao,
+        emPreparacao: record.emPreparacao === true,
         local: record.local,
         espaco: record.espaco,
         destinatarioId: record.destinatario?.id ?? null,
