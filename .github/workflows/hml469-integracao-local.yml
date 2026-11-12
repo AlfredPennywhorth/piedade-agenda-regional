@@ -1,0 +1,92 @@
+name: HML469 — integração efêmera sem Cloudflare
+
+on:
+  pull_request:
+    branches: [develop]
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/hml469-integracao-local.yml'
+      - 'docs/09-homologacao/hml469-release-isolada-plano.md'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: hml469-local-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  integracao-local:
+    name: Testes da release #469 (sem deploy)
+    if: ${{ github.event.pull_request.number == 471 }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      RELEASE_SHA: 49eedc3e40133dee9bdc4e6295a4e2acc619c2fa
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Verificar PR #469 e SHA imutável
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_sha="$(gh api repos/${{ github.repository }}/pulls/469 --jq '.head.sha')"
+          test "$head_sha" = "$RELEASE_SHA" || {
+            echo "::error::A PR #469 mudou de SHA. Atualizar plano e revisar antes dos testes."
+            exit 1
+          }
+          echo "Release #469 fixada em $head_sha"
+
+      - name: Checkout somente do candidato da PR #469
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          persist-credentials: false
+
+      - name: Conferir o commit em execução
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          echo "SHA testado: $RELEASE_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "Runner temporário; nenhuma Cloudflare API/token/secret utilizado." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Instalar dependências em runner efêmero
+        run: pnpm install --frozen-lockfile
+
+      - name: Testes de integração PA, agenda, eventos e Portaria
+        run: |
+          pnpm --filter @piedade/worker exec vitest run \
+            src/test/membros.spec.ts \
+            src/test/agenda.spec.ts \
+            src/test/eventos.spec.ts \
+            src/test/portaria-operador-temporario.spec.ts
+
+      - name: Regressão Web e controle de acesso
+        run: pnpm --filter @piedade/web test
+
+      - name: Typecheck e builds locais sem deploy
+        run: |
+          pnpm typecheck
+          pnpm build
+
+      - name: Escopo e limitações
+        if: always()
+        run: |
+          {
+            echo "### HML469 — integração local"
+            echo "- Candidato: \`$RELEASE_SHA\`"
+            echo "- Runner descartável; testes em memória/locais; sem Worker/Pages/D1 Cloudflare"
+            echo "- Nenhum deploy, migration remota ou alteração em Beta/Produção"
+            echo "- Não substitui smoke Cloudflare real, teste de CORS real ou aprovação de release"
+          } >> "$GITHUB_STEP_SUMMARY"
