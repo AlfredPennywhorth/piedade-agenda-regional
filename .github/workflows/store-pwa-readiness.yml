@@ -1,0 +1,79 @@
+name: Microsoft Store PWA — prontidão local (sem publicação)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [develop]
+    paths:
+      - '.github/workflows/store-pwa-readiness.yml'
+      - 'docs/09-homologacao/microsoft-store-pwa-publicacao-automacao.md'
+      - 'apps/web/vite.config.ts'
+      - 'apps/web/public/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: store-pwa-readiness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prontidao:
+    name: Build e inspecionar manifesto PWA (offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+      - name: Build local para inspecionar PWA (não publicar)
+        env:
+          VITE_APP_ENV: production
+          VITE_API_URL: https://example.invalid/api/v1
+          VITE_APP_VERSION: readiness-only
+          VITE_BUILD_SHA: ${{ github.sha }}
+        run: pnpm --filter @piedade/web build
+      - name: Conferir manifesto, identidade e ícones
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync, existsSync, appendFileSync } from 'node:fs'
+          import { resolve, join } from 'node:path'
+          const dist = resolve('apps/web/dist')
+          const manifestPath = join(dist, 'manifest.webmanifest')
+          if (!existsSync(manifestPath)) throw new Error('manifest.webmanifest ausente no build')
+          const m = JSON.parse(readFileSync(manifestPath, 'utf8'))
+          if (m.name !== 'Agenda Regional São Paulo') throw new Error('Nome inesperado no PWA de produção: ' + m.name)
+          if (m.display !== 'standalone') throw new Error('display standalone ausente')
+          if (!Array.isArray(m.icons) || !m.icons.some(i => i.sizes === '192x192') || !m.icons.some(i => i.sizes === '512x512')) {
+            throw new Error('Ícones PWA 192/512 ausentes')
+          }
+          for (const icon of m.icons) {
+            const local = String(icon.src || '').replace(/^\//, '')
+            if (!local || local.includes('..') || !existsSync(join(dist, local))) throw new Error('Ícone ausente no build: ' + icon.src)
+          }
+          const warnings = []
+          if (!m.id) warnings.push('Manifest sem id explícito — avaliar identidade estável antes do pacote Windows')
+          if (!m.start_url) warnings.push('Manifest sem start_url explícita — avaliar no PWABuilder')
+          if (!m.scope) warnings.push('Manifest sem scope explícito — avaliar no PWABuilder')
+          const summary = [
+            '### PWA Windows — verificação de prontidão, não publicação',
+            '- SHA inspecionado: `' + process.env.GITHUB_SHA + '`',
+            '- Manifesto: `' + m.name + '`',
+            '- Display: `' + m.display + '`',
+            '- Ícones 192x192 e 512x512: presentes',
+            '- Nenhuma operação Microsoft Store / Cloudflare realizada',
+            '- **Não equivale a certificação PWABuilder ou Partner Center**',
+            ...warnings.map(x => '- Atenção: ' + x),
+          ].join('\n') + '\n'
+          console.log(summary)
+          if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary)
+          NODE
