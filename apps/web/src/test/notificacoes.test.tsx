@@ -136,6 +136,7 @@ describe('S10 - Compartilhamento WhatsApp e Segurança SW', () => {
   })
 
   it('wa.me possui link com texto codificado e sem dados sensíveis', () => {
+    vi.mocked(apiClient.fetchWithAuth).mockResolvedValue([])
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
     
     const mockItem: AgendaItem = {

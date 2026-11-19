@@ -11,6 +11,7 @@ import {
   setores,
   administracoes,
   regionais,
+  gruposTrabalho,
   membros,
   funcoes,
   rsvp,
@@ -81,8 +82,27 @@ convocacoesRouter.get('/', async c => {
     .innerJoin(eventos, eq(convocacoes.eventoId, eventos.id))
     .where(condicao)
     .all()
+
+  const ids: string[] = data.map((item: any) => item.convocacao.id)
+  const funcoesPorConvocacao = new Map<string, string[]>()
+  for (const lote of emLotes(ids, 80)) {
+    const vinculadas = await db.select({
+      convocacaoId: convocacaoFuncoes.convocacaoId,
+      nome: funcoes.nome,
+    }).from(convocacaoFuncoes)
+      .innerJoin(funcoes, eq(funcoes.id, convocacaoFuncoes.funcaoId))
+      .where(inArray(convocacaoFuncoes.convocacaoId, lote))
+      .all()
+    for (const vinculada of vinculadas) {
+      const nomes = funcoesPorConvocacao.get(vinculada.convocacaoId) ?? []
+      nomes.push(vinculada.nome)
+      funcoesPorConvocacao.set(vinculada.convocacaoId, nomes)
+    }
+  }
   return c.json(data.map((item: any) => ({
-    ...item.convocacao, possuiFuncaoDco: Boolean(item.possuiFuncaoDco),
+    ...item.convocacao,
+    possuiFuncaoDco: Boolean(item.possuiFuncaoDco),
+    funcoesConvocadas: funcoesPorConvocacao.get(item.convocacao.id) ?? [],
   })))
 })
 
@@ -286,8 +306,15 @@ convocacoesRouter.get('/:id/funcoes', async c => {
   }
 
   const data = await db
-    .select()
+    .select({
+      id: convocacaoFuncoes.id,
+      convocacaoId: convocacaoFuncoes.convocacaoId,
+      funcaoId: convocacaoFuncoes.funcaoId,
+      funcaoNome: funcoes.nome,
+      createdAt: convocacaoFuncoes.createdAt,
+    })
     .from(convocacaoFuncoes)
+    .innerJoin(funcoes, eq(funcoes.id, convocacaoFuncoes.funcaoId))
     .where(eq(convocacaoFuncoes.convocacaoId, id))
     .all()
   return c.json(data)
@@ -493,7 +520,22 @@ convocacoesRouter.post('/:id/publicar', async c => {
     conditions.push(or(eq(vinculosFuncionais.regionalId, evento.regionalId),
       and(vinculoDco, inArray(vinculosFuncionais.casaId, casasDaRegional)))!)
   } else if (evento.grupoTrabalhoId) {
-    conditions.push(eq(vinculosFuncionais.grupoTrabalhoId, evento.grupoTrabalhoId))
+    const grupo = await db.select({
+      regionalId: gruposTrabalho.regionalId,
+      administracaoId: gruposTrabalho.administracaoId,
+      setorId: gruposTrabalho.setorId,
+    }).from(gruposTrabalho).where(and(
+      eq(gruposTrabalho.id, evento.grupoTrabalhoId),
+      eq(gruposTrabalho.ativo, true),
+    )).get()
+
+    if (!grupo) return c.json({ error: 'Grupo de Trabalho não encontrado ou inativo' }, 400)
+
+    const escoposCompativeis = [eq(vinculosFuncionais.grupoTrabalhoId, evento.grupoTrabalhoId)]
+    if (grupo.regionalId) escoposCompativeis.push(eq(vinculosFuncionais.regionalId, grupo.regionalId))
+    if (grupo.administracaoId) escoposCompativeis.push(eq(vinculosFuncionais.administracaoId, grupo.administracaoId))
+    if (grupo.setorId) escoposCompativeis.push(eq(vinculosFuncionais.setorId, grupo.setorId))
+    conditions.push(or(...escoposCompativeis)!)
   }
 
   // Realiza query juntando vinculosFuncionais e membros

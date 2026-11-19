@@ -98,6 +98,7 @@ const mockConvocacoes = [
     eventoId: EVENTO_ID,
     status: 'PUBLICADA',
     observacoes: 'Convocação publicada',
+    funcoesConvocadas: ['Membro de Grupo de Trabalho', 'Coordenação da Regional'],
     ativo: true,
     createdAt: '2026-09-16T10:00:00.000Z',
     updatedAt: '2026-09-16T10:00:00.000Z'
@@ -122,6 +123,7 @@ describe('ConvocacoesView', () => {
       expect(screen.getAllByText('Reunião Presencial Teste').length).toBeGreaterThan(0)
       expect(screen.getByText('Minha observação rascunho')).toBeInTheDocument()
       expect(screen.getByText('Convocação publicada')).toBeInTheDocument()
+      expect(screen.getByText(/Membro de Grupo de Trabalho, Coordenação da Regional/)).toBeInTheDocument()
     })
   })
 

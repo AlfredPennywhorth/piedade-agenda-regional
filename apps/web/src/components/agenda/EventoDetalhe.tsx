@@ -46,6 +46,7 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
   
   const [isLoadingRsvp, setIsLoadingRsvp] = useState(false)
   const [rsvpError, setRsvpError] = useState('')
+  const [funcoesConvocadas, setFuncoesConvocadas] = useState<string[]>([])
   const [convidadosConvocacao, setConvidadosConvocacao] = useState<Array<{
     destinatarioId: string
     membroId: string
@@ -107,6 +108,22 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
     return () => {
       ativo = false
     }
+  }, [item.convocacao?.id])
+
+  useEffect(() => {
+    if (!item.convocacao) {
+      setFuncoesConvocadas([])
+      return
+    }
+    let ativo = true
+    apiClient.fetchWithAuth<Array<{ funcaoNome?: string }>>(`/convocacoes/${item.convocacao.id}/funcoes`)
+      .then(itens => {
+        if (ativo) setFuncoesConvocadas(itens.map(item => item.funcaoNome).filter((nome): nome is string => !!nome))
+      })
+      .catch(() => {
+        if (ativo) setFuncoesConvocadas([])
+      })
+    return () => { ativo = false }
   }, [item.convocacao?.id])
 
   const handleClose = () => {
@@ -498,6 +515,13 @@ export function EventoDetalhe({ item, onClose, onRsvpUpdated, onExternalResponse
           <div className="border-t border-slate-100 pt-4">
             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Vínculo da convocação</h3>
             <p className="font-medium text-slate-900">{item.vinculo.funcaoNome}</p>
+          </div>
+        )}
+
+        {funcoesConvocadas.length > 0 && (
+          <div className="border-t border-slate-100 pt-4">
+            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2">Funções convocadas</h3>
+            <p className="font-medium text-slate-900">{funcoesConvocadas.join(', ')}</p>
           </div>
         )}
 

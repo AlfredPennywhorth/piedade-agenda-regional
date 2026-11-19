@@ -22,6 +22,7 @@ import {
 } from '../db/schema'
 import { and, eq } from 'drizzle-orm'
 import { hashToken } from '../security/tokens'
+import { prepararSincronizacaoConvocacoes } from '../routes/vinculos_funcionais'
 
 describe('S06 - Convocações', () => {
   let sqlite: Database.Database
@@ -188,6 +189,68 @@ describe('S06 - Convocações', () => {
     expect(log?.atorMembroId).toBe(ctx.mem1Id)
     expect(log?.escopoTipo).toBe('SETOR')
     expect(log?.escopoId).toBe(ctx.setId)
+  })
+
+  it('1a. reunião de GT convoca funções do próprio GT e do escopo institucional do grupo', async () => {
+    const ctx = await setupBaseData()
+    const conta = sqlite.prepare('SELECT id FROM contas_acesso WHERE membro_id = ?').get(ctx.mem1Id) as { id: string }
+    sqlite.prepare(
+      "INSERT INTO acessos_conta (id, conta_acesso_id, perfil_codigo, escopo_tipo, escopo_id) VALUES (?, ?, 'GESTOR_AGENDA', 'GRUPO_TRABALHO', ?)"
+    ).run(crypto.randomUUID(), conta.id, ctx.gtId)
+
+    const membroGtId = crypto.randomUUID()
+    const coordenadorRegionalId = crypto.randomUUID()
+    await db.insert(membros).values([
+      { id: membroGtId, nome: 'Membro do GT', casaId: ctx.casId, ativo: true },
+      { id: coordenadorRegionalId, nome: 'Coordenador Regional', casaId: ctx.casId, ativo: true },
+    ])
+    await db.insert(vinculosFuncionais).values([
+      { id: crypto.randomUUID(), membroId: membroGtId, funcaoId: ctx.f1Id, grupoTrabalhoId: ctx.gtId, ativo: true },
+      { id: crypto.randomUUID(), membroId: coordenadorRegionalId, funcaoId: ctx.f2Id, regionalId: ctx.regId, ativo: true },
+    ])
+
+    const eventoId = crypto.randomUUID()
+    await db.insert(eventos).values({
+      id: eventoId,
+      titulo: 'Reunião do GT com convidados funcionais',
+      modalidade: 'ONLINE',
+      inicioEm: '2028-06-01T19:00:00.000Z',
+      fimEm: '2028-06-01T20:00:00.000Z',
+      grupoTrabalhoId: ctx.gtId,
+      ativo: true,
+    })
+
+    const criada = await app.request('/api/v1/convocacoes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventoId }),
+    })
+    expect(criada.status).toBe(201)
+    const { id: convocacaoId } = await criada.json()
+    for (const funcaoId of [ctx.f1Id, ctx.f2Id]) {
+      expect((await app.request(`/api/v1/convocacoes/${convocacaoId}/funcoes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ funcaoId }),
+      })).status).toBe(201)
+    }
+    expect((await app.request(`/api/v1/convocacoes/${convocacaoId}/publicar`, { method: 'POST' })).status).toBe(200)
+
+    const destinatarios = await (await app.request(`/api/v1/convocacoes/${convocacaoId}/destinatarios`)).json() as Array<{ membroId: string }>
+    expect(destinatarios.map(item => item.membroId)).toEqual(expect.arrayContaining([
+      membroGtId,
+      coordenadorRegionalId,
+    ]))
+
+    const novoCoordenadorId = crypto.randomUUID()
+    await db.insert(membros).values({ id: novoCoordenadorId, nome: 'Novo Coordenador', casaId: ctx.casId, ativo: true })
+    const novoVinculo = {
+      id: crypto.randomUUID(), membroId: novoCoordenadorId, funcaoId: ctx.f2Id,
+      regionalId: ctx.regId, administracaoId: null, setorId: null, casaId: null,
+      grupoTrabalhoId: null, ativo: true,
+    }
+    const sincronizacoes = await prepararSincronizacaoConvocacoes(db, novoVinculo)
+    expect(sincronizacoes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ convocacaoId, destinatarioNovo: true }),
+    ]))
   })
 
   it('1.0.1 impede segunda convocação para o mesmo evento', async () => {
