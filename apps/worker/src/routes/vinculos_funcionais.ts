@@ -102,7 +102,9 @@ function escopoDoVinculo(vinculo: any): {
 function eventoCorrespondeAoVinculo(evento: any, vinculo: any, hierarquiaDco: {
   casaId: string; pontoAtendimentoId: string | null; setorId: string; administracaoId: string; regionalId: string
   casaAtiva: boolean; setorAtivo: boolean; administracaoAtiva: boolean; regionalAtiva: boolean
-} | null, dcoAutomatico: boolean): boolean {
+} | null, dcoAutomatico: boolean, escopoGrupo: {
+  regionalId: string | null; administracaoId: string | null; setorId: string | null
+} | null = null): boolean {
   // Apenas o DCO automático segue a hierarquia da Casa, respeitando os níveis ativos.
   // O evento de Setor não exige Administração ativa; o de Casa exige Casa ativa.
   if (dcoAutomatico) {
@@ -122,11 +124,18 @@ function eventoCorrespondeAoVinculo(evento: any, vinculo: any, hierarquiaDco: {
       && evento.regionalId === hierarquiaDco.regionalId
     return false
   }
+  if (evento.grupoTrabalhoId) {
+    if (vinculo.grupoTrabalhoId) return evento.grupoTrabalhoId === vinculo.grupoTrabalhoId
+    if (vinculo.regionalId) return escopoGrupo?.regionalId === vinculo.regionalId
+    if (vinculo.administracaoId) return escopoGrupo?.administracaoId === vinculo.administracaoId
+    if (vinculo.setorId) return escopoGrupo?.setorId === vinculo.setorId
+    return false
+  }
   if (vinculo.regionalId) return evento.regionalId === vinculo.regionalId
   if (vinculo.administracaoId) return evento.administracaoId === vinculo.administracaoId
   if (vinculo.setorId) return evento.setorId === vinculo.setorId
   if (vinculo.casaId) return evento.casaId === vinculo.casaId
-  if (vinculo.grupoTrabalhoId) return evento.grupoTrabalhoId === vinculo.grupoTrabalhoId
+  if (vinculo.grupoTrabalhoId) return false
   return false
 }
 
@@ -205,8 +214,27 @@ export async function prepararSincronizacaoConvocacoes(db: any, vinculo: any, as
     .all()
 
   const resultado: SincronizacaoConvocacao[] = []
+  const escoposGrupos = new Map<string, {
+    regionalId: string | null; administracaoId: string | null; setorId: string | null
+  } | null>()
   for (const candidata of candidatas) {
-    if (!eventoCorrespondeAoVinculo(candidata.evento, vinculo, hierarquiaDco, !!dcoAutomatico)) continue
+    let escopoGrupo = null
+    if (candidata.evento.grupoTrabalhoId) {
+      const grupoId = candidata.evento.grupoTrabalhoId
+      if (!escoposGrupos.has(grupoId)) {
+        const grupo = await db.select({
+          regionalId: gruposTrabalho.regionalId,
+          administracaoId: gruposTrabalho.administracaoId,
+          setorId: gruposTrabalho.setorId,
+        }).from(gruposTrabalho).where(and(
+          eq(gruposTrabalho.id, grupoId),
+          eq(gruposTrabalho.ativo, true),
+        )).get()
+        escoposGrupos.set(grupoId, grupo ?? null)
+      }
+      escopoGrupo = escoposGrupos.get(grupoId) ?? null
+    }
+    if (!eventoCorrespondeAoVinculo(candidata.evento, vinculo, hierarquiaDco, !!dcoAutomatico, escopoGrupo)) continue
 
     const existente = await db
       .select({ id: convocacaoDestinatarios.id })

@@ -16,6 +16,7 @@ interface ConvocacaoFuncao {
   convocacaoId: string
   funcaoId: string
   createdAt: string
+  funcaoNome?: string
 }
 
 interface ConvocacaoFuncoesModalProps {
@@ -214,7 +215,7 @@ export function ConvocacaoFuncoesModal({ convocacaoId, onClose, returnFocusRef }
                     {funcoesVinculadas.map((vinculo) => (
                       <li key={vinculo.id} className="flex min-w-0 items-center justify-between gap-2 bg-white p-3 hover:bg-slate-50">
                         <span className="min-w-0 break-words text-sm font-medium text-slate-800">
-                          {getNomeFuncao(vinculo.funcaoId)}
+                          {vinculo.funcaoNome || getNomeFuncao(vinculo.funcaoId)}
                         </span>
                         <button
                           onClick={() => handleRemover(vinculo.funcaoId)}

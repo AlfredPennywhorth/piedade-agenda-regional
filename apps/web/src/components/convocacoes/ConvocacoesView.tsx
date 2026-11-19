@@ -31,7 +31,7 @@ interface GrupoTrabalhoLookup {
   administracaoId?: string | null
   setorId?: string | null
 }
-type ConvocacaoComDco = Convocacao & { possuiFuncaoDco?: boolean }
+type ConvocacaoComDco = Convocacao & { possuiFuncaoDco?: boolean; funcoesConvocadas?: string[] }
 type FiltroStatus = 'ATIVAS' | 'RASCUNHO' | 'PUBLICADA' | 'CANCELADA' | 'TODAS'
 
 export function ConvocacoesView({
@@ -628,6 +628,11 @@ export function ConvocacoesView({
                   <p className="text-sm text-slate-500">
                     Status: <span className="font-medium text-slate-700">{conv.status}</span>
                   </p>
+                  {conv.funcoesConvocadas && conv.funcoesConvocadas.length > 0 && (
+                    <p className="mt-1 text-sm text-slate-600">
+                      <span className="font-medium">Funções convocadas:</span> {conv.funcoesConvocadas.join(', ')}
+                    </p>
+                  )}
                   {conv.observacoes && (
                     <p className="text-sm text-slate-600 mt-1 line-clamp-2">{conv.observacoes}</p>
                   )}

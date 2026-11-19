@@ -169,6 +169,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
 
   // Modal Details
   const [eventoDetalhe, setEventoDetalhe] = useState<Evento | null>(null)
+  const [funcoesConvocadasDetalhe, setFuncoesConvocadasDetalhe] = useState<string[]>([])
   const [participantesExternos, setParticipantesExternos] = useState<ParticipanteExterno[]>([])
   const [podeVerParticipantesExternos, setPodeVerParticipantesExternos] = useState(false)
   const [listaParticipantesCarregada, setListaParticipantesCarregada] = useState(false)
@@ -608,6 +609,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
     setErro(null)
     eventoDetalheIdRef.current = item.id
     setEventoDetalhe(item)
+    setFuncoesConvocadasDetalhe([])
     setParticipantesExternos([])
     setPodeVerParticipantesExternos(false)
     setListaParticipantesCarregada(false)
@@ -630,6 +632,15 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
 
     if (consultaAtual !== eventoDetalheConsultaSeq.current) return
     setEventoDetalhe(itemCompleto)
+    if (itemCompleto.abrangencia !== 'NACIONAL' && itemCompleto.abrangencia !== 'INTERNACIONAL') {
+      try {
+        const convocacoes = await fetchWithAuth<Array<{ eventoId: string; funcoesConvocadas?: string[] }>>('/convocacoes')
+        if (consultaAtual !== eventoDetalheConsultaSeq.current) return
+        setFuncoesConvocadasDetalhe(convocacoes.find(convocacao => convocacao.eventoId === itemCompleto.id)?.funcoesConvocadas ?? [])
+      } catch {
+        if (consultaAtual === eventoDetalheConsultaSeq.current) setFuncoesConvocadasDetalhe([])
+      }
+    }
     // O acesso à gestão nominal não deve desaparecer por uma falha isolada na
     // consulta dos participantes; a API continuará validando cada operação.
     if ((itemCompleto.abrangencia === 'NACIONAL' || itemCompleto.abrangencia === 'INTERNACIONAL') && !itemCompleto.pessoal) {
@@ -720,6 +731,7 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
     eventoDetalheIdRef.current = null
     setBuscaConviteExecutada(false)
     setEventoDetalhe(null)
+    setFuncoesConvocadasDetalhe([])
   }
 
   const abrirFormEditar = async (id: string, serieId: string | null) => {
@@ -2242,6 +2254,12 @@ export function EventosView({ onEventoCriado, onEventoPessoalCriado, podeVisuali
                   <p className="text-slate-900">{new Date(eventoDetalhe.fimEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
                 </div>
               </div>
+              {funcoesConvocadasDetalhe.length > 0 && (
+                <div>
+                  <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Funções convocadas</span>
+                  <p className="text-slate-900">{funcoesConvocadasDetalhe.join(', ')}</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Modalidade</span>
